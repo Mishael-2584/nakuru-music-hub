@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Phone, Mail, MapPin } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -14,21 +14,52 @@ const Contact = () => {
     subject: "",
     message: ""
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    // Simulate form submission
-    console.log("Contact form submitted:", formData);
-    
-    toast({
-      title: "Message Sent!",
-      description: "Thank you for your message. We'll get back to you soon!",
-    });
-    
-    // Reset form
-    setFormData({ name: "", email: "", subject: "", message: "" });
+    try {
+      const { error } = await supabase
+        .from('contact_messages')
+        .insert([
+          {
+            name: formData.name,
+            email: formData.email,
+            subject: formData.subject,
+            message: formData.message,
+          }
+        ]);
+
+      if (error) {
+        console.error("Contact form error:", error);
+        toast({
+          title: "Message Failed",
+          description: "There was an error sending your message. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Message Sent!",
+        description: "Thank you for your message. We'll get back to you soon!",
+      });
+      
+      // Reset form
+      setFormData({ name: "", email: "", subject: "", message: "" });
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -36,6 +67,13 @@ const Contact = () => {
       ...formData,
       [e.target.name]: e.target.value
     });
+  };
+
+  const scrollToRegistration = () => {
+    const element = document.getElementById('registration');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   return (
@@ -94,8 +132,12 @@ const Contact = () => {
                     required
                     className="resize-none"
                   />
-                  <Button type="submit" className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 transition-all duration-300 shadow-lg">
-                    Send Message
+                  <Button 
+                    type="submit" 
+                    disabled={isSubmitting}
+                    className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 transition-all duration-300 shadow-lg"
+                  >
+                    {isSubmitting ? "Sending..." : "Send Message"}
                   </Button>
                 </form>
               </CardContent>
@@ -147,7 +189,11 @@ const Contact = () => {
                   <p><strong>Weekends:</strong> Sun - From Noon</p>
                   <p><strong>Age Requirement:</strong> 3 years and above</p>
                 </div>
-                <Button variant="secondary" className="w-full h-12 text-lg font-semibold shadow-lg hover:scale-105 transition-transform duration-200">
+                <Button 
+                  variant="secondary" 
+                  onClick={scrollToRegistration}
+                  className="w-full h-12 text-lg font-semibold shadow-lg hover:scale-105 transition-transform duration-200"
+                >
                   Register for Classes
                 </Button>
               </CardContent>

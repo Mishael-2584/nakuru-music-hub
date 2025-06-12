@@ -1,10 +1,14 @@
 
-import { Music, Phone, Mail, Menu, X } from "lucide-react";
+import { Music, Phone, Mail, Menu, X, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
@@ -12,6 +16,15 @@ const Header = () => {
       element.scrollIntoView({ behavior: 'smooth' });
       setIsMobileMenuOpen(false);
     }
+  };
+
+  const handleAdminClick = () => {
+    if (user) {
+      navigate("/admin");
+    } else {
+      navigate("/auth");
+    }
+    setIsMobileMenuOpen(false);
   };
 
   return (
@@ -57,9 +70,17 @@ const Header = () => {
             <Button 
               variant="secondary" 
               className="ml-4 font-semibold shadow-lg hover:scale-105 transition-transform duration-200"
-              onClick={() => scrollToSection('contact')}
+              onClick={() => scrollToSection('registration')}
             >
               Register Now
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon"
+              className="ml-2 bg-white/20 border-white/30 hover:bg-white/30"
+              onClick={handleAdminClick}
+            >
+              <User className="h-4 w-4" />
             </Button>
           </nav>
 
@@ -110,9 +131,16 @@ const Header = () => {
             <Button 
               variant="secondary" 
               className="w-full mt-2 font-semibold"
-              onClick={() => scrollToSection('contact')}
+              onClick={() => scrollToSection('registration')}
             >
               Register Now
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full mt-2 bg-white/20 border-white/30 hover:bg-white/30"
+              onClick={handleAdminClick}
+            >
+              {user ? "Admin Panel" : "Admin Login"}
             </Button>
           </nav>
         )}

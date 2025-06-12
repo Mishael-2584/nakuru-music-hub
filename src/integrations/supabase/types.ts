@@ -9,7 +9,108 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      contact_messages: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          is_read: boolean | null
+          message: string
+          name: string
+          subject: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          is_read?: boolean | null
+          message: string
+          name: string
+          subject: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          name?: string
+          subject?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          role: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id: string
+          role?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          role?: string | null
+        }
+        Relationships: []
+      }
+      registrations: {
+        Row: {
+          age: number
+          created_at: string
+          email: string
+          experience: string
+          goals: string | null
+          id: string
+          instrument: string
+          parent_name: string | null
+          parent_phone: string | null
+          phone: string
+          preferred_schedule: string | null
+          status: string | null
+          student_name: string
+          updated_at: string
+        }
+        Insert: {
+          age: number
+          created_at?: string
+          email: string
+          experience: string
+          goals?: string | null
+          id?: string
+          instrument: string
+          parent_name?: string | null
+          parent_phone?: string | null
+          phone: string
+          preferred_schedule?: string | null
+          status?: string | null
+          student_name: string
+          updated_at?: string
+        }
+        Update: {
+          age?: number
+          created_at?: string
+          email?: string
+          experience?: string
+          goals?: string | null
+          id?: string
+          instrument?: string
+          parent_name?: string | null
+          parent_phone?: string | null
+          phone?: string
+          preferred_schedule?: string | null
+          status?: string | null
+          student_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

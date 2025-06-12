@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Registration = () => {
   const [formData, setFormData] = useState({
@@ -20,32 +20,69 @@ const Registration = () => {
     goals: "",
     preferredSchedule: ""
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    // Simulate form submission
-    console.log("Registration form submitted:", formData);
-    
-    toast({
-      title: "Registration Submitted!",
-      description: "Thank you for registering! We'll contact you within 24 hours to schedule your first lesson.",
-    });
-    
-    // Reset form
-    setFormData({
-      studentName: "",
-      age: "",
-      email: "",
-      phone: "",
-      parentName: "",
-      parentPhone: "",
-      instrument: "",
-      experience: "",
-      goals: "",
-      preferredSchedule: ""
-    });
+    try {
+      const { error } = await supabase
+        .from('registrations')
+        .insert([
+          {
+            student_name: formData.studentName,
+            age: parseInt(formData.age),
+            email: formData.email,
+            phone: formData.phone,
+            parent_name: formData.parentName || null,
+            parent_phone: formData.parentPhone || null,
+            instrument: formData.instrument,
+            experience: formData.experience,
+            goals: formData.goals || null,
+            preferred_schedule: formData.preferredSchedule || null,
+          }
+        ]);
+
+      if (error) {
+        console.error("Registration error:", error);
+        toast({
+          title: "Registration Failed",
+          description: "There was an error submitting your registration. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Registration Submitted!",
+        description: "Thank you for registering! We'll contact you within 24 hours to schedule your first lesson.",
+      });
+      
+      // Reset form
+      setFormData({
+        studentName: "",
+        age: "",
+        email: "",
+        phone: "",
+        parentName: "",
+        parentPhone: "",
+        instrument: "",
+        experience: "",
+        goals: "",
+        preferredSchedule: ""
+      });
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -239,9 +276,10 @@ const Registration = () => {
 
                 <Button 
                   type="submit" 
+                  disabled={isSubmitting}
                   className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 transition-all duration-300 shadow-lg hover:scale-105"
                 >
-                  Submit Registration
+                  {isSubmitting ? "Submitting..." : "Submit Registration"}
                 </Button>
               </form>
             </CardContent>
