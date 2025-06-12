@@ -1,0 +1,73 @@
+
+import { Music, Phone, Mail, MapPin } from "lucide-react";
+
+const Footer = () => {
+  return (
+    <footer className="bg-primary text-primary-foreground">
+      <div className="container mx-auto px-4 py-12">
+        <div className="grid md:grid-cols-4 gap-8">
+          <div className="space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-secondary rounded-full">
+                <Music className="h-5 w-5 text-secondary-foreground" />
+              </div>
+              <div>
+                <h3 className="font-bold">DAMON MUSIC ACADEMY</h3>
+                <p className="text-xs opacity-90">WHERE WORDS FAIL, MUSIC SPEAKS</p>
+              </div>
+            </div>
+            <p className="text-sm opacity-80">
+              Nurturing musical talent in Nakuru, Kenya. Join us to discover your musical potential.
+            </p>
+          </div>
+          
+          <div>
+            <h4 className="font-semibold mb-4">Quick Links</h4>
+            <ul className="space-y-2 text-sm">
+              <li><a href="#home" className="hover:text-secondary transition-colors">Home</a></li>
+              <li><a href="#courses" className="hover:text-secondary transition-colors">Courses</a></li>
+              <li><a href="#about" className="hover:text-secondary transition-colors">About</a></li>
+              <li><a href="#contact" className="hover:text-secondary transition-colors">Contact</a></li>
+            </ul>
+          </div>
+          
+          <div>
+            <h4 className="font-semibold mb-4">Courses</h4>
+            <ul className="space-y-2 text-sm">
+              <li>Piano & Keyboard</li>
+              <li>Guitar Lessons</li>
+              <li>Voice Training</li>
+              <li>Violin</li>
+              <li>Saxophone</li>
+              <li>Music Theory</li>
+            </ul>
+          </div>
+          
+          <div>
+            <h4 className="font-semibold mb-4">Contact Info</h4>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                <span>0701 195 460</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                <span>damonmusicacademy@gmail.com</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                <span>Nakuru, Kenya</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="border-t border-primary-foreground/20 mt-8 pt-8 text-center text-sm opacity-80">
+          <p>&copy; 2024 Damon Music Academy. All rights reserved.</p>
+        </div>
+      </div>
+    </footer>
+  );
+};
+
+export default Footer;
