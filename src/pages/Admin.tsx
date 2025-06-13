@@ -9,22 +9,30 @@ import { Music } from "lucide-react";
 
 const Admin = () => {
   const navigate = useNavigate();
-  const { user, loading, initialized, isAuthenticated } = useAuth();
-  const [hasRedirected, setHasRedirected] = useState(false);
+  const { user, loading, isAuthenticated } = useAuth();
+  const [shouldRender, setShouldRender] = useState(false);
 
   useEffect(() => {
-    // Only check for redirect after auth is initialized and we haven't already redirected
-    if (initialized && !loading && !hasRedirected) {
+    let mounted = true;
+
+    if (!loading) {
       if (!isAuthenticated || !user) {
-        console.log("Admin page: No authenticated user, redirecting to auth");
-        setHasRedirected(true);
+        console.log("No authenticated user, redirecting to auth");
         navigate("/auth", { replace: true });
+      } else {
+        console.log("User authenticated, rendering admin panel");
+        if (mounted) {
+          setShouldRender(true);
+        }
       }
     }
-  }, [initialized, loading, isAuthenticated, user, navigate, hasRedirected]);
 
-  // Show loading while initializing
-  if (!initialized || loading) {
+    return () => {
+      mounted = false;
+    };
+  }, [user, loading, isAuthenticated, navigate]);
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -37,9 +45,8 @@ const Admin = () => {
     );
   }
 
-  // Don't render admin panel if user is not authenticated (prevents flash)
-  if (!isAuthenticated || !user) {
-    return null;
+  if (!isAuthenticated || !user || !shouldRender) {
+    return null; // Will redirect to auth
   }
 
   return (

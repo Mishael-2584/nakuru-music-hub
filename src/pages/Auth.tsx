@@ -1,34 +1,85 @@
 
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useNavigate, useLocation } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import AuthForm from "@/components/auth/AuthForm";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { User } from "@supabase/supabase-js";
 import { Music } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { user, loading, initialized, isAuthenticated } = useAuth();
-  const [hasRedirected, setHasRedirected] = useState(false);
+  const location = useLocation();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
-    // Only check for redirect after auth is initialized and we haven't already redirected
-    if (initialized && !loading && !hasRedirected) {
-      if (isAuthenticated && user) {
-        console.log("Auth page: User authenticated, redirecting to admin");
-        setHasRedirected(true);
-        navigate("/admin", { replace: true });
+    let mounted = true;
+
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (mounted) {
+          if (error) {
+            console.error("Error checking session:", error);
+          }
+          
+          if (session?.user) {
+            setUser(session.user);
+            // Redirect to admin only if we have a valid session
+            navigate("/admin", { replace: true });
+          } else {
+            setUser(null);
+          }
+          setCheckingSession(false);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Unexpected error checking session:", error);
+        if (mounted) {
+          setCheckingSession(false);
+          setLoading(false);
+        }
       }
-    }
-  }, [initialized, loading, isAuthenticated, user, navigate, hasRedirected]);
+    };
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log("Auth page - Auth state changed:", event);
+        
+        if (mounted) {
+          if (session?.user) {
+            setUser(session.user);
+            // Only navigate if we're not already checking session
+            if (!checkingSession) {
+              navigate("/admin", { replace: true });
+            }
+          } else {
+            setUser(null);
+            setLoading(false);
+          }
+        }
+      }
+    );
+
+    checkSession();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [navigate, checkingSession]);
 
   const handleAuthSuccess = () => {
-    console.log("Auth success - state change will handle redirect");
+    // Auth state change will handle the redirect
+    console.log("Auth success - waiting for state change");
   };
 
-  // Show loading while initializing
-  if (!initialized || loading) {
+  if (loading || checkingSession) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-muted/20 to-muted/50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -41,9 +92,8 @@ const Auth = () => {
     );
   }
 
-  // Don't render auth form if user is authenticated (prevents flash)
-  if (isAuthenticated && user) {
-    return null;
+  if (user) {
+    return null; // Will redirect to admin
   }
 
   return (

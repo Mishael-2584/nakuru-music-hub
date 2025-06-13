@@ -7,32 +7,25 @@ export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
-    const initialize = async () => {
+    // Get initial session first
+    const getInitialSession = async () => {
       try {
-        // Get initial session
         const { data: { session }, error } = await supabase.auth.getSession();
-        
         if (mounted) {
           if (error) {
-            console.error("Error getting initial session:", error);
+            console.error("Error getting session:", error);
           }
-          
           setSession(session);
           setUser(session?.user ?? null);
-          setInitialized(true);
           setLoading(false);
-          
-          console.log("Auth initialized:", { user: session?.user?.email, hasSession: !!session });
         }
       } catch (error) {
-        console.error("Unexpected error during auth initialization:", error);
+        console.error("Unexpected error getting session:", error);
         if (mounted) {
-          setInitialized(true);
           setLoading(false);
         }
       }
@@ -40,17 +33,22 @@ export const useAuth = () => {
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         console.log("Auth state changed:", event, session?.user?.email);
         
-        if (mounted && initialized) {
+        if (mounted) {
           setSession(session);
           setUser(session?.user ?? null);
+          
+          // Only set loading to false after we've handled the auth change
+          if (event !== 'INITIAL_SESSION') {
+            setLoading(false);
+          }
         }
       }
     );
 
-    initialize();
+    getInitialSession();
 
     return () => {
       mounted = false;
@@ -65,6 +63,8 @@ export const useAuth = () => {
       if (error) {
         console.error("Sign out error:", error);
       }
+      setUser(null);
+      setSession(null);
       return { error };
     } catch (error) {
       console.error("Unexpected sign out error:", error);
@@ -78,7 +78,6 @@ export const useAuth = () => {
     user,
     session,
     loading,
-    initialized,
     signOut,
     isAuthenticated: !!user && !!session,
   };
