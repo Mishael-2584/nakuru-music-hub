@@ -75,7 +75,7 @@ const Hero = () => {
                   <Award className="h-6 w-6 text-accent" />
                 </div>
                 <div>
-                  <span className="text-2xl font-bold text-accent">15+</span>
+                  <span className="text-2xl font-bold text-accent">5+</span>
                   <p className="text-sm font-medium text-muted-foreground">Expert Instructors</p>
                 </div>
               </div>
@@ -85,7 +85,7 @@ const Hero = () => {
                   <Music className="h-6 w-6 text-secondary" />
                 </div>
                 <div>
-                  <span className="text-2xl font-bold text-secondary">10+</span>
+                  <span className="text-2xl font-bold text-secondary">5+</span>
                   <p className="text-sm font-medium text-muted-foreground">Instruments</p>
                 </div>
               </div>

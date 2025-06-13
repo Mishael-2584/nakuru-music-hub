@@ -1,36 +1,36 @@
-
 import { Music, Phone, Mail, MapPin } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-
 const Footer = () => {
   const navigate = useNavigate();
   const location = useLocation();
-
   const scrollToSection = (sectionId: string) => {
     // If not on home page, navigate to home first
     if (location.pathname !== '/') {
-      navigate('/', { replace: true });
+      navigate('/', {
+        replace: true
+      });
       // Small delay to ensure page loads before scrolling
       setTimeout(() => {
         const element = document.getElementById(sectionId);
         if (element) {
-          element.scrollIntoView({ behavior: 'smooth' });
+          element.scrollIntoView({
+            behavior: 'smooth'
+          });
         }
       }, 100);
     } else {
       const element = document.getElementById(sectionId);
       if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
+        element.scrollIntoView({
+          behavior: 'smooth'
+        });
       }
     }
   };
-
   const handleHomeClick = () => {
     navigate('/');
   };
-
-  return (
-    <footer className="bg-primary text-primary-foreground">
+  return <footer className="bg-primary text-primary-foreground">
       <div className="container mx-auto px-4 py-12">
         <div className="grid md:grid-cols-4 gap-8">
           <div className="space-y-4">
@@ -52,34 +52,22 @@ const Footer = () => {
             <h4 className="font-semibold mb-4">Quick Links</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <button 
-                  onClick={handleHomeClick} 
-                  className="hover:text-secondary transition-colors text-left"
-                >
+                <button onClick={handleHomeClick} className="hover:text-secondary transition-colors text-left">
                   Home
                 </button>
               </li>
               <li>
-                <button 
-                  onClick={() => scrollToSection('courses')} 
-                  className="hover:text-secondary transition-colors text-left"
-                >
+                <button onClick={() => scrollToSection('courses')} className="hover:text-secondary transition-colors text-left">
                   Courses
                 </button>
               </li>
               <li>
-                <button 
-                  onClick={() => scrollToSection('about')} 
-                  className="hover:text-secondary transition-colors text-left"
-                >
+                <button onClick={() => scrollToSection('about')} className="hover:text-secondary transition-colors text-left">
                   About
                 </button>
               </li>
               <li>
-                <button 
-                  onClick={() => scrollToSection('contact')} 
-                  className="hover:text-secondary transition-colors text-left"
-                >
+                <button onClick={() => scrollToSection('contact')} className="hover:text-secondary transition-colors text-left">
                   Contact
                 </button>
               </li>
@@ -118,11 +106,9 @@ const Footer = () => {
         </div>
         
         <div className="border-t border-primary-foreground/20 mt-8 pt-8 text-center text-sm opacity-80">
-          <p>&copy; 2024 Damon Music Academy. All rights reserved.</p>
+          <p>© 2025 Damon Music Academy. All rights reserved.</p>
         </div>
       </div>
-    </footer>
-  );
+    </footer>;
 };
-
 export default Footer;
