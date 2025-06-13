@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Music, Guitar, Headphones, Mic, Piano, Trumpet, Volume2, BookOpen } from "lucide-react";
+import { Music, Guitar, Headphones, Mic, Piano, Wind, Volume2, BookOpen } from "lucide-react";
 
 const courses = [
   {
@@ -46,7 +46,7 @@ const courses = [
     color: "from-accent to-primary"
   },
   {
-    icon: Trumpet,
+    icon: Wind,
     name: "Trumpet & Recorder",
     description: "Brass and wind instrument instruction",
     level: "All Levels",
