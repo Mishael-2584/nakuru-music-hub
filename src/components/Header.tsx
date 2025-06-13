@@ -3,19 +3,37 @@ import { Music, Phone, Mail, Menu, X, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-      setIsMobileMenuOpen(false);
+    // If not on home page, navigate to home first
+    if (location.pathname !== '/') {
+      navigate('/', { replace: true });
+      // Small delay to ensure page loads before scrolling
+      setTimeout(() => {
+        const element = document.getElementById(sectionId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    } else {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
     }
+    setIsMobileMenuOpen(false);
+  };
+
+  const handleHomeClick = () => {
+    navigate('/');
+    setIsMobileMenuOpen(false);
   };
 
   const handleAdminClick = () => {
@@ -31,7 +49,7 @@ const Header = () => {
     <header className="bg-gradient-to-r from-primary to-accent text-white sticky top-0 z-50 shadow-2xl">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4 cursor-pointer" onClick={handleHomeClick}>
             <div className="p-3 bg-white/20 rounded-full backdrop-blur-sm">
               <Music className="h-8 w-8 text-white" />
             </div>
@@ -44,7 +62,7 @@ const Header = () => {
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-8">
             <button 
-              onClick={() => scrollToSection('home')} 
+              onClick={handleHomeClick} 
               className="hover:text-secondary transition-colors duration-200 font-medium"
             >
               Home
@@ -105,7 +123,7 @@ const Header = () => {
         {isMobileMenuOpen && (
           <nav className="lg:hidden mt-4 pb-4 space-y-2">
             <button 
-              onClick={() => scrollToSection('home')} 
+              onClick={handleHomeClick} 
               className="block w-full text-left py-2 px-4 hover:bg-white/20 rounded transition-colors duration-200"
             >
               Home

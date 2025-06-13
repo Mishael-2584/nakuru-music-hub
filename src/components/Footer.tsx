@@ -1,13 +1,40 @@
 
 import { Music, Phone, Mail, MapPin } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const Footer = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const scrollToSection = (sectionId: string) => {
+    // If not on home page, navigate to home first
+    if (location.pathname !== '/') {
+      navigate('/', { replace: true });
+      // Small delay to ensure page loads before scrolling
+      setTimeout(() => {
+        const element = document.getElementById(sectionId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    } else {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  };
+
+  const handleHomeClick = () => {
+    navigate('/');
+  };
+
   return (
     <footer className="bg-primary text-primary-foreground">
       <div className="container mx-auto px-4 py-12">
         <div className="grid md:grid-cols-4 gap-8">
           <div className="space-y-4">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 cursor-pointer" onClick={handleHomeClick}>
               <div className="p-2 bg-secondary rounded-full">
                 <Music className="h-5 w-5 text-secondary-foreground" />
               </div>
@@ -24,10 +51,38 @@ const Footer = () => {
           <div>
             <h4 className="font-semibold mb-4">Quick Links</h4>
             <ul className="space-y-2 text-sm">
-              <li><a href="#home" className="hover:text-secondary transition-colors">Home</a></li>
-              <li><a href="#courses" className="hover:text-secondary transition-colors">Courses</a></li>
-              <li><a href="#about" className="hover:text-secondary transition-colors">About</a></li>
-              <li><a href="#contact" className="hover:text-secondary transition-colors">Contact</a></li>
+              <li>
+                <button 
+                  onClick={handleHomeClick} 
+                  className="hover:text-secondary transition-colors text-left"
+                >
+                  Home
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => scrollToSection('courses')} 
+                  className="hover:text-secondary transition-colors text-left"
+                >
+                  Courses
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => scrollToSection('about')} 
+                  className="hover:text-secondary transition-colors text-left"
+                >
+                  About
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => scrollToSection('contact')} 
+                  className="hover:text-secondary transition-colors text-left"
+                >
+                  Contact
+                </button>
+              </li>
             </ul>
           </div>
           

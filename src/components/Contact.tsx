@@ -6,6 +6,7 @@ import { Phone, Mail, MapPin } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -16,6 +17,8 @@ const Contact = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,9 +73,21 @@ const Contact = () => {
   };
 
   const scrollToRegistration = () => {
-    const element = document.getElementById('registration');
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
+    // If not on home page, navigate to home first
+    if (location.pathname !== '/') {
+      navigate('/', { replace: true });
+      // Small delay to ensure page loads before scrolling
+      setTimeout(() => {
+        const element = document.getElementById('registration');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    } else {
+      const element = document.getElementById('registration');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   };
 
