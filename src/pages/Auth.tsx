@@ -1,5 +1,6 @@
+
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import AuthForm from "@/components/auth/AuthForm";
 import Header from "@/components/Header";
@@ -9,47 +10,84 @@ import { Music } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
-    // Check initial session
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        navigate("/admin", { replace: true });
-      } else {
-        setLoading(false);
+    let mounted = true;
+
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (mounted) {
+          if (error) {
+            console.error("Error checking session:", error);
+          }
+          
+          if (session?.user) {
+            setUser(session.user);
+            // Redirect to admin only if we have a valid session
+            navigate("/admin", { replace: true });
+          } else {
+            setUser(null);
+          }
+          setCheckingSession(false);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Unexpected error checking session:", error);
+        if (mounted) {
+          setCheckingSession(false);
+          setLoading(false);
+        }
       }
     };
 
-    getSession();
-
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (session?.user) {
-          setUser(session.user);
-          navigate("/admin", { replace: true });
-        } else {
-          setUser(null);
-          setLoading(false);
+      async (event, session) => {
+        console.log("Auth page - Auth state changed:", event);
+        
+        if (mounted) {
+          if (session?.user) {
+            setUser(session.user);
+            // Only navigate if we're not already checking session
+            if (!checkingSession) {
+              navigate("/admin", { replace: true });
+            }
+          } else {
+            setUser(null);
+            setLoading(false);
+          }
         }
       }
     );
 
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    checkSession();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [navigate, checkingSession]);
 
   const handleAuthSuccess = () => {
-    navigate("/admin", { replace: true });
+    // Auth state change will handle the redirect
+    console.log("Auth success - waiting for state change");
   };
 
-  if (loading) {
+  if (loading || checkingSession) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-muted/20 to-muted/50 flex items-center justify-center">
-        <div className="text-lg">Loading...</div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center animate-pulse">
+            <Music className="h-6 w-6 text-white" />
+          </div>
+          <div className="text-lg text-muted-foreground">Checking your session...</div>
+        </div>
       </div>
     );
   }

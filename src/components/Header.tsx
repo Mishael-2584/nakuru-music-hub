@@ -7,7 +7,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -37,9 +37,13 @@ const Header = () => {
   };
 
   const handleAdminClick = () => {
-    if (user) {
+    console.log("Admin button clicked, user:", user, "isAuthenticated:", isAuthenticated);
+    
+    if (isAuthenticated && user) {
+      console.log("User is authenticated, navigating to admin");
       navigate("/admin");
     } else {
+      console.log("User not authenticated, navigating to auth");
       navigate("/auth");
     }
     setIsMobileMenuOpen(false);
@@ -80,6 +84,12 @@ const Header = () => {
               About
             </button>
             <button 
+              onClick={() => scrollToSection('testimonials')} 
+              className="hover:text-secondary transition-colors duration-200 font-medium"
+            >
+              Testimonials
+            </button>
+            <button 
               onClick={() => scrollToSection('contact')} 
               className="hover:text-secondary transition-colors duration-200 font-medium"
             >
@@ -97,6 +107,7 @@ const Header = () => {
               size="icon"
               className="ml-2 bg-white/20 border-white/30 hover:bg-white/30"
               onClick={handleAdminClick}
+              title={isAuthenticated ? "Admin Panel" : "Admin Login"}
             >
               <User className="h-4 w-4" />
             </Button>
@@ -141,6 +152,12 @@ const Header = () => {
               About
             </button>
             <button 
+              onClick={() => scrollToSection('testimonials')} 
+              className="block w-full text-left py-2 px-4 hover:bg-white/20 rounded transition-colors duration-200"
+            >
+              Testimonials
+            </button>
+            <button 
               onClick={() => scrollToSection('contact')} 
               className="block w-full text-left py-2 px-4 hover:bg-white/20 rounded transition-colors duration-200"
             >
@@ -158,7 +175,7 @@ const Header = () => {
               className="w-full mt-2 bg-white/20 border-white/30 hover:bg-white/30"
               onClick={handleAdminClick}
             >
-              {user ? "Admin Panel" : "Admin Login"}
+              {isAuthenticated ? "Admin Panel" : "Admin Login"}
             </Button>
           </nav>
         )}
