@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic } from "lucide-react";
+import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,7 +36,7 @@ interface ContactMessage {
 }
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState<'registrations' | 'messages' | 'stats'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'timetable'>('stats');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
@@ -56,7 +56,6 @@ const AdminPanel = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Fetch registrations
       const { data: regData, error: regError } = await supabase
         .from('registrations')
         .select('*')
@@ -73,7 +72,6 @@ const AdminPanel = () => {
         setRegistrations(regData || []);
       }
 
-      // Fetch contact messages
       const { data: msgData, error: msgError } = await supabase
         .from('contact_messages')
         .select('*')
@@ -184,6 +182,15 @@ const AdminPanel = () => {
     }
   };
 
+  const getInstrumentIcon = (instrument: string) => {
+    const lower = instrument.toLowerCase();
+    if (lower.includes('piano') || lower.includes('keyboard')) return Piano;
+    if (lower.includes('guitar')) return Guitar;
+    if (lower.includes('voice') || lower.includes('vocal')) return Mic;
+    return Music;
+  };
+
+  const activeStudents = registrations.filter(reg => reg.status === 'approved');
   const filteredRegistrations = registrations.filter(reg =>
     reg.student_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     reg.instrument.toLowerCase().includes(searchTerm.toLowerCase())
@@ -191,6 +198,15 @@ const AdminPanel = () => {
 
   const pendingCount = registrations.filter(reg => reg.status === 'pending').length;
   const unreadMessages = contactMessages.filter(msg => !msg.is_read).length;
+
+  // Mock timetable data (in real app, this would come from database)
+  const timetableSlots = [
+    { time: '7:00 AM', monday: 'Piano - Sarah', tuesday: 'Guitar - John', wednesday: 'Voice - Emma', thursday: 'Piano - Mike', friday: 'Guitar - Lisa' },
+    { time: '8:00 AM', monday: 'Voice - Tom', tuesday: 'Piano - Anna', wednesday: 'Guitar - Sam', thursday: 'Voice - Kate', friday: 'Piano - David' },
+    { time: '9:00 AM', monday: 'Guitar - Ben', tuesday: 'Voice - Lucy', wednesday: 'Piano - Alex', thursday: 'Guitar - Nina', friday: 'Voice - Paul' },
+    { time: '10:00 AM', monday: 'Piano - Grace', tuesday: 'Guitar - Mark', wednesday: 'Voice - Zoe', thursday: 'Piano - Jack', friday: 'Guitar - Sophie' },
+    { time: '11:00 AM', monday: 'Voice - Oliver', tuesday: 'Piano - Mia', wednesday: 'Guitar - Ryan', thursday: 'Voice - Chloe', friday: 'Piano - Ethan' },
+  ];
 
   if (isLoading) {
     return (
@@ -206,7 +222,6 @@ const AdminPanel = () => {
   return (
     <section id="admin" className="py-24 bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5 min-h-screen">
       <div className="container mx-auto px-4">
-        {/* Header with musical theme */}
         <div className="flex justify-between items-center mb-16">
           <div className="text-center flex-1">
             <div className="flex items-center justify-center mb-6">
@@ -231,7 +246,6 @@ const AdminPanel = () => {
           </Button>
         </div>
 
-        {/* Musical themed navigation */}
         <div className="flex justify-center mb-8">
           <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-2 shadow-xl border border-primary/10">
             <Button
@@ -240,7 +254,23 @@ const AdminPanel = () => {
               className="rounded-xl px-6 py-3 transition-all duration-200"
             >
               <Piano className="h-4 w-4 mr-2" />
-              Harmony Overview
+              Overview
+            </Button>
+            <Button
+              variant={activeTab === 'students' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('students')}
+              className="rounded-xl px-6 py-3 transition-all duration-200"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Active Students ({activeStudents.length})
+            </Button>
+            <Button
+              variant={activeTab === 'timetable' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('timetable')}
+              className="rounded-xl px-6 py-3 transition-all duration-200"
+            >
+              <Clock className="h-4 w-4 mr-2" />
+              Timetable
             </Button>
             <Button
               variant={activeTab === 'registrations' ? 'default' : 'ghost'}
@@ -248,7 +278,7 @@ const AdminPanel = () => {
               className="rounded-xl px-6 py-3 transition-all duration-200"
             >
               <Guitar className="h-4 w-4 mr-2" />
-              Student Registrations ({registrations.length})
+              Registrations ({registrations.length})
             </Button>
             <Button
               variant={activeTab === 'messages' ? 'default' : 'ghost'}
@@ -261,19 +291,19 @@ const AdminPanel = () => {
           </div>
         </div>
 
-        {/* Stats Overview with musical theme */}
+        {/* Stats Overview */}
         {activeTab === 'stats' && (
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card className="shadow-xl border-0 bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Total Students</p>
-                    <p className="text-3xl font-bold text-primary">{registrations.length}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Future musicians</p>
+                    <p className="text-sm font-medium text-muted-foreground">Active Students</p>
+                    <p className="text-3xl font-bold text-primary">{activeStudents.length}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Currently enrolled</p>
                   </div>
                   <div className="p-3 bg-primary/20 rounded-full">
-                    <Users className="h-8 w-8 text-primary" />
+                    <Star className="h-8 w-8 text-primary" />
                   </div>
                 </div>
               </CardContent>
@@ -283,7 +313,7 @@ const AdminPanel = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Pending Auditions</p>
+                    <p className="text-sm font-medium text-muted-foreground">Pending Applications</p>
                     <p className="text-3xl font-bold text-accent">{pendingCount}</p>
                     <p className="text-xs text-muted-foreground mt-1">Awaiting review</p>
                   </div>
@@ -298,9 +328,9 @@ const AdminPanel = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">New Inquiries</p>
+                    <p className="text-sm font-medium text-muted-foreground">New Messages</p>
                     <p className="text-3xl font-bold text-secondary">{unreadMessages}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Unread messages</p>
+                    <p className="text-xs text-muted-foreground mt-1">Unread inquiries</p>
                   </div>
                   <div className="p-3 bg-secondary/20 rounded-full">
                     <Mail className="h-8 w-8 text-secondary" />
@@ -313,12 +343,12 @@ const AdminPanel = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Total Conversations</p>
-                    <p className="text-3xl font-bold text-green-600">{contactMessages.length}</p>
-                    <p className="text-xs text-muted-foreground mt-1">All messages</p>
+                    <p className="text-sm font-medium text-muted-foreground">Total Registrations</p>
+                    <p className="text-3xl font-bold text-green-600">{registrations.length}</p>
+                    <p className="text-xs text-muted-foreground mt-1">All applications</p>
                   </div>
                   <div className="p-3 bg-green-100 rounded-full">
-                    <Music className="h-8 w-8 text-green-600" />
+                    <BookOpen className="h-8 w-8 text-green-600" />
                   </div>
                 </div>
               </CardContent>
@@ -326,7 +356,136 @@ const AdminPanel = () => {
           </div>
         )}
 
-        {/* Registrations Tab with improved styling */}
+        {/* Active Students Tab */}
+        {activeTab === 'students' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Active Students Orchestra
+              </h3>
+              <Input
+                placeholder="Search students..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="max-w-sm bg-white/80 backdrop-blur-sm border-primary/20"
+              />
+            </div>
+            
+            <div className="grid gap-4">
+              {activeStudents.filter(student => 
+                student.student_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                student.instrument.toLowerCase().includes(searchTerm.toLowerCase())
+              ).map((student) => {
+                const InstrumentIcon = getInstrumentIcon(student.instrument);
+                return (
+                  <Card key={student.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-4">
+                          <div className="p-3 bg-gradient-to-r from-primary/20 to-accent/20 rounded-full">
+                            <InstrumentIcon className="h-6 w-6 text-primary" />
+                          </div>
+                          <div>
+                            <h4 className="text-xl font-bold text-primary">{student.student_name}</h4>
+                            <p className="text-muted-foreground">Age: {student.age} • {student.instrument}</p>
+                          </div>
+                        </div>
+                        <Badge className="bg-green-100 text-green-800">Active</Badge>
+                      </div>
+                      
+                      <div className="grid md:grid-cols-2 gap-4 mb-4">
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{student.email}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{student.phone}</span>
+                        </div>
+                      </div>
+
+                      {student.goals && (
+                        <div className="p-3 bg-primary/5 rounded-lg border border-primary/10">
+                          <p className="text-sm font-medium text-primary mb-1">Learning Goals:</p>
+                          <p className="text-sm text-muted-foreground">{student.goals}</p>
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-between items-center mt-4">
+                        <span className="text-sm text-muted-foreground">
+                          Enrolled: {new Date(student.created_at).toLocaleDateString()}
+                        </span>
+                        <span className="text-sm font-medium text-primary">Experience: {student.experience}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Timetable Tab */}
+        {activeTab === 'timetable' && (
+          <div className="space-y-6">
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent text-center">
+              Weekly Class Schedule Symphony
+            </h3>
+            
+            <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-primary/20">
+                        <th className="text-left p-3 font-bold text-primary">Time</th>
+                        <th className="text-left p-3 font-bold text-primary">Monday</th>
+                        <th className="text-left p-3 font-bold text-primary">Tuesday</th>
+                        <th className="text-left p-3 font-bold text-primary">Wednesday</th>
+                        <th className="text-left p-3 font-bold text-primary">Thursday</th>
+                        <th className="text-left p-3 font-bold text-primary">Friday</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {timetableSlots.map((slot, index) => (
+                        <tr key={index} className="border-b border-primary/10 hover:bg-primary/5">
+                          <td className="p-3 font-medium text-primary">{slot.time}</td>
+                          <td className="p-3">
+                            <div className="p-2 bg-gradient-to-r from-primary/10 to-accent/10 rounded text-sm">
+                              {slot.monday}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <div className="p-2 bg-gradient-to-r from-accent/10 to-secondary/10 rounded text-sm">
+                              {slot.tuesday}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <div className="p-2 bg-gradient-to-r from-secondary/10 to-primary/10 rounded text-sm">
+                              {slot.wednesday}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <div className="p-2 bg-gradient-to-r from-primary/10 to-accent/10 rounded text-sm">
+                              {slot.thursday}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <div className="p-2 bg-gradient-to-r from-accent/10 to-secondary/10 rounded text-sm">
+                              {slot.friday}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Registrations Tab */}
         {activeTab === 'registrations' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -407,7 +566,7 @@ const AdminPanel = () => {
           </div>
         )}
 
-        {/* Messages Tab with improved styling */}
+        {/* Messages Tab */}
         {activeTab === 'messages' && (
           <div className="space-y-6">
             <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
