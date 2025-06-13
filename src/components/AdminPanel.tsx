@@ -1,9 +1,8 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Mail, Phone, Calendar, Music, LogOut } from "lucide-react";
+import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,7 +36,7 @@ interface ContactMessage {
 }
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState<'registrations' | 'messages' | 'stats'>('registrations');
+  const [activeTab, setActiveTab] = useState<'registrations' | 'messages' | 'stats'>('stats');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
@@ -195,138 +194,164 @@ const AdminPanel = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Loading...</div>
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5">
+        <div className="text-center">
+          <Music className="h-12 w-12 text-primary mx-auto mb-4 animate-pulse" />
+          <div className="text-lg text-muted-foreground">Loading your music academy dashboard...</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <section id="admin" className="py-24 bg-muted/20">
+    <section id="admin" className="py-24 bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5 min-h-screen">
       <div className="container mx-auto px-4">
+        {/* Header with musical theme */}
         <div className="flex justify-between items-center mb-16">
           <div className="text-center flex-1">
-            <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Admin Panel
+            <div className="flex items-center justify-center mb-6">
+              <div className="p-4 bg-gradient-to-r from-primary to-accent rounded-full shadow-2xl">
+                <Music className="h-12 w-12 text-white" />
+              </div>
+            </div>
+            <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+              Music Academy Dashboard
             </h2>
             <p className="text-xl text-muted-foreground">
-              Manage registrations and messages from students and parents
+              Orchestrating student success and managing musical journeys
             </p>
           </div>
           <Button
             variant="outline"
             onClick={handleSignOut}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10"
           >
             <LogOut className="h-4 w-4" />
             Sign Out
           </Button>
         </div>
 
-        {/* Navigation Tabs */}
+        {/* Musical themed navigation */}
         <div className="flex justify-center mb-8">
-          <div className="bg-white rounded-lg p-1 shadow-lg border">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-2 shadow-xl border border-primary/10">
             <Button
               variant={activeTab === 'stats' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('stats')}
-              className="rounded-md"
+              className="rounded-xl px-6 py-3 transition-all duration-200"
             >
-              <Users className="h-4 w-4 mr-2" />
-              Overview
+              <Piano className="h-4 w-4 mr-2" />
+              Harmony Overview
             </Button>
             <Button
               variant={activeTab === 'registrations' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('registrations')}
-              className="rounded-md"
+              className="rounded-xl px-6 py-3 transition-all duration-200"
             >
-              <Music className="h-4 w-4 mr-2" />
-              Registrations ({registrations.length})
+              <Guitar className="h-4 w-4 mr-2" />
+              Student Registrations ({registrations.length})
             </Button>
             <Button
               variant={activeTab === 'messages' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('messages')}
-              className="rounded-md"
+              className="rounded-xl px-6 py-3 transition-all duration-200"
             >
-              <Mail className="h-4 w-4 mr-2" />
+              <Mic className="h-4 w-4 mr-2" />
               Messages ({contactMessages.length})
             </Button>
           </div>
         </div>
 
-        {/* Stats Overview */}
+        {/* Stats Overview with musical theme */}
         {activeTab === 'stats' && (
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="shadow-lg border-0 bg-gradient-to-br from-primary/10 to-primary/5">
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Total Registrations</p>
+                    <p className="text-sm font-medium text-muted-foreground">Total Students</p>
                     <p className="text-3xl font-bold text-primary">{registrations.length}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Future musicians</p>
                   </div>
-                  <Users className="h-8 w-8 text-primary" />
+                  <div className="p-3 bg-primary/20 rounded-full">
+                    <Users className="h-8 w-8 text-primary" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="shadow-lg border-0 bg-gradient-to-br from-accent/10 to-accent/5">
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-accent/10 to-accent/5 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Pending Applications</p>
+                    <p className="text-sm font-medium text-muted-foreground">Pending Auditions</p>
                     <p className="text-3xl font-bold text-accent">{pendingCount}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Awaiting review</p>
                   </div>
-                  <Calendar className="h-8 w-8 text-accent" />
+                  <div className="p-3 bg-accent/20 rounded-full">
+                    <Calendar className="h-8 w-8 text-accent" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="shadow-lg border-0 bg-gradient-to-br from-secondary/10 to-secondary/5">
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-secondary/10 to-secondary/5 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">New Messages</p>
+                    <p className="text-sm font-medium text-muted-foreground">New Inquiries</p>
                     <p className="text-3xl font-bold text-secondary">{unreadMessages}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Unread messages</p>
                   </div>
-                  <Mail className="h-8 w-8 text-secondary" />
+                  <div className="p-3 bg-secondary/20 rounded-full">
+                    <Mail className="h-8 w-8 text-secondary" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="shadow-lg border-0 bg-gradient-to-br from-green-100 to-green-50">
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-green-100 to-green-50 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Total Messages</p>
+                    <p className="text-sm font-medium text-muted-foreground">Total Conversations</p>
                     <p className="text-3xl font-bold text-green-600">{contactMessages.length}</p>
+                    <p className="text-xs text-muted-foreground mt-1">All messages</p>
                   </div>
-                  <Music className="h-8 w-8 text-green-600" />
+                  <div className="p-3 bg-green-100 rounded-full">
+                    <Music className="h-8 w-8 text-green-600" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
         )}
 
-        {/* Registrations Tab */}
+        {/* Registrations Tab with improved styling */}
         {activeTab === 'registrations' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h3 className="text-2xl font-bold">Student Registrations</h3>
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Student Registration Symphony
+              </h3>
               <Input
                 placeholder="Search by name or instrument..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="max-w-sm"
+                className="max-w-sm bg-white/80 backdrop-blur-sm border-primary/20"
               />
             </div>
             
             <div className="grid gap-4">
               {filteredRegistrations.map((registration) => (
-                <Card key={registration.id} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+                <Card key={registration.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
                   <CardContent className="p-6">
                     <div className="flex justify-between items-start mb-4">
                       <div>
-                        <h4 className="text-xl font-bold">{registration.student_name}</h4>
-                        <p className="text-muted-foreground">Age: {registration.age} • {registration.instrument}</p>
+                        <h4 className="text-xl font-bold text-primary">{registration.student_name}</h4>
+                        <p className="text-muted-foreground flex items-center gap-2">
+                          <Music className="h-4 w-4" />
+                          Age: {registration.age} • Instrument: {registration.instrument}
+                        </p>
                       </div>
                       <Badge className={getStatusColor(registration.status)}>
                         {registration.status.charAt(0).toUpperCase() + registration.status.slice(1)}
@@ -345,15 +370,15 @@ const AdminPanel = () => {
                     </div>
 
                     {registration.goals && (
-                      <div className="mb-4">
-                        <p className="text-sm font-medium text-muted-foreground">Goals:</p>
-                        <p className="text-sm">{registration.goals}</p>
+                      <div className="mb-4 p-3 bg-primary/5 rounded-lg border border-primary/10">
+                        <p className="text-sm font-medium text-primary mb-1">Musical Goals:</p>
+                        <p className="text-sm text-muted-foreground">{registration.goals}</p>
                       </div>
                     )}
                     
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">
-                        Submitted: {new Date(registration.created_at).toLocaleDateString()}
+                        Registered: {new Date(registration.created_at).toLocaleDateString()}
                       </span>
                       <div className="space-x-2">
                         <Button 
@@ -361,8 +386,9 @@ const AdminPanel = () => {
                           size="sm"
                           onClick={() => updateRegistrationStatus(registration.id, 'approved')}
                           disabled={registration.status === 'approved'}
+                          className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
                         >
-                          Approve
+                          Accept Student
                         </Button>
                         <Button 
                           variant="destructive" 
@@ -370,7 +396,7 @@ const AdminPanel = () => {
                           onClick={() => updateRegistrationStatus(registration.id, 'rejected')}
                           disabled={registration.status === 'rejected'}
                         >
-                          Reject
+                          Decline
                         </Button>
                       </div>
                     </div>
@@ -381,30 +407,37 @@ const AdminPanel = () => {
           </div>
         )}
 
-        {/* Messages Tab */}
+        {/* Messages Tab with improved styling */}
         {activeTab === 'messages' && (
           <div className="space-y-6">
-            <h3 className="text-2xl font-bold">Contact Messages</h3>
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Musical Conversations
+            </h3>
             
             <div className="grid gap-4">
               {contactMessages.map((message) => (
-                <Card key={message.id} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+                <Card key={message.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
                   <CardContent className="p-6">
                     <div className="flex justify-between items-start mb-4">
                       <div>
-                        <h4 className="text-xl font-bold">{message.name}</h4>
-                        <p className="text-muted-foreground">{message.email}</p>
+                        <h4 className="text-xl font-bold text-primary">{message.name}</h4>
+                        <p className="text-muted-foreground flex items-center gap-2">
+                          <Mail className="h-4 w-4" />
+                          {message.email}
+                        </p>
                       </div>
                       <div className="flex items-center gap-2">
                         {!message.is_read && (
-                          <Badge variant="destructive">New</Badge>
+                          <Badge variant="destructive">New Melody</Badge>
                         )}
                         <Badge variant="outline">{new Date(message.created_at).toLocaleDateString()}</Badge>
                       </div>
                     </div>
                     
-                    <h5 className="font-semibold mb-2">{message.subject}</h5>
-                    <p className="text-muted-foreground mb-4">{message.message}</p>
+                    <div className="p-3 bg-accent/5 rounded-lg border border-accent/10 mb-4">
+                      <h5 className="font-semibold text-accent mb-2">{message.subject}</h5>
+                      <p className="text-muted-foreground">{message.message}</p>
+                    </div>
                     
                     <div className="flex space-x-2">
                       {!message.is_read && (
@@ -412,6 +445,7 @@ const AdminPanel = () => {
                           variant="outline" 
                           size="sm"
                           onClick={() => markMessageAsRead(message.id)}
+                          className="bg-white/80 border-primary/20 hover:bg-primary/10"
                         >
                           Mark as Read
                         </Button>
