@@ -1,5 +1,7 @@
+
 import { Button } from "@/components/ui/button";
 import { Music, Users, Award, Play, ArrowRight } from "lucide-react";
+
 const Hero = () => {
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
@@ -9,7 +11,9 @@ const Hero = () => {
       });
     }
   };
-  return <section id="home" className="relative py-20 overflow-hidden min-h-screen flex items-center">
+
+  return (
+    <section id="home" className="relative py-20 overflow-hidden min-h-screen flex items-center">
       {/* Animated background elements */}
       <div className="absolute inset-0">
         <div className="absolute top-20 left-10 w-32 h-32 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
@@ -22,16 +26,16 @@ const Hero = () => {
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-8 animate-fade-in">
             {/* Musical note decoration */}
-            <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center gap-2 sm:gap-4 mb-6">
               <div className="flex gap-2">
                 <div className="w-4 h-4 bg-primary rounded-full animate-bounce"></div>
                 <div className="w-4 h-4 bg-accent rounded-full animate-bounce delay-100"></div>
                 <div className="w-4 h-4 bg-secondary rounded-full animate-bounce delay-200"></div>
               </div>
-              <span className="text-sm font-medium text-primary uppercase tracking-wider">Nakuru's Premier Music Academy</span>
+              <span className="text-xs sm:text-sm font-medium text-primary uppercase tracking-wider">Nakuru's Premier Music Academy</span>
             </div>
             
-            <h1 className="text-6xl lg:text-7xl font-bold leading-tight">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight">
               <span className="bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
                 Where Words Fail,
               </span>
@@ -41,12 +45,12 @@ const Hero = () => {
               </span>
             </h1>
             
-            <p className="text-xl text-muted-foreground leading-relaxed max-w-lg">
+            <p className="text-lg sm:text-xl text-muted-foreground leading-relaxed max-w-lg">
               Discover your musical potential at Damon Music Academy. We offer comprehensive 
               music education for students aged 3 years and above in Nakuru, Kenya.
             </p>
             
-            <div className="flex flex-wrap gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <Button size="lg" className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white shadow-lg hover:shadow-xl transition-all duration-300 group" onClick={() => scrollToSection('registration')}>
                 <Play className="h-5 w-5 mr-2 group-hover:animate-pulse" />
                 Start Your Journey
@@ -59,7 +63,7 @@ const Hero = () => {
             </div>
             
             {/* Stats with enhanced design */}
-            <div className="flex items-center gap-8 pt-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8 pt-8">
               <div className="flex items-center gap-3 group">
                 <div className="p-3 bg-primary/10 rounded-full group-hover:bg-primary/20 transition-colors">
                   <Users className="h-6 w-6 text-primary" />
@@ -128,6 +132,8 @@ const Hero = () => {
       <svg className="absolute bottom-0 left-0 right-0" viewBox="0 0 1200 120" xmlns="http://www.w3.org/2000/svg">
         <path d="M0,60 C300,100 600,20 900,60 C1050,80 1150,40 1200,60 L1200,120 L0,120 Z" fill="white" opacity="0.8" />
       </svg>
-    </section>;
+    </section>
+  );
 };
+
 export default Hero;

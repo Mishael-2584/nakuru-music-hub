@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import AuthForm from "@/components/auth/AuthForm";
@@ -10,14 +10,16 @@ import { Music } from "lucide-react";
 const Auth = () => {
   const navigate = useNavigate();
   const { user, loading, isAuthenticated, isInitialized } = useAuth();
+  const [hasRedirected, setHasRedirected] = useState(false);
 
   useEffect(() => {
     // Only redirect after auth is fully initialized and user is authenticated
-    if (isInitialized && !loading && isAuthenticated && user) {
+    if (isInitialized && !loading && isAuthenticated && user && !hasRedirected) {
       console.log("User is authenticated, redirecting to admin");
+      setHasRedirected(true);
       navigate("/admin", { replace: true });
     }
-  }, [user, loading, isAuthenticated, isInitialized, navigate]);
+  }, [user, loading, isAuthenticated, isInitialized, navigate, hasRedirected]);
 
   const handleAuthSuccess = () => {
     console.log("Auth success - will redirect when state updates");
@@ -38,8 +40,8 @@ const Auth = () => {
     );
   }
 
-  // If user is authenticated, show loading while redirect happens
-  if (isAuthenticated && user) {
+  // If user is authenticated and we haven't redirected yet, show loading
+  if (isAuthenticated && user && !hasRedirected) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-muted/20 to-muted/50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">

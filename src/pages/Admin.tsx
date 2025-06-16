@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
@@ -10,16 +10,20 @@ import { Music } from "lucide-react";
 const Admin = () => {
   const navigate = useNavigate();
   const { user, loading, isAuthenticated, isInitialized } = useAuth();
+  const [hasRedirected, setHasRedirected] = useState(false);
 
   useEffect(() => {
-    // Only redirect after auth is fully initialized
-    if (isInitialized && !loading) {
+    // Only check for redirect after auth is fully initialized and we haven't redirected yet
+    if (isInitialized && !loading && !hasRedirected) {
       if (!isAuthenticated || !user) {
         console.log("No authenticated user, redirecting to auth");
+        setHasRedirected(true);
         navigate("/auth", { replace: true });
+      } else {
+        console.log("User authenticated, staying on admin page");
       }
     }
-  }, [user, loading, isAuthenticated, isInitialized, navigate]);
+  }, [user, loading, isAuthenticated, isInitialized, navigate, hasRedirected]);
 
   // Show loading while auth is initializing
   if (!isInitialized || loading) {
@@ -35,7 +39,7 @@ const Admin = () => {
     );
   }
 
-  // If not authenticated, show loading while redirect happens
+  // If not authenticated and we haven't redirected yet, show loading
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5 flex items-center justify-center">
@@ -43,7 +47,7 @@ const Admin = () => {
           <div className="w-12 h-12 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center animate-pulse">
             <Music className="h-6 w-6 text-white" />
           </div>
-          <div className="text-lg text-muted-foreground">Redirecting to login...</div>
+          <div className="text-lg text-muted-foreground">Checking authentication...</div>
         </div>
       </div>
     );

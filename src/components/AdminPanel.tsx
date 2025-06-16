@@ -50,12 +50,15 @@ const AdminPanel = () => {
       navigate("/auth");
       return;
     }
+    console.log("AdminPanel: User authenticated, fetching data...");
     fetchData();
   }, [user, navigate]);
 
   const fetchData = async () => {
     setIsLoading(true);
+    console.log("AdminPanel: Starting data fetch...");
     try {
+      console.log("AdminPanel: Fetching registrations...");
       const { data: regData, error: regError } = await supabase
         .from('registrations')
         .select('*')
@@ -65,13 +68,15 @@ const AdminPanel = () => {
         console.error("Error fetching registrations:", regError);
         toast({
           title: "Error",
-          description: "Failed to load registrations",
+          description: "Failed to load registrations: " + regError.message,
           variant: "destructive",
         });
       } else {
+        console.log("AdminPanel: Registrations fetched successfully:", regData?.length || 0, "records");
         setRegistrations(regData || []);
       }
 
+      console.log("AdminPanel: Fetching contact messages...");
       const { data: msgData, error: msgError } = await supabase
         .from('contact_messages')
         .select('*')
@@ -81,21 +86,23 @@ const AdminPanel = () => {
         console.error("Error fetching messages:", msgError);
         toast({
           title: "Error",
-          description: "Failed to load messages",
+          description: "Failed to load messages: " + msgError.message,
           variant: "destructive",
         });
       } else {
+        console.log("AdminPanel: Messages fetched successfully:", msgData?.length || 0, "records");
         setContactMessages(msgData || []);
       }
     } catch (error) {
-      console.error("Unexpected error:", error);
+      console.error("AdminPanel: Unexpected error:", error);
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description: "An unexpected error occurred while loading data",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
+      console.log("AdminPanel: Data fetch completed");
     }
   };
 

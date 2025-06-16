@@ -8,7 +8,7 @@ export const useAuth = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
-  const authTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSessionRef = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -16,23 +16,24 @@ export const useAuth = () => {
     const updateAuthState = (newSession: Session | null) => {
       if (!mounted) return;
       
-      // Clear any pending auth updates
-      if (authTimeoutRef.current) {
-        clearTimeout(authTimeoutRef.current);
+      // Prevent duplicate updates for the same session
+      const sessionId = newSession?.access_token || null;
+      if (lastSessionRef.current === sessionId) {
+        return;
       }
-
-      // Debounce auth state updates to prevent rapid changes
-      authTimeoutRef.current = setTimeout(() => {
-        if (mounted) {
-          setSession(newSession);
-          setUser(newSession?.user ?? null);
-          setLoading(false);
-          setIsInitialized(true);
-        }
-      }, 100);
+      
+      lastSessionRef.current = sessionId;
+      console.log("Auth state updating:", newSession?.user?.email, "Session ID:", sessionId?.substring(0, 10));
+      
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
+      setLoading(false);
+      if (!isInitialized) {
+        setIsInitialized(true);
+      }
     };
 
-    // Get initial session
+    // Get initial session first
     const getInitialSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -40,6 +41,7 @@ export const useAuth = () => {
           if (error) {
             console.error("Error getting session:", error);
           }
+          console.log("Initial session retrieved:", session?.user?.email);
           updateAuthState(session);
         }
       } catch (error) {
@@ -51,11 +53,14 @@ export const useAuth = () => {
       }
     };
 
-    // Set up auth state listener
+    // Set up auth state listener after getting initial session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log("Auth state changed:", event, session?.user?.email);
-        updateAuthState(session);
+        console.log("Auth event:", event, session?.user?.email);
+        // Only update if this is a meaningful change
+        if (event !== 'INITIAL_SESSION') {
+          updateAuthState(session);
+        }
       }
     );
 
@@ -63,12 +68,9 @@ export const useAuth = () => {
 
     return () => {
       mounted = false;
-      if (authTimeoutRef.current) {
-        clearTimeout(authTimeoutRef.current);
-      }
       subscription.unsubscribe();
     };
-  }, []);
+  }, [isInitialized]);
 
   const signOut = async () => {
     try {
