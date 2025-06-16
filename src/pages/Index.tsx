@@ -7,12 +7,14 @@ import Testimonials from "@/components/Testimonials";
 import Registration from "@/components/Registration";
 import Contact from "@/components/Contact";
 import Footer from "@/components/Footer";
+import Gallery from "@/components/Gallery";
 
 const Index = () => {
   return (
     <div className="min-h-screen">
       <Header />
       <Hero />
+      <Gallery />
       <Courses />
       <About />
       <Testimonials />

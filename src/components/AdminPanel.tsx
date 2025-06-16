@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star } from "lucide-react";
+import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,12 +35,32 @@ interface ContactMessage {
   created_at: string;
 }
 
+interface AdminProfile {
+  id: string;
+  email: string;
+  role: string;
+  created_at: string;
+}
+
+interface ClassSchedule {
+  id: string;
+  day: string;
+  time: string;
+  instrument: string;
+  instructor: string;
+  student: string;
+  level: string;
+}
+
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'timetable'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'admins'>('stats');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
+  const [adminProfiles, setAdminProfiles] = useState<AdminProfile[]>([]);
+  const [classSchedule, setClassSchedule] = useState<ClassSchedule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string>('admin');
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -57,7 +77,23 @@ const AdminPanel = () => {
   const fetchData = async () => {
     setIsLoading(true);
     console.log("AdminPanel: Starting data fetch...");
+    
     try {
+      // Get user's role
+      console.log("AdminPanel: Fetching user profile...");
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user?.id)
+        .single();
+
+      if (profileError) {
+        console.error("Error fetching user profile:", profileError);
+      } else {
+        console.log("AdminPanel: User role:", profile?.role);
+        setUserRole(profile?.role || 'admin');
+      }
+
       console.log("AdminPanel: Fetching registrations...");
       const { data: regData, error: regError } = await supabase
         .from('registrations')
@@ -93,6 +129,24 @@ const AdminPanel = () => {
         console.log("AdminPanel: Messages fetched successfully:", msgData?.length || 0, "records");
         setContactMessages(msgData || []);
       }
+
+      // Fetch admin profiles for super admin
+      if (profile?.role === 'super_admin') {
+        console.log("AdminPanel: Fetching admin profiles...");
+        const { data: adminData, error: adminError } = await supabase
+          .from('profiles')
+          .select('id, email, role, created_at')
+          .in('role', ['admin', 'super_admin'])
+          .order('created_at', { ascending: false });
+
+        if (adminError) {
+          console.error("Error fetching admin profiles:", adminError);
+        } else {
+          console.log("AdminPanel: Admin profiles fetched successfully:", adminData?.length || 0, "records");
+          setAdminProfiles(adminData || []);
+        }
+      }
+
     } catch (error) {
       console.error("AdminPanel: Unexpected error:", error);
       toast({
@@ -112,7 +166,7 @@ const AdminPanel = () => {
       navigate("/auth");
       toast({
         title: "Signed Out",
-        description: "You have been successfully signed out.",
+        description: "You have been successfully signed out from Damon Music Academy.",
       });
     }
   };
@@ -206,21 +260,12 @@ const AdminPanel = () => {
   const pendingCount = registrations.filter(reg => reg.status === 'pending').length;
   const unreadMessages = contactMessages.filter(msg => !msg.is_read).length;
 
-  // Mock timetable data (in real app, this would come from database)
-  const timetableSlots = [
-    { time: '7:00 AM', monday: 'Piano - Sarah', tuesday: 'Guitar - John', wednesday: 'Voice - Emma', thursday: 'Piano - Mike', friday: 'Guitar - Lisa' },
-    { time: '8:00 AM', monday: 'Voice - Tom', tuesday: 'Piano - Anna', wednesday: 'Guitar - Sam', thursday: 'Voice - Kate', friday: 'Piano - David' },
-    { time: '9:00 AM', monday: 'Guitar - Ben', tuesday: 'Voice - Lucy', wednesday: 'Piano - Alex', thursday: 'Guitar - Nina', friday: 'Voice - Paul' },
-    { time: '10:00 AM', monday: 'Piano - Grace', tuesday: 'Guitar - Mark', wednesday: 'Voice - Zoe', thursday: 'Piano - Jack', friday: 'Guitar - Sophie' },
-    { time: '11:00 AM', monday: 'Voice - Oliver', tuesday: 'Piano - Mia', wednesday: 'Guitar - Ryan', thursday: 'Voice - Chloe', friday: 'Piano - Ethan' },
-  ];
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5">
         <div className="text-center">
           <Music className="h-12 w-12 text-primary mx-auto mb-4 animate-pulse" />
-          <div className="text-lg text-muted-foreground">Loading your music academy dashboard...</div>
+          <div className="text-lg text-muted-foreground">Loading Damon Music Academy dashboard...</div>
         </div>
       </div>
     );
@@ -237,11 +282,24 @@ const AdminPanel = () => {
               </div>
             </div>
             <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
-              Music Academy Dashboard
+              Damon Music Academy Dashboard
             </h2>
             <p className="text-xl text-muted-foreground">
-              Orchestrating student success and managing musical journeys
+              {userRole === 'super_admin' ? 'Super Admin Panel - Full System Access' : 'Orchestrating student success and managing musical journeys'}
             </p>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              {userRole === 'super_admin' ? (
+                <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                  <Shield className="h-3 w-3 mr-1" />
+                  Super Admin
+                </Badge>
+              ) : (
+                <Badge className="bg-gradient-to-r from-primary to-accent text-white">
+                  <UserCog className="h-3 w-3 mr-1" />
+                  Admin
+                </Badge>
+              )}
+            </div>
           </div>
           <Button
             variant="outline"
@@ -253,12 +311,12 @@ const AdminPanel = () => {
           </Button>
         </div>
 
-        <div className="flex justify-center mb-8">
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-2 shadow-xl border border-primary/10">
+        <div className="flex justify-center mb-8 overflow-x-auto">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-2 shadow-xl border border-primary/10 flex gap-2">
             <Button
               variant={activeTab === 'stats' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('stats')}
-              className="rounded-xl px-6 py-3 transition-all duration-200"
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
             >
               <Piano className="h-4 w-4 mr-2" />
               Overview
@@ -266,35 +324,45 @@ const AdminPanel = () => {
             <Button
               variant={activeTab === 'students' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('students')}
-              className="rounded-xl px-6 py-3 transition-all duration-200"
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
             >
               <Users className="h-4 w-4 mr-2" />
-              Active Students ({activeStudents.length})
+              Students ({activeStudents.length})
             </Button>
             <Button
-              variant={activeTab === 'timetable' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('timetable')}
-              className="rounded-xl px-6 py-3 transition-all duration-200"
+              variant={activeTab === 'schedule' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('schedule')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
             >
               <Clock className="h-4 w-4 mr-2" />
-              Timetable
+              Schedule
             </Button>
             <Button
               variant={activeTab === 'registrations' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('registrations')}
-              className="rounded-xl px-6 py-3 transition-all duration-200"
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
             >
               <Guitar className="h-4 w-4 mr-2" />
-              Registrations ({registrations.length})
+              Applications ({registrations.length})
             </Button>
             <Button
               variant={activeTab === 'messages' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('messages')}
-              className="rounded-xl px-6 py-3 transition-all duration-200"
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
             >
               <Mic className="h-4 w-4 mr-2" />
               Messages ({contactMessages.length})
             </Button>
+            {userRole === 'super_admin' && (
+              <Button
+                variant={activeTab === 'admins' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('admins')}
+                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                Admins ({adminProfiles.length})
+              </Button>
+            )}
           </div>
         </div>
 
@@ -363,6 +431,79 @@ const AdminPanel = () => {
           </div>
         )}
 
+        {/* Schedule Tab */}
+        {activeTab === 'schedule' && (
+          <div className="space-y-6">
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent text-center">
+              Class Schedule Management
+            </h3>
+            
+            <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="text-center py-12">
+                  <Clock className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                  <h4 className="text-xl font-semibold text-muted-foreground mb-2">Schedule Management Coming Soon</h4>
+                  <p className="text-muted-foreground">
+                    Real-time class scheduling and timetable management will be available in the next update.
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Currently managing schedules manually. Contact system administrator for assistance.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Admin Management Tab (Super Admin Only) */}
+        {activeTab === 'admins' && userRole === 'super_admin' && (
+          <div className="space-y-6">
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent text-center">
+              Admin Management
+            </h3>
+            
+            <div className="grid gap-4">
+              {adminProfiles.map((admin) => (
+                <Card key={admin.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
+                  <CardContent className="p-6">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-gradient-to-r from-primary/20 to-accent/20 rounded-full">
+                          {admin.role === 'super_admin' ? (
+                            <Shield className="h-6 w-6 text-purple-600" />
+                          ) : (
+                            <UserCog className="h-6 w-6 text-primary" />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="text-xl font-bold text-primary">{admin.email}</h4>
+                          <p className="text-muted-foreground">
+                            {admin.role === 'super_admin' ? 'Super Administrator' : 'Administrator'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {admin.role === 'super_admin' ? (
+                          <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">Super Admin</Badge>
+                        ) : (
+                          <Badge className="bg-gradient-to-r from-primary to-accent text-white">Admin</Badge>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4 text-sm text-muted-foreground">
+                      Account created: {new Date(admin.created_at).toLocaleDateString()}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Keep existing code for other tabs (students, registrations, messages) */}
+        {/* ... keep existing code (students tab implementation) */}
+        
         {/* Active Students Tab */}
         {activeTab === 'students' && (
           <div className="space-y-6">
@@ -429,66 +570,6 @@ const AdminPanel = () => {
                 );
               })}
             </div>
-          </div>
-        )}
-
-        {/* Timetable Tab */}
-        {activeTab === 'timetable' && (
-          <div className="space-y-6">
-            <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent text-center">
-              Weekly Class Schedule Symphony
-            </h3>
-            
-            <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-              <CardContent className="p-6">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-primary/20">
-                        <th className="text-left p-3 font-bold text-primary">Time</th>
-                        <th className="text-left p-3 font-bold text-primary">Monday</th>
-                        <th className="text-left p-3 font-bold text-primary">Tuesday</th>
-                        <th className="text-left p-3 font-bold text-primary">Wednesday</th>
-                        <th className="text-left p-3 font-bold text-primary">Thursday</th>
-                        <th className="text-left p-3 font-bold text-primary">Friday</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {timetableSlots.map((slot, index) => (
-                        <tr key={index} className="border-b border-primary/10 hover:bg-primary/5">
-                          <td className="p-3 font-medium text-primary">{slot.time}</td>
-                          <td className="p-3">
-                            <div className="p-2 bg-gradient-to-r from-primary/10 to-accent/10 rounded text-sm">
-                              {slot.monday}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="p-2 bg-gradient-to-r from-accent/10 to-secondary/10 rounded text-sm">
-                              {slot.tuesday}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="p-2 bg-gradient-to-r from-secondary/10 to-primary/10 rounded text-sm">
-                              {slot.wednesday}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="p-2 bg-gradient-to-r from-primary/10 to-accent/10 rounded text-sm">
-                              {slot.thursday}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="p-2 bg-gradient-to-r from-accent/10 to-secondary/10 rounded text-sm">
-                              {slot.friday}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         )}
 
@@ -613,6 +694,7 @@ const AdminPanel = () => {
                           onClick={() => markMessageAsRead(message.id)}
                           className="bg-white/80 border-primary/20 hover:bg-primary/10"
                         >
+                          <Eye className="h-4 w-4 mr-2" />
                           Mark as Read
                         </Button>
                       )}

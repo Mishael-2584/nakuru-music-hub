@@ -44,8 +44,8 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
 
         if (data.user) {
           toast({
-            title: "Login Successful",
-            description: "Welcome back, admin!",
+            title: "Welcome Back!",
+            description: "Successfully signed in to Damon Music Academy admin panel.",
           });
           onSuccess();
         }
@@ -59,12 +59,43 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
           return;
         }
 
-        const redirectUrl = `${window.location.origin}/admin`;
+        // Check admin count limit before allowing registration
+        const { data: adminCount, error: countError } = await supabase
+          .from('profiles')
+          .select('id', { count: 'exact' })
+          .eq('role', 'admin');
+
+        if (countError) {
+          console.error("Error checking admin count:", countError);
+          toast({
+            title: "Registration Failed",
+            description: "Unable to verify admin count. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (adminCount && adminCount.length >= 3) {
+          toast({
+            title: "Registration Not Allowed",
+            description: "Maximum number of admin accounts (3) has been reached.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Use the actual site URL for email redirect
+        const siteUrl = window.location.origin;
+        const redirectUrl = `${siteUrl}/admin`;
+        
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: redirectUrl,
+            data: {
+              role: 'admin'
+            }
           },
         });
 
@@ -80,12 +111,12 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
         if (data.user && !data.session) {
           toast({
             title: "Registration Successful",
-            description: "Please check your email to confirm your account.",
+            description: "Please check your email from Damon Music Academy to confirm your account.",
           });
         } else if (data.session) {
           toast({
-            title: "Registration Successful",
-            description: "Welcome to the admin panel!",
+            title: "Welcome to Damon Music Academy!",
+            description: "Your admin account has been created successfully.",
           });
           onSuccess();
         }
@@ -116,10 +147,10 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
             </div>
           </div>
           <CardTitle className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            {isLogin ? "Welcome Back" : "Create Account"}
+            {isLogin ? "Welcome Back" : "Join Damon Music Academy"}
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            {isLogin ? "Sign in to access your admin panel" : "Join our admin team"}
+            {isLogin ? "Sign in to access your admin panel" : "Create your admin account (Max 3 admins allowed)"}
           </p>
         </CardHeader>
         <CardContent className="px-4 sm:px-6 space-y-6">
@@ -135,7 +166,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="admin@damonmusic.com"
+                placeholder="admin@damonmusicacademy.com"
                 className="h-12 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
               />
             </div>
@@ -222,7 +253,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
               ) : (
                 <div className="flex items-center gap-2">
                   <UserPlus className="h-4 w-4" />
-                  Create Account
+                  Create Admin Account
                 </div>
               )}
             </Button>
@@ -234,7 +265,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
                 onClick={() => setIsLogin(!isLogin)}
                 className="text-sm text-muted-foreground hover:text-primary transition-colors"
               >
-                {isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
+                {isLogin ? "Need an admin account? Sign up" : "Already have an account? Sign in"}
               </Button>
             </div>
           </form>
