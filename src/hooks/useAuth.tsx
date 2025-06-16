@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -7,9 +7,30 @@ export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const authTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     let mounted = true;
+
+    const updateAuthState = (newSession: Session | null) => {
+      if (!mounted) return;
+      
+      // Clear any pending auth updates
+      if (authTimeoutRef.current) {
+        clearTimeout(authTimeoutRef.current);
+      }
+
+      // Debounce auth state updates to prevent rapid changes
+      authTimeoutRef.current = setTimeout(() => {
+        if (mounted) {
+          setSession(newSession);
+          setUser(newSession?.user ?? null);
+          setLoading(false);
+          setIsInitialized(true);
+        }
+      }, 100);
+    };
 
     // Get initial session
     const getInitialSession = async () => {
@@ -19,14 +40,13 @@ export const useAuth = () => {
           if (error) {
             console.error("Error getting session:", error);
           }
-          setSession(session);
-          setUser(session?.user ?? null);
-          setLoading(false);
+          updateAuthState(session);
         }
       } catch (error) {
         console.error("Unexpected error getting session:", error);
         if (mounted) {
           setLoading(false);
+          setIsInitialized(true);
         }
       }
     };
@@ -35,12 +55,7 @@ export const useAuth = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log("Auth state changed:", event, session?.user?.email);
-        
-        if (mounted) {
-          setSession(session);
-          setUser(session?.user ?? null);
-          setLoading(false);
-        }
+        updateAuthState(session);
       }
     );
 
@@ -48,6 +63,9 @@ export const useAuth = () => {
 
     return () => {
       mounted = false;
+      if (authTimeoutRef.current) {
+        clearTimeout(authTimeoutRef.current);
+      }
       subscription.unsubscribe();
     };
   }, []);
@@ -59,14 +77,10 @@ export const useAuth = () => {
       if (error) {
         console.error("Sign out error:", error);
       }
-      setUser(null);
-      setSession(null);
       return { error };
     } catch (error) {
       console.error("Unexpected sign out error:", error);
       return { error };
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -74,6 +88,7 @@ export const useAuth = () => {
     user,
     session,
     loading,
+    isInitialized,
     signOut,
     isAuthenticated: !!user && !!session,
   };

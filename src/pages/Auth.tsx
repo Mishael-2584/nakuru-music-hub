@@ -9,21 +9,23 @@ import { Music } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { user, loading, isAuthenticated } = useAuth();
+  const { user, loading, isAuthenticated, isInitialized } = useAuth();
 
   useEffect(() => {
-    if (!loading && isAuthenticated && user) {
+    // Only redirect after auth is fully initialized and user is authenticated
+    if (isInitialized && !loading && isAuthenticated && user) {
       console.log("User is authenticated, redirecting to admin");
       navigate("/admin", { replace: true });
     }
-  }, [user, loading, isAuthenticated, navigate]);
+  }, [user, loading, isAuthenticated, isInitialized, navigate]);
 
   const handleAuthSuccess = () => {
-    console.log("Auth success - redirecting to admin");
-    navigate("/admin", { replace: true });
+    console.log("Auth success - will redirect when state updates");
+    // Don't manually redirect here, let the useEffect handle it
   };
 
-  if (loading) {
+  // Show loading while auth is initializing
+  if (!isInitialized || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-muted/20 to-muted/50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -36,8 +38,18 @@ const Auth = () => {
     );
   }
 
+  // If user is authenticated, show loading while redirect happens
   if (isAuthenticated && user) {
-    return null; // Will redirect to admin
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-muted/20 to-muted/50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center animate-pulse">
+            <Music className="h-6 w-6 text-white" />
+          </div>
+          <div className="text-lg text-muted-foreground">Redirecting to dashboard...</div>
+        </div>
+      </div>
+    );
   }
 
   return (
