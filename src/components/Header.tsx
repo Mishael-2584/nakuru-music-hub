@@ -51,20 +51,24 @@ const Header = () => {
 
   return (
     <header className="bg-gradient-to-r from-primary to-accent text-white sticky top-0 z-50 shadow-2xl">
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-4 py-3 sm:py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4 cursor-pointer" onClick={handleHomeClick}>
-            <div className="p-3 bg-white/20 rounded-full backdrop-blur-sm">
-              <Music className="h-8 w-8 text-white" />
+          <div className="flex items-center space-x-3 sm:space-x-4 cursor-pointer" onClick={handleHomeClick}>
+            <div className="p-2 sm:p-3 bg-white/20 rounded-full backdrop-blur-sm">
+              <Music className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
             </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-wide">DAMON MUSIC ACADEMY</h1>
-              <p className="text-sm opacity-90 font-medium">WHERE WORDS FAIL, MUSIC SPEAKS</p>
+            <div className="hidden sm:block">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-wide">DAMON MUSIC ACADEMY</h1>
+              <p className="text-xs sm:text-sm opacity-90 font-medium">WHERE WORDS FAIL, MUSIC SPEAKS</p>
+            </div>
+            <div className="sm:hidden">
+              <h1 className="text-lg font-bold tracking-wide">DAMON</h1>
+              <p className="text-xs opacity-90 font-medium">MUSIC ACADEMY</p>
             </div>
           </div>
           
           {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center space-x-8">
+          <nav className="hidden lg:flex items-center space-x-6 xl:space-x-8">
             <button 
               onClick={handleHomeClick} 
               className="hover:text-secondary transition-colors duration-200 font-medium"
@@ -114,8 +118,8 @@ const Header = () => {
           </nav>
 
           {/* Mobile Menu Button */}
-          <div className="lg:hidden flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
+          <div className="lg:hidden flex items-center space-x-2 sm:space-x-4">
+            <div className="hidden sm:flex items-center space-x-2">
               <Phone className="h-4 w-4" />
               <span className="text-sm font-medium">0701 195 460</span>
             </div>
@@ -125,7 +129,7 @@ const Header = () => {
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="text-white hover:bg-white/20"
             >
-              {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              {isMobileMenuOpen ? <X className="h-5 w-5 sm:h-6 sm:w-6" /> : <Menu className="h-5 w-5 sm:h-6 sm:w-6" />}
             </Button>
           </div>
         </div>

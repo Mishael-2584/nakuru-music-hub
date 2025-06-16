@@ -27,7 +27,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
@@ -41,11 +41,13 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
           return;
         }
 
-        toast({
-          title: "Login Successful",
-          description: "Welcome back, admin!",
-        });
-        onSuccess();
+        if (data.user) {
+          toast({
+            title: "Login Successful",
+            description: "Welcome back, admin!",
+          });
+          onSuccess();
+        }
       } else {
         if (password !== confirmPassword) {
           toast({
@@ -57,7 +59,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
         }
 
         const redirectUrl = `${window.location.origin}/admin`;
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -74,12 +76,21 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
           return;
         }
 
-        toast({
-          title: "Registration Successful",
-          description: "Please check your email to confirm your account.",
-        });
+        if (data.user && !data.session) {
+          toast({
+            title: "Registration Successful",
+            description: "Please check your email to confirm your account.",
+          });
+        } else if (data.session) {
+          toast({
+            title: "Registration Successful",
+            description: "Welcome to the admin panel!",
+          });
+          onSuccess();
+        }
       }
     } catch (error) {
+      console.error("Auth error:", error);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -91,84 +102,93 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="text-center">
-          {isLogin ? "Admin Login" : "Admin Registration"}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleAuth} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="admin@damonmusic.com"
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <div className="relative">
+    <div className="w-full max-w-md mx-auto px-4">
+      <Card className="shadow-2xl border-0 bg-white/90 backdrop-blur-sm">
+        <CardHeader className="text-center pb-6">
+          <CardTitle className="text-xl sm:text-2xl font-bold text-primary">
+            {isLogin ? "Admin Login" : "Admin Registration"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 sm:px-6">
+          <form onSubmit={handleAuth} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
               <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="••••••••"
+                placeholder="admin@damonmusic.com"
+                className="h-11"
               />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                  className="h-11 pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {!isLogin && (
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                  className="h-11"
+                />
+              </div>
+            )}
+
+            <Button 
+              type="submit" 
+              className="w-full h-11 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 transition-all duration-200" 
+              disabled={isLoading}
+            >
+              {isLoading ? "Loading..." : isLogin ? "Sign In" : "Sign Up"}
+            </Button>
+
+            <div className="text-center pt-4">
               <Button
                 type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                onClick={() => setShowPassword(!showPassword)}
+                variant="link"
+                onClick={() => setIsLogin(!isLogin)}
+                className="text-sm text-muted-foreground hover:text-primary transition-colors"
               >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
+                {isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
               </Button>
             </div>
-          </div>
-
-          {!isLogin && (
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-              />
-            </div>
-          )}
-
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Loading..." : isLogin ? "Sign In" : "Sign Up"}
-          </Button>
-
-          <div className="text-center">
-            <Button
-              type="button"
-              variant="link"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm"
-            >
-              {isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
