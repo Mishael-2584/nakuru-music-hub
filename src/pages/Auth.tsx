@@ -10,20 +10,21 @@ import { Music } from "lucide-react";
 const Auth = () => {
   const navigate = useNavigate();
   const { user, loading, isAuthenticated, isInitialized } = useAuth();
-  const [hasRedirected, setHasRedirected] = useState(false);
+  const [redirectHandled, setRedirectHandled] = useState(false);
 
   useEffect(() => {
-    // Only redirect after auth is fully initialized and user is authenticated
-    if (isInitialized && !loading && isAuthenticated && user && !hasRedirected) {
+    // Only redirect after auth is fully initialized, user is authenticated, and we haven't redirected yet
+    if (isInitialized && !loading && isAuthenticated && user && !redirectHandled) {
       console.log("User is authenticated, redirecting to admin");
-      setHasRedirected(true);
+      setRedirectHandled(true);
       navigate("/admin", { replace: true });
     }
-  }, [user, loading, isAuthenticated, isInitialized, navigate, hasRedirected]);
+  }, [user, loading, isAuthenticated, isInitialized, navigate, redirectHandled]);
 
   const handleAuthSuccess = () => {
     console.log("Auth success - will redirect when state updates");
-    // Don't manually redirect here, let the useEffect handle it
+    // Reset redirect handled so the useEffect can handle the redirect
+    setRedirectHandled(false);
   };
 
   // Show loading while auth is initializing
@@ -41,7 +42,7 @@ const Auth = () => {
   }
 
   // If user is authenticated and we haven't redirected yet, show loading
-  if (isAuthenticated && user && !hasRedirected) {
+  if (isAuthenticated && user && !redirectHandled) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-muted/20 to-muted/50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">

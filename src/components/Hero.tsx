@@ -1,137 +1,126 @@
 
 import { Button } from "@/components/ui/button";
-import { Music, Users, Award, Play, ArrowRight } from "lucide-react";
+import { Music, Star, Users, Trophy, Heart } from "lucide-react";
 
 const Hero = () => {
-  const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId);
+  const scrollToRegistration = () => {
+    const element = document.getElementById('registration');
     if (element) {
-      element.scrollIntoView({
-        behavior: 'smooth'
-      });
+      element.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
   return (
-    <section id="home" className="relative py-20 overflow-hidden min-h-screen flex items-center">
+    <section className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-accent/5 to-secondary/10 overflow-hidden">
       {/* Animated background elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-20 left-10 w-32 h-32 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute top-40 right-20 w-48 h-48 bg-accent/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute bottom-20 left-1/3 w-40 h-40 bg-secondary/10 rounded-full blur-3xl animate-pulse delay-2000"></div>
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5"></div>
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-10 -left-10 w-40 h-40 md:w-60 md:h-60 bg-primary/10 rounded-full animate-pulse"></div>
+        <div className="absolute top-1/4 right-10 w-32 h-32 md:w-48 md:h-48 bg-accent/10 rounded-full animate-pulse delay-1000"></div>
+        <div className="absolute bottom-10 left-1/4 w-24 h-24 md:w-36 md:h-36 bg-secondary/10 rounded-full animate-pulse delay-2000"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-20 h-20 md:w-28 md:h-28 bg-primary/5 rounded-full animate-pulse delay-3000"></div>
       </div>
-      
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          <div className="space-y-8 animate-fade-in">
-            {/* Musical note decoration */}
-            <div className="flex items-center gap-2 sm:gap-4 mb-6">
-              <div className="flex gap-2">
-                <div className="w-4 h-4 bg-primary rounded-full animate-bounce"></div>
-                <div className="w-4 h-4 bg-accent rounded-full animate-bounce delay-100"></div>
-                <div className="w-4 h-4 bg-secondary rounded-full animate-bounce delay-200"></div>
+
+      <div className="container mx-auto px-4 py-12 sm:py-16 md:py-20 lg:py-24 text-center relative z-10">
+        <div className="max-w-4xl mx-auto">
+          {/* Icon with animation */}
+          <div className="flex justify-center mb-6 sm:mb-8">
+            <div className="relative">
+              <div className="p-4 sm:p-6 md:p-8 bg-gradient-to-r from-primary to-accent rounded-full shadow-2xl animate-scale-in">
+                <Music className="h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 text-white" />
               </div>
-              <span className="text-xs sm:text-sm font-medium text-primary uppercase tracking-wider">Nakuru's Premier Music Academy</span>
-            </div>
-            
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight">
-              <span className="bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                Where Words Fail,
-              </span>
-              <br />
-              <span className="bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent animate-gradient">
-                Music Speaks
-              </span>
-            </h1>
-            
-            <p className="text-lg sm:text-xl text-muted-foreground leading-relaxed max-w-lg">
-              Discover your musical potential at Damon Music Academy. We offer comprehensive 
-              music education for students aged 3 years and above in Nakuru, Kenya.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <Button size="lg" className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white shadow-lg hover:shadow-xl transition-all duration-300 group" onClick={() => scrollToSection('registration')}>
-                <Play className="h-5 w-5 mr-2 group-hover:animate-pulse" />
-                Start Your Journey
-                <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
-              <Button size="lg" variant="outline" className="border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/5 backdrop-blur-sm transition-all duration-300" onClick={() => scrollToSection('courses')}>
-                <Music className="h-5 w-5 mr-2" />
-                View Courses
-              </Button>
-            </div>
-            
-            {/* Stats with enhanced design */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8 pt-8">
-              <div className="flex items-center gap-3 group">
-                <div className="p-3 bg-primary/10 rounded-full group-hover:bg-primary/20 transition-colors">
-                  <Users className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <span className="text-2xl font-bold text-primary">100+</span>
-                  <p className="text-sm font-medium text-muted-foreground">Students</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3 group">
-                <div className="p-3 bg-accent/10 rounded-full group-hover:bg-accent/20 transition-colors">
-                  <Award className="h-6 w-6 text-accent" />
-                </div>
-                <div>
-                  <span className="text-2xl font-bold text-accent">5+</span>
-                  <p className="text-sm font-medium text-muted-foreground">Expert Instructors</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3 group">
-                <div className="p-3 bg-secondary/10 rounded-full group-hover:bg-secondary/20 transition-colors">
-                  <Music className="h-6 w-6 text-secondary" />
-                </div>
-                <div>
-                  <span className="text-2xl font-bold text-secondary">5+</span>
-                  <p className="text-sm font-medium text-muted-foreground">Instruments</p>
-                </div>
-              </div>
+              <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 to-accent/20 rounded-full animate-pulse"></div>
             </div>
           </div>
-          
-          <div className="relative lg:justify-self-end">
-            <div className="relative group">
-              {/* Floating elements around the image */}
-              <div className="absolute -top-6 -left-6 w-12 h-12 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center shadow-lg animate-float">
-                <Music className="h-6 w-6 text-white" />
-              </div>
-              <div className="absolute -top-4 -right-8 w-16 h-16 bg-gradient-to-r from-accent to-secondary rounded-full flex items-center justify-center shadow-lg animate-float delay-1000">
-                <Users className="h-8 w-8 text-white" />
-              </div>
-              <div className="absolute -bottom-6 -left-8 w-14 h-14 bg-gradient-to-r from-secondary to-primary rounded-full flex items-center justify-center shadow-lg animate-float delay-2000">
-                <Award className="h-7 w-7 text-white" />
-              </div>
-              
-              {/* Main image with enhanced styling */}
-              <div className="aspect-square relative overflow-hidden rounded-3xl shadow-2xl group-hover:shadow-3xl transition-shadow duration-500">
-                <img src="/lovable-uploads/40fee785-03dc-4548-8e48-b09291ee8f42.png" alt="Damon Music Academy Students" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                <div className="absolute inset-0 bg-gradient-to-t from-primary/30 via-transparent to-accent/20 group-hover:from-primary/40 group-hover:to-accent/30 transition-all duration-500"></div>
-                
-                {/* Overlay content */}
-                <div className="absolute bottom-6 left-6 right-6">
-                  <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-4 shadow-lg">
-                    <p className="text-sm font-semibold text-primary mb-1">🎵 Join Our Musical Family</p>
-                    <p className="text-xs text-muted-foreground">Experience the joy of learning music in our vibrant community</p>
-                  </div>
-                </div>
-              </div>
+
+          {/* Main heading with responsive text sizes */}
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
+            <span className="bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent animate-fade-in">
+              DAMON MUSIC ACADEMY
+            </span>
+          </h1>
+
+          {/* Improved responsive tagline */}
+          <div className="mb-6 sm:mb-8 md:mb-10">
+            <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold text-muted-foreground animate-fade-in delay-200">
+              <span className="block sm:inline">WHERE WORDS FAIL,</span>
+              <span className="block sm:inline sm:ml-2">MUSIC SPEAKS</span>
+            </p>
+          </div>
+
+          {/* Description with better tablet spacing */}
+          <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-muted-foreground mb-8 sm:mb-10 md:mb-12 max-w-3xl mx-auto leading-relaxed animate-fade-in delay-400 px-2">
+            Discover your musical potential in the heart of Nakuru, Kenya. 
+            Join our passionate community of musicians and let your creativity soar.
+          </p>
+
+          {/* Enhanced stats section */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 md:gap-8 mb-8 sm:mb-10 md:mb-12">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+              <Users className="h-6 w-6 md:h-8 md:w-8 text-primary mx-auto mb-2" />
+              <div className="text-xl md:text-2xl lg:text-3xl font-bold text-primary">500+</div>
+              <div className="text-xs md:text-sm text-muted-foreground">Students</div>
+            </div>
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+              <Trophy className="h-6 w-6 md:h-8 md:w-8 text-accent mx-auto mb-2" />
+              <div className="text-xl md:text-2xl lg:text-3xl font-bold text-accent">10+</div>
+              <div className="text-xs md:text-sm text-muted-foreground">Years</div>
+            </div>
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+              <Music className="h-6 w-6 md:h-8 md:w-8 text-secondary mx-auto mb-2" />
+              <div className="text-xl md:text-2xl lg:text-3xl font-bold text-secondary">15+</div>
+              <div className="text-xs md:text-sm text-muted-foreground">Instruments</div>
+            </div>
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+              <Heart className="h-6 w-6 md:h-8 md:w-8 text-primary mx-auto mb-2" />
+              <div className="text-xl md:text-2xl lg:text-3xl font-bold text-primary">100%</div>
+              <div className="text-xs md:text-sm text-muted-foreground">Passion</div>
+            </div>
+          </div>
+
+          {/* Enhanced CTA buttons with better responsive spacing */}
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center animate-fade-in delay-600">
+            <Button 
+              size="lg" 
+              className="w-full sm:w-auto bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-bold py-4 px-8 md:px-12 text-base md:text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105"
+              onClick={scrollToRegistration}
+            >
+              Start Your Musical Journey
+            </Button>
+            <Button 
+              variant="outline" 
+              size="lg"
+              className="w-full sm:w-auto border-2 border-primary text-primary hover:bg-primary hover:text-white font-semibold py-4 px-8 md:px-12 text-base md:text-lg transition-all duration-300 hover:scale-105"
+              onClick={() => {
+                const element = document.getElementById('courses');
+                if (element) {
+                  element.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
+            >
+              Explore Courses
+            </Button>
+          </div>
+
+          {/* Enhanced trust indicators */}
+          <div className="mt-12 sm:mt-16 md:mt-20">
+            <p className="text-sm md:text-base text-muted-foreground mb-4 md:mb-6">Trusted by musicians across Kenya</p>
+            <div className="flex justify-center items-center space-x-2 md:space-x-4">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} className="h-5 w-5 md:h-6 md:w-6 text-yellow-400 fill-current animate-pulse" style={{ animationDelay: `${i * 200}ms` }} />
+              ))}
+              <span className="ml-2 md:ml-4 text-sm md:text-base text-muted-foreground font-medium">4.9/5 from 200+ reviews</span>
             </div>
           </div>
         </div>
       </div>
-      
-      {/* Musical wave decoration at bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white via-white/50 to-transparent"></div>
-      <svg className="absolute bottom-0 left-0 right-0" viewBox="0 0 1200 120" xmlns="http://www.w3.org/2000/svg">
-        <path d="M0,60 C300,100 600,20 900,60 C1050,80 1150,40 1200,60 L1200,120 L0,120 Z" fill="white" opacity="0.8" />
-      </svg>
+
+      {/* Floating musical notes animation */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-20 left-10 text-4xl text-primary/20 animate-bounce" style={{ animationDelay: '1s' }}>♪</div>
+        <div className="absolute top-40 right-20 text-3xl text-accent/20 animate-bounce" style={{ animationDelay: '2s' }}>♫</div>
+        <div className="absolute bottom-40 left-20 text-2xl text-secondary/20 animate-bounce" style={{ animationDelay: '3s' }}>♪</div>
+        <div className="absolute bottom-20 right-10 text-5xl text-primary/20 animate-bounce" style={{ animationDelay: '4s' }}>♫</div>
+      </div>
     </section>
   );
 };

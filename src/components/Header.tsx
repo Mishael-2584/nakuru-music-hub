@@ -1,21 +1,21 @@
 
-import { Music, Phone, Mail, Menu, X, User } from "lucide-react";
+import { Music, Phone, Mail, Menu, X, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, signOut, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
 
   const scrollToSection = (sectionId: string) => {
-    // If not on home page, navigate to home first
     if (location.pathname !== '/') {
       navigate('/', { replace: true });
-      // Small delay to ensure page loads before scrolling
       setTimeout(() => {
         const element = document.getElementById(sectionId);
         if (element) {
@@ -36,17 +36,53 @@ const Header = () => {
     setIsMobileMenuOpen(false);
   };
 
-  const handleAdminClick = () => {
-    console.log("Admin button clicked, user:", user, "isAuthenticated:", isAuthenticated);
+  const handleAuthAction = async () => {
+    if (loading) return;
     
     if (isAuthenticated && user) {
-      console.log("User is authenticated, navigating to admin");
-      navigate("/admin");
+      // User is logged in, show admin panel or logout option
+      if (location.pathname === '/admin') {
+        // If already on admin page, sign out
+        try {
+          await signOut();
+          toast({
+            title: "Signed out",
+            description: "You have been successfully signed out.",
+          });
+          navigate('/');
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to sign out. Please try again.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        // Navigate to admin panel
+        console.log("User is authenticated, navigating to admin");
+        navigate("/admin");
+      }
     } else {
+      // User is not logged in, navigate to auth page
       console.log("User not authenticated, navigating to auth");
       navigate("/auth");
     }
     setIsMobileMenuOpen(false);
+  };
+
+  const getAuthButtonText = () => {
+    if (loading) return "Loading...";
+    if (isAuthenticated) {
+      return location.pathname === '/admin' ? "Sign Out" : "Admin Panel";
+    }
+    return "Admin Login";
+  };
+
+  const getAuthButtonIcon = () => {
+    if (isAuthenticated && location.pathname === '/admin') {
+      return <LogOut className="h-4 w-4" />;
+    }
+    return <User className="h-4 w-4" />;
   };
 
   return (
@@ -110,10 +146,11 @@ const Header = () => {
               variant="outline" 
               size="icon"
               className="ml-2 bg-white/20 border-white/30 hover:bg-white/30"
-              onClick={handleAdminClick}
-              title={isAuthenticated ? "Admin Panel" : "Admin Login"}
+              onClick={handleAuthAction}
+              disabled={loading}
+              title={getAuthButtonText()}
             >
-              <User className="h-4 w-4" />
+              {getAuthButtonIcon()}
             </Button>
           </nav>
 
@@ -176,10 +213,12 @@ const Header = () => {
             </Button>
             <Button 
               variant="outline" 
-              className="w-full mt-2 bg-white/20 border-white/30 hover:bg-white/30"
-              onClick={handleAdminClick}
+              className="w-full mt-2 bg-white/20 border-white/30 hover:bg-white/30 flex items-center justify-center gap-2"
+              onClick={handleAuthAction}
+              disabled={loading}
             >
-              {isAuthenticated ? "Admin Panel" : "Admin Login"}
+              {getAuthButtonIcon()}
+              {getAuthButtonText()}
             </Button>
           </nav>
         )}

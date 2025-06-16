@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, UserPlus, LogIn } from "lucide-react";
 
 interface AuthFormProps {
   onSuccess: () => void;
@@ -18,6 +18,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -103,16 +104,31 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
 
   return (
     <div className="w-full max-w-md mx-auto px-4">
-      <Card className="shadow-2xl border-0 bg-white/90 backdrop-blur-sm">
-        <CardHeader className="text-center pb-6">
-          <CardTitle className="text-xl sm:text-2xl font-bold text-primary">
-            {isLogin ? "Admin Login" : "Admin Registration"}
+      <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm hover:shadow-3xl transition-all duration-300">
+        <CardHeader className="text-center pb-6 space-y-4">
+          <div className="flex justify-center">
+            <div className="p-3 bg-gradient-to-r from-primary to-accent rounded-full">
+              {isLogin ? (
+                <LogIn className="h-6 w-6 text-white" />
+              ) : (
+                <UserPlus className="h-6 w-6 text-white" />
+              )}
+            </div>
+          </div>
+          <CardTitle className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            {isLogin ? "Welcome Back" : "Create Account"}
           </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            {isLogin ? "Sign in to access your admin panel" : "Join our admin team"}
+          </p>
         </CardHeader>
-        <CardContent className="px-4 sm:px-6">
-          <form onSubmit={handleAuth} className="space-y-4">
+        <CardContent className="px-4 sm:px-6 space-y-6">
+          <form onSubmit={handleAuth} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -120,12 +136,15 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="admin@damonmusic.com"
-                className="h-11"
+                className="h-12 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
               />
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+              <Label htmlFor="password" className="text-sm font-medium flex items-center gap-2">
+                <Lock className="h-4 w-4" />
+                Password
+              </Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -134,7 +153,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   placeholder="••••••••"
-                  className="h-11 pr-10"
+                  className="h-12 pr-12 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
                 />
                 <Button
                   type="button"
@@ -144,9 +163,9 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
                   ) : (
-                    <Eye className="h-4 w-4" />
+                    <Eye className="h-4 w-4 text-muted-foreground" />
                   )}
                 </Button>
               </div>
@@ -154,25 +173,58 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
 
             {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  placeholder="••••••••"
-                  className="h-11"
-                />
+                <Label htmlFor="confirmPassword" className="text-sm font-medium flex items-center gap-2">
+                  <Lock className="h-4 w-4" />
+                  Confirm Password
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    placeholder="••••••••"
+                    className="h-12 pr-12 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
               </div>
             )}
 
             <Button 
               type="submit" 
-              className="w-full h-11 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 transition-all duration-200" 
+              className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-xl" 
               disabled={isLoading}
             >
-              {isLoading ? "Loading..." : isLogin ? "Sign In" : "Sign Up"}
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Loading...
+                </div>
+              ) : isLogin ? (
+                <div className="flex items-center gap-2">
+                  <LogIn className="h-4 w-4" />
+                  Sign In
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  Create Account
+                </div>
+              )}
             </Button>
 
             <div className="text-center pt-4">
