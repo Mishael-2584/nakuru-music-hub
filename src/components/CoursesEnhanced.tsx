@@ -1,8 +1,7 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Piano, Guitar, Mic, Drum, Violin, Music, Brain, Trumpet } from "lucide-react";
+import { Piano, Guitar, Mic, Drum, Music, Brain, Wind, Volume2 } from "lucide-react";
 
 const CoursesEnhanced = () => {
   const courses = [
@@ -85,7 +84,7 @@ const CoursesEnhanced = () => {
     {
       title: "Violin",
       description: "Classical and contemporary violin techniques",
-      icon: Violin,
+      icon: Music,
       color: "accent",
       details: {
         duration: "Individual 45-minute sessions",
@@ -123,7 +122,7 @@ const CoursesEnhanced = () => {
     {
       title: "Saxophone",
       description: "Jazz up your musical journey",
-      icon: Music,
+      icon: Wind,
       color: "primary",
       details: {
         duration: "Individual 45-minute sessions",
@@ -142,7 +141,7 @@ const CoursesEnhanced = () => {
     {
       title: "Trumpet & Brass",
       description: "Master the art of brass instruments",
-      icon: Trumpet,
+      icon: Volume2,
       color: "accent",
       details: {
         duration: "Individual 45-minute sessions",
