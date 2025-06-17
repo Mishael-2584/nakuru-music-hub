@@ -31,6 +31,11 @@ const Header = () => {
     setIsMobileMenuOpen(false);
   };
 
+  const navigateToPage = (path: string) => {
+    navigate(path);
+    setIsMobileMenuOpen(false);
+  };
+
   const handleHomeClick = () => {
     navigate('/');
     setIsMobileMenuOpen(false);
@@ -40,9 +45,7 @@ const Header = () => {
     if (loading) return;
     
     if (isAuthenticated && user) {
-      // User is logged in, show admin panel or logout option
       if (location.pathname === '/admin') {
-        // If already on admin page, sign out
         try {
           await signOut();
           toast({
@@ -58,13 +61,9 @@ const Header = () => {
           });
         }
       } else {
-        // Navigate to admin panel
-        console.log("User is authenticated, navigating to admin");
         navigate("/admin");
       }
     } else {
-      // User is not logged in, navigate to auth page
-      console.log("User not authenticated, navigating to auth");
       navigate("/auth");
     }
     setIsMobileMenuOpen(false);
@@ -112,22 +111,34 @@ const Header = () => {
               Home
             </button>
             <button 
-              onClick={() => scrollToSection('courses')} 
-              className="hover:text-secondary transition-colors duration-200 font-medium"
-            >
-              Courses
-            </button>
-            <button 
-              onClick={() => scrollToSection('about')} 
+              onClick={() => navigateToPage('/about')} 
               className="hover:text-secondary transition-colors duration-200 font-medium"
             >
               About
             </button>
             <button 
-              onClick={() => scrollToSection('testimonials')} 
+              onClick={() => navigateToPage('/courses')} 
               className="hover:text-secondary transition-colors duration-200 font-medium"
             >
-              Testimonials
+              Courses
+            </button>
+            <button 
+              onClick={() => navigateToPage('/services')} 
+              className="hover:text-secondary transition-colors duration-200 font-medium"
+            >
+              Services
+            </button>
+            <button 
+              onClick={() => navigateToPage('/fees')} 
+              className="hover:text-secondary transition-colors duration-200 font-medium"
+            >
+              Fees
+            </button>
+            <button 
+              onClick={() => navigateToPage('/gallery')} 
+              className="hover:text-secondary transition-colors duration-200 font-medium"
+            >
+              Gallery
             </button>
             <button 
               onClick={() => scrollToSection('contact')} 
@@ -181,22 +192,34 @@ const Header = () => {
               Home
             </button>
             <button 
-              onClick={() => scrollToSection('courses')} 
-              className="block w-full text-left py-2 px-4 hover:bg-white/20 rounded transition-colors duration-200"
-            >
-              Courses
-            </button>
-            <button 
-              onClick={() => scrollToSection('about')} 
+              onClick={() => navigateToPage('/about')} 
               className="block w-full text-left py-2 px-4 hover:bg-white/20 rounded transition-colors duration-200"
             >
               About
             </button>
             <button 
-              onClick={() => scrollToSection('testimonials')} 
+              onClick={() => navigateToPage('/courses')} 
               className="block w-full text-left py-2 px-4 hover:bg-white/20 rounded transition-colors duration-200"
             >
-              Testimonials
+              Courses
+            </button>
+            <button 
+              onClick={() => navigateToPage('/services')} 
+              className="block w-full text-left py-2 px-4 hover:bg-white/20 rounded transition-colors duration-200"
+            >
+              Services
+            </button>
+            <button 
+              onClick={() => navigateToPage('/fees')} 
+              className="block w-full text-left py-2 px-4 hover:bg-white/20 rounded transition-colors duration-200"
+            >
+              Fees
+            </button>
+            <button 
+              onClick={() => navigateToPage('/gallery')} 
+              className="block w-full text-left py-2 px-4 hover:bg-white/20 rounded transition-colors duration-200"
+            >
+              Gallery
             </button>
             <button 
               onClick={() => scrollToSection('contact')} 
