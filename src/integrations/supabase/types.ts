@@ -39,6 +39,147 @@ export type Database = {
         }
         Relationships: []
       }
+      events: {
+        Row: {
+          created_at: string
+          description: string | null
+          event_date: string
+          event_time: string | null
+          id: string
+          image_url: string | null
+          is_featured: boolean | null
+          location: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          event_date: string
+          event_time?: string | null
+          id?: string
+          image_url?: string | null
+          is_featured?: boolean | null
+          location?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          event_date?: string
+          event_time?: string | null
+          id?: string
+          image_url?: string | null
+          is_featured?: boolean | null
+          location?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      exam_bodies: {
+        Row: {
+          abbreviation: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          logo_url: string | null
+          name: string
+          website_url: string | null
+        }
+        Insert: {
+          abbreviation: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name: string
+          website_url?: string | null
+        }
+        Update: {
+          abbreviation?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name?: string
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      fees: {
+        Row: {
+          course_name: string
+          course_type: string
+          created_at: string
+          description: string | null
+          duration: string | null
+          id: string
+          is_active: boolean | null
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          course_name: string
+          course_type: string
+          created_at?: string
+          description?: string | null
+          duration?: string | null
+          id?: string
+          is_active?: boolean | null
+          price: number
+          updated_at?: string
+        }
+        Update: {
+          course_name?: string
+          course_type?: string
+          created_at?: string
+          description?: string | null
+          duration?: string | null
+          id?: string
+          is_active?: boolean | null
+          price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      news: {
+        Row: {
+          content: string
+          created_at: string
+          excerpt: string | null
+          id: string
+          image_url: string | null
+          is_featured: boolean | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          image_url?: string | null
+          is_featured?: boolean | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          image_url?: string | null
+          is_featured?: boolean | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -63,50 +204,151 @@ export type Database = {
       registrations: {
         Row: {
           age: number
+          course_category: string | null
           created_at: string
           email: string
           experience: string
           goals: string | null
           id: string
           instrument: string
+          learning_mode: string | null
+          location: string | null
+          owns_instrument: boolean | null
           parent_name: string | null
           parent_phone: string | null
           phone: string
           preferred_schedule: string | null
+          proficiency_level: string | null
           status: string | null
           student_name: string
+          time_slot_id: string | null
           updated_at: string
         }
         Insert: {
           age: number
+          course_category?: string | null
           created_at?: string
           email: string
           experience: string
           goals?: string | null
           id?: string
           instrument: string
+          learning_mode?: string | null
+          location?: string | null
+          owns_instrument?: boolean | null
           parent_name?: string | null
           parent_phone?: string | null
           phone: string
           preferred_schedule?: string | null
+          proficiency_level?: string | null
           status?: string | null
           student_name: string
+          time_slot_id?: string | null
           updated_at?: string
         }
         Update: {
           age?: number
+          course_category?: string | null
           created_at?: string
           email?: string
           experience?: string
           goals?: string | null
           id?: string
           instrument?: string
+          learning_mode?: string | null
+          location?: string | null
+          owns_instrument?: boolean | null
           parent_name?: string | null
           parent_phone?: string | null
           phone?: string
           preferred_schedule?: string | null
+          proficiency_level?: string | null
           status?: string | null
           student_name?: string
+          time_slot_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registrations_time_slot_id_fkey"
+            columns: ["time_slot_id"]
+            isOneToOne: false
+            referencedRelation: "time_slots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          features: string[] | null
+          id: string
+          is_active: boolean | null
+          name: string
+          price_range: string | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description: string
+          features?: string[] | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          price_range?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          features?: string[] | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          price_range?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      time_slots: {
+        Row: {
+          created_at: string
+          current_bookings: number | null
+          day_of_week: number
+          end_time: string
+          id: string
+          instructor_name: string | null
+          is_available: boolean | null
+          max_capacity: number | null
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_bookings?: number | null
+          day_of_week: number
+          end_time: string
+          id?: string
+          instructor_name?: string | null
+          is_available?: boolean | null
+          max_capacity?: number | null
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_bookings?: number | null
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          instructor_name?: string | null
+          is_available?: boolean | null
+          max_capacity?: number | null
+          start_time?: string
           updated_at?: string
         }
         Relationships: []

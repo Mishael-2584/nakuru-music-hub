@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Music, Star, Users, Trophy, Heart } from "lucide-react";
+import { Music, Star, Users, Trophy, Heart, Award } from "lucide-react";
 
 const Hero = () => {
   const scrollToRegistration = () => {
@@ -42,14 +42,14 @@ const Hero = () => {
             </div>
           </div>
 
-          {/* Main heading with responsive text sizes */}
+          {/* Updated main heading */}
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
             <span className="bg-gradient-to-r from-white via-primary to-accent bg-clip-text text-transparent animate-fade-in">
-              DAMON MUSIC ACADEMY
+              NAKURU'S PREMIER MUSIC & CREATIVE ARTS HUB
             </span>
           </h1>
 
-          {/* Improved responsive tagline */}
+          {/* Updated tagline */}
           <div className="mb-6 sm:mb-8 md:mb-10">
             <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold text-white/90 animate-fade-in delay-200">
               <span className="block">WHERE WORDS FAIL,</span>
@@ -57,13 +57,14 @@ const Hero = () => {
             </p>
           </div>
 
-          {/* Description with better tablet spacing */}
-          <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-white/80 mb-8 sm:mb-10 md:mb-12 max-w-3xl mx-auto leading-relaxed animate-fade-in delay-400 px-2">
-            Discover your musical potential in the heart of Nakuru, Kenya. 
-            Join our passionate community of musicians and let your creativity soar.
+          {/* Updated description */}
+          <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-white/80 mb-8 sm:mb-10 md:mb-12 max-w-4xl mx-auto leading-relaxed animate-fade-in delay-400 px-2">
+            Whether you're picking up your first instrument, exploring the strokes of a paintbrush, 
+            or diving into professional audio-visual production, Damon Music Academy in Nakuru provides 
+            expert guidance and a vibrant community to help your creative talent truly soar.
           </p>
 
-          {/* Enhanced stats section */}
+          {/* Updated stats section */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6 lg:gap-8 mb-8 sm:mb-10 md:mb-12">
             <div className="bg-white/90 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
               <Users className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-primary mx-auto mb-2" />
@@ -81,20 +82,20 @@ const Hero = () => {
               <div className="text-xs sm:text-sm text-muted-foreground">Instruments</div>
             </div>
             <div className="bg-white/90 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-              <Heart className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-primary mx-auto mb-2" />
+              <Award className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-primary mx-auto mb-2" />
               <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-primary">100%</div>
-              <div className="text-xs sm:text-sm text-muted-foreground">Passion</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">Proven Results</div>
             </div>
           </div>
 
-          {/* Enhanced CTA buttons with better responsive spacing */}
+          {/* CTA buttons */}
           <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center animate-fade-in delay-600 mb-8 sm:mb-12 md:mb-16">
             <Button 
               size="lg" 
               className="w-full sm:w-auto bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-bold py-3 sm:py-4 px-6 sm:px-8 md:px-12 text-sm sm:text-base md:text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105"
               onClick={scrollToRegistration}
             >
-              Start Your Musical Journey
+              Start Your Creative Journey
             </Button>
             <Button 
               variant="outline" 
@@ -107,18 +108,18 @@ const Hero = () => {
                 }
               }}
             >
-              Explore Courses
+              Explore Our Programs
             </Button>
           </div>
 
-          {/* Enhanced trust indicators */}
+          {/* Updated trust indicators with 4.8 rating */}
           <div className="mt-8 sm:mt-12 md:mt-16">
             <p className="text-sm md:text-base text-white/70 mb-4 md:mb-6">Trusted by musicians across Kenya</p>
             <div className="flex justify-center items-center space-x-2 md:space-x-4">
               {[...Array(5)].map((_, i) => (
                 <Star key={i} className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-yellow-400 fill-current animate-pulse" style={{ animationDelay: `${i * 200}ms` }} />
               ))}
-              <span className="ml-2 md:ml-4 text-xs sm:text-sm md:text-base text-white/70 font-medium">4.8/5 from 200+ reviews</span>
+              <span className="ml-2 md:ml-4 text-xs sm:text-sm md:text-base text-white/70 font-medium">4.8/5 from 300+ Google reviews</span>
             </div>
           </div>
         </div>

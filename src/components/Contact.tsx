@@ -1,12 +1,13 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Phone, Mail, MapPin } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { MapPin, Phone, Mail, Clock } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate, useLocation } from "react-router-dom";
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -17,8 +18,6 @@ const Contact = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const location = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,20 +26,13 @@ const Contact = () => {
     try {
       const { error } = await supabase
         .from('contact_messages')
-        .insert([
-          {
-            name: formData.name,
-            email: formData.email,
-            subject: formData.subject,
-            message: formData.message,
-          }
-        ]);
+        .insert([formData]);
 
       if (error) {
         console.error("Contact form error:", error);
         toast({
-          title: "Message Failed",
-          description: "There was an error sending your message. Please try again.",
+          title: "Error",
+          description: "Failed to send message. Please try again.",
           variant: "destructive",
         });
         return;
@@ -48,11 +40,15 @@ const Contact = () => {
 
       toast({
         title: "Message Sent!",
-        description: "Thank you for your message. We'll get back to you soon!",
+        description: "Thank you for your message. We'll get back to you soon.",
       });
       
-      // Reset form
-      setFormData({ name: "", email: "", subject: "", message: "" });
+      setFormData({
+        name: "",
+        email: "",
+        subject: "",
+        message: ""
+      });
     } catch (error) {
       console.error("Unexpected error:", error);
       toast({
@@ -72,148 +68,165 @@ const Contact = () => {
     });
   };
 
-  const scrollToRegistration = () => {
-    // If not on home page, navigate to home first
-    if (location.pathname !== '/') {
-      navigate('/', { replace: true });
-      // Small delay to ensure page loads before scrolling
-      setTimeout(() => {
-        const element = document.getElementById('registration');
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth' });
-        }
-      }, 100);
-    } else {
-      const element = document.getElementById('registration');
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
-  };
-
   return (
-    <section id="contact" className="py-24 bg-gradient-to-br from-muted/20 to-muted/50">
+    <section id="contact" className="py-24 bg-gradient-to-br from-primary/5 to-secondary/5">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
           <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Get In Touch
+            Get in Touch
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Ready to start your musical journey? Contact us today and let's create beautiful music together!
+            Ready to start your musical journey? We'd love to hear from you!
           </p>
         </div>
         
-        <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          <div className="lg:col-span-2">
-            <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-sm">
-              <CardHeader className="pb-8">
-                <CardTitle className="text-2xl font-bold">Send us a Message</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
+          {/* Contact Information */}
+          <div className="space-y-8">
+            <div>
+              <h3 className="text-2xl font-bold mb-6 text-primary">Contact Information</h3>
+              <div className="space-y-6">
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 bg-primary/10 rounded-full">
+                    <MapPin className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold">Address</h4>
+                    <p className="text-muted-foreground">P.O. BOX 14857-20100</p>
+                    <p className="text-muted-foreground">Olive Inn, Nakuru, Kenya</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 bg-accent/10 rounded-full">
+                    <Phone className="h-6 w-6 text-accent" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold">Phone</h4>
+                    <p className="text-muted-foreground">0701195460</p>
+                    <p className="text-muted-foreground">0713490535</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 bg-secondary/10 rounded-full">
+                    <Mail className="h-6 w-6 text-secondary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold">Email</h4>
+                    <p className="text-muted-foreground">info@damonmusicacademy.co.ke</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 bg-primary/10 rounded-full">
+                    <Clock className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold">Operating Hours</h4>
+                    <p className="text-muted-foreground">Monday - Saturday: 8:00 AM - 6:00 PM</p>
+                    <p className="text-muted-foreground">Sunday: 2:00 PM - 5:00 PM</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Google Maps */}
+            <div className="mt-8">
+              <h4 className="font-semibold mb-4">Find Us</h4>
+              <div className="relative overflow-hidden rounded-lg shadow-lg">
+                <iframe
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3989.755193!2d36.0661!3d-0.3031!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1829907b79a3e587%3A0x5f8b4b7b4b7b4b7b!2sOlive%20Inn%2C%20Nakuru!5e0!3m2!1sen!2ske!4v1635000000000!5m2!1sen!2ske"
+                  width="100%"
+                  height="200"
+                  style={{ border: 0 }}
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                ></iframe>
+              </div>
+              <Button
+                variant="outline"
+                className="mt-3 w-full"
+                onClick={() => window.open('https://maps.app.goo.gl/XGZaDXxaEbkdMLGj8', '_blank')}
+              >
+                Open in Google Maps
+              </Button>
+            </div>
+          </div>
+          
+          {/* Contact Form */}
+          <Card className="shadow-2xl border-0 bg-white/90 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold">Send us a Message</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Name *</Label>
                     <Input 
+                      id="name"
                       name="name"
-                      placeholder="Your Name" 
+                      placeholder="Your full name"
                       value={formData.name}
                       onChange={handleInputChange}
                       required
                       className="h-12"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email *</Label>
                     <Input 
+                      id="email"
                       name="email"
                       type="email"
-                      placeholder="Your Email" 
+                      placeholder="your@email.com"
                       value={formData.email}
                       onChange={handleInputChange}
                       required
                       className="h-12"
                     />
                   </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="subject">Subject *</Label>
                   <Input 
+                    id="subject"
                     name="subject"
-                    placeholder="Subject" 
+                    placeholder="What's this about?"
                     value={formData.subject}
                     onChange={handleInputChange}
                     required
                     className="h-12"
                   />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="message">Message *</Label>
                   <Textarea 
+                    id="message"
                     name="message"
-                    placeholder="Your Message" 
-                    rows={5} 
+                    placeholder="Tell us more about your inquiry..."
                     value={formData.message}
                     onChange={handleInputChange}
                     required
+                    rows={6}
                     className="resize-none"
                   />
-                  <Button 
-                    type="submit" 
-                    disabled={isSubmitting}
-                    className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 transition-all duration-300 shadow-lg"
-                  >
-                    {isSubmitting ? "Sending..." : "Send Message"}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
-          
-          <div className="space-y-6">
-            <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-              <CardContent className="p-8 space-y-6">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-primary/10 rounded-full">
-                    <Phone className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-lg mb-2">Phone Numbers</p>
-                    <p className="text-muted-foreground">0701 195 460</p>
-                    <p className="text-muted-foreground">0735 211 627</p>
-                    <p className="text-muted-foreground">0721 952 647</p>
-                  </div>
                 </div>
                 
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-primary/10 rounded-full">
-                    <Mail className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-lg mb-2">Email</p>
-                    <p className="text-muted-foreground break-all">damonmusicacademy@gmail.com</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-primary/10 rounded-full">
-                    <MapPin className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-lg mb-2">Location</p>
-                    <p className="text-muted-foreground">Nakuru, Kenya</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-gradient-to-br from-primary to-accent text-white shadow-xl border-0">
-              <CardContent className="p-8 text-center space-y-6">
-                <h3 className="text-2xl font-bold">Class Schedule</h3>
-                <div className="space-y-3 text-sm">
-                  <p><strong>Weekdays:</strong> Mon - Fri, 7AM - 7PM</p>
-                  <p><strong>Weekends:</strong> Sun - From Noon</p>
-                  <p><strong>Age Requirement:</strong> 3 years and above</p>
-                </div>
                 <Button 
-                  variant="secondary" 
-                  onClick={scrollToRegistration}
-                  className="w-full h-12 text-lg font-semibold shadow-lg hover:scale-105 transition-transform duration-200"
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="w-full h-12 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 transition-all duration-300 shadow-lg hover:scale-105"
                 >
-                  Register for Classes
+                  {isSubmitting ? "Sending..." : "Send Message"}
                 </Button>
-              </CardContent>
-            </Card>
-          </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </section>

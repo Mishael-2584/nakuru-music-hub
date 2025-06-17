@@ -1,27 +1,68 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+
+interface TimeSlot {
+  id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  instructor_name: string | null;
+  max_capacity: number | null;
+  current_bookings: number | null;
+}
 
 const Registration = () => {
   const [formData, setFormData] = useState({
     studentName: "",
     age: "",
+    location: "",
     email: "",
     phone: "",
     parentName: "",
     parentPhone: "",
+    courseCategory: "",
     instrument: "",
+    ownsInstrument: false,
+    learningMode: "",
+    proficiencyLevel: "",
+    timeSlotId: "",
     experience: "",
     goals: "",
     preferredSchedule: ""
   });
+  
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  useEffect(() => {
+    const fetchTimeSlots = async () => {
+      const { data, error } = await supabase
+        .from('time_slots')
+        .select('*')
+        .eq('is_available', true)
+        .order('day_of_week, start_time');
+
+      if (error) {
+        console.error('Error fetching time slots:', error);
+      } else {
+        setTimeSlots(data || []);
+      }
+    };
+
+    fetchTimeSlots();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,11 +75,17 @@ const Registration = () => {
           {
             student_name: formData.studentName,
             age: parseInt(formData.age),
+            location: formData.location,
             email: formData.email,
             phone: formData.phone,
             parent_name: formData.parentName || null,
             parent_phone: formData.parentPhone || null,
+            course_category: formData.courseCategory,
             instrument: formData.instrument,
+            owns_instrument: formData.ownsInstrument,
+            learning_mode: formData.learningMode,
+            proficiency_level: formData.proficiencyLevel,
+            time_slot_id: formData.timeSlotId || null,
             experience: formData.experience,
             goals: formData.goals || null,
             preferred_schedule: formData.preferredSchedule || null,
@@ -55,20 +102,40 @@ const Registration = () => {
         return;
       }
 
+      // Update time slot booking count
+      if (formData.timeSlotId) {
+        const timeSlot = timeSlots.find(slot => slot.id === formData.timeSlotId);
+        if (timeSlot) {
+          await supabase
+            .from('time_slots')
+            .update({ 
+              current_bookings: (timeSlot.current_bookings || 0) + 1,
+              is_available: (timeSlot.current_bookings || 0) + 1 < (timeSlot.max_capacity || 1)
+            })
+            .eq('id', formData.timeSlotId);
+        }
+      }
+
       toast({
         title: "Registration Submitted!",
-        description: "Thank you for registering! We'll contact you within 24 hours to schedule your first lesson.",
+        description: "Thank you for registering! We'll contact you within 24 hours to confirm your enrollment.",
       });
       
       // Reset form
       setFormData({
         studentName: "",
         age: "",
+        location: "",
         email: "",
         phone: "",
         parentName: "",
         parentPhone: "",
+        courseCategory: "",
         instrument: "",
+        ownsInstrument: false,
+        learningMode: "",
+        proficiencyLevel: "",
+        timeSlotId: "",
         experience: "",
         goals: "",
         preferredSchedule: ""
@@ -85,12 +152,9 @@ const Registration = () => {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
+  const availableTimeSlots = timeSlots.filter(slot => 
+    (slot.current_bookings || 0) < (slot.max_capacity || 1)
+  );
 
   return (
     <section id="registration" className="py-24 bg-gradient-to-br from-secondary/10 to-accent/10">
@@ -100,14 +164,14 @@ const Registration = () => {
             Register for Classes
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Take the first step towards your musical journey. Fill out the form below and we'll get in touch!
+            Take the first step towards your creative journey. Fill out the form below and we'll get in touch!
           </p>
         </div>
         
         <div className="max-w-4xl mx-auto">
           <Card className="shadow-2xl border-0 bg-white/90 backdrop-blur-sm">
             <CardHeader className="pb-8">
-              <CardTitle className="text-3xl font-bold text-center">Class Registration Form</CardTitle>
+              <CardTitle className="text-3xl font-bold text-center">Student Registration Form</CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-8">
@@ -119,10 +183,9 @@ const Registration = () => {
                       <Label htmlFor="studentName">Student Name *</Label>
                       <Input 
                         id="studentName"
-                        name="studentName"
                         placeholder="Full name of student"
                         value={formData.studentName}
-                        onChange={handleInputChange}
+                        onChange={(e) => setFormData({...formData, studentName: e.target.value})}
                         required
                         className="h-12"
                       />
@@ -131,13 +194,12 @@ const Registration = () => {
                       <Label htmlFor="age">Age *</Label>
                       <Input 
                         id="age"
-                        name="age"
                         type="number"
                         min="3"
                         max="100"
                         placeholder="Student's age"
                         value={formData.age}
-                        onChange={handleInputChange}
+                        onChange={(e) => setFormData({...formData, age: e.target.value})}
                         required
                         className="h-12"
                       />
@@ -145,27 +207,38 @@ const Registration = () => {
                   </div>
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label htmlFor="email">Email *</Label>
+                      <Label htmlFor="location">Location *</Label>
                       <Input 
-                        id="email"
-                        name="email"
-                        type="email"
-                        placeholder="student@example.com"
-                        value={formData.email}
-                        onChange={handleInputChange}
+                        id="location"
+                        placeholder="City/Area (e.g., Nakuru, Nairobi)"
+                        value={formData.location}
+                        onChange={(e) => setFormData({...formData, location: e.target.value})}
                         required
                         className="h-12"
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label htmlFor="email">Email *</Label>
+                      <Input 
+                        id="email"
+                        type="email"
+                        placeholder="student@example.com"
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        required
+                        className="h-12"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
                       <Label htmlFor="phone">Phone Number *</Label>
                       <Input 
                         id="phone"
-                        name="phone"
                         type="tel"
                         placeholder="0701 234 567"
                         value={formData.phone}
-                        onChange={handleInputChange}
+                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
                         required
                         className="h-12"
                       />
@@ -173,18 +246,17 @@ const Registration = () => {
                   </div>
                 </div>
 
-                {/* Parent/Guardian Information (for minors) */}
+                {/* Parent/Guardian Information */}
                 <div className="space-y-6">
-                  <h3 className="text-xl font-bold text-primary border-b border-primary/20 pb-2">Parent/Guardian Information</h3>
+                  <h3 className="text-xl font-bold text-primary border-b border-primary/20 pb-2">Parent/Guardian Information (if under 18)</h3>
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <Label htmlFor="parentName">Parent/Guardian Name</Label>
                       <Input 
                         id="parentName"
-                        name="parentName"
-                        placeholder="Full name (if student is under 18)"
+                        placeholder="Full name"
                         value={formData.parentName}
-                        onChange={handleInputChange}
+                        onChange={(e) => setFormData({...formData, parentName: e.target.value})}
                         className="h-12"
                       />
                     </div>
@@ -192,11 +264,10 @@ const Registration = () => {
                       <Label htmlFor="parentPhone">Parent/Guardian Phone</Label>
                       <Input 
                         id="parentPhone"
-                        name="parentPhone"
                         type="tel"
                         placeholder="0701 234 567"
                         value={formData.parentPhone}
-                        onChange={handleInputChange}
+                        onChange={(e) => setFormData({...formData, parentPhone: e.target.value})}
                         className="h-12"
                       />
                     </div>
@@ -206,69 +277,118 @@ const Registration = () => {
                 {/* Course Information */}
                 <div className="space-y-6">
                   <h3 className="text-xl font-bold text-primary border-b border-primary/20 pb-2">Course Information</h3>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="instrument">Preferred Instrument *</Label>
-                      <select 
-                        id="instrument"
-                        name="instrument"
-                        value={formData.instrument}
-                        onChange={handleInputChange}
-                        required
-                        className="h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        <option value="">Select an instrument</option>
-                        <option value="piano">Piano</option>
-                        <option value="guitar">Guitar</option>
-                        <option value="violin">Violin</option>
-                        <option value="drums">Drums</option>
-                        <option value="voice">Voice Training</option>
-                        <option value="saxophone">Saxophone</option>
-                        <option value="flute">Flute</option>
-                        <option value="trumpet">Trumpet</option>
-                        <option value="bass">Bass Guitar</option>
-                        <option value="theory">Music Theory</option>
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="experience">Experience Level *</Label>
-                      <select 
-                        id="experience"
-                        name="experience"
-                        value={formData.experience}
-                        onChange={handleInputChange}
-                        required
-                        className="h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        <option value="">Select experience level</option>
-                        <option value="beginner">Complete Beginner</option>
-                        <option value="some-experience">Some Experience</option>
-                        <option value="intermediate">Intermediate</option>
-                        <option value="advanced">Advanced</option>
-                      </select>
-                    </div>
-                  </div>
+                  
                   <div className="space-y-2">
-                    <Label htmlFor="goals">Musical Goals</Label>
+                    <Label htmlFor="courseCategory">Course Category *</Label>
+                    <Select value={formData.courseCategory} onValueChange={(value) => setFormData({...formData, courseCategory: value, instrument: ""})}>
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Select course category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="music">Music</SelectItem>
+                        <SelectItem value="production">Music Production</SelectItem>
+                        <SelectItem value="art">Art & Photography</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {formData.courseCategory === "music" && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="instrument">Preferred Instrument *</Label>
+                        <Select value={formData.instrument} onValueChange={(value) => setFormData({...formData, instrument: value})}>
+                          <SelectTrigger className="h-12">
+                            <SelectValue placeholder="Select an instrument" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="piano">Piano</SelectItem>
+                            <SelectItem value="guitar">Guitar</SelectItem>
+                            <SelectItem value="violin">Violin</SelectItem>
+                            <SelectItem value="drums">Drums</SelectItem>
+                            <SelectItem value="voice">Voice Training</SelectItem>
+                            <SelectItem value="saxophone">Saxophone</SelectItem>
+                            <SelectItem value="flute">Flute</SelectItem>
+                            <SelectItem value="trumpet">Trumpet</SelectItem>
+                            <SelectItem value="trombone">Trombone</SelectItem>
+                            <SelectItem value="theory">Music Theory</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="ownsInstrument"
+                            checked={formData.ownsInstrument}
+                            onCheckedChange={(checked) => setFormData({...formData, ownsInstrument: checked as boolean})}
+                          />
+                          <Label htmlFor="ownsInstrument">I own the instrument</Label>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {formData.courseCategory && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="learningMode">Preferred Learning Mode *</Label>
+                        <Select value={formData.learningMode} onValueChange={(value) => setFormData({...formData, learningMode: value})}>
+                          <SelectTrigger className="h-12">
+                            <SelectValue placeholder="Select learning mode" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="in-person">In Person at the Academy</SelectItem>
+                            <SelectItem value="home">Home Lessons</SelectItem>
+                            <SelectItem value="online">Online Lessons</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="proficiencyLevel">Current Proficiency Level *</Label>
+                        <Select value={formData.proficiencyLevel} onValueChange={(value) => setFormData({...formData, proficiencyLevel: value})}>
+                          <SelectTrigger className="h-12">
+                            <SelectValue placeholder="Select your level" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="beginner">Beginner - No prior experience / Just starting out</SelectItem>
+                            <SelectItem value="intermediate">Intermediate - Can play some pieces and read basic music</SelectItem>
+                            <SelectItem value="advanced">Advanced - Can play well and read music effectively</SelectItem>
+                            <SelectItem value="assessment">Unsure / Needs Assessment - Please guide me</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {formData.learningMode === "in-person" && (
+                        <div className="space-y-2">
+                          <Label htmlFor="timeSlot">Preferred Time Slot</Label>
+                          <Select value={formData.timeSlotId} onValueChange={(value) => setFormData({...formData, timeSlotId: value})}>
+                            <SelectTrigger className="h-12">
+                              <SelectValue placeholder="Select available time slot" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableTimeSlots.map((slot) => (
+                                <SelectItem key={slot.id} value={slot.id}>
+                                  {dayNames[slot.day_of_week]} {slot.start_time} - {slot.end_time}
+                                  {slot.instructor_name && ` (${slot.instructor_name})`}
+                                  {slot.max_capacity && ` - ${(slot.max_capacity - (slot.current_bookings || 0))} spots left`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="goals">Learning Goals</Label>
                     <Textarea 
                       id="goals"
-                      name="goals"
-                      placeholder="What would you like to achieve with your music lessons?"
+                      placeholder="What would you like to achieve with your lessons?"
                       value={formData.goals}
-                      onChange={handleInputChange}
+                      onChange={(e) => setFormData({...formData, goals: e.target.value})}
                       rows={3}
-                      className="resize-none"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="preferredSchedule">Preferred Schedule</Label>
-                    <Textarea 
-                      id="preferredSchedule"
-                      name="preferredSchedule"
-                      placeholder="When would you prefer to have lessons? (e.g., weekday evenings, weekend mornings)"
-                      value={formData.preferredSchedule}
-                      onChange={handleInputChange}
-                      rows={2}
                       className="resize-none"
                     />
                   </div>
