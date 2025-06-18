@@ -8,7 +8,7 @@ const News = () => {
     <div className="min-h-screen">
       <Header />
       
-      <section className="py-20 bg-gradient-to-br from-emerald-900/20 via-teal-900/20 to-cyan-900/20 relative overflow-hidden">
+      <section className="pt-24 py-20 bg-gradient-to-br from-emerald-900/20 via-teal-900/20 to-cyan-900/20 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('/lovable-uploads/70f23f35-6eb2-49a1-8bf6-677fe0c49746.png')] bg-cover bg-center opacity-10"></div>
         <div className="container mx-auto px-4 relative">
           <div className="text-center mb-16">

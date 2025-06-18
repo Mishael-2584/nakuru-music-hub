@@ -8,7 +8,7 @@ const AboutPage = () => {
     <div className="min-h-screen">
       <Header />
       
-      <section className="py-20 bg-gradient-to-br from-blue-900/20 via-indigo-900/20 to-purple-900/20 relative overflow-hidden">
+      <section className="pt-24 py-20 bg-gradient-to-br from-blue-900/20 via-indigo-900/20 to-purple-900/20 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('/lovable-uploads/40fee785-03dc-4548-8e48-b09291ee8f42.png')] bg-cover bg-center opacity-10"></div>
         <div className="container mx-auto px-4 relative">
           <div className="text-center mb-16">

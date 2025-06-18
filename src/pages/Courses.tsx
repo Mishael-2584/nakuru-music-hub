@@ -8,7 +8,7 @@ const Courses = () => {
     <div className="min-h-screen">
       <Header />
       
-      <section className="py-20 bg-gradient-to-br from-orange-900/20 via-red-900/20 to-pink-900/20 relative overflow-hidden">
+      <section className="pt-24 py-20 bg-gradient-to-br from-orange-900/20 via-red-900/20 to-pink-900/20 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('/lovable-uploads/cc2f7a6b-1ce1-4921-a0b6-b29db99b5d4a.png')] bg-cover bg-center opacity-10"></div>
         <div className="container mx-auto px-4 relative">
           <div className="text-center mb-16">

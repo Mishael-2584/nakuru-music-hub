@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Music } from "lucide-react";
+import { Menu, X, Music, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const Header = () => {
@@ -17,7 +17,7 @@ const Header = () => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-primary/10 shadow-lg">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center space-x-2">
@@ -93,6 +93,13 @@ const Header = () => {
             >
               Gallery
             </Link>
+            <Link
+              to="/auth"
+              className="flex items-center space-x-1 text-gray-700 hover:text-primary transition-colors"
+            >
+              <LogIn className="h-4 w-4" />
+              <span>Login</span>
+            </Link>
           </nav>
 
           {/* Mobile Menu Button */}
@@ -106,7 +113,7 @@ const Header = () => {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <nav className="md:hidden py-4 border-t border-primary/10">
+          <nav className="md:hidden py-4 border-t border-gray-200">
             <div className="flex flex-col space-y-4">
               <Link
                 to="/"
@@ -179,6 +186,14 @@ const Header = () => {
                 onClick={() => setIsMenuOpen(false)}
               >
                 Gallery
+              </Link>
+              <Link
+                to="/auth"
+                className="flex items-center space-x-1 text-gray-700 hover:text-primary transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <LogIn className="h-4 w-4" />
+                <span>Login</span>
               </Link>
             </div>
           </nav>

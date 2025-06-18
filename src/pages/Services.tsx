@@ -8,7 +8,7 @@ const ServicesPage = () => {
     <div className="min-h-screen">
       <Header />
       
-      <section className="py-20 bg-gradient-to-br from-secondary/5 to-primary/5">
+      <section className="pt-24 py-20 bg-gradient-to-br from-secondary/5 to-primary/5">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
