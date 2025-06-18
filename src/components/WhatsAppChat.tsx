@@ -1,0 +1,29 @@
+
+import { MessageCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+const WhatsAppChat = () => {
+  const handleWhatsAppClick = () => {
+    const phoneNumber = "+254700000000"; // Replace with your actual WhatsApp business number
+    const message = "Hello! I'm interested in learning more about Damon Music Academy's programs.";
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50">
+      <Button
+        onClick={handleWhatsAppClick}
+        className="bg-green-500 hover:bg-green-600 text-white rounded-full p-4 shadow-2xl transition-all duration-300 hover:scale-110 group"
+        size="lg"
+      >
+        <MessageCircle className="h-6 w-6 mr-2" />
+        <span className="hidden group-hover:inline-block transition-all duration-300">
+          Chat with us now
+        </span>
+      </Button>
+    </div>
+  );
+};
+
+export default WhatsAppChat;

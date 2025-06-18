@@ -53,7 +53,7 @@ interface ClassSchedule {
 }
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'admins'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'news' | 'admins'>('stats');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
@@ -330,14 +330,6 @@ const AdminPanel = () => {
               Students ({activeStudents.length})
             </Button>
             <Button
-              variant={activeTab === 'schedule' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('schedule')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
-            >
-              <Clock className="h-4 w-4 mr-2" />
-              Schedule
-            </Button>
-            <Button
               variant={activeTab === 'registrations' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('registrations')}
               className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
@@ -346,12 +338,36 @@ const AdminPanel = () => {
               Applications ({registrations.length})
             </Button>
             <Button
+              variant={activeTab === 'events' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('events')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Events
+            </Button>
+            <Button
+              variant={activeTab === 'news' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('news')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+            >
+              <BookOpen className="h-4 w-4 mr-2" />
+              News
+            </Button>
+            <Button
               variant={activeTab === 'messages' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('messages')}
               className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
             >
               <Mic className="h-4 w-4 mr-2" />
               Messages ({contactMessages.length})
+            </Button>
+            <Button
+              variant={activeTab === 'schedule' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('schedule')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+            >
+              <Clock className="h-4 w-4 mr-2" />
+              Schedule
             </Button>
             {userRole === 'super_admin' && (
               <Button
@@ -431,10 +447,58 @@ const AdminPanel = () => {
           </div>
         )}
 
+        {/* Events Tab */}
+        {activeTab === 'events' && (
+          <div className="space-y-6">
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent text-center">
+              Events Management
+            </h3>
+            
+            <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="text-center py-12">
+                  <Calendar className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                  <h4 className="text-xl font-semibold text-muted-foreground mb-2">Events Management Coming Soon</h4>
+                  <p className="text-muted-foreground">
+                    Full event creation, editing, and management capabilities will be available in the next update.
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Currently, events can be managed directly through the database.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* News Tab */}
+        {activeTab === 'news' && (
+          <div className="space-y-6">
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent text-center">
+              News Management
+            </h3>
+            
+            <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="text-center py-12">
+                  <BookOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                  <h4 className="text-xl font-semibold text-muted-foreground mb-2">News Management Coming Soon</h4>
+                  <p className="text-muted-foreground">
+                    Full news article creation, editing, and management capabilities will be available in the next update.
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Currently, news articles can be managed directly through the database.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Schedule Tab */}
         {activeTab === 'schedule' && (
           <div className="space-y-6">
-            <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent text-center">
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Class Schedule Management
             </h3>
             
@@ -458,7 +522,7 @@ const AdminPanel = () => {
         {/* Admin Management Tab (Super Admin Only) */}
         {activeTab === 'admins' && userRole === 'super_admin' && (
           <div className="space-y-6">
-            <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent text-center">
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Admin Management
             </h3>
             

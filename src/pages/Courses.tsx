@@ -8,10 +8,11 @@ const Courses = () => {
     <div className="min-h-screen">
       <Header />
       
-      <section className="py-20 bg-gradient-to-br from-primary/5 to-accent/5">
-        <div className="container mx-auto px-4">
+      <section className="py-20 bg-gradient-to-br from-orange-900/20 via-red-900/20 to-pink-900/20 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('/lovable-uploads/cc2f7a6b-1ce1-4921-a0b6-b29db99b5d4a.png')] bg-cover bg-center opacity-10"></div>
+        <div className="container mx-auto px-4 relative">
           <div className="text-center mb-16">
-            <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            <h1 className="text-6xl font-bold mb-6 bg-gradient-to-r from-orange-400 via-red-500 to-pink-500 bg-clip-text text-transparent">
               Our Music Programs
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">

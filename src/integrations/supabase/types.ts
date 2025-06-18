@@ -39,9 +39,52 @@ export type Database = {
         }
         Relationships: []
       }
-      events: {
+      event_registrations: {
         Row: {
           created_at: string
+          email: string
+          event_id: string | null
+          id: string
+          message: string | null
+          name: string
+          phone: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          event_id?: string | null
+          id?: string
+          message?: string | null
+          name: string
+          phone?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          event_id?: string | null
+          id?: string
+          message?: string | null
+          name?: string
+          phone?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_registrations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          content: string | null
+          created_at: string
+          current_attendees: number | null
           description: string | null
           event_date: string
           event_time: string | null
@@ -49,11 +92,17 @@ export type Database = {
           image_url: string | null
           is_featured: boolean | null
           location: string | null
+          max_attendees: number | null
+          registration_required: boolean | null
+          slug: string | null
+          status: string | null
           title: string
           updated_at: string
         }
         Insert: {
+          content?: string | null
           created_at?: string
+          current_attendees?: number | null
           description?: string | null
           event_date: string
           event_time?: string | null
@@ -61,11 +110,17 @@ export type Database = {
           image_url?: string | null
           is_featured?: boolean | null
           location?: string | null
+          max_attendees?: number | null
+          registration_required?: boolean | null
+          slug?: string | null
+          status?: string | null
           title: string
           updated_at?: string
         }
         Update: {
+          content?: string | null
           created_at?: string
+          current_attendees?: number | null
           description?: string | null
           event_date?: string
           event_time?: string | null
@@ -73,6 +128,10 @@ export type Database = {
           image_url?: string | null
           is_featured?: boolean | null
           location?: string | null
+          max_attendees?: number | null
+          registration_required?: boolean | null
+          slug?: string | null
+          status?: string | null
           title?: string
           updated_at?: string
         }
@@ -118,9 +177,14 @@ export type Database = {
           created_at: string
           description: string | null
           duration: string | null
+          exam_fee: number | null
           id: string
           is_active: boolean | null
+          level: string | null
+          material_fee: number | null
+          payment_frequency: string | null
           price: number
+          registration_fee: number | null
           updated_at: string
         }
         Insert: {
@@ -129,9 +193,14 @@ export type Database = {
           created_at?: string
           description?: string | null
           duration?: string | null
+          exam_fee?: number | null
           id?: string
           is_active?: boolean | null
+          level?: string | null
+          material_fee?: number | null
+          payment_frequency?: string | null
           price: number
+          registration_fee?: number | null
           updated_at?: string
         }
         Update: {
@@ -140,9 +209,14 @@ export type Database = {
           created_at?: string
           description?: string | null
           duration?: string | null
+          exam_fee?: number | null
           id?: string
           is_active?: boolean | null
+          level?: string | null
+          material_fee?: number | null
+          payment_frequency?: string | null
           price?: number
+          registration_fee?: number | null
           updated_at?: string
         }
         Relationships: []
@@ -155,6 +229,8 @@ export type Database = {
           id: string
           image_url: string | null
           is_featured: boolean | null
+          slug: string | null
+          status: string | null
           title: string
           updated_at: string
         }
@@ -165,6 +241,8 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_featured?: boolean | null
+          slug?: string | null
+          status?: string | null
           title: string
           updated_at?: string
         }
@@ -175,6 +253,8 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_featured?: boolean | null
+          slug?: string | null
+          status?: string | null
           title?: string
           updated_at?: string
         }

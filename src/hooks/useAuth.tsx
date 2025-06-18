@@ -1,116 +1,77 @@
 
-import { useState, useEffect, useRef } from "react";
-import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 
-export const useAuth = () => {
+interface AuthContextType {
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+  isAuthenticated: boolean;
+  isInitialized: boolean;
+  signOut: () => Promise<{ error: any }>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
-  const initializationRef = useRef(false);
-  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Prevent multiple initializations
-    if (initializationRef.current) return;
-    initializationRef.current = true;
-
-    let mounted = true;
-
-    const updateAuthState = (newSession: Session | null, immediate = false) => {
-      if (!mounted) return;
-      
-      // Clear any pending updates
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-        updateTimeoutRef.current = null;
-      }
-
-      const doUpdate = () => {
-        if (!mounted) return;
-        
-        console.log("Auth state updating:", newSession?.user?.email || "No user");
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
-        setLoading(false);
-        setIsInitialized(true);
-      };
-
-      if (immediate) {
-        doUpdate();
-      } else {
-        // Debounce updates to prevent rapid state changes
-        updateTimeoutRef.current = setTimeout(doUpdate, 100);
-      }
-    };
-
     // Get initial session
     const getInitialSession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (mounted) {
-          if (error) {
-            console.error("Error getting session:", error);
-            setLoading(false);
-            setIsInitialized(true);
-          } else {
-            console.log("Initial session retrieved:", session?.user?.email || "No session");
-            updateAuthState(session, true);
-          }
-        }
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
       } catch (error) {
-        console.error("Unexpected error getting session:", error);
-        if (mounted) {
-          setLoading(false);
-          setIsInitialized(true);
-        }
+        console.error('Error getting initial session:', error);
+      } finally {
+        setLoading(false);
+        setIsInitialized(true);
       }
     };
-
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log("Auth event:", event, session?.user?.email || "No user");
-        // Only update for meaningful changes, not initial session
-        if (event !== 'INITIAL_SESSION' && mounted) {
-          updateAuthState(session);
-        }
-      }
-    );
 
     getInitialSession();
 
-    return () => {
-      mounted = false;
-      initializationRef.current = false;
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state change:', event, session?.user?.email);
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+        setIsInitialized(true);
       }
-      subscription.unsubscribe();
-    };
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const signOut = async () => {
-    try {
-      setLoading(true);
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error("Sign out error:", error);
-      }
-      return { error };
-    } catch (error) {
-      console.error("Unexpected sign out error:", error);
-      return { error };
-    }
+    const { error } = await supabase.auth.signOut();
+    return { error };
   };
 
-  return {
+  const value = {
     user,
     session,
     loading,
+    isAuthenticated: !!user,
     isInitialized,
-    signOut,
-    isAuthenticated: !!user && !!session,
+    signOut
   };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };

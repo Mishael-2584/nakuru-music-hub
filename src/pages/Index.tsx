@@ -6,6 +6,8 @@ import Testimonials from "@/components/Testimonials";
 import Registration from "@/components/Registration";
 import Contact from "@/components/Contact";
 import Footer from "@/components/Footer";
+import SocialMedia from "@/components/SocialMedia";
+import WhatsAppChat from "@/components/WhatsAppChat";
 
 const Index = () => {
   return (
@@ -15,8 +17,10 @@ const Index = () => {
       <CoursesTeaser />
       <Testimonials />
       <Registration />
+      <SocialMedia />
       <Contact />
       <Footer />
+      <WhatsAppChat />
     </div>
   );
 };
