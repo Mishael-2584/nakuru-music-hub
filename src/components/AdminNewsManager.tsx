@@ -54,7 +54,22 @@ const AdminNewsManager = () => {
     try {
       const { data, error } = await supabase
         .from('news')
-        .select('*')
+        .select(`
+          id,
+          title,
+          content,
+          excerpt,
+          image_url,
+          featured_image_url,
+          author,
+          category,
+          status,
+          is_featured,
+          slug,
+          tags,
+          created_at,
+          updated_at
+        `)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -67,7 +82,16 @@ const AdminNewsManager = () => {
         return;
       }
 
-      setArticles(data || []);
+      // Ensure data has proper defaults for new fields
+      const articlesWithDefaults = (data || []).map(article => ({
+        ...article,
+        featured_image_url: article.featured_image_url || null,
+        author: article.author || null,
+        category: article.category || 'general',
+        tags: article.tags || null
+      }));
+
+      setArticles(articlesWithDefaults);
     } catch (error) {
       console.error('Unexpected error:', error);
     } finally {

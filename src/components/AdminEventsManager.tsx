@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,7 +68,30 @@ const AdminEventsManager = () => {
     try {
       const { data, error } = await supabase
         .from('events')
-        .select('*')
+        .select(`
+          id,
+          title,
+          description,
+          content,
+          event_date,
+          event_time,
+          location,
+          image_url,
+          featured_image_url,
+          organizer,
+          contact_email,
+          contact_phone,
+          price,
+          max_attendees,
+          current_attendees,
+          registration_required,
+          status,
+          is_featured,
+          slug,
+          tags,
+          created_at,
+          updated_at
+        `)
         .order('event_date', { ascending: true });
 
       if (error) {
@@ -82,7 +104,18 @@ const AdminEventsManager = () => {
         return;
       }
 
-      setEvents(data || []);
+      // Ensure data has proper defaults for new fields
+      const eventsWithDefaults = (data || []).map(event => ({
+        ...event,
+        featured_image_url: event.featured_image_url || null,
+        organizer: event.organizer || null,
+        contact_email: event.contact_email || null,
+        contact_phone: event.contact_phone || null,
+        tags: event.tags || null,
+        price: event.price || null
+      }));
+
+      setEvents(eventsWithDefaults);
     } catch (error) {
       console.error('Unexpected error:', error);
     } finally {
