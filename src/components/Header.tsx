@@ -44,7 +44,7 @@ const Header = () => {
           {/* Logo - Updated with new logo */}
           <Link to="/" className="flex items-center space-x-3 group">
             <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
-              <img alt="Damon Music Academy Logo" src="/lovable-uploads/07e85f5a-a5c3-4a5c-8bec-faf1e80b587c.png" className="w-10 h-10 object-cover" />
+              <img alt="Damon Music Academy Logo" src="/lovable-uploads/6897b00c-5998-4e70-896a-816a979e52f6.png" className="w-10 h-10 object-cover" />
             </div>
             <div className="hidden md:block">
               <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
