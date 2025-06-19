@@ -8,6 +8,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import AdminEventsManager from "./AdminEventsManager";
+import AdminNewsManager from "./AdminNewsManager";
 
 interface Registration {
   id: string;
@@ -448,52 +450,10 @@ const AdminPanel = () => {
         )}
 
         {/* Events Tab */}
-        {activeTab === 'events' && (
-          <div className="space-y-6">
-            <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent text-center">
-              Events Management
-            </h3>
-            
-            <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-              <CardContent className="p-6">
-                <div className="text-center py-12">
-                  <Calendar className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                  <h4 className="text-xl font-semibold text-muted-foreground mb-2">Events Management Coming Soon</h4>
-                  <p className="text-muted-foreground">
-                    Full event creation, editing, and management capabilities will be available in the next update.
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Currently, events can be managed directly through the database.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+        {activeTab === 'events' && <AdminEventsManager />}
 
         {/* News Tab */}
-        {activeTab === 'news' && (
-          <div className="space-y-6">
-            <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent text-center">
-              News Management
-            </h3>
-            
-            <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-              <CardContent className="p-6">
-                <div className="text-center py-12">
-                  <BookOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                  <h4 className="text-xl font-semibold text-muted-foreground mb-2">News Management Coming Soon</h4>
-                  <p className="text-muted-foreground">
-                    Full news article creation, editing, and management capabilities will be available in the next update.
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Currently, news articles can be managed directly through the database.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+        {activeTab === 'news' && <AdminNewsManager />}
 
         {/* Schedule Tab */}
         {activeTab === 'schedule' && (
@@ -565,9 +525,6 @@ const AdminPanel = () => {
           </div>
         )}
 
-        {/* Keep existing code for other tabs (students, registrations, messages) */}
-        {/* ... keep existing code (students tab implementation) */}
-        
         {/* Active Students Tab */}
         {activeTab === 'students' && (
           <div className="space-y-6">
