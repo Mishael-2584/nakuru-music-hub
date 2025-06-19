@@ -40,7 +40,7 @@ const Header = () => {
           <Link to="/" className="flex items-center space-x-3 group">
             <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
               <img 
-                src="/lovable-uploads/cc2f7a6b-1ce1-4921-a0b6-b29db99b5d4a.png" 
+                src="/lovable-uploads/bda126b8-9e86-4564-9832-173ce818d676.png" 
                 alt="Damon Music Academy Logo" 
                 className="w-10 h-10 object-contain"
               />

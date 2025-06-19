@@ -1,109 +1,67 @@
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-
-interface TimeSlot {
-  id: string;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  instructor_name: string | null;
-  max_capacity: number | null;
-  current_bookings: number | null;
-}
+import { Music, Users, Award, Star } from "lucide-react";
 
 const Registration = () => {
   const [formData, setFormData] = useState({
-    studentName: "",
+    student_name: "",
     age: "",
-    location: "",
     email: "",
     phone: "",
-    parentName: "",
-    parentPhone: "",
-    courseCategory: "",
+    parent_name: "",
+    parent_phone: "",
+    course_category: "",
     instrument: "",
-    ownsInstrument: false,
-    learningMode: "",
-    proficiencyLevel: "",
-    timeSlotId: "",
     experience: "",
     goals: "",
-    preferredSchedule: "",
-    medicalConditions: "",
-    emergencyContactName: "",
-    emergencyContactPhone: "",
-    previousMusicalEducation: "",
-    specificRequirements: ""
+    preferred_schedule: "",
+    proficiency_level: "beginner",
+    learning_mode: "in-person",
+    owns_instrument: false,
+    location: ""
   });
-  
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-
-  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-  useEffect(() => {
-    const fetchTimeSlots = async () => {
-      const { data, error } = await supabase
-        .from('time_slots')
-        .select('*')
-        .eq('is_available', true)
-        .order('day_of_week, start_time');
-
-      if (error) {
-        console.error('Error fetching time slots:', error);
-      } else {
-        setTimeSlots(data || []);
-      }
-    };
-
-    fetchTimeSlots();
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
       const { error } = await supabase
         .from('registrations')
-        .insert([
-          {
-            student_name: formData.studentName,
-            age: parseInt(formData.age),
-            location: formData.location,
-            email: formData.email,
-            phone: formData.phone,
-            parent_name: formData.parentName || null,
-            parent_phone: formData.parentPhone || null,
-            course_category: formData.courseCategory,
-            instrument: formData.instrument,
-            owns_instrument: formData.ownsInstrument,
-            learning_mode: formData.learningMode,
-            proficiency_level: formData.proficiencyLevel,
-            time_slot_id: formData.timeSlotId || null,
-            experience: formData.experience,
-            goals: formData.goals || null,
-            preferred_schedule: formData.preferredSchedule || null,
-            medical_conditions: formData.medicalConditions || null,
-            emergency_contact_name: formData.emergencyContactName || null,
-            emergency_contact_phone: formData.emergencyContactPhone || null,
-            previous_musical_education: formData.previousMusicalEducation || null,
-            specific_requirements: formData.specificRequirements || null,
-          }
-        ]);
+        .insert([{
+          student_name: formData.student_name,
+          age: parseInt(formData.age),
+          email: formData.email,
+          phone: formData.phone,
+          parent_name: formData.parent_name || null,
+          parent_phone: formData.parent_phone || null,
+          course_category: formData.course_category,
+          instrument: formData.instrument,
+          experience: formData.experience,
+          goals: formData.goals || null,
+          preferred_schedule: formData.preferred_schedule || null,
+          proficiency_level: formData.proficiency_level,
+          learning_mode: formData.learning_mode,
+          owns_instrument: formData.owns_instrument,
+          location: formData.location || null,
+          status: 'pending'
+        }]);
 
       if (error) {
-        console.error("Registration error:", error);
+        console.error('Registration error:', error);
         toast({
           title: "Registration Failed",
           description: "There was an error submitting your registration. Please try again.",
@@ -112,53 +70,34 @@ const Registration = () => {
         return;
       }
 
-      // Update time slot booking count
-      if (formData.timeSlotId) {
-        const timeSlot = timeSlots.find(slot => slot.id === formData.timeSlotId);
-        if (timeSlot) {
-          await supabase
-            .from('time_slots')
-            .update({ 
-              current_bookings: (timeSlot.current_bookings || 0) + 1,
-              is_available: (timeSlot.current_bookings || 0) + 1 < (timeSlot.max_capacity || 1)
-            })
-            .eq('id', formData.timeSlotId);
-        }
-      }
-
       toast({
-        title: "Registration Submitted!",
-        description: "Thank you for registering! We'll contact you within 24 hours to confirm your enrollment.",
+        title: "Registration Successful!",
+        description: "Thank you for registering! We'll contact you soon to confirm your enrollment.",
       });
-      
+
       // Reset form
       setFormData({
-        studentName: "",
+        student_name: "",
         age: "",
-        location: "",
         email: "",
         phone: "",
-        parentName: "",
-        parentPhone: "",
-        courseCategory: "",
+        parent_name: "",
+        parent_phone: "",
+        course_category: "",
         instrument: "",
-        ownsInstrument: false,
-        learningMode: "",
-        proficiencyLevel: "",
-        timeSlotId: "",
         experience: "",
         goals: "",
-        preferredSchedule: "",
-        medicalConditions: "",
-        emergencyContactName: "",
-        emergencyContactPhone: "",
-        previousMusicalEducation: "",
-        specificRequirements: ""
+        preferred_schedule: "",
+        proficiency_level: "beginner",
+        learning_mode: "in-person",
+        owns_instrument: false,
+        location: ""
       });
+
     } catch (error) {
-      console.error("Unexpected error:", error);
+      console.error('Unexpected error:', error);
       toast({
-        title: "Error",
+        title: "Registration Failed",
         description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
@@ -167,323 +106,260 @@ const Registration = () => {
     }
   };
 
-  const availableTimeSlots = timeSlots.filter(slot => 
-    (slot.current_bookings || 0) < (slot.max_capacity || 1)
-  );
-
   return (
-    <section id="registration" className="py-24 bg-gradient-to-br from-secondary/10 to-accent/10">
+    <section id="registration" className="py-24 bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
-          <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Register for Classes
+          <div className="flex items-center justify-center mb-6">
+            <div className="p-4 bg-gradient-to-r from-primary to-accent rounded-full shadow-2xl">
+              <Music className="h-12 w-12 text-white" />
+            </div>
+          </div>
+          <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+            Start Your Musical Journey
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Take the first step towards your creative journey. Fill out the form below and we'll get in touch!
+            Join hundreds of students who have discovered their musical passion at Damon Music Academy
           </p>
         </div>
-        
-        <div className="max-w-4xl mx-auto">
-          <Card className="shadow-2xl border-0 bg-white/90 backdrop-blur-sm">
-            <CardHeader className="pb-8">
-              <CardTitle className="text-3xl font-bold text-center">Student Registration Form</CardTitle>
+
+        <div className="grid lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+          {/* Stats Cards */}
+          <div className="lg:col-span-1 space-y-6">
+            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+              <CardContent className="p-6 text-center">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="p-3 bg-primary/20 rounded-full">
+                    <Users className="h-8 w-8 text-primary" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-primary mb-2">500+</h3>
+                <p className="text-muted-foreground">Happy Students</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+              <CardContent className="p-6 text-center">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="p-3 bg-accent/20 rounded-full">
+                    <Award className="h-8 w-8 text-accent" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-accent mb-2">15+</h3>
+                <p className="text-muted-foreground">Expert Instructors</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+              <CardContent className="p-6 text-center">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="p-3 bg-secondary/20 rounded-full">
+                    <Star className="h-8 w-8 text-secondary" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-secondary mb-2">5.0</h3>
+                <p className="text-muted-foreground">Average Rating</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Registration Form */}
+          <Card className="lg:col-span-2 bg-white/95 backdrop-blur-sm border-0 shadow-2xl">
+            <CardHeader className="text-center pb-6">
+              <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Register Now
+              </CardTitle>
+              <p className="text-muted-foreground">Fill out the form below to secure your spot</p>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-8">
-                {/* Student Information */}
-                <div className="space-y-6">
-                  <h3 className="text-xl font-bold text-primary border-b border-primary/20 pb-2">Student Information</h3>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="studentName">Student Name *</Label>
-                      <Input 
-                        id="studentName"
-                        placeholder="Full name of student"
-                        value={formData.studentName}
-                        onChange={(e) => setFormData({...formData, studentName: e.target.value})}
-                        required
-                        className="h-12"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="age">Age *</Label>
-                      <Input 
-                        id="age"
-                        type="number"
-                        min="3"
-                        max="100"
-                        placeholder="Student's age"
-                        value={formData.age}
-                        onChange={(e) => setFormData({...formData, age: e.target.value})}
-                        required
-                        className="h-12"
-                      />
-                    </div>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Personal Information */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="student_name">Student Name *</Label>
+                    <Input
+                      id="student_name"
+                      value={formData.student_name}
+                      onChange={(e) => setFormData({...formData, student_name: e.target.value})}
+                      required
+                    />
                   </div>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="location">Location *</Label>
-                      <Input 
-                        id="location"
-                        placeholder="City/Area (e.g., Nakuru, Nairobi)"
-                        value={formData.location}
-                        onChange={(e) => setFormData({...formData, location: e.target.value})}
-                        required
-                        className="h-12"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email *</Label>
-                      <Input 
-                        id="email"
-                        type="email"
-                        placeholder="student@example.com"
-                        value={formData.email}
-                        onChange={(e) => setFormData({...formData, email: e.target.value})}
-                        required
-                        className="h-12"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number *</Label>
-                      <Input 
-                        id="phone"
-                        type="tel"
-                        placeholder="0701 234 567"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                        required
-                        className="h-12"
-                      />
-                    </div>
+                  <div>
+                    <Label htmlFor="age">Age *</Label>
+                    <Input
+                      id="age"
+                      type="number"
+                      min="5"
+                      max="80"
+                      value={formData.age}
+                      onChange={(e) => setFormData({...formData, age: e.target.value})}
+                      required
+                    />
                   </div>
                 </div>
 
-                {/* Parent/Guardian Information */}
-                <div className="space-y-6">
-                  <h3 className="text-xl font-bold text-primary border-b border-primary/20 pb-2">Parent/Guardian Information (if under 18)</h3>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="parentName">Parent/Guardian Name</Label>
-                      <Input 
-                        id="parentName"
-                        placeholder="Full name"
-                        value={formData.parentName}
-                        onChange={(e) => setFormData({...formData, parentName: e.target.value})}
-                        className="h-12"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="parentPhone">Parent/Guardian Phone</Label>
-                      <Input 
-                        id="parentPhone"
-                        type="tel"
-                        placeholder="0701 234 567"
-                        value={formData.parentPhone}
-                        onChange={(e) => setFormData({...formData, parentPhone: e.target.value})}
-                        className="h-12"
-                      />
-                    </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="email">Email *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Phone Number *</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                      required
+                    />
                   </div>
                 </div>
 
-                {/* Emergency Contact */}
-                <div className="space-y-6">
-                  <h3 className="text-xl font-bold text-primary border-b border-primary/20 pb-2">Emergency Contact</h3>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="emergencyContactName">Emergency Contact Name</Label>
-                      <Input 
-                        id="emergencyContactName"
-                        placeholder="Full name"
-                        value={formData.emergencyContactName}
-                        onChange={(e) => setFormData({...formData, emergencyContactName: e.target.value})}
-                        className="h-12"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="emergencyContactPhone">Emergency Contact Phone</Label>
-                      <Input 
-                        id="emergencyContactPhone"
-                        type="tel"
-                        placeholder="0701 234 567"
-                        value={formData.emergencyContactPhone}
-                        onChange={(e) => setFormData({...formData, emergencyContactPhone: e.target.value})}
-                        className="h-12"
-                      />
-                    </div>
+                {/* Parent Information (for minors) */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="parent_name">Parent/Guardian Name</Label>
+                    <Input
+                      id="parent_name"
+                      value={formData.parent_name}
+                      onChange={(e) => setFormData({...formData, parent_name: e.target.value})}
+                      placeholder="Required for students under 18"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="parent_phone">Parent/Guardian Phone</Label>
+                    <Input
+                      id="parent_phone"
+                      type="tel"
+                      value={formData.parent_phone}
+                      onChange={(e) => setFormData({...formData, parent_phone: e.target.value})}
+                      placeholder="Required for students under 18"
+                    />
                   </div>
                 </div>
 
                 {/* Course Information */}
-                <div className="space-y-6">
-                  <h3 className="text-xl font-bold text-primary border-b border-primary/20 pb-2">Course Information</h3>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="courseCategory">Course Category *</Label>
-                    <Select value={formData.courseCategory} onValueChange={(value) => setFormData({...formData, courseCategory: value, instrument: ""})}>
-                      <SelectTrigger className="h-12">
-                        <SelectValue placeholder="Select course category" />
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="course_category">Course Category *</Label>
+                    <Select value={formData.course_category} onValueChange={(value) => setFormData({...formData, course_category: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="music">Music</SelectItem>
-                        <SelectItem value="production">Music Production</SelectItem>
-                        <SelectItem value="art">Art & Photography</SelectItem>
+                        <SelectItem value="Music">Music</SelectItem>
+                        <SelectItem value="Production">Production</SelectItem>
+                        <SelectItem value="Art">Art</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {formData.courseCategory === "music" && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="instrument">Preferred Instrument *</Label>
-                        <Select value={formData.instrument} onValueChange={(value) => setFormData({...formData, instrument: value})}>
-                          <SelectTrigger className="h-12">
-                            <SelectValue placeholder="Select an instrument" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="piano">Piano</SelectItem>
-                            <SelectItem value="guitar">Guitar</SelectItem>
-                            <SelectItem value="violin">Violin</SelectItem>
-                            <SelectItem value="drums">Drums</SelectItem>
-                            <SelectItem value="voice">Voice Training</SelectItem>
-                            <SelectItem value="saxophone">Saxophone</SelectItem>
-                            <SelectItem value="flute">Flute</SelectItem>
-                            <SelectItem value="trumpet">Trumpet</SelectItem>
-                            <SelectItem value="trombone">Trombone</SelectItem>
-                            <SelectItem value="theory">Music Theory</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="ownsInstrument"
-                            checked={formData.ownsInstrument}
-                            onCheckedChange={(checked) => setFormData({...formData, ownsInstrument: checked as boolean})}
-                          />
-                          <Label htmlFor="ownsInstrument">I own the instrument</Label>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {formData.courseCategory && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="learningMode">Preferred Learning Mode *</Label>
-                        <Select value={formData.learningMode} onValueChange={(value) => setFormData({...formData, learningMode: value})}>
-                          <SelectTrigger className="h-12">
-                            <SelectValue placeholder="Select learning mode" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="in-person">In Person at the Academy</SelectItem>
-                            <SelectItem value="home">Home Lessons</SelectItem>
-                            <SelectItem value="online">Online Lessons</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="proficiencyLevel">Current Proficiency Level *</Label>
-                        <Select value={formData.proficiencyLevel} onValueChange={(value) => setFormData({...formData, proficiencyLevel: value})}>
-                          <SelectTrigger className="h-12">
-                            <SelectValue placeholder="Select your level" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="beginner">Beginner - No prior experience / Just starting out</SelectItem>
-                            <SelectItem value="intermediate">Intermediate - Can play some pieces and read basic music</SelectItem>
-                            <SelectItem value="advanced">Advanced - Can play well and read music effectively</SelectItem>
-                            <SelectItem value="assessment">Unsure / Needs Assessment - Please guide me</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="previousMusicalEducation">Previous Musical Education</Label>
-                        <Textarea 
-                          id="previousMusicalEducation"
-                          placeholder="Please describe any previous musical training or education..."
-                          value={formData.previousMusicalEducation}
-                          onChange={(e) => setFormData({...formData, previousMusicalEducation: e.target.value})}
-                          rows={3}
-                          className="resize-none"
-                        />
-                      </div>
-
-                      {formData.learningMode === "in-person" && (
-                        <div className="space-y-2">
-                          <Label htmlFor="timeSlot">Preferred Time Slot</Label>
-                          <Select value={formData.timeSlotId} onValueChange={(value) => setFormData({...formData, timeSlotId: value})}>
-                            <SelectTrigger className="h-12">
-                              <SelectValue placeholder="Select available time slot" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableTimeSlots.map((slot) => (
-                                <SelectItem key={slot.id} value={slot.id}>
-                                  {dayNames[slot.day_of_week]} {slot.start_time} - {slot.end_time}
-                                  {slot.instructor_name && ` (${slot.instructor_name})`}
-                                  {slot.max_capacity && ` - ${(slot.max_capacity - (slot.current_bookings || 0))} spots left`}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label htmlFor="goals">Learning Goals</Label>
-                    <Textarea 
-                      id="goals"
-                      placeholder="What would you like to achieve with your lessons?"
-                      value={formData.goals}
-                      onChange={(e) => setFormData({...formData, goals: e.target.value})}
-                      rows={3}
-                      className="resize-none"
+                  <div>
+                    <Label htmlFor="instrument">Instrument/Subject *</Label>
+                    <Input
+                      id="instrument"
+                      value={formData.instrument}
+                      onChange={(e) => setFormData({...formData, instrument: e.target.value})}
+                      placeholder="e.g., Piano, Guitar, Vocals, etc."
+                      required
                     />
                   </div>
                 </div>
 
-                {/* Medical Information */}
-                <div className="space-y-6">
-                  <h3 className="text-xl font-bold text-primary border-b border-primary/20 pb-2">Medical Information</h3>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="medicalConditions">Medical Conditions / Allergies</Label>
-                    <Textarea 
-                      id="medicalConditions"
-                      placeholder="Please list any medical conditions, allergies, or physical limitations we should be aware of..."
-                      value={formData.medicalConditions}
-                      onChange={(e) => setFormData({...formData, medicalConditions: e.target.value})}
-                      rows={3}
-                      className="resize-none"
-                    />
-                  </div>
+                {/* Experience and Goals */}
+                <div>
+                  <Label htmlFor="experience">Current Experience Level *</Label>
+                  <RadioGroup 
+                    value={formData.experience} 
+                    onValueChange={(value) => setFormData({...formData, experience: value})}
+                    className="flex flex-wrap gap-6 mt-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="Beginner" id="beginner" />
+                      <Label htmlFor="beginner">Beginner</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="Intermediate" id="intermediate" />
+                      <Label htmlFor="intermediate">Intermediate</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="Advanced" id="advanced" />
+                      <Label htmlFor="advanced">Advanced</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="specificRequirements">Specific Requirements or Accommodations</Label>
-                    <Textarea 
-                      id="specificRequirements"
-                      placeholder="Any special accommodations or requirements for lessons..."
-                      value={formData.specificRequirements}
-                      onChange={(e) => setFormData({...formData, specificRequirements: e.target.value})}
-                      rows={3}
-                      className="resize-none"
-                    />
+                <div>
+                  <Label htmlFor="goals">Learning Goals</Label>
+                  <Textarea
+                    id="goals"
+                    value={formData.goals}
+                    onChange={(e) => setFormData({...formData, goals: e.target.value})}
+                    placeholder="What would you like to achieve? (e.g., learn specific songs, prepare for exams, performance goals)"
+                    rows={3}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="preferred_schedule">Preferred Schedule</Label>
+                  <Input
+                    id="preferred_schedule"
+                    value={formData.preferred_schedule}
+                    onChange={(e) => setFormData({...formData, preferred_schedule: e.target.value})}
+                    placeholder="e.g., Weekday evenings, Saturday mornings"
+                  />
+                </div>
+
+                {/* Learning Preferences */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Learning Mode</Label>
+                    <RadioGroup 
+                      value={formData.learning_mode} 
+                      onValueChange={(value) => setFormData({...formData, learning_mode: value})}
+                      className="flex gap-6 mt-2"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="in-person" id="in-person" />
+                        <Label htmlFor="in-person">In-Person</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="online" id="online" />
+                        <Label htmlFor="online">Online</Label>
+                      </div>
+                    </RadioGroup>
                   </div>
+                  <div className="flex items-center space-x-2 pt-6">
+                    <Checkbox
+                      id="owns_instrument"
+                      checked={formData.owns_instrument}
+                      onCheckedChange={(checked) => setFormData({...formData, owns_instrument: checked as boolean})}
+                    />
+                    <Label htmlFor="owns_instrument">I own the instrument I want to learn</Label>
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="location">Location (if different from main campus)</Label>
+                  <Input
+                    id="location"
+                    value={formData.location}
+                    onChange={(e) => setFormData({...formData, location: e.target.value})}
+                    placeholder="Optional: Specify if you prefer a different location"
+                  />
                 </div>
 
                 <Button 
                   type="submit" 
+                  className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold py-3 text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                   disabled={isSubmitting}
-                  className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 transition-all duration-300 shadow-lg hover:scale-105"
                 >
-                  {isSubmitting ? "Submitting..." : "Submit Registration"}
+                  {isSubmitting ? "Submitting..." : "Register Now"}
                 </Button>
               </form>
             </CardContent>

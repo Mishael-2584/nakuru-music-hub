@@ -1,6 +1,6 @@
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Star, Quote } from "lucide-react";
 
 const Testimonials = () => {
@@ -9,7 +9,7 @@ const Testimonials = () => {
       id: 1,
       name: "Sarah Chen",
       role: "Piano Student",
-      image: "https://images.unsplash.com/photo-1494790108755-2616b612b4d4?w=150&h=150&fit=crop&crop=face",
+      initials: "SC",
       content: "The instructors at Damon Music Academy are absolutely incredible! My piano skills have improved dramatically in just 6 months. The personalized approach and supportive environment make all the difference.",
       rating: 5,
       location: "Nakuru"
@@ -18,7 +18,7 @@ const Testimonials = () => {
       id: 2,
       name: "Michael Ochieng",
       role: "Guitar Student",
-      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+      initials: "MO",
       content: "I've been learning guitar here for over a year now, and I can't recommend this place enough. The teachers are patient, knowledgeable, and truly care about your progress. Best music school in Nakuru!",
       rating: 5,
       location: "Nakuru"
@@ -27,7 +27,7 @@ const Testimonials = () => {
       id: 3,
       name: "Grace Wanjiku",
       role: "Voice Training Student",
-      image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
+      initials: "GW",
       content: "My daughter has been taking voice lessons here and her confidence has soared! The vocal coaches are professional and create such a positive learning environment. She looks forward to every lesson.",
       rating: 5,
       location: "Nakuru"
@@ -36,7 +36,7 @@ const Testimonials = () => {
       id: 4,
       name: "David Kimani",
       role: "Music Production Student",
-      image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
+      initials: "DK",
       content: "The music production course exceeded my expectations. Modern equipment, experienced instructors, and hands-on learning. I'm now producing my own tracks professionally. Thank you Damon Music Academy!",
       rating: 5,
       location: "Nakuru"
@@ -45,7 +45,7 @@ const Testimonials = () => {
       id: 5,
       name: "Mary Njeri",
       role: "Art Student",
-      image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face",
+      initials: "MN",
       content: "The art program here is fantastic! I've learned so much about different techniques and styles. The instructors are encouraging and help you find your unique artistic voice. Highly recommend!",
       rating: 5,
       location: "Nakuru"
@@ -54,7 +54,7 @@ const Testimonials = () => {
       id: 6,
       name: "John Mwangi",
       role: "Photography Student",
-      image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face",
+      initials: "JM",
       content: "Learning photography at Damon has been life-changing. From basics to advanced techniques, the course is comprehensive. Now I'm working as a freelance photographer. Best investment I've made!",
       rating: 5,
       location: "Nakuru"
@@ -92,9 +92,8 @@ const Testimonials = () => {
                 
                 <div className="flex items-center gap-4">
                   <Avatar className="h-12 w-12 border-2 border-primary/20">
-                    <AvatarImage src={testimonial.image} alt={testimonial.name} />
-                    <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white">
-                      {testimonial.name.split(' ').map(n => n[0]).join('')}
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white font-semibold">
+                      {testimonial.initials}
                     </AvatarFallback>
                   </Avatar>
                   <div>
