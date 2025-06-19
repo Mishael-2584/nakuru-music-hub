@@ -50,7 +50,7 @@ const Header = () => {
               <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                 Damon Music Academy
               </h1>
-              <p className="text-xs text-muted-foreground">Excellence in Music Education</p>
+              <p className="text-xs text-muted-foreground font-bold">Nakuru's Premier Music &amp; Creative Arts Hub</p>
             </div>
           </Link>
 
