@@ -159,10 +159,7 @@ const CoursesTeaser = () => {
                       </div>
                     ))}
                   </div>
-
-                  <Button className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold group-hover:scale-105 transition-all duration-200">
-                    Learn More
-                  </Button>
+                  
                 </CardContent>
               </Card>
             );
