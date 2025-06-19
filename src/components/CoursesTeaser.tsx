@@ -17,7 +17,7 @@ const CoursesTeaser = () => {
       students: 150,
       rating: 4.9,
       price: "From KSh 8,000/month",
-      image: "/lovable-uploads/65de1b46-84a6-446b-8225-6359d2d2027d.png",
+      image: "/lovable-uploads/_MWS4407.png",
       features: ["One-on-one lessons", "Group sessions", "Performance opportunities", "ABRSM certification prep"]
     },
     {
@@ -56,7 +56,7 @@ const CoursesTeaser = () => {
       students: 60,
       rating: 4.7,
       price: "From KSh 12,000/month",
-      image: "/lovable-uploads/70f23f35-6eb2-49a1-8bf6-677fe0c49746.png",
+      image: "/lovable-uploads/31a53eab-3aed-45c3-b91e-339ed5bb7893.png",
       features: ["Studio software", "Mixing & mastering", "Beat making", "Professional equipment"]
     },
     {
@@ -69,7 +69,7 @@ const CoursesTeaser = () => {
       students: 45,
       rating: 4.6,
       price: "From KSh 10,000/month",
-      image: "/lovable-uploads/31a53eab-3aed-45c3-b91e-339ed5bb7893.png",
+      image: "/lovable-uploads/65de1b46-84a6-446b-8225-6359d2d2027d.png",
       features: ["Digital photography", "Photo editing", "Portfolio development", "Exhibition opportunities"]
     },
     {
