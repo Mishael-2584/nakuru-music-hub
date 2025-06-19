@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Edit, Trash2, Eye, ImageIcon } from "lucide-react";
+import { Plus, Edit, Trash2, ImageIcon } from "lucide-react";
 
 interface NewsArticle {
   id: string;
@@ -17,13 +17,9 @@ interface NewsArticle {
   content: string;
   excerpt: string | null;
   image_url: string | null;
-  featured_image_url: string | null;
-  author: string | null;
-  category: string;
   status: string;
   is_featured: boolean | null;
   slug: string | null;
-  tags: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -37,12 +33,9 @@ const AdminNewsManager = () => {
     title: "",
     content: "",
     excerpt: "",
-    author: "",
-    category: "general",
     status: "draft",
     is_featured: false,
-    image_url: "",
-    tags: ""
+    image_url: ""
   });
   const { toast } = useToast();
 
@@ -60,13 +53,9 @@ const AdminNewsManager = () => {
           content,
           excerpt,
           image_url,
-          featured_image_url,
-          author,
-          category,
           status,
           is_featured,
           slug,
-          tags,
           created_at,
           updated_at
         `)
@@ -82,16 +71,7 @@ const AdminNewsManager = () => {
         return;
       }
 
-      // Ensure data has proper defaults for new fields
-      const articlesWithDefaults = (data || []).map(article => ({
-        ...article,
-        featured_image_url: article.featured_image_url || null,
-        author: article.author || null,
-        category: article.category || 'general',
-        tags: article.tags || null
-      }));
-
-      setArticles(articlesWithDefaults);
+      setArticles(data || []);
     } catch (error) {
       console.error('Unexpected error:', error);
     } finally {
@@ -104,20 +84,15 @@ const AdminNewsManager = () => {
     
     try {
       const slug = formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      const tagsArray = formData.tags ? formData.tags.split(',').map(tag => tag.trim()) : [];
 
       const articleData = {
         title: formData.title,
         content: formData.content,
         excerpt: formData.excerpt || null,
-        author: formData.author || null,
-        category: formData.category,
         status: formData.status,
         is_featured: formData.is_featured,
-        featured_image_url: formData.image_url || null,
         image_url: formData.image_url || null,
         slug: slug,
-        tags: tagsArray.length > 0 ? tagsArray : null,
       };
 
       let error;
@@ -168,12 +143,9 @@ const AdminNewsManager = () => {
       title: article.title,
       content: article.content,
       excerpt: article.excerpt || "",
-      author: article.author || "",
-      category: article.category,
       status: article.status,
       is_featured: article.is_featured || false,
-      image_url: article.featured_image_url || article.image_url || "",
-      tags: article.tags ? article.tags.join(', ') : ""
+      image_url: article.image_url || ""
     });
     setIsEditing(true);
   };
@@ -213,12 +185,9 @@ const AdminNewsManager = () => {
       title: "",
       content: "",
       excerpt: "",
-      author: "",
-      category: "general",
       status: "draft",
       is_featured: false,
-      image_url: "",
-      tags: ""
+      image_url: ""
     });
     setEditingArticle(null);
     setIsEditing(false);
@@ -248,24 +217,14 @@ const AdminNewsManager = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="title">Title *</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="author">Author</Label>
-                  <Input
-                    id="author"
-                    value={formData.author}
-                    onChange={(e) => setFormData({ ...formData, author: e.target.value })}
-                  />
-                </div>
+              <div>
+                <Label htmlFor="title">Title *</Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  required
+                />
               </div>
 
               <div>
@@ -290,7 +249,7 @@ const AdminNewsManager = () => {
               </div>
 
               <div>
-                <Label htmlFor="image_url">Featured Image URL</Label>
+                <Label htmlFor="image_url">Image URL</Label>
                 <Input
                   id="image_url"
                   value={formData.image_url}
@@ -299,22 +258,7 @@ const AdminNewsManager = () => {
                 />
               </div>
 
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="category">Category</Label>
-                  <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="general">General</SelectItem>
-                      <SelectItem value="events">Events</SelectItem>
-                      <SelectItem value="achievements">Achievements</SelectItem>
-                      <SelectItem value="announcements">Announcements</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
+              <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="status">Status</Label>
                   <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
@@ -337,16 +281,6 @@ const AdminNewsManager = () => {
                   />
                   <Label htmlFor="is_featured">Featured Article</Label>
                 </div>
-              </div>
-
-              <div>
-                <Label htmlFor="tags">Tags (comma-separated)</Label>
-                <Input
-                  id="tags"
-                  value={formData.tags}
-                  onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                  placeholder="music, performance, student"
-                />
               </div>
 
               <div className="flex gap-2">
@@ -383,24 +317,12 @@ const AdminNewsManager = () => {
                   </p>
                   
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>Category: {article.category}</span>
-                    {article.author && <span>By: {article.author}</span>}
                     <span>{new Date(article.created_at).toLocaleDateString()}</span>
                   </div>
-
-                  {article.tags && (
-                    <div className="flex gap-1 mt-2">
-                      {article.tags.map((tag, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex items-center gap-2 ml-4">
-                  {article.featured_image_url && (
+                  {article.image_url && (
                     <ImageIcon className="h-4 w-4 text-green-500" />
                   )}
                   <Button

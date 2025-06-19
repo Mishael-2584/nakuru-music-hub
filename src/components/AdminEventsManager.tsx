@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,18 +20,12 @@ interface Event {
   event_time: string | null;
   location: string | null;
   image_url: string | null;
-  featured_image_url: string | null;
-  organizer: string | null;
-  contact_email: string | null;
-  contact_phone: string | null;
-  price: number | null;
   max_attendees: number | null;
   current_attendees: number | null;
   registration_required: boolean | null;
   status: string;
   is_featured: boolean | null;
   slug: string | null;
-  tags: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -47,16 +42,11 @@ const AdminEventsManager = () => {
     event_date: "",
     event_time: "",
     location: "",
-    organizer: "",
-    contact_email: "",
-    contact_phone: "",
-    price: "",
     max_attendees: "",
     registration_required: false,
     status: "draft",
     is_featured: false,
-    image_url: "",
-    tags: ""
+    image_url: ""
   });
   const { toast } = useToast();
 
@@ -77,18 +67,12 @@ const AdminEventsManager = () => {
           event_time,
           location,
           image_url,
-          featured_image_url,
-          organizer,
-          contact_email,
-          contact_phone,
-          price,
           max_attendees,
           current_attendees,
           registration_required,
           status,
           is_featured,
           slug,
-          tags,
           created_at,
           updated_at
         `)
@@ -104,18 +88,7 @@ const AdminEventsManager = () => {
         return;
       }
 
-      // Ensure data has proper defaults for new fields
-      const eventsWithDefaults = (data || []).map(event => ({
-        ...event,
-        featured_image_url: event.featured_image_url || null,
-        organizer: event.organizer || null,
-        contact_email: event.contact_email || null,
-        contact_phone: event.contact_phone || null,
-        tags: event.tags || null,
-        price: event.price || null
-      }));
-
-      setEvents(eventsWithDefaults);
+      setEvents(data || []);
     } catch (error) {
       console.error('Unexpected error:', error);
     } finally {
@@ -128,7 +101,6 @@ const AdminEventsManager = () => {
     
     try {
       const slug = formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      const tagsArray = formData.tags ? formData.tags.split(',').map(tag => tag.trim()) : [];
 
       const eventData = {
         title: formData.title,
@@ -137,18 +109,12 @@ const AdminEventsManager = () => {
         event_date: formData.event_date,
         event_time: formData.event_time || null,
         location: formData.location || null,
-        organizer: formData.organizer || null,
-        contact_email: formData.contact_email || null,
-        contact_phone: formData.contact_phone || null,
-        price: formData.price ? parseFloat(formData.price) : null,
         max_attendees: formData.max_attendees ? parseInt(formData.max_attendees) : null,
         registration_required: formData.registration_required,
         status: formData.status,
         is_featured: formData.is_featured,
-        featured_image_url: formData.image_url || null,
         image_url: formData.image_url || null,
         slug: slug,
-        tags: tagsArray.length > 0 ? tagsArray : null,
       };
 
       let error;
@@ -202,16 +168,11 @@ const AdminEventsManager = () => {
       event_date: event.event_date,
       event_time: event.event_time || "",
       location: event.location || "",
-      organizer: event.organizer || "",
-      contact_email: event.contact_email || "",
-      contact_phone: event.contact_phone || "",
-      price: event.price ? event.price.toString() : "",
       max_attendees: event.max_attendees ? event.max_attendees.toString() : "",
       registration_required: event.registration_required || false,
       status: event.status,
       is_featured: event.is_featured || false,
-      image_url: event.featured_image_url || event.image_url || "",
-      tags: event.tags ? event.tags.join(', ') : ""
+      image_url: event.image_url || ""
     });
     setIsEditing(true);
   };
@@ -254,16 +215,11 @@ const AdminEventsManager = () => {
       event_date: "",
       event_time: "",
       location: "",
-      organizer: "",
-      contact_email: "",
-      contact_phone: "",
-      price: "",
       max_attendees: "",
       registration_required: false,
       status: "draft",
       is_featured: false,
-      image_url: "",
-      tags: ""
+      image_url: ""
     });
     setEditingEvent(null);
     setIsEditing(false);
@@ -304,11 +260,11 @@ const AdminEventsManager = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="organizer">Organizer</Label>
+                  <Label htmlFor="location">Location</Label>
                   <Input
-                    id="organizer"
-                    value={formData.organizer}
-                    onChange={(e) => setFormData({ ...formData, organizer: e.target.value })}
+                    id="location"
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   />
                 </div>
               </div>
@@ -354,56 +310,6 @@ const AdminEventsManager = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="location">Location</Label>
-                  <Input
-                    id="location"
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="contact_email">Contact Email</Label>
-                  <Input
-                    id="contact_email"
-                    type="email"
-                    value={formData.contact_email}
-                    onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="contact_phone">Contact Phone</Label>
-                  <Input
-                    id="contact_phone"
-                    value={formData.contact_phone}
-                    onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="price">Price (KSh)</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="image_url">Featured Image URL</Label>
-                <Input
-                  id="image_url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  placeholder="https://example.com/image.jpg"
-                />
-              </div>
-
-              <div className="grid md:grid-cols-4 gap-4">
-                <div>
                   <Label htmlFor="max_attendees">Max Attendees</Label>
                   <Input
                     id="max_attendees"
@@ -412,7 +318,19 @@ const AdminEventsManager = () => {
                     onChange={(e) => setFormData({ ...formData, max_attendees: e.target.value })}
                   />
                 </div>
+              </div>
 
+              <div>
+                <Label htmlFor="image_url">Image URL</Label>
+                <Input
+                  id="image_url"
+                  value={formData.image_url}
+                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                  placeholder="https://example.com/image.jpg"
+                />
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="status">Status</Label>
                   <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
@@ -445,16 +363,6 @@ const AdminEventsManager = () => {
                   />
                   <Label htmlFor="is_featured">Featured Event</Label>
                 </div>
-              </div>
-
-              <div>
-                <Label htmlFor="tags">Tags (comma-separated)</Label>
-                <Input
-                  id="tags"
-                  value={formData.tags}
-                  onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                  placeholder="concert, workshop, masterclass"
-                />
               </div>
 
               <div className="flex gap-2">
@@ -514,20 +422,10 @@ const AdminEventsManager = () => {
                       </div>
                     )}
                   </div>
-
-                  {event.tags && (
-                    <div className="flex gap-1 mt-2">
-                      {event.tags.map((tag, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex items-center gap-2 ml-4">
-                  {event.featured_image_url && (
+                  {event.image_url && (
                     <ImageIcon className="h-4 w-4 text-green-500" />
                   )}
                   <Button
