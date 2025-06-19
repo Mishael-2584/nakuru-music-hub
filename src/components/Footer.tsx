@@ -1,21 +1,14 @@
-
 import { MapPin, Phone, Mail, Clock, Facebook, Instagram, Youtube } from "lucide-react";
 import { Link } from "react-router-dom";
-
 const Footer = () => {
-  return (
-    <footer className="bg-gray-900 text-white">
+  return <footer className="bg-gray-900 text-white">
       <div className="container mx-auto px-4 py-16">
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Company Info */}
           <div className="space-y-4">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
-                <img 
-                  src="/lovable-uploads/bda126b8-9e86-4564-9832-173ce818d676.png" 
-                  alt="Damon Music Academy Logo" 
-                  className="w-8 h-8 object-contain"
-                />
+                <img src="/lovable-uploads/bda126b8-9e86-4564-9832-173ce818d676.png" alt="Damon Music Academy Logo" className="w-8 h-8 object-cover" />
               </div>
               <div>
                 <h3 className="text-xl font-bold">Damon Music Academy</h3>
@@ -49,12 +42,7 @@ const Footer = () => {
                 <MapPin className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
                 <div>
                   <p className="text-gray-300">Nakuru Town, Kenya</p>
-                  <a 
-                    href="https://maps.app.goo.gl/XGZaDXxaEbkdMLGj8" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline text-sm"
-                  >
+                  <a href="https://maps.app.goo.gl/XGZaDXxaEbkdMLGj8" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-sm">
                     View on Google Maps
                   </a>
                 </div>
@@ -91,26 +79,13 @@ const Footer = () => {
             <div className="pt-4">
               <h5 className="font-semibold mb-3">Follow Us</h5>
               <div className="flex gap-3">
-                <a 
-                  href="https://www.facebook.com/DamonMusicAcademy/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-primary transition-colors"
-                >
+                <a href="https://www.facebook.com/DamonMusicAcademy/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-primary transition-colors">
                   <Facebook className="h-5 w-5" />
                 </a>
-                <a 
-                  href="https://www.youtube.com/channel/UCBwFLi3WFpddfQRV7S6GFiw" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-red-600 transition-colors"
-                >
+                <a href="https://www.youtube.com/channel/UCBwFLi3WFpddfQRV7S6GFiw" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-red-600 transition-colors">
                   <Youtube className="h-5 w-5" />
                 </a>
-                <a 
-                  href="#" 
-                  className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-gradient-to-r hover:from-purple-500 hover:to-pink-500 transition-colors"
-                >
+                <a href="#" className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-gradient-to-r hover:from-purple-500 hover:to-pink-500 transition-colors">
                   <Instagram className="h-5 w-5" />
                 </a>
               </div>
@@ -131,8 +106,6 @@ const Footer = () => {
           </div>
         </div>
       </div>
-    </footer>
-  );
+    </footer>;
 };
-
 export default Footer;
