@@ -13,12 +13,12 @@ const Hero = () => {
       image: "/lovable-uploads/cc2f7a6b-1ce1-4921-a0b6-b29db99b5d4a.png",
       title: "NAKURU'S PREMIER",
       subtitle: "MUSIC & CREATIVE ARTS HUB",
-      description: "Discover your musical potential with world-class instruction, state-of-the-art facilities, and a community that celebrates creativity.",
+      description: "Whether you're picking up your first instrument, exploring the strokes of a paintbrush, or diving into professional audio-visual production, Damon Music Academy in Nakuru provides expert guidance and a vibrant community to help your creative talent truly soar.",
       isMain: true
     },
     {
       id: 2,
-      image: "/lovable-uploads/65de1b46-84a6-446b-8225-6359d2d2027d.png",
+      image: "/lovable-uploads/SMC02260.png",
       title: "MASTER MUSICAL",
       subtitle: "INSTRUMENTS",
       description: "From piano to guitar, violin to drums - learn from expert instructors who are passionate about sharing their craft.",
@@ -26,7 +26,7 @@ const Hero = () => {
     },
     {
       id: 3,
-      image: "/lovable-uploads/70f23f35-6eb2-49a1-8bf6-677fe0c49746.png",
+      image: "/lovable-uploads/31a53eab-3aed-45c3-b91e-339ed5bb7893.png",
       title: "UNLEASH YOUR",
       subtitle: "CREATIVE POTENTIAL",
       description: "Explore music production, digital arts, and creative expression in our modern studios equipped with professional-grade equipment.",
