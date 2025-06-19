@@ -1,244 +1,88 @@
 
 import { Button } from "@/components/ui/button";
-import { Music, Star, Users, Trophy, Heart, Award, ChevronLeft, ChevronRight } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Play, ArrowRight, Star, Users, Award } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Hero = () => {
-  const [currentSlide, setCurrentSlide] = useState(0);
-
-  const slides = [
-    {
-      type: "static",
-      content: {
-        title: "NAKURU'S PREMIER MUSIC & CREATIVE ARTS HUB",
-        subtitle: "WHERE WORDS FAIL, MUSIC SPEAKS",
-        description: "Whether you're picking up your first instrument, exploring the strokes of a paintbrush, or diving into professional audio-visual production, Damon Music Academy in Nakuru provides expert guidance and a vibrant community to help your creative talent truly soar.",
-        backgroundImage: "/lovable-uploads/65de1b46-84a6-446b-8225-6359d2d2027d.png"
-      }
-    },
-    {
-      type: "image",
-      content: {
-        backgroundImage: "/lovable-uploads/29861c9f-1df3-42f1-982f-ef38574fb617.png",
-        title: "Professional Vocal Training",
-        description: "Develop your unique voice with expert vocal coaching and state-of-the-art recording facilities"
-      }
-    },
-    {
-      type: "image",
-      content: {
-        backgroundImage: "/lovable-uploads/cc2f7a6b-1ce1-4921-a0b6-b29db99b5d4a.png",
-        title: "Master Musical Instruments",
-        description: "Learn from professional instructors in our fully equipped studios with quality instruments"
-      }
-    },
-    {
-      type: "image",
-      content: {
-        backgroundImage: "/lovable-uploads/31a53eab-3aed-45c3-b91e-339ed5bb7893.png",
-        title: "Professional Music Production",
-        description: "Create professional recordings in our industry-standard recording studio"
-      }
-    }
-  ];
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % slides.length);
-    }, 6000);
-
-    return () => clearInterval(timer);
-  }, [slides.length]);
-
-  const scrollToRegistration = () => {
-    const element = document.getElementById('registration');
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  const scrollToCourses = () => {
-    const element = document.getElementById('courses');
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  const goToPrevious = () => {
-    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
-  };
-
-  const goToNext = () => {
-    setCurrentSlide((prev) => (prev + 1) % slides.length);
-  };
-
-  const currentSlideData = slides[currentSlide];
-
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* Background with carousel image */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000"
-        style={{
-          backgroundImage: `url("${currentSlideData.content.backgroundImage}")`,
-        }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/50 to-black/60"></div>
-      </div>
-
-      {/* Navigation arrows */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border-0 z-20"
-        onClick={goToPrevious}
-      >
-        <ChevronLeft className="h-6 w-6" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border-0 z-20"
-        onClick={goToNext}
-      >
-        <ChevronRight className="h-6 w-6" />
-      </Button>
-
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-10 -left-10 w-40 h-40 md:w-60 md:h-60 bg-primary/20 rounded-full animate-pulse"></div>
-        <div className="absolute top-1/4 right-10 w-32 h-32 md:w-48 md:h-48 bg-accent/20 rounded-full animate-pulse delay-1000"></div>
-        <div className="absolute bottom-10 left-1/4 w-24 h-24 md:w-36 md:h-36 bg-secondary/20 rounded-full animate-pulse delay-2000"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-20 h-20 md:w-28 md:h-28 bg-primary/10 rounded-full animate-pulse delay-3000"></div>
-      </div>
-
-      <div className="container mx-auto px-4 py-12 sm:py-16 md:py-20 lg:py-24 text-center relative z-10">
-        <div className="max-w-4xl mx-auto">
-          {currentSlideData.type === "static" ? (
-            <>
-              {/* Icon with animation */}
-              <div className="flex justify-center mb-6 sm:mb-8">
-                <div className="relative">
-                  <div className="p-4 sm:p-6 md:p-8 bg-gradient-to-r from-primary to-accent rounded-full shadow-2xl animate-scale-in">
-                    <Music className="h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 text-white" />
-                  </div>
-                  <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 to-accent/20 rounded-full animate-pulse"></div>
-                </div>
-              </div>
-
-              {/* Main heading */}
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
-                <span className="bg-gradient-to-r from-white via-primary to-accent bg-clip-text text-transparent animate-fade-in">
-                  {currentSlideData.content.title}
-                </span>
-              </h1>
-
-              {/* Tagline */}
-              <div className="mb-6 sm:mb-8 md:mb-10">
-                <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold text-white/90 animate-fade-in delay-200">
-                  <span className="block">WHERE WORDS FAIL,</span>
-                  <span className="block">MUSIC SPEAKS</span>
-                </p>
-              </div>
-
-              {/* Description */}
-              <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-white/80 mb-8 sm:mb-10 md:mb-12 max-w-4xl mx-auto leading-relaxed animate-fade-in delay-400 px-2">
-                {currentSlideData.content.description}
-              </p>
-
-              {/* Stats section */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6 lg:gap-8 mb-8 sm:mb-10 md:mb-12">
-                <div className="bg-white/90 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-                  <Users className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-primary mx-auto mb-2" />
-                  <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-primary">500+</div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">Students</div>
-                </div>
-                <div className="bg-white/90 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-                  <Trophy className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-accent mx-auto mb-2" />
-                  <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-accent">10+</div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">Years</div>
-                </div>
-                <div className="bg-white/90 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-                  <Music className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-secondary mx-auto mb-2" />
-                  <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-secondary">15+</div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">Instruments</div>
-                </div>
-                <div className="bg-white/90 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-                  <Award className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-primary mx-auto mb-2" />
-                  <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-primary">100%</div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">Proven Results</div>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Image slide content */}
-              <div className="mb-8">
-                <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
-                  <span className="bg-gradient-to-r from-white via-primary to-accent bg-clip-text text-transparent animate-fade-in">
-                    {currentSlideData.content.title}
-                  </span>
-                </h1>
-                <p className="text-lg sm:text-xl md:text-2xl text-white/90 max-w-3xl mx-auto leading-relaxed animate-fade-in delay-200">
-                  {currentSlideData.content.description}
-                </p>
-              </div>
-            </>
-          )}
-
-          {/* CTA buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center animate-fade-in delay-600 mb-8 sm:mb-12 md:mb-16">
-            <Button 
-              size="lg" 
-              className="w-full sm:w-auto bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-bold py-3 sm:py-4 px-6 sm:px-8 md:px-12 text-sm sm:text-base md:text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105"
-              onClick={scrollToRegistration}
-            >
-              Start Your Creative Journey
-            </Button>
-            <Button 
-              variant="outline" 
-              size="lg"
-              className="w-full sm:w-auto border-2 border-white text-white hover:bg-white hover:text-primary font-semibold py-3 sm:py-4 px-6 sm:px-8 md:px-12 text-sm sm:text-base md:text-lg transition-all duration-300 hover:scale-105 bg-white/10 backdrop-blur-sm"
-              onClick={scrollToCourses}
-            >
-              Explore Our Programs
-            </Button>
-          </div>
-
-          {/* Trust indicators - only show on static slide */}
-          {currentSlideData.type === "static" && (
-            <div className="mt-8 sm:mt-12 md:mt-16">
-              <p className="text-sm md:text-base text-white/70 mb-4 md:mb-6">Trusted by musicians across Kenya</p>
-              <div className="flex justify-center items-center space-x-2 md:space-x-4">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-yellow-400 fill-current animate-pulse" style={{ animationDelay: `${i * 200}ms` }} />
-                ))}
-                <span className="ml-2 md:ml-4 text-xs sm:text-sm md:text-base text-white/70 font-medium">4.8/5 from 300+ Google reviews</span>
-              </div>
-            </div>
-          )}
+    <section className="relative min-h-screen flex items-center overflow-hidden">
+      {/* Background with multiple slides */}
+      <div className="absolute inset-0">
+        {/* Main slide - Updated with trumpet player image */}
+        <div className="absolute inset-0 bg-[url('/lovable-uploads/cc2f7a6b-1ce1-4921-a0b6-b29db99b5d4a.png')] bg-cover bg-center">
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent"></div>
         </div>
       </div>
-
-      {/* Dots indicator */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-3 z-20">
-        {slides.map((_, index) => (
-          <button
-            key={index}
-            className={`w-3 h-3 rounded-full transition-all duration-300 ${
-              index === currentSlide ? 'bg-white' : 'bg-white/50'
-            }`}
-            onClick={() => setCurrentSlide(index)}
-          />
-        ))}
+      
+      {/* Content */}
+      <div className="container mx-auto px-4 relative z-10">
+        <div className="max-w-4xl">
+          <div className="mb-6 flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+              ))}
+            </div>
+            <span className="text-white/90 text-sm font-medium">Rated 5.0 by 500+ students</span>
+          </div>
+          
+          <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
+            <span className="text-white">NAKURU'S PREMIER</span>
+            <br />
+            <span className="bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+              MUSIC & CREATIVE ARTS HUB
+            </span>
+          </h1>
+          
+          <p className="text-xl md:text-2xl text-white/90 mb-8 max-w-2xl leading-relaxed">
+            Discover your musical potential with world-class instruction, state-of-the-art facilities, and a community that celebrates creativity.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 mb-12">
+            <Button asChild size="lg" className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold px-8 py-4 text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+              <Link to="/courses">
+                Start Your Journey
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
+            </Button>
+            
+            <Button variant="outline" size="lg" className="border-2 border-white text-white hover:bg-white hover:text-black font-semibold px-8 py-4 text-lg rounded-full backdrop-blur-sm transition-all duration-300">
+              <Play className="mr-2 h-5 w-5" />
+              Watch Demo
+            </Button>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-8 max-w-2xl">
+            <div className="text-center">
+              <div className="flex items-center justify-center mb-2">
+                <Users className="h-8 w-8 text-primary" />
+              </div>
+              <div className="text-2xl font-bold text-white">500+</div>
+              <div className="text-white/80 text-sm">Active Students</div>
+            </div>
+            <div className="text-center">
+              <div className="flex items-center justify-center mb-2">
+                <Award className="h-8 w-8 text-primary" />
+              </div>
+              <div className="text-2xl font-bold text-white">15+</div>
+              <div className="text-white/80 text-sm">Expert Instructors</div>
+            </div>
+            <div className="text-center">
+              <div className="flex items-center justify-center mb-2">
+                <Star className="h-8 w-8 text-primary" />
+              </div>
+              <div className="text-2xl font-bold text-white">10+</div>
+              <div className="text-white/80 text-sm">Years of Excellence</div>
+            </div>
+          </div>
+        </div>
       </div>
-
-      {/* Floating musical notes animation */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-20 left-10 text-2xl sm:text-4xl text-white/30 animate-bounce" style={{ animationDelay: '1s' }}>♪</div>
-        <div className="absolute top-40 right-20 text-xl sm:text-3xl text-white/30 animate-bounce" style={{ animationDelay: '2s' }}>♫</div>
-        <div className="absolute bottom-40 left-20 text-lg sm:text-2xl text-white/30 animate-bounce" style={{ animationDelay: '3s' }}>♪</div>
-        <div className="absolute bottom-20 right-10 text-3xl sm:text-5xl text-white/30 animate-bounce" style={{ animationDelay: '4s' }}>♫</div>
+      
+      {/* Scroll indicator */}
+      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
+        <div className="w-6 h-10 border-2 border-white rounded-full flex justify-center">
+          <div className="w-1 h-3 bg-white rounded-full mt-2 animate-pulse"></div>
+        </div>
       </div>
     </section>
   );

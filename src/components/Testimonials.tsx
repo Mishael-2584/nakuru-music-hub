@@ -1,147 +1,115 @@
+
 import { Card, CardContent } from "@/components/ui/card";
-import { Star, Quote, Music } from "lucide-react";
-const testimonials = [{
-  name: "Sarah Kimani",
-  age: 16,
-  instrument: "Piano",
-  quote: "Damon Music Academy transformed my musical journey. The instructors are amazing and patient, helping me achieve my dream of playing classical pieces beautifully.",
-  rating: 5,
-  image: "🎹"
-}, {
-  name: "David Mwangi",
-  age: 28,
-  instrument: "Guitar",
-  quote: "As an adult learner, I was nervous about starting guitar lessons. The flexible schedule and encouraging environment made all the difference. I'm now playing in a local band!",
-  rating: 5,
-  image: "🎸"
-}, {
-  name: "Grace Wanjiku",
-  age: 12,
-  instrument: "Voice",
-  quote: "I love singing here! My voice coach helped me find my confidence and now I perform in school concerts. The academy feels like a second home to me.",
-  rating: 5,
-  image: "🎤"
-}, {
-  name: "John Ochieng",
-  age: 35,
-  instrument: "Saxophone",
-  quote: "The jazz saxophone lessons here are incredible. The instructor's expertise and passion for music is infectious. I've learned more in 6 months than I thought possible.",
-  rating: 5,
-  image: "🎷"
-}, {
-  name: "Mary Akinyi",
-  age: 14,
-  instrument: "Violin",
-  quote: "Learning violin seemed impossible until I joined Damon Music Academy. The step-by-step approach and supportive community helped me master this beautiful instrument.",
-  rating: 5,
-  image: "🎻"
-}, {
-  name: "Peter Kiprotich",
-  age: 22,
-  instrument: "Music Theory",
-  quote: "The music theory classes opened up a whole new world for me. Now I understand the 'why' behind the music, not just the 'how'. It's made me a better musician overall.",
-  rating: 5,
-  image: "📚"
-}];
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Star, Quote } from "lucide-react";
+
 const Testimonials = () => {
-  return <section id="testimonials" className="py-20 bg-gradient-to-br from-secondary/5 via-background to-accent/5 relative overflow-hidden">
-      {/* Background decorative elements */}
-      <div className="absolute top-20 left-20 w-40 h-40 bg-secondary/5 rounded-full blur-3xl animate-float"></div>
-      <div className="absolute bottom-10 right-10 w-56 h-56 bg-accent/5 rounded-full blur-3xl animate-float delay-1000"></div>
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-primary/5 rounded-full blur-3xl animate-float delay-500"></div>
-      
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="text-center mb-16 space-y-6">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-secondary to-accent rounded-full flex items-center justify-center shadow-2xl">
-              <Quote className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-sm font-medium text-secondary uppercase tracking-wider">Student Stories</span>
-          </div>
-          
-          <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-secondary via-accent to-primary bg-clip-text text-transparent">
-            Harmonious Testimonials
+  const testimonials = [
+    {
+      id: 1,
+      name: "Sarah Chen",
+      role: "Piano Student",
+      image: "https://images.unsplash.com/photo-1494790108755-2616b612b4d4?w=150&h=150&fit=crop&crop=face",
+      content: "The instructors at Damon Music Academy are absolutely incredible! My piano skills have improved dramatically in just 6 months. The personalized approach and supportive environment make all the difference.",
+      rating: 5,
+      location: "Nakuru"
+    },
+    {
+      id: 2,
+      name: "Michael Ochieng",
+      role: "Guitar Student",
+      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+      content: "I've been learning guitar here for over a year now, and I can't recommend this place enough. The teachers are patient, knowledgeable, and truly care about your progress. Best music school in Nakuru!",
+      rating: 5,
+      location: "Nakuru"
+    },
+    {
+      id: 3,
+      name: "Grace Wanjiku",
+      role: "Voice Training Student",
+      image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
+      content: "My daughter has been taking voice lessons here and her confidence has soared! The vocal coaches are professional and create such a positive learning environment. She looks forward to every lesson.",
+      rating: 5,
+      location: "Nakuru"
+    },
+    {
+      id: 4,
+      name: "David Kimani",
+      role: "Music Production Student",
+      image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
+      content: "The music production course exceeded my expectations. Modern equipment, experienced instructors, and hands-on learning. I'm now producing my own tracks professionally. Thank you Damon Music Academy!",
+      rating: 5,
+      location: "Nakuru"
+    },
+    {
+      id: 5,
+      name: "Mary Njeri",
+      role: "Art Student",
+      image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face",
+      content: "The art program here is fantastic! I've learned so much about different techniques and styles. The instructors are encouraging and help you find your unique artistic voice. Highly recommend!",
+      rating: 5,
+      location: "Nakuru"
+    },
+    {
+      id: 6,
+      name: "John Mwangi",
+      role: "Photography Student",
+      image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face",
+      content: "Learning photography at Damon has been life-changing. From basics to advanced techniques, the course is comprehensive. Now I'm working as a freelance photographer. Best investment I've made!",
+      rating: 5,
+      location: "Nakuru"
+    }
+  ];
+
+  return (
+    <section className="py-24 bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5">
+      <div className="container mx-auto px-4">
+        <div className="text-center mb-16">
+          <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            What Our Students Say
           </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Hear the inspiring stories from our musical family and discover how Damon Music Academy has transformed their musical journeys
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            Real testimonials from our amazing students who are excelling in their musical and creative journeys
           </p>
         </div>
         
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-          {testimonials.map((testimonial, index) => <Card key={index} className="group hover:shadow-3xl transition-all duration-500 hover:-translate-y-3 border-0 bg-white/90 backdrop-blur-sm relative overflow-hidden">
-              {/* Musical note decoration */}
-              <div className="absolute top-4 right-4 w-8 h-8 bg-gradient-to-r from-primary/20 to-accent/20 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                <Music className="h-4 w-4 text-primary" />
-              </div>
-              
-              <CardContent className="p-6 space-y-4">
-                {/* Rating stars */}
-                <div className="flex items-center gap-1 mb-4">
-                  {[...Array(testimonial.rating)].map((_, i) => <Star key={i} className="h-4 w-4 fill-secondary text-secondary" />)}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {testimonials.map((testimonial) => (
+            <Card key={testimonial.id} className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+              <CardContent className="p-8">
+                <div className="flex items-center gap-1 mb-6">
+                  {[...Array(testimonial.rating)].map((_, i) => (
+                    <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                  ))}
                 </div>
                 
-                {/* Quote */}
-                <div className="relative">
-                  <Quote className="absolute -top-2 -left-2 h-8 w-8 text-accent/20" />
-                  <p className="text-muted-foreground leading-relaxed italic pl-6">
-                    "{testimonial.quote}"
+                <div className="relative mb-6">
+                  <Quote className="absolute -top-2 -left-2 h-8 w-8 text-primary/20" />
+                  <p className="text-gray-700 leading-relaxed pl-6">
+                    "{testimonial.content}"
                   </p>
                 </div>
                 
-                {/* Student info */}
-                <div className="flex items-center gap-4 pt-4 border-t border-primary/10">
-                  <div className="w-12 h-12 bg-gradient-to-r from-primary/10 to-accent/10 rounded-full flex items-center justify-center text-2xl">
-                    {testimonial.image}
-                  </div>
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-12 w-12 border-2 border-primary/20">
+                    <AvatarImage src={testimonial.image} alt={testimonial.name} />
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white">
+                      {testimonial.name.split(' ').map(n => n[0]).join('')}
+                    </AvatarFallback>
+                  </Avatar>
                   <div>
-                    <h4 className="font-bold text-primary">{testimonial.name}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Age {testimonial.age} • {testimonial.instrument} Student
-                    </p>
+                    <h4 className="font-semibold text-gray-900">{testimonial.name}</h4>
+                    <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                    <p className="text-xs text-primary font-medium">{testimonial.location}</p>
                   </div>
                 </div>
               </CardContent>
-            </Card>)}
-        </div>
-        
-        {/* Call to action */}
-        <div className="text-center">
-          <div className="bg-gradient-to-r from-primary/10 via-accent/10 to-secondary/10 rounded-3xl p-8 max-w-2xl mx-auto backdrop-blur-sm border border-primary/20 shadow-2xl">
-            <div className="space-y-6">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <div className="w-3 h-3 bg-primary rounded-full animate-pulse"></div>
-                <div className="w-3 h-3 bg-accent rounded-full animate-pulse delay-100"></div>
-                <div className="w-3 h-3 bg-secondary rounded-full animate-pulse delay-200"></div>
-              </div>
-              
-              <h3 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                Ready to Write Your Musical Story?
-              </h3>
-              <p className="text-lg text-muted-foreground leading-relaxed">
-                Join hundreds of satisfied students who have discovered their musical passion at Damon Music Academy. 
-                Your journey to musical excellence starts here!
-              </p>
-              
-              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">100+</div>
-                  <div className="text-sm text-muted-foreground">Happy Students</div>
-                </div>
-                <div className="hidden sm:block w-px h-12 bg-gradient-to-b from-primary/20 to-accent/20"></div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-accent">5+</div>
-                  <div className="text-sm text-muted-foreground">Expert Instructors</div>
-                </div>
-                <div className="hidden sm:block w-px h-12 bg-gradient-to-b from-accent/20 to-secondary/20"></div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-secondary">5+</div>
-                  <div className="text-sm text-muted-foreground">Instruments Taught</div>
-                </div>
-              </div>
-            </div>
-          </div>
+            </Card>
+          ))}
         </div>
       </div>
-    </section>;
+    </section>
+  );
 };
+
 export default Testimonials;

@@ -37,7 +37,12 @@ const Registration = () => {
     timeSlotId: "",
     experience: "",
     goals: "",
-    preferredSchedule: ""
+    preferredSchedule: "",
+    medicalConditions: "",
+    emergencyContactName: "",
+    emergencyContactPhone: "",
+    previousMusicalEducation: "",
+    specificRequirements: ""
   });
   
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
@@ -89,6 +94,11 @@ const Registration = () => {
             experience: formData.experience,
             goals: formData.goals || null,
             preferred_schedule: formData.preferredSchedule || null,
+            medical_conditions: formData.medicalConditions || null,
+            emergency_contact_name: formData.emergencyContactName || null,
+            emergency_contact_phone: formData.emergencyContactPhone || null,
+            previous_musical_education: formData.previousMusicalEducation || null,
+            specific_requirements: formData.specificRequirements || null,
           }
         ]);
 
@@ -138,7 +148,12 @@ const Registration = () => {
         timeSlotId: "",
         experience: "",
         goals: "",
-        preferredSchedule: ""
+        preferredSchedule: "",
+        medicalConditions: "",
+        emergencyContactName: "",
+        emergencyContactPhone: "",
+        previousMusicalEducation: "",
+        specificRequirements: ""
       });
     } catch (error) {
       console.error("Unexpected error:", error);
@@ -274,6 +289,34 @@ const Registration = () => {
                   </div>
                 </div>
 
+                {/* Emergency Contact */}
+                <div className="space-y-6">
+                  <h3 className="text-xl font-bold text-primary border-b border-primary/20 pb-2">Emergency Contact</h3>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="emergencyContactName">Emergency Contact Name</Label>
+                      <Input 
+                        id="emergencyContactName"
+                        placeholder="Full name"
+                        value={formData.emergencyContactName}
+                        onChange={(e) => setFormData({...formData, emergencyContactName: e.target.value})}
+                        className="h-12"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="emergencyContactPhone">Emergency Contact Phone</Label>
+                      <Input 
+                        id="emergencyContactPhone"
+                        type="tel"
+                        placeholder="0701 234 567"
+                        value={formData.emergencyContactPhone}
+                        onChange={(e) => setFormData({...formData, emergencyContactPhone: e.target.value})}
+                        className="h-12"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {/* Course Information */}
                 <div className="space-y-6">
                   <h3 className="text-xl font-bold text-primary border-b border-primary/20 pb-2">Course Information</h3>
@@ -359,6 +402,18 @@ const Registration = () => {
                         </Select>
                       </div>
 
+                      <div className="space-y-2">
+                        <Label htmlFor="previousMusicalEducation">Previous Musical Education</Label>
+                        <Textarea 
+                          id="previousMusicalEducation"
+                          placeholder="Please describe any previous musical training or education..."
+                          value={formData.previousMusicalEducation}
+                          onChange={(e) => setFormData({...formData, previousMusicalEducation: e.target.value})}
+                          rows={3}
+                          className="resize-none"
+                        />
+                      </div>
+
                       {formData.learningMode === "in-person" && (
                         <div className="space-y-2">
                           <Label htmlFor="timeSlot">Preferred Time Slot</Label>
@@ -388,6 +443,35 @@ const Registration = () => {
                       placeholder="What would you like to achieve with your lessons?"
                       value={formData.goals}
                       onChange={(e) => setFormData({...formData, goals: e.target.value})}
+                      rows={3}
+                      className="resize-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Medical Information */}
+                <div className="space-y-6">
+                  <h3 className="text-xl font-bold text-primary border-b border-primary/20 pb-2">Medical Information</h3>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="medicalConditions">Medical Conditions / Allergies</Label>
+                    <Textarea 
+                      id="medicalConditions"
+                      placeholder="Please list any medical conditions, allergies, or physical limitations we should be aware of..."
+                      value={formData.medicalConditions}
+                      onChange={(e) => setFormData({...formData, medicalConditions: e.target.value})}
+                      rows={3}
+                      className="resize-none"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="specificRequirements">Specific Requirements or Accommodations</Label>
+                    <Textarea 
+                      id="specificRequirements"
+                      placeholder="Any special accommodations or requirements for lessons..."
+                      value={formData.specificRequirements}
+                      onChange={(e) => setFormData({...formData, specificRequirements: e.target.value})}
                       rows={3}
                       className="resize-none"
                     />
