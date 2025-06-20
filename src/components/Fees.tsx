@@ -1,184 +1,190 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Check, Star, Clock, Users, Award } from "lucide-react";
+import { Check, Star, Clock, Users, Award, Globe, Home, Monitor } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Fees = () => {
   const feeStructure = [
     {
-      category: "Individual Music Lessons",
+      category: "🎶 Instrumental & Music Theory Lessons",
+      subtitle: "Monthly Plan (1-on-1, 4 weeks – 1 session/week)",
+      note: "Students may choose more than one class per week — total adjusts accordingly.",
       courses: [
         {
-          name: "Piano (Individual)",
-          level: "All Levels",
-          duration: "1 hour/week",
-          monthly: "KSh 12,000",
-          termly: "KSh 35,000",
-          registrationFee: "KSh 2,000",
-          materialFee: "KSh 1,500",
-          examFee: "KSh 3,000",
-          features: ["One-on-one instruction", "Personalized curriculum", "Performance opportunities", "ABRSM preparation"],
+          name: "At the Academy",
+          duration: "1 hour",
+          monthly: "KSh 4,800",
+          icon: Home,
+          features: ["One-on-one instruction", "Professional facilities", "All instruments available", "Flexible scheduling"],
           popular: true
         },
         {
-          name: "Guitar (Individual)",
-          level: "All Levels",
-          duration: "1 hour/week",
+          name: "At the Academy",
+          duration: "30 minutes", 
+          monthly: "KSh 5,600",
+          icon: Home,
+          features: ["One-on-one instruction", "Professional facilities", "Perfect for beginners", "Focused sessions"]
+        },
+        {
+          name: "Home (Nakuru & Environs)",
+          duration: "1 hour",
           monthly: "KSh 10,000",
-          termly: "KSh 28,000",
-          registrationFee: "KSh 2,000",
-          materialFee: "KSh 1,200",
-          examFee: "KSh 3,000",
-          features: ["Acoustic & Electric", "Multiple styles", "Song composition", "Recording techniques"]
+          icon: Users,
+          features: ["Convenient home lessons", "Personal attention", "Comfortable environment", "Travel included"]
         },
         {
-          name: "Voice Training (Individual)",
-          level: "All Levels",
-          duration: "1 hour/week",
-          monthly: "KSh 11,000",
-          termly: "KSh 32,000",
-          registrationFee: "KSh 2,000",
-          materialFee: "KSh 1,000",
-          examFee: "KSh 3,500",
-          features: ["Breath control", "Vocal range expansion", "Performance coaching", "Recording sessions"]
-        },
-        {
-          name: "Violin (Individual)",
-          level: "All Levels",
-          duration: "1 hour/week",
-          monthly: "KSh 12,000",
-          termly: "KSh 35,000",
-          registrationFee: "KSh 2,000",
-          materialFee: "KSh 2,000",
-          examFee: "KSh 3,000",
-          features: ["Classical & contemporary", "Ensemble playing", "Music theory", "Performance skills"]
+          name: "Online (Global)",
+          duration: "1 hour",
+          monthly: "$44/month",
+          icon: Globe,
+          features: ["Global accessibility", "Flexible timing", "Digital resources", "Interactive sessions"],
+          special: true
         }
       ]
     },
     {
-      category: "Group Music Lessons",
+      category: "Pay Per Class",
+      subtitle: "Flexible payment option for individual sessions",
       courses: [
         {
-          name: "Piano (Group)",
-          level: "Beginner to Intermediate",
-          duration: "1 hour/week",
-          monthly: "KSh 8,000",
-          termly: "KSh 22,000",
-          registrationFee: "KSh 1,500",
-          materialFee: "KSh 1,200",
-          examFee: "KSh 2,500",
-          features: ["Small group setting (max 4)", "Peer learning", "Group performances", "Affordable option"],
-          classSize: "2-4 students"
+          name: "At the Academy",
+          duration: "1 hour",
+          perClass: "KSh 1,500",
+          icon: Home,
+          features: ["No commitment required", "Pay as you go", "Professional facilities", "Trial friendly"]
         },
         {
-          name: "Guitar (Group)",
-          level: "Beginner to Intermediate",
-          duration: "1 hour/week",
-          monthly: "KSh 7,000",
-          termly: "KSh 19,000",
-          registrationFee: "KSh 1,500",
-          materialFee: "KSh 1,000",
-          examFee: "KSh 2,500",
-          features: ["Interactive learning", "Band formation", "Jam sessions", "Music theory basics"],
-          classSize: "3-5 students"
+          name: "At the Academy", 
+          duration: "30 minutes",
+          perClass: "KSh 1,600",
+          icon: Home,
+          features: ["Short focused sessions", "Perfect for busy schedules", "No commitment", "Quality instruction"]
+        },
+        {
+          name: "Home (Nakuru & Environs)",
+          duration: "1 hour", 
+          perClass: "KSh 2,700",
+          icon: Users,
+          features: ["Home convenience", "Personal attention", "No travel needed", "Comfortable learning"]
+        },
+        {
+          name: "Online (Global)",
+          duration: "1 hour",
+          perClass: "$11/class", 
+          icon: Globe,
+          features: ["Global reach", "Flexible scheduling", "Digital tools", "Cost effective"],
+          special: true
         }
       ]
     },
     {
-      category: "Music Production",
+      category: "🎧 Music Production & Sound Engineering",
+      subtitle: "3 sessions/week · 1 hour each",
       courses: [
         {
-          name: "Music Production & Audio Engineering",
-          level: "Beginner to Advanced",
-          duration: "2 hours/week",
-          monthly: "KSh 15,000",
-          termly: "KSh 42,000",
-          registrationFee: "KSh 3,000",
-          materialFee: "KSh 2,500",
-          examFee: "KSh 4,000",
-          features: ["Professional software training", "Studio access", "Mixing & mastering", "Industry certification"],
+          name: "1st Term",
+          level: "Foundation Level",
+          termly: "KSh 45,500",
+          features: ["Professional software training", "Studio access", "Industry techniques", "Portfolio development"],
           premium: true
         },
         {
-          name: "Beat Making & Composition",
-          level: "All Levels",
-          duration: "1.5 hours/week",
-          monthly: "KSh 12,000",
-          termly: "KSh 34,000",
-          registrationFee: "KSh 2,500",
-          materialFee: "KSh 2,000",
-          examFee: "KSh 3,500",
-          features: ["Digital music creation", "Genre exploration", "Collaboration projects", "Portfolio development"]
+          name: "Final Term", 
+          level: "Advanced Level",
+          termly: "KSh 42,500",
+          features: ["Advanced production", "Mixing & mastering", "Industry certification", "Career guidance"]
         }
       ]
     },
     {
-      category: "Art & Photography",
+      category: "📸 Photography & Videography", 
+      subtitle: "3 sessions/week · 1 hour each",
       courses: [
         {
-          name: "Digital Photography",
-          level: "All Levels",
-          duration: "2 hours/week",
-          monthly: "KSh 10,000",
-          termly: "KSh 28,000",
-          registrationFee: "KSh 2,000",
-          materialFee: "KSh 1,800",
-          examFee: "KSh 3,000",
-          features: ["Professional equipment", "Photo editing", "Portfolio development", "Exhibition opportunities"]
+          name: "1st Term",
+          level: "Foundation Level", 
+          termly: "KSh 45,500",
+          features: ["Camera techniques", "Composition skills", "Editing software", "Portfolio building"],
+          premium: true
         },
         {
-          name: "Art & Design",
+          name: "Final Term",
+          level: "Advanced Level",
+          termly: "KSh 42,500", 
+          features: ["Advanced techniques", "Professional editing", "Business skills", "Industry networking"]
+        }
+      ]
+    },
+    {
+      category: "🎨 Art Classes",
+      subtitle: "1 session/week · 2–3 hours per session",
+      courses: [
+        {
+          name: "Art Classes",
           level: "All Levels",
-          duration: "2 hours/week",
-          monthly: "KSh 8,500",
-          termly: "KSh 24,000",
-          registrationFee: "KSh 1,800",
-          materialFee: "KSh 2,200",
-          examFee: "KSh 2,800",
-          features: ["Traditional & digital art", "Design principles", "Creative projects", "Gallery exhibitions"]
+          monthly: "KSh 4,000",
+          features: ["Extended sessions", "Various mediums", "Creative expression", "Exhibition opportunities"],
+          duration: "2-3 hours/week"
         }
       ]
     }
   ];
 
-  const paymentOptions = [
-    "Monthly payments accepted",
-    "Termly discounts available",
-    "Family discounts for multiple students",
-    "Flexible payment plans",
-    "Mobile money payments (M-Pesa, Airtel Money)",
-    "Bank transfers accepted"
+  const additionalInfo = [
+    "All classes are one-on-one unless otherwise indicated",
+    "Term and monthly payments are made upfront", 
+    "Students may choose multiple classes per week",
+    "Flexible scheduling available",
+    "Professional equipment provided",
+    "Qualified instructors with industry experience"
   ];
+
+  const getIconColor = (category: string) => {
+    if (category.includes("Instrumental")) return "from-blue-500 to-blue-600";
+    if (category.includes("Pay Per Class")) return "from-green-500 to-green-600";
+    if (category.includes("Production")) return "from-purple-500 to-purple-600";
+    if (category.includes("Photography")) return "from-orange-500 to-orange-600";
+    if (category.includes("Art")) return "from-pink-500 to-pink-600";
+    return "from-primary to-accent";
+  };
 
   return (
     <section className="py-16">
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold mb-4">Course Fees & Pricing</h2>
+          <h2 className="text-4xl font-bold mb-4">Damon Music Academy – Fee Structure</h2>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Transparent, affordable pricing for world-class music and creative arts education. 
-            Choose from individual or group lessons to fit your budget and learning style.
+            Transparent, affordable pricing for world-class music and creative arts education.
           </p>
         </div>
 
         {/* Fee Structure */}
         {feeStructure.map((category, categoryIndex) => (
           <div key={categoryIndex} className="mb-16">
-            <h3 className="text-2xl font-bold mb-8 text-center text-primary">
-              {category.category}
-            </h3>
+            <div className="text-center mb-8">
+              <h3 className="text-2xl font-bold mb-2 text-primary">
+                {category.category}
+              </h3>
+              {category.subtitle && (
+                <p className="text-lg text-muted-foreground mb-2">{category.subtitle}</p>
+              )}
+              {category.note && (
+                <p className="text-sm text-muted-foreground italic">{category.note}</p>
+              )}
+            </div>
             
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {category.courses.map((course, courseIndex) => (
                 <Card key={courseIndex} className={`relative shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-300 hover:scale-105 ${
-                  course.popular ? 'ring-2 ring-primary' : course.premium ? 'ring-2 ring-accent' : ''
+                  course.popular ? 'ring-2 ring-blue-500' : 
+                  course.premium ? 'ring-2 ring-purple-500' : 
+                  course.special ? 'ring-2 ring-green-500' : ''
                 }`}>
                   {course.popular && (
                     <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                      <Badge className="bg-primary text-white px-4 py-1">
+                      <Badge className="bg-blue-500 text-white px-4 py-1">
                         <Star className="w-3 h-3 mr-1" />
                         Most Popular
                       </Badge>
@@ -192,51 +198,56 @@ const Fees = () => {
                       </Badge>
                     </div>
                   )}
+                  {course.special && (
+                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                      <Badge className="bg-green-500 text-white px-4 py-1">
+                        <Globe className="w-3 h-3 mr-1" />
+                        Global
+                      </Badge>
+                    </div>
+                  )}
                   
                   <CardHeader className="pb-4">
-                    <CardTitle className="text-xl">{course.name}</CardTitle>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Badge variant="outline">{course.level}</Badge>
-                        <span>•</span>
-                        <Clock className="w-4 h-4" />
-                        <span>{course.duration}</span>
+                    <div className="flex items-center gap-3 mb-3">
+                      {course.icon && (
+                        <div className={`p-2 bg-gradient-to-r ${getIconColor(category.category)} rounded-lg`}>
+                          <course.icon className="w-5 h-5 text-white" />
+                        </div>
+                      )}
+                      <div>
+                        <CardTitle className="text-lg">{course.name}</CardTitle>
+                        {course.level && (
+                          <Badge variant="outline" className="mt-1">{course.level}</Badge>
+                        )}
                       </div>
-                      {course.classSize && (
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {course.duration && (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Users className="w-4 h-4" />
-                          <span>{course.classSize}</span>
+                          <Clock className="w-4 h-4" />
+                          <span>{course.duration}</span>
                         </div>
                       )}
                     </div>
                   </CardHeader>
 
-                  <CardContent className="space-y-6">
+                  <CardContent className="space-y-4 pt-0">
                     {/* Pricing */}
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Monthly:</span>
-                        <span className="text-2xl font-bold text-primary">{course.monthly}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Per Term:</span>
-                        <span className="text-lg font-semibold">{course.termly}</span>
-                      </div>
-                    </div>
-
-                    {/* Additional Fees */}
-                    <div className="border-t pt-4 space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Registration Fee:</span>
-                        <span className="font-medium">{course.registrationFee}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Material Fee:</span>
-                        <span className="font-medium">{course.materialFee}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Exam Fee (optional):</span>
-                        <span className="font-medium">{course.examFee}</span>
+                    <div className="text-center">
+                      {course.monthly && (
+                        <div className="text-2xl font-bold text-primary">{course.monthly}</div>
+                      )}
+                      {course.perClass && (
+                        <div className="text-2xl font-bold text-green-600">{course.perClass}</div>
+                      )}
+                      {course.termly && (
+                        <div className="text-2xl font-bold text-purple-600">{course.termly}</div>
+                      )}
+                      <div className="text-sm text-muted-foreground mt-1">
+                        {course.monthly && "per month"}
+                        {course.perClass && "per class"}
+                        {course.termly && "per term"}
                       </div>
                     </div>
 
@@ -260,30 +271,30 @@ const Fees = () => {
           </div>
         ))}
 
-        {/* Payment Information */}
+        {/* Additional Information */}
         <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-8 mb-12">
-          <h3 className="text-2xl font-bold mb-6 text-center">Payment Information</h3>
-          <div className="grid md:grid-cols-2 gap-8">
+          <h3 className="text-2xl font-bold mb-6 text-center">Important Information</h3>
+          <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <h4 className="text-lg font-semibold mb-4">Payment Options</h4>
+              <h4 className="text-lg font-semibold mb-4">Payment Terms</h4>
               <div className="space-y-2">
-                {paymentOptions.map((option, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-500" />
-                    <span className="text-sm">{option}</span>
+                {additionalInfo.slice(0, 3).map((info, index) => (
+                  <div key={index} className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                    <span className="text-sm">{info}</span>
                   </div>
                 ))}
               </div>
             </div>
             <div>
-              <h4 className="text-lg font-semibold mb-4">Additional Information</h4>
-              <div className="space-y-3 text-sm text-muted-foreground">
-                <p>• All fees are quoted in Kenyan Shillings (KSh)</p>
-                <p>• Registration fee is one-time payment</p>
-                <p>• Material fees cover books, sheet music, and basic supplies</p>
-                <p>• Exam fees are optional and for certification purposes</p>
-                <p>• Family discounts available for 2+ students</p>
-                <p>• Instruments available for rent at additional cost</p>
+              <h4 className="text-lg font-semibold mb-4">What's Included</h4>
+              <div className="space-y-2">
+                {additionalInfo.slice(3).map((info, index) => (
+                  <div key={index} className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                    <span className="text-sm">{info}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -291,9 +302,9 @@ const Fees = () => {
 
         {/* Call to Action */}
         <div className="text-center">
-          <h3 className="text-2xl font-bold mb-4">Ready to Start Your Musical Journey?</h3>
+          <h3 className="text-2xl font-bold mb-4">Ready to Start Your Creative Journey?</h3>
           <p className="text-muted-foreground mb-6">
-            Contact us for more information or to schedule a trial lesson
+            Contact us for more information or to schedule your first lesson
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button asChild size="lg" className="bg-gradient-to-r from-primary to-accent text-white">
