@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, Edit, Trash2, Users, ImageIcon, Calendar, MapPin } from "lucide-react";
 import ImageUpload from "@/components/ui/image-upload";
+import RichTextEditor from "@/components/ui/RichTextEditor";
 
 interface Event {
   id: string;
@@ -280,12 +281,10 @@ const AdminEventsManager = () => {
               </div>
 
               <div>
-                <Label htmlFor="content">Full Content</Label>
-                <Textarea
-                  id="content"
+                <RichTextEditor
                   value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  rows={6}
+                  onChange={(val) => setFormData({ ...formData, content: val })}
+                  label="Full Content"
                 />
               </div>
 

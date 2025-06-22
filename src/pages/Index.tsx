@@ -8,7 +8,7 @@ import Footer from "@/components/Footer";
 import SocialMedia from "@/components/SocialMedia";
 import WhatsAppChat from "@/components/WhatsAppChat";
 import NewsList from "@/components/NewsList";
-import Services from "@/components/Services";
+import { ServicesCarousel } from "@/components/Services";
 import ExamBodies from "@/components/ExamBodies";
 
 const Index = () => {
@@ -18,7 +18,7 @@ const Index = () => {
       <main>
         <Hero />
         <CoursesTeaser />
-        <Services />
+        <ServicesCarousel />
         <ExamBodies />
         <Testimonials />
         <NewsList />

@@ -390,7 +390,7 @@ const AdminPanel = () => {
         </div>
 
         {/* Stats Overview */}
-        {activeTab === 'stats' && (
+        <div style={{ display: activeTab === 'stats' ? 'block' : 'none' }}>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card className="shadow-xl border-0 bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
               <CardContent className="p-6">
@@ -452,10 +452,10 @@ const AdminPanel = () => {
               </CardContent>
             </Card>
           </div>
-        )}
+        </div>
 
         {/* Events Tab */}
-        {activeTab === 'events' && (
+        <div style={{ display: activeTab === 'events' ? 'block' : 'none' }}>
           <Tabs defaultValue="events" className="w-full">
             <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
               <TabsTrigger value="events">
@@ -474,10 +474,10 @@ const AdminPanel = () => {
               <AdminNewsManager />
             </TabsContent>
           </Tabs>
-        )}
+        </div>
 
         {/* Schedule Tab */}
-        {activeTab === 'schedule' && (
+        <div style={{ display: activeTab === 'schedule' ? 'block' : 'none' }}>
           <div className="space-y-6">
             <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Class Schedule Management
@@ -498,10 +498,10 @@ const AdminPanel = () => {
               </CardContent>
             </Card>
           </div>
-        )}
+        </div>
 
         {/* Admin Management Tab (Super Admin Only) */}
-        {activeTab === 'admins' && userRole === 'super_admin' && (
+        <div style={{ display: activeTab === 'admins' && userRole === 'super_admin' ? 'block' : 'none' }}>
           <div className="space-y-6">
             <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Admin Management
@@ -544,10 +544,10 @@ const AdminPanel = () => {
               ))}
             </div>
           </div>
-        )}
+        </div>
 
         {/* Active Students Tab */}
-        {activeTab === 'students' && (
+        <div style={{ display: activeTab === 'students' ? 'block' : 'none' }}>
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
@@ -613,10 +613,10 @@ const AdminPanel = () => {
               })}
             </div>
           </div>
-        )}
+        </div>
 
         {/* Registrations Tab */}
-        {activeTab === 'registrations' && (
+        <div style={{ display: activeTab === 'registrations' ? 'block' : 'none' }}>
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
@@ -694,10 +694,10 @@ const AdminPanel = () => {
               ))}
             </div>
           </div>
-        )}
+        </div>
 
         {/* Messages Tab */}
-        {activeTab === 'messages' && (
+        <div style={{ display: activeTab === 'messages' ? 'block' : 'none' }}>
           <div className="space-y-6">
             <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Musical Conversations
@@ -746,7 +746,7 @@ const AdminPanel = () => {
               ))}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </section>
   );

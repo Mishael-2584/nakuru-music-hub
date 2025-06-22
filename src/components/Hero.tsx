@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Play, ArrowRight, Star, Users, Award, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -60,7 +59,7 @@ const Hero = () => {
   const currentSlideData = slides[currentSlide];
 
   return (
-    <section className="relative min-h-screen flex items-center overflow-hidden">
+    <section className="relative min-h-screen flex items-center overflow-hidden pt-20">
       {/* Background carousel */}
       <div className="absolute inset-0">
         <div 
