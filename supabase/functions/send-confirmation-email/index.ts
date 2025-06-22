@@ -1,10 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-// List of allowed origins.
+// List of allowed origins - more permissive for hosted environments
 const allowedOrigins = [
   'http://localhost:8080', // Vite dev server
   'http://localhost:5173', // Alternative Vite port
   'https://damonmusicacademy.co.ke', // Production domain
+  'https://*.vercel.app', // Vercel deployments
+  'https://*.netlify.app', // Netlify deployments
+  'https://*.supabase.co', // Supabase domains
 ];
 
 // Add production domain from environment variables if it exists.
@@ -25,12 +28,18 @@ interface EmailRequest {
 
 serve(async (req) => {
   const origin = req.headers.get('Origin') || '';
-  const isAllowed = allowedOrigins.includes(origin);
+  
+  // More permissive CORS for hosted environments
+  const isAllowed = allowedOrigins.some(allowed => 
+    origin === allowed || 
+    allowed.includes('*') && origin.includes(allowed.replace('*', ''))
+  );
 
   const corsHeaders = {
-    'Access-Control-Allow-Origin': isAllowed ? origin : allowedOrigins[0],
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Origin': isAllowed ? origin : '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Max-Age': '86400',
   };
 
   if (req.method === 'OPTIONS') {
@@ -38,10 +47,16 @@ serve(async (req) => {
   }
 
   try {
+    console.log('📧 Email function called from origin:', origin);
+    console.log('📧 Request method:', req.method);
+    
     const { to, subject, html }: EmailRequest = await req.json();
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
+    console.log('📧 Email request received:', { to, subject: subject.substring(0, 50) + '...' });
+
     if (!resendApiKey) {
+      console.error('❌ RESEND_API_KEY is not configured');
       throw new Error('RESEND_API_KEY is not configured in Supabase secrets.');
     }
 
@@ -52,6 +67,7 @@ serve(async (req) => {
       html: html.replace('{{LOGO_URL}}', logoUrl),
     };
 
+    console.log('📧 Sending to Resend API...');
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
@@ -59,6 +75,8 @@ serve(async (req) => {
     });
     
     const responseText = await response.text();
+    console.log('📧 Resend API response status:', response.status);
+    console.log('📧 Resend API response:', responseText);
 
     if (!response.ok) {
       throw new Error(`Failed to send email. Status: ${response.status}. Body: ${responseText}`);
@@ -81,6 +99,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
+    console.error('❌ Email function error:', error);
     return new Response(
       JSON.stringify({ success: false, message: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }

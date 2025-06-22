@@ -329,6 +329,10 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
       registrationId: registration.id
     });
     
+    // Get the current origin for debugging
+    const currentOrigin = window.location.origin;
+    console.log('📧 Current origin:', currentOrigin);
+    
     const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
       body: {
         to: registration.email,
@@ -346,8 +350,21 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
         message: error.message,
         status: error.status,
         statusText: error.statusText,
-        details: error.details
+        details: error.details,
+        name: error.name
       });
+      
+      // Check for specific error types
+      if (error.message?.includes('CORS')) {
+        console.error('❌ CORS error detected - check function configuration');
+      }
+      if (error.status === 401) {
+        console.error('❌ Authentication error - check Supabase key');
+      }
+      if (error.status === 403) {
+        console.error('❌ Permission error - check function access');
+      }
+      
       return false;
     }
 
