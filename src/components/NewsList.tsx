@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -77,44 +76,47 @@ const NewsList = () => {
   }
 
   return (
-    <section className="py-16">
+    <section className="py-16 md:py-24 bg-gray-50">
       <div className="container mx-auto px-4">
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {news.map((item) => (
-            <Card key={item.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-300 group">
+            <Card key={item.id} className="flex flex-col rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 group bg-white">
               <CardHeader className="p-0">
                 {item.image_url && (
-                  <div className="h-48 bg-cover bg-center rounded-t-lg" 
-                       style={{ backgroundImage: `url(${item.image_url})` }}>
-                    <div className="h-full bg-gradient-to-t from-black/60 to-transparent rounded-t-lg flex items-end p-4">
-                      {item.is_featured && (
-                        <Badge className="bg-gradient-to-r from-blue-500 to-purple-500">
-                          Featured
-                        </Badge>
-                      )}
+                  <Link to={`/news/${item.slug}`} className="block h-48 overflow-hidden">
+                    <div className="h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-110" 
+                         style={{ backgroundImage: `url(${item.image_url})` }}>
                     </div>
-                  </div>
+                  </Link>
                 )}
               </CardHeader>
-              <CardContent className="p-6">
+              <CardContent className="p-6 flex flex-col flex-grow">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
                   <Calendar className="h-4 w-4" />
                   <span>{new Date(item.created_at).toLocaleDateString()}</span>
+                   {item.is_featured && (
+                    <>
+                      <span className="mx-1">·</span>
+                      <Badge className="bg-primary/10 text-primary border-primary/20">
+                        Featured
+                      </Badge>
+                    </>
+                  )}
                 </div>
                 
-                <h3 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors">
+                <h3 className="text-xl font-bold mb-3 flex-grow group-hover:text-primary transition-colors">
                   <Link to={`/news/${item.slug}`}>
                     {item.title}
                   </Link>
                 </h3>
                 
-                <p className="text-muted-foreground line-clamp-3">
+                <p className="text-muted-foreground line-clamp-3 mb-4">
                   {item.excerpt || item.content.substring(0, 150) + '...'}
                 </p>
                 
                 <Link 
                   to={`/news/${item.slug}`} 
-                  className="inline-block mt-4 text-primary font-medium hover:underline"
+                  className="inline-block mt-auto text-primary font-semibold hover:underline"
                 >
                   Read More →
                 </Link>

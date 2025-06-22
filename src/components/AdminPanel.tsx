@@ -2,14 +2,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye } from "lucide-react";
+import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import AdminEventsManager from "./AdminEventsManager";
-import AdminNewsManager from "./AdminNewsManager";
+import AdminEventsManager from "@/components/AdminEventsManager";
+import AdminNewsManager from "@/components/AdminNewsManager";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Registration {
   id: string;
@@ -352,7 +353,7 @@ const AdminPanel = () => {
               onClick={() => setActiveTab('news')}
               className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
             >
-              <BookOpen className="h-4 w-4 mr-2" />
+              <Newspaper className="h-4 w-4 mr-2" />
               News
             </Button>
             <Button
@@ -450,10 +451,26 @@ const AdminPanel = () => {
         )}
 
         {/* Events Tab */}
-        {activeTab === 'events' && <AdminEventsManager />}
-
-        {/* News Tab */}
-        {activeTab === 'news' && <AdminNewsManager />}
+        {activeTab === 'events' && (
+          <Tabs defaultValue="events" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
+              <TabsTrigger value="events">
+                <Calendar className="mr-2 h-4 w-4" />
+                Events Manager
+              </TabsTrigger>
+              <TabsTrigger value="news">
+                <Newspaper className="mr-2 h-4 w-4" />
+                News Manager
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="events" className="mt-6">
+              <AdminEventsManager />
+            </TabsContent>
+            <TabsContent value="news" className="mt-6">
+              <AdminNewsManager />
+            </TabsContent>
+          </Tabs>
+        )}
 
         {/* Schedule Tab */}
         {activeTab === 'schedule' && (

@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Check, Star, Clock, Users, Award, Globe, Home, Monitor } from "lucide-react";
+import { Check, Star, Clock, Users, Award, Globe, Home } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Fees = () => {
@@ -141,180 +141,55 @@ const Fees = () => {
   ];
 
   const getIconColor = (category: string) => {
-    if (category.includes("Instrumental")) return "from-blue-500 to-blue-600";
-    if (category.includes("Pay Per Class")) return "from-green-500 to-green-600";
-    if (category.includes("Production")) return "from-purple-500 to-purple-600";
-    if (category.includes("Photography")) return "from-orange-500 to-orange-600";
-    if (category.includes("Art")) return "from-pink-500 to-pink-600";
+    if (category.includes("Production") || category.includes("Photography")) return "from-purple-500 to-pink-500";
     return "from-primary to-accent";
   };
 
   return (
-    <section className="py-16">
+    <section className="py-16 bg-gray-50">
       <div className="container mx-auto px-4">
-        {/* Header */}
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold mb-4">Damon Music Academy – Fee Structure</h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Damon Music Academy – Fee Structure</h2>
+          <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
             Transparent, affordable pricing for world-class music and creative arts education.
           </p>
         </div>
-
-        {/* Fee Structure */}
+        
         {feeStructure.map((category, categoryIndex) => (
-          <div key={categoryIndex} className="mb-16">
+          <div key={categoryIndex} className="mb-12">
             <div className="text-center mb-8">
-              <h3 className="text-2xl font-bold mb-2 text-primary">
-                {category.category}
-              </h3>
-              {category.subtitle && (
-                <p className="text-lg text-muted-foreground mb-2">{category.subtitle}</p>
-              )}
-              {category.note && (
-                <p className="text-sm text-muted-foreground italic">{category.note}</p>
-              )}
+              <h3 className="text-2xl md:text-3xl font-bold mb-2 text-primary">{category.category}</h3>
+              {category.subtitle && <p className="text-base md:text-lg text-muted-foreground mb-2">{category.subtitle}</p>}
+              {category.note && <p className="text-sm text-muted-foreground italic">{category.note}</p>}
             </div>
             
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {category.courses.map((course, courseIndex) => (
-                <Card key={courseIndex} className={`relative shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-300 hover:scale-105 ${
-                  course.popular ? 'ring-2 ring-blue-500' : 
-                  course.premium ? 'ring-2 ring-purple-500' : 
-                  course.special ? 'ring-2 ring-green-500' : ''
-                }`}>
+                <Card key={courseIndex} className={`relative flex flex-col shadow-lg border-0 bg-white hover:shadow-xl transition-all duration-300 ${course.popular ? 'ring-2 ring-blue-500' : ''}`}>
                   {course.popular && (
-                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                      <Badge className="bg-blue-500 text-white px-4 py-1">
-                        <Star className="w-3 h-3 mr-1" />
-                        Most Popular
-                      </Badge>
-                    </div>
+                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2"><Badge className="bg-blue-500 text-white px-3 py-1 text-sm"><Star className="w-3 h-3 mr-1" />Popular</Badge></div>
                   )}
-                  {course.premium && (
-                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                      <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-1">
-                        <Award className="w-3 h-3 mr-1" />
-                        Premium
-                      </Badge>
-                    </div>
-                  )}
-                  {course.special && (
-                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                      <Badge className="bg-green-500 text-white px-4 py-1">
-                        <Globe className="w-3 h-3 mr-1" />
-                        Global
-                      </Badge>
-                    </div>
-                  )}
-                  
                   <CardHeader className="pb-4">
                     <div className="flex items-center gap-3 mb-3">
-                      {course.icon && (
-                        <div className={`p-2 bg-gradient-to-r ${getIconColor(category.category)} rounded-lg`}>
-                          <course.icon className="w-5 h-5 text-white" />
-                        </div>
-                      )}
-                      <div>
-                        <CardTitle className="text-lg">{course.name}</CardTitle>
-                        {course.level && (
-                          <Badge variant="outline" className="mt-1">{course.level}</Badge>
-                        )}
-                      </div>
+                       {course.icon && <div className={`p-2 bg-gradient-to-r ${getIconColor(category.category)} rounded-lg`}><course.icon className="w-5 h-5 text-white" /></div>}
+                       <CardTitle className="text-lg">{course.name}</CardTitle>
                     </div>
-                    
-                    <div className="space-y-2">
-                      {course.duration && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="w-4 h-4" />
-                          <span>{course.duration}</span>
-                        </div>
-                      )}
-                    </div>
+                    {course.duration && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Clock className="w-4 h-4" /><span>{course.duration}</span></div>}
                   </CardHeader>
-
-                  <CardContent className="space-y-4 pt-0">
-                    {/* Pricing */}
-                    <div className="text-center">
-                      {course.monthly && (
-                        <div className="text-2xl font-bold text-primary">{course.monthly}</div>
-                      )}
-                      {course.perClass && (
-                        <div className="text-2xl font-bold text-green-600">{course.perClass}</div>
-                      )}
-                      {course.termly && (
-                        <div className="text-2xl font-bold text-purple-600">{course.termly}</div>
-                      )}
-                      <div className="text-sm text-muted-foreground mt-1">
-                        {course.monthly && "per month"}
-                        {course.perClass && "per class"}
-                        {course.termly && "per term"}
-                      </div>
-                    </div>
-
-                    {/* Features */}
-                    <div className="space-y-2">
+                  <CardContent className="flex-grow flex flex-col pt-0">
+                    <div className="text-center my-4"><div className="text-2xl font-bold text-primary">{course.monthly || course.perClass || course.termly}</div><div className="text-sm text-muted-foreground mt-1">{course.monthly ? "per month" : course.perClass ? "per class" : "per term"}</div></div>
+                    <div className="space-y-2 flex-grow">
                       {course.features.map((feature, featureIndex) => (
-                        <div key={featureIndex} className="flex items-center gap-2">
-                          <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
-                          <span className="text-sm">{feature}</span>
-                        </div>
+                        <div key={featureIndex} className="flex items-center gap-2 text-sm"><Check className="w-4 h-4 text-green-500 flex-shrink-0" /><span>{feature}</span></div>
                       ))}
                     </div>
-
-                    <Button className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold">
-                      Enroll Now
-                    </Button>
+                    <Button asChild className="w-full mt-6 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold"><Link to="/#registration">Enroll Now</Link></Button>
                   </CardContent>
                 </Card>
               ))}
             </div>
           </div>
         ))}
-
-        {/* Additional Information */}
-        <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-8 mb-12">
-          <h3 className="text-2xl font-bold mb-6 text-center">Important Information</h3>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="text-lg font-semibold mb-4">Payment Terms</h4>
-              <div className="space-y-2">
-                {additionalInfo.slice(0, 3).map((info, index) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm">{info}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h4 className="text-lg font-semibold mb-4">What's Included</h4>
-              <div className="space-y-2">
-                {additionalInfo.slice(3).map((info, index) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm">{info}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Call to Action */}
-        <div className="text-center">
-          <h3 className="text-2xl font-bold mb-4">Ready to Start Your Creative Journey?</h3>
-          <p className="text-muted-foreground mb-6">
-            Contact us for more information or to schedule your first lesson
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button asChild size="lg" className="bg-gradient-to-r from-primary to-accent text-white">
-              <Link to="/#registration">Register Now</Link>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <Link to="/contact">Contact Us</Link>
-            </Button>
-          </div>
-        </div>
       </div>
     </section>
   );

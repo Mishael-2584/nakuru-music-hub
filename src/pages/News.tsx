@@ -1,4 +1,3 @@
-
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import NewsList from "@/components/NewsList";
@@ -8,14 +7,14 @@ const News = () => {
     <div className="min-h-screen">
       <Header />
       
-      <section className="pt-24 py-20 bg-gradient-to-br from-emerald-900/20 via-teal-900/20 to-cyan-900/20 relative overflow-hidden">
+      <section className="pt-24 md:pt-32 pb-20 bg-gradient-to-br from-emerald-900/20 via-teal-900/20 to-cyan-900/20 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('/lovable-uploads/70f23f35-6eb2-49a1-8bf6-677fe0c49746.png')] bg-cover bg-center opacity-10"></div>
         <div className="container mx-auto px-4 relative">
-          <div className="text-center mb-16">
-            <h1 className="text-6xl font-bold mb-6 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 bg-clip-text text-transparent">
+          <div className="text-center">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 bg-clip-text text-transparent">
               Latest News
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
               Stay updated with the latest happenings at Damon Music Academy
             </p>
           </div>

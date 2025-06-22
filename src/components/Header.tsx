@@ -42,16 +42,8 @@ const Header = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
           {/* Logo - Updated with new logo */}
-          <Link to="/" className="flex items-center space-x-3 group">
-            <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
-              <img alt="Damon Music Academy Logo" src="/lovable-uploads/6897b00c-5998-4e70-896a-816a979e52f6.png" className="w-10 h-10 object-cover" />
-            </div>
-            <div className="hidden md:block">
-              <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Damon Music Academy
-              </h1>
-              <p className="text-xs text-muted-foreground font-bold">Nakuru's Premier Music &amp; Creative Arts Hub</p>
-            </div>
+          <Link to="/" className="flex items-center group">
+            <img alt="Damon Music Academy Logo" src="/damon-logo.png" className="h-12 sm:h-14 object-contain transition-transform duration-300 group-hover:scale-105" />
           </Link>
 
           {/* Desktop Navigation */}
@@ -66,7 +58,7 @@ const Header = () => {
             <Button variant="outline" size="sm" asChild className="border-primary text-primary hover:bg-primary hover:text-white">
               <Link to="/auth">Login</Link>
             </Button>
-            <Button size="sm" asChild className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold shadow-lg hover:scale-105 transition-all duration-200">
+            <Button size="sm" asChild className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-orange-500 font-semibold shadow-lg hover:scale-105 transition-all duration-200">
               <Link to="/#registration">Enroll Now</Link>
             </Button>
           </div>
@@ -87,7 +79,7 @@ const Header = () => {
                 <Button variant="outline" size="sm" asChild className="border-primary text-primary hover:bg-primary hover:text-white">
                   <Link to="/auth" onClick={() => setIsMenuOpen(false)}>Login</Link>
                 </Button>
-                <Button size="sm" asChild className="bg-gradient-to-r from-primary to-accent text-white">
+                <Button size="sm" asChild className="bg-gradient-to-r from-primary to-accent text-orange-500">
                   <Link to="/#registration" onClick={() => setIsMenuOpen(false)}>Enroll Now</Link>
                 </Button>
               </div>

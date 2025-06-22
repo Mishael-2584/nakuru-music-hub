@@ -6,17 +6,13 @@ const Footer = () => {
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Company Info */}
           <div className="space-y-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
-                <img src="/lovable-uploads/bda126b8-9e86-4564-9832-173ce818d676.png" alt="Damon Music Academy Logo" className="w-8 h-8 object-cover" />
+            <Link to="/">
+              <div className="bg-white rounded-md p-2 inline-block">
+                <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-12 object-contain" />
               </div>
-              <div>
-                <h3 className="text-xl font-bold">Damon Music Academy</h3>
-                <p className="text-sm text-gray-400">Excellence in Music Education</p>
-              </div>
-            </div>
+            </Link>
             <p className="text-gray-300 leading-relaxed">
-              Nurturing musical talent and creativity in Nakuru since 2010. Join our community of passionate musicians and artists.
+              Since 2016, we've been nurturing musical talent and creativity in Nakuru. Join our community of passionate musicians and artists where no one leaves the same way they came.
             </p>
           </div>
 
@@ -96,7 +92,7 @@ const Footer = () => {
         <div className="border-t border-gray-800 mt-12 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-gray-400 text-sm">
-              © 2024 Damon Music Academy. All rights reserved.
+              © 2025 Damon Music Academy. All rights reserved.
             </p>
             <div className="flex gap-6 text-sm">
               <Link to="#" className="text-gray-400 hover:text-primary transition-colors">Privacy Policy</Link>

@@ -1,105 +1,49 @@
+import { Award } from "lucide-react";
 
-import { Card, CardContent } from "@/components/ui/card";
-import { Award, Star, Shield } from "lucide-react";
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-
-interface ExamBody {
-  id: string;
-  name: string;
-  abbreviation: string;
-  description: string | null;
-  logo_url: string | null;
-  website_url: string | null;
-}
+const examBodies = [
+  {
+    name: "ABRSM",
+    logoUrl: "https://upload.wikimedia.org/wikipedia/en/thumb/f/f6/ABRSM_logo.svg/1200px-ABRSM_logo.svg.png",
+    description: "The Associated Board of the Royal Schools of Music is a leading provider of music exams and assessments, offering graded music exams, diplomas, and assessments.",
+  },
+  {
+    name: "LCM",
+    logoUrl: "https://centrestagedance.org/wp-content/uploads/2016/11/lcm-logo.jpeg",
+    description: "London College of Music Examinations is an international examinations board offering graded and diploma qualifications in music, drama, and communication.",
+  },
+  {
+    name: "Rockschool",
+    logoUrl: "https://mandm.academy/wp-content/uploads/2020/10/rockschool-logo-1.jpg",
+    description: "RSL Awards is a leading global provider of contemporary music and performance arts qualifications, covering a range of popular genres and instruments.",
+  },
+];
 
 const ExamBodies = () => {
-  const [examBodies, setExamBodies] = useState<ExamBody[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchExamBodies = async () => {
-      const { data, error } = await supabase
-        .from('exam_bodies')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) {
-        console.error('Error fetching exam bodies:', error);
-      } else {
-        setExamBodies(data || []);
-      }
-      setIsLoading(false);
-    };
-
-    fetchExamBodies();
-  }, []);
-
-  if (isLoading) {
-    return (
-      <section className="py-16 bg-gradient-to-br from-primary/5 to-accent/5">
-        <div className="container mx-auto px-4">
-          <div className="text-center">
-            <div className="text-lg text-muted-foreground">Loading certifications...</div>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
   return (
-    <section className="py-16 bg-gradient-to-br from-primary/5 to-accent/5">
+    <section className="py-20 bg-gray-50">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <div className="flex justify-center mb-4">
-            <div className="p-3 bg-gradient-to-r from-primary to-accent rounded-full shadow-lg">
-              <Shield className="h-8 w-8 text-white" />
-            </div>
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary font-semibold py-2 px-4 rounded-full text-sm mb-4">
+            <Award className="w-5 h-5" />
+            Examining Bodies
           </div>
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Internationally Recognized Certifications
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            Globally Recognized Certifications
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Damon Music Academy is authorized to prepare students for internationally recognized music examinations
+          <p className="max-w-3xl mx-auto text-base md:text-lg text-gray-600">
+            We are proud to prepare our students for examinations with the world's leading music and performance arts exam boards, opening doors to global opportunities.
           </p>
         </div>
-        
-        <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-          {examBodies.map((examBody) => (
-            <Card key={examBody.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-300 hover:scale-105 text-center">
-              <CardContent className="p-8">
-                <div className="flex justify-center mb-4">
-                  <div className="p-4 bg-gradient-to-r from-accent to-secondary rounded-full shadow-lg">
-                    <Award className="h-10 w-10 text-white" />
-                  </div>
-                </div>
-                
-                <h3 className="text-2xl font-bold text-primary mb-2">{examBody.abbreviation}</h3>
-                <h4 className="text-lg font-semibold text-muted-foreground mb-4">{examBody.name}</h4>
-                
-                {examBody.description && (
-                  <p className="text-sm text-muted-foreground mb-4">{examBody.description}</p>
-                )}
-                
-                <div className="flex justify-center items-center space-x-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="h-4 w-4 text-yellow-400 fill-current" />
-                  ))}
-                  <span className="ml-2 text-sm text-muted-foreground">Globally Recognized</span>
-                </div>
-              </CardContent>
-            </Card>
+        <div className="grid md:grid-cols-3 gap-8">
+          {examBodies.map((body) => (
+            <div key={body.name} className="bg-white p-6 md:p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 flex flex-col items-center text-center group">
+              <div className="h-20 md:h-24 flex items-center justify-center mb-6">
+                <img src={body.logoUrl} alt={`${body.name} logo`} className="max-h-14 md:max-h-16 object-contain transition-transform duration-300 group-hover:scale-105" />
+              </div>
+              <h3 className="text-xl md:text-2xl font-bold text-gray-800 mb-3">{body.name}</h3>
+              <p className="text-gray-600 leading-relaxed text-sm md:text-base">{body.description}</p>
+            </div>
           ))}
-        </div>
-        
-        <div className="text-center mt-12">
-          <div className="inline-flex items-center gap-2 px-6 py-3 bg-white/80 backdrop-blur-sm rounded-full shadow-lg">
-            <Award className="h-5 w-5 text-primary" />
-            <span className="text-sm font-medium text-muted-foreground">
-              Preparing students for excellence since 2014
-            </span>
-          </div>
         </div>
       </div>
     </section>

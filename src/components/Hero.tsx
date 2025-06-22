@@ -34,7 +34,7 @@ const Hero = () => {
     },
     {
       id: 4,
-      image: "/lovable-uploads/40fee785-03dc-4548-8e48-b09291ee8f42.png",
+      image: "/lovable-uploads/29861c9f-1df3-42f1-982f-ef38574fb617.png",
       title: "JOIN OUR MUSICAL",
       subtitle: "COMMUNITY",
       description: "Connect with fellow musicians, participate in recitals, and be part of Nakuru's most vibrant creative community.",
@@ -123,7 +123,7 @@ const Hero = () => {
                   <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
                 ))}
               </div>
-              <span className="text-white/90 text-sm font-medium">Rated 5.0 by 500+ students</span>
+              <span className="text-white/90 text-sm font-medium">Rated 4.8 by 100+ students</span>
             </div>
           )}
           

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -83,67 +82,58 @@ const EventsList = () => {
   }
 
   return (
-    <section className="py-16">
+    <section className="py-16 md:py-24 bg-gray-50">
       <div className="container mx-auto px-4">
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {events.map((event) => (
-            <Card key={event.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-300 group">
+            <Card key={event.id} className="flex flex-col rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 group bg-white">
               <CardHeader className="p-0">
                 {event.image_url && (
-                  <div className="h-48 bg-cover bg-center rounded-t-lg" 
-                       style={{ backgroundImage: `url(${event.image_url})` }}>
-                    <div className="h-full bg-gradient-to-t from-black/60 to-transparent rounded-t-lg flex items-end p-4">
-                      {event.is_featured && (
-                        <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500">
-                          Featured Event
-                        </Badge>
-                      )}
+                  <Link to={`/events/${event.slug}`} className="block h-48 overflow-hidden">
+                    <div className="h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-110" 
+                         style={{ backgroundImage: `url(${event.image_url})` }}>
                     </div>
-                  </div>
+                  </Link>
                 )}
               </CardHeader>
-              <CardContent className="p-6">
-                <CardTitle className="text-xl mb-3 group-hover:text-primary transition-colors">
-                  {event.title}
+              <CardContent className="p-6 flex flex-col flex-grow">
+                <CardTitle className="text-xl mb-3 flex-grow group-hover:text-primary transition-colors">
+                  <Link to={`/events/${event.slug}`}>{event.title}</Link>
                 </CardTitle>
                 
                 <p className="text-muted-foreground mb-4 line-clamp-2">
                   {event.description}
                 </p>
                 
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2 text-sm">
+                <div className="space-y-3 text-sm text-muted-foreground border-t pt-4 mt-auto">
+                  <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-primary" />
-                    <span>{new Date(event.event_date).toLocaleDateString()}</span>
+                    <span>{new Date(event.event_date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
                   </div>
                   
                   {event.event_time && (
-                    <div className="flex items-center gap-2 text-sm">
+                    <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-primary" />
                       <span>{event.event_time}</span>
                     </div>
                   )}
                   
                   {event.location && (
-                    <div className="flex items-center gap-2 text-sm">
+                    <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-primary" />
                       <span>{event.location}</span>
                     </div>
                   )}
                   
-                  {event.registration_required && event.max_attendees && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Users className="h-4 w-4 text-primary" />
-                      <span>{event.current_attendees || 0}/{event.max_attendees} attendees</span>
-                    </div>
+                  {event.is_featured && (
+                      <div className="flex items-center gap-2 pt-2">
+                        <Badge className="bg-primary/10 text-primary border-primary/20">
+                          Featured Event
+                        </Badge>
+                      </div>
                   )}
                 </div>
                 
-                <Button asChild className="w-full">
-                  <Link to={`/events/${event.slug}`}>
-                    Learn More
-                  </Link>
-                </Button>
               </CardContent>
             </Card>
           ))}

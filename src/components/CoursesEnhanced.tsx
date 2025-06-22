@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Piano, Guitar, Mic, Drum, Music, Brain, Wind, Volume2 } from "lucide-react";
+import { Piano, Guitar, Mic, Drum, Music, Brain, Wind, Volume2, Camera, Video, MonitorPlay, Code, Palette } from "lucide-react";
 
 const CoursesEnhanced = () => {
   const courses = [
@@ -156,6 +156,120 @@ const CoursesEnhanced = () => {
         instruments: "Student and intermediate brass instruments available",
         schedule: "Monday to Saturday, 9 AM - 6 PM"
       }
+    },
+    {
+      title: "Music Production",
+      description: "From beat making to final mixdown",
+      icon: Mic,
+      color: "secondary",
+      details: {
+        duration: "Individual (1 hour) or Group (2 hours) sessions",
+        levels: "Beginner to Advanced",
+        features: [
+          "Digital Audio Workstation (DAW) basics",
+          "Recording, mixing, and mastering techniques",
+          "Beat making and sound design",
+          "Vocal production and effects",
+          "Access to our fully-equipped studio"
+        ],
+        instruments: "DAWs (Logic Pro X, Ableton Live), MIDI controllers, studio monitors",
+        schedule: "Flexible scheduling, project-based learning"
+      }
+    },
+    {
+      title: "Videography",
+      description: "Tell stories through moving images",
+      icon: Video,
+      color: "primary",
+      details: {
+        duration: "4-week workshops or individual projects",
+        levels: "Beginner to Intermediate",
+        features: [
+          "Camera operation and settings",
+          "Cinematic composition and lighting",
+          "Video editing with Adobe Premiere Pro",
+          "Storyboarding and pre-production",
+          "Portfolio development"
+        ],
+        instruments: "DSLR/Mirrorless cameras, gimbals, lighting kits, editing software",
+        schedule: "Weekend workshops and weekday evening classes"
+      }
+    },
+    {
+      title: "Photography",
+      description: "Capture moments, create art",
+      icon: Camera,
+      color: "accent",
+      details: {
+        duration: "Individual sessions and themed workshops",
+        levels: "All levels",
+        features: [
+          "Understanding your camera (manual mode)",
+          "Principles of composition and light",
+          "Portrait, landscape, and street photography",
+          "Editing with Adobe Lightroom and Photoshop",
+          "Building a professional portfolio"
+        ],
+        instruments: "Access to various lenses and lighting equipment",
+        schedule: "Flexible one-on-one sessions and monthly workshops"
+      }
+    },
+    {
+      title: "Art & Design",
+      description: "Unleash your visual creativity",
+      icon: Palette,
+      color: "secondary",
+      details: {
+        duration: "Weekly classes and holiday camps",
+        levels: "Kids, Teens, and Adults",
+        features: [
+          "Drawing and sketching fundamentals",
+          "Painting with acrylics and watercolors",
+          "Digital art and illustration",
+          "Crafts and mixed media projects",
+          "Exhibition opportunities"
+        ],
+        instruments: "All materials provided (canvases, paints, sketchbooks, digital tablets)",
+        schedule: "After-school classes and weekend workshops"
+      }
+    },
+    {
+      title: "Live Sound Engineering",
+      description: "Become the master of event audio",
+      icon: MonitorPlay,
+      color: "primary",
+      details: {
+        duration: "8-week intensive course",
+        levels: "Beginner to Intermediate",
+        features: [
+          "Live sound setup and mixing",
+          "Mixer operation (analog and digital)",
+          "Microphone placement and techniques",
+          "Live broadcasting and streaming",
+          "Hands-on experience at real events"
+        ],
+        instruments: "Digital mixing consoles, PA systems, stage monitors, microphones",
+        schedule: "Evening classes and weekend practicals"
+      }
+    },
+    {
+      title: "Code Kids: Web Wizards",
+      description: "The Art & Science of Web Development",
+      icon: Code,
+      color: "accent",
+      details: {
+        duration: "Weekly classes (90 minutes)",
+        levels: "Beginner (Ages 10-16)",
+        features: [
+          "Learn HTML, CSS, and JavaScript",
+          "Build and deploy your own websites",
+          "Introduction to web design principles",
+          "Fun, project-based learning",
+          "Develop problem-solving and logic skills"
+        ],
+        instruments: "Access to online coding platforms",
+        schedule: "Saturdays (Morning and Afternoon sessions)"
+      }
     }
   ];
 
@@ -173,7 +287,7 @@ const CoursesEnhanced = () => {
   };
 
   return (
-    <section id="courses" className="py-24 bg-gradient-to-br from-primary/5 to-accent/5">
+    <section id="courses" className="py-16 md:py-24 bg-gradient-to-br from-primary/5 to-accent/5">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
           <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
@@ -184,7 +298,7 @@ const CoursesEnhanced = () => {
           </p>
         </div>
         
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {courses.map((course, index) => {
             const IconComponent = course.icon;
             return (
