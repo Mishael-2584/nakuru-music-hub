@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import AdminEventsManager from "@/components/AdminEventsManager";
 import AdminNewsManager from "@/components/AdminNewsManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -280,9 +280,13 @@ const AdminPanel = () => {
         <div className="flex justify-between items-center mb-16">
           <div className="text-center flex-1">
             <div className="flex items-center justify-center mb-6">
-              <div className="p-4 bg-gradient-to-r from-primary to-accent rounded-full shadow-2xl">
-                <Music className="h-12 w-12 text-white" />
-              </div>
+              <Link to="/" className="group">
+                <img 
+                  alt="Damon Music Academy Logo" 
+                  src="/damon-logo.png" 
+                  className="h-16 sm:h-20 object-contain transition-transform duration-300 group-hover:scale-105 cursor-pointer" 
+                />
+              </Link>
             </div>
             <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
               Damon Music Academy Dashboard
