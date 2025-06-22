@@ -20,14 +20,14 @@ const Fees = () => {
           popular: true
         },
         {
-          name: "At Home",
+          name: "Home lesson (Nakuru Cbd & Environs)",
           duration: "30 minutes", 
           monthly: "KSh 5,600",
           icon: Home,
           features: ["One-on-one instruction", "Professional facilities", "Perfect for beginners", "Focused sessions"]
         },
         {
-          name: "Home (Nakuru & Environs)",
+          name: "Home lesson (Nakuru Cbd & Environs)",
           duration: "1 hour",
           monthly: "KSh 10,000",
           icon: Users,
@@ -55,14 +55,14 @@ const Fees = () => {
           features: ["No commitment required", "Pay as you go", "Professional facilities", "Trial friendly"]
         },
         {
-          name: "At Home", 
+          name: "Home lesson (Nakuru Cbd & Environs)", 
           duration: "30 minutes",
           perClass: "KSh 1,600",
           icon: Home,
           features: ["Short focused sessions", "Perfect for busy schedules", "No commitment", "Quality instruction"]
         },
         {
-          name: "Home (Nakuru & Environs)",
+          name: "Home lesson (Nakuru Cbd & Environs)",
           duration: "1 hour", 
           perClass: "KSh 2,700",
           icon: Users,

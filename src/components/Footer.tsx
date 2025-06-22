@@ -62,12 +62,13 @@ const Footer = () => {
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">Business Hours</h4>
             <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-primary" />
+              <div className="flex items-start gap-3">
+                <Clock className="h-5 w-5 text-primary mt-1" />
                 <div className="text-gray-300">
-                  <p className="text-sm">Mon - Fri: 9:00 AM - 6:00 PM</p>
-                  <p className="text-sm">Sat: 9:00 AM - 4:00 PM</p>
-                  <p className="text-sm">Sun: Closed</p>
+                  <p className="text-sm font-medium">Academy Hours:</p>
+                  <p className="text-sm">Sun: 8am-6pm | M-F: 7am-6pm</p>
+                  <p className="text-sm mt-2 font-medium">Home Lessons:</p>
+                  <p className="text-sm">M-F: 9am-6pm</p>
                 </div>
               </div>
             </div>

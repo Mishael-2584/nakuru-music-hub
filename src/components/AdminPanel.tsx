@@ -221,6 +221,45 @@ const AdminPanel = () => {
     }
   };
 
+  const deleteRegistration = async (id: string, studentName: string) => {
+    // Show confirmation dialog
+    if (!confirm(`Are you sure you want to delete the registration for ${studentName}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('registrations')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error("Error deleting registration:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete registration",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Remove from local state
+      setRegistrations(prev => prev.filter(reg => reg.id !== id));
+
+      toast({
+        title: "Registration Deleted",
+        description: `Registration for ${studentName} has been deleted successfully.`,
+      });
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while deleting the registration",
+        variant: "destructive",
+      });
+    }
+  };
+
   const markMessageAsRead = async (id: string) => {
     try {
       const { error } = await supabase
@@ -878,6 +917,14 @@ const AdminPanel = () => {
                             disabled={registration.status === 'rejected'}
                           >
                             Decline
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => deleteRegistration(registration.id, registration.student_name)}
+                            className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+                          >
+                            Delete
                           </Button>
                         </div>
                       </div>

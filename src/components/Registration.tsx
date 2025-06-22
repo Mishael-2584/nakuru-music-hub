@@ -9,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { sendConfirmationEmail } from "@/lib/emailService";
 import { Music, Users, Award, Star, ArrowRight, ArrowLeft, CheckCircle, MapPin, Phone, Mail, User, Calendar, Guitar, Mic, Palette, Video, Speaker } from "lucide-react";
 
 const Registration = () => {
@@ -400,6 +401,30 @@ const Registration = () => {
         title: "Registration Successful! 🎉",
         description: "Thank you for registering! We'll contact you soon to confirm your enrollment.",
       });
+
+      // Send confirmation email with the complete registration data
+      if (data && data[0]) {
+        try {
+          const emailSent = await sendConfirmationEmail(data[0]);
+          if (emailSent) {
+            console.log('✅ Confirmation email sent successfully');
+            toast({
+              title: "Email Sent",
+              description: "A confirmation receipt has been sent to your email address.",
+            });
+          } else {
+            console.warn('⚠️ Failed to send confirmation email');
+            toast({
+              title: "Email Not Sent",
+              description: "Registration successful, but we couldn't send the confirmation email. Please check your email address.",
+              variant: "destructive",
+            });
+          }
+        } catch (emailError) {
+          console.error('❌ Email sending error:', emailError);
+          // Don't fail the registration if email fails
+        }
+      }
 
       // Reset form after a delay
       setTimeout(() => {
@@ -978,15 +1003,19 @@ const Registration = () => {
         <div className="space-y-3 text-sm text-green-700">
           <div className="flex items-start space-x-3">
             <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-            <p>We'll review your registration within 24 hours</p>
+            <p>A confirmation email with your receipt has been sent to your email address</p>
           </div>
           <div className="flex items-start space-x-3">
             <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-            <p>You'll receive a confirmation email with next steps</p>
+            <p>We'll review your registration within 24-48 hours</p>
           </div>
           <div className="flex items-start space-x-3">
             <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-            <p>Our team will contact you to schedule your first lesson</p>
+            <p>Our team will contact you to confirm your enrollment and schedule your first lesson</p>
+          </div>
+          <div className="flex items-start space-x-3">
+            <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+            <p>Please check your email (including spam folder) for the confirmation receipt</p>
           </div>
         </div>
       </div>

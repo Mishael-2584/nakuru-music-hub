@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -124,8 +123,16 @@ const Contact = () => {
                   </div>
                   <div>
                     <h4 className="font-semibold">Operating Hours</h4>
-                    <p className="text-muted-foreground">Monday - Saturday: 8:00 AM - 6:00 PM</p>
-                    <p className="text-muted-foreground">Sunday: 2:00 PM - 5:00 PM</p>
+                    <div className="text-muted-foreground">
+                      <p className="font-medium text-primary/80">At the Academy:</p>
+                      <p>Sunday: 8:00 AM - 6:00 PM</p>
+                      <p>Mon - Fri: 7:00 AM - 6:00 PM</p>
+                      <p>Saturday: Closed</p>
+                      <br />
+                      <p className="font-medium text-primary/80">Home Lessons:</p>
+                      <p>Mon - Fri: 9:00 AM - 6:00 PM</p>
+                      <p>Saturday: Closed</p>
+                    </div>
                   </div>
                 </div>
               </div>

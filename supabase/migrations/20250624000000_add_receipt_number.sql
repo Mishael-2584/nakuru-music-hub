@@ -1,0 +1,61 @@
+-- Add receipt number field to registrations table
+-- This will be used to generate unique confirmation receipts
+
+ALTER TABLE public.registrations 
+ADD COLUMN IF NOT EXISTS receipt_number TEXT;
+
+-- Create a function to generate receipt numbers
+CREATE OR REPLACE FUNCTION generate_receipt_number()
+RETURNS TEXT
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    receipt_num TEXT;
+    year_part TEXT;
+    sequence_num INTEGER;
+BEGIN
+    -- Get current year
+    year_part := EXTRACT(YEAR FROM CURRENT_DATE)::TEXT;
+    
+    -- Get the next sequence number for this year
+    SELECT COALESCE(MAX(CAST(SUBSTRING(receipt_number FROM 9) AS INTEGER)), 0) + 1
+    INTO sequence_num
+    FROM public.registrations 
+    WHERE receipt_number LIKE 'DMA-' || year_part || '-%';
+    
+    -- Format: DMA-YYYY-XXXXX (e.g., DMA-2024-00001)
+    receipt_num := 'DMA-' || year_part || '-' || LPAD(sequence_num::TEXT, 5, '0');
+    
+    RETURN receipt_num;
+END;
+$$;
+
+-- Create a trigger to automatically generate receipt numbers
+CREATE OR REPLACE FUNCTION set_receipt_number()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NEW.receipt_number IS NULL THEN
+        NEW.receipt_number := generate_receipt_number();
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+-- Create the trigger
+DROP TRIGGER IF EXISTS trigger_set_receipt_number ON public.registrations;
+CREATE TRIGGER trigger_set_receipt_number
+    BEFORE INSERT ON public.registrations
+    FOR EACH ROW
+    EXECUTE FUNCTION set_receipt_number();
+
+-- Add unique constraint on receipt_number
+ALTER TABLE public.registrations 
+ADD CONSTRAINT registrations_receipt_number_unique UNIQUE (receipt_number);
+
+-- Add index for receipt number lookups
+CREATE INDEX IF NOT EXISTS idx_registrations_receipt_number ON public.registrations(receipt_number);
+
+-- Add comment
+COMMENT ON COLUMN public.registrations.receipt_number IS 'Unique receipt number for confirmation (format: DMA-YYYY-XXXXX)'; 
