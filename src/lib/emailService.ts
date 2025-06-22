@@ -28,6 +28,27 @@ interface RegistrationData {
 
 export const sendConfirmationEmail = async (registration: RegistrationData): Promise<boolean> => {
   try {
+    console.log('📧 sendConfirmationEmail called with registration:', registration);
+    console.log('📧 Required fields check:', {
+      hasId: !!registration.id,
+      hasReceiptNumber: !!registration.receipt_number,
+      hasStudentName: !!registration.student_name,
+      hasEmail: !!registration.email,
+      hasCreatedAt: !!registration.created_at
+    });
+
+    // Validate required fields
+    if (!registration.id || !registration.receipt_number || !registration.student_name || !registration.email || !registration.created_at) {
+      console.error('❌ Missing required fields for email:', {
+        id: registration.id,
+        receipt_number: registration.receipt_number,
+        student_name: registration.student_name,
+        email: registration.email,
+        created_at: registration.created_at
+      });
+      return false;
+    }
+
     const formatDate = (dateString: string) => {
       return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',

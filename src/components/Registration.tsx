@@ -359,7 +359,7 @@ const Registration = () => {
       const { data, error } = await supabase
         .from('registrations')
         .insert([submissionData])
-        .select();
+        .select('*, receipt_number');
 
       if (error) {
         console.error('❌ Registration error:', error);
@@ -405,6 +405,7 @@ const Registration = () => {
       // Send confirmation email with the complete registration data
       if (data && data[0]) {
         try {
+          console.log('📧 Registration data for email:', data[0]);
           const emailSent = await sendConfirmationEmail(data[0]);
           if (emailSent) {
             console.log('✅ Confirmation email sent successfully');
