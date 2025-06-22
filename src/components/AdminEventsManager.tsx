@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, Edit, Trash2, Users, ImageIcon, Calendar, MapPin } from "lucide-react";
+import ImageUpload from "@/components/ui/image-upload";
 
 interface Event {
   id: string;
@@ -320,12 +321,13 @@ const AdminEventsManager = () => {
               </div>
 
               <div>
-                <Label htmlFor="image_url">Image URL</Label>
-                <Input
-                  id="image_url"
+                <Label htmlFor="image_url">Event Image</Label>
+                <ImageUpload
                   value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  placeholder="https://example.com/image.jpg"
+                  onChange={(url) => setFormData({ ...formData, image_url: url })}
+                  label="Event Image"
+                  placeholder="Upload an image for this event"
+                  maxSize={5}
                 />
               </div>
 

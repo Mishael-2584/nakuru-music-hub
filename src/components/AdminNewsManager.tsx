@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, Edit, Trash2, ImageIcon } from "lucide-react";
+import ImageUpload from "@/components/ui/image-upload";
 
 interface NewsArticle {
   id: string;
@@ -248,12 +249,13 @@ const AdminNewsManager = () => {
               </div>
 
               <div>
-                <Label htmlFor="image_url">Image URL</Label>
-                <Input
-                  id="image_url"
+                <Label htmlFor="image_url">Article Image</Label>
+                <ImageUpload
                   value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  placeholder="https://example.com/image.jpg"
+                  onChange={(url) => setFormData({ ...formData, image_url: url })}
+                  label="Article Image"
+                  placeholder="Upload an image for this article"
+                  maxSize={5}
                 />
               </div>
 
