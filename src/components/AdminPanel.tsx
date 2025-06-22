@@ -316,14 +316,17 @@ const AdminPanel = () => {
   };
 
   const activeStudents = registrations.filter(reg => reg.status === 'approved');
-  const filteredRegistrations = registrations.filter(reg =>
-    reg.student_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    reg.instrument.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    reg.course_category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    reg.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    reg.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (reg.production_type && reg.production_type.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredRegistrations = registrations.filter(reg => {
+    const term = searchTerm.trim().toLowerCase();
+    return (
+      (reg.student_name || '').toLowerCase().includes(term) ||
+      (reg.instrument || '').toLowerCase().includes(term) ||
+      (reg.course_category || '').toLowerCase().includes(term) ||
+      (reg.location || '').toLowerCase().includes(term) ||
+      (reg.email || '').toLowerCase().includes(term) ||
+      (reg.production_type || '').toLowerCase().includes(term)
+    );
+  });
 
   const pendingCount = registrations.filter(reg => reg.status === 'pending').length;
   const unreadMessages = contactMessages.filter(msg => !msg.is_read).length;
@@ -695,244 +698,248 @@ const AdminPanel = () => {
               />
             </div>
             
-            <div className="grid gap-6">
-              {filteredRegistrations.map((registration) => {
-                const isExpanded = expandedCards.has(registration.id);
-                return (
-                  <Card key={registration.id} className="shadow-xl border-0 bg-white/95 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
-                    <CardContent className="p-6">
-                      {/* Header Section - Always Visible */}
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-4">
-                          <div className="p-3 bg-gradient-to-r from-primary/20 to-accent/20 rounded-full">
-                            {registration.course_category === 'Music' && <Music className="h-6 w-6 text-primary" />}
-                            {registration.course_category === 'Production' && <Mic className="h-6 w-6 text-accent" />}
-                            {registration.course_category === 'Art' && <Palette className="h-6 w-6 text-secondary" />}
+            {filteredRegistrations.length === 0 ? (
+              <div className="text-center text-muted-foreground py-12 text-lg">No results found.</div>
+            ) : (
+              <div className="grid gap-6">
+                {filteredRegistrations.map((registration) => {
+                  const isExpanded = expandedCards.has(registration.id);
+                  return (
+                    <Card key={registration.id} className="shadow-xl border-0 bg-white/95 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
+                      <CardContent className="p-6">
+                        {/* Header Section - Always Visible */}
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex items-center gap-4">
+                            <div className="p-3 bg-gradient-to-r from-primary/20 to-accent/20 rounded-full">
+                              {registration.course_category === 'Music' && <Music className="h-6 w-6 text-primary" />}
+                              {registration.course_category === 'Production' && <Mic className="h-6 w-6 text-accent" />}
+                              {registration.course_category === 'Art' && <Palette className="h-6 w-6 text-secondary" />}
+                            </div>
+                            <div>
+                              <h4 className="text-xl font-bold text-primary">{registration.student_name}</h4>
+                              <p className="text-muted-foreground flex items-center gap-2">
+                                Age: {registration.age} • {registration.course_category} • {registration.location}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <h4 className="text-xl font-bold text-primary">{registration.student_name}</h4>
-                            <p className="text-muted-foreground flex items-center gap-2">
-                              Age: {registration.age} • {registration.course_category} • {registration.location}
-                            </p>
+                          <div className="flex items-center gap-3">
+                            <Badge className={`${getStatusColor(registration.status)} text-white font-semibold px-3 py-1`}>
+                              {registration.status.charAt(0).toUpperCase() + registration.status.slice(1)}
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleExpanded(registration.id)}
+                              className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+                            >
+                              {isExpanded ? (
+                                <ChevronUp className="h-4 w-4 text-gray-600" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-gray-600" />
+                              )}
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Badge className={`${getStatusColor(registration.status)} text-white font-semibold px-3 py-1`}>
-                            {registration.status.charAt(0).toUpperCase() + registration.status.slice(1)}
-                          </Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleExpanded(registration.id)}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-                          >
-                            {isExpanded ? (
-                              <ChevronUp className="h-4 w-4 text-gray-600" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4 text-gray-600" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
 
-                      {/* Essential Info - Always Visible */}
-                      <div className="grid md:grid-cols-3 gap-4 mb-4">
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm text-gray-700">{registration.email}</span>
+                        {/* Essential Info - Always Visible */}
+                        <div className="grid md:grid-cols-3 gap-4 mb-4">
+                          <div className="flex items-center gap-2">
+                            <Mail className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-gray-700">{registration.email}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-gray-700">{registration.country_code} {registration.phone}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <BookOpen className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-gray-700">
+                              {registration.course_category === 'Music' ? registration.instrument : 
+                               registration.course_category === 'Production' ? registration.production_type : 
+                               'Art Course'}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm text-gray-700">{registration.country_code} {registration.phone}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <BookOpen className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm text-gray-700">
-                            {registration.course_category === 'Music' ? registration.instrument : 
-                             registration.course_category === 'Production' ? registration.production_type : 
-                             'Art Course'}
-                          </span>
-                        </div>
-                      </div>
 
-                      {/* Expandable Detailed Information */}
-                      {isExpanded && (
-                        <div className="space-y-6 border-t border-gray-200 pt-6 animate-in slide-in-from-top duration-300">
-                          {/* Contact Information */}
-                          <div className="grid md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                              <h5 className="font-semibold text-primary flex items-center gap-2">
-                                <Mail className="h-4 w-4" />
-                                Contact Information
-                              </h5>
-                              <div className="space-y-2 text-sm">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-gray-600">Email:</span>
-                                  <span className="text-gray-800">{registration.email}</span>
+                        {/* Expandable Detailed Information */}
+                        {isExpanded && (
+                          <div className="space-y-6 border-t border-gray-200 pt-6 animate-in slide-in-from-top duration-300">
+                            {/* Contact Information */}
+                            <div className="grid md:grid-cols-2 gap-6">
+                              <div className="space-y-3">
+                                <h5 className="font-semibold text-primary flex items-center gap-2">
+                                  <Mail className="h-4 w-4" />
+                                  Contact Information
+                                </h5>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-gray-600">Email:</span>
+                                    <span className="text-gray-800">{registration.email}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-gray-600">Phone:</span>
+                                    <span className="text-gray-800">{registration.country_code} {registration.phone}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-gray-600">Location:</span>
+                                    <span className="text-gray-800">{registration.location}</span>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-gray-600">Phone:</span>
-                                  <span className="text-gray-800">{registration.country_code} {registration.phone}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-gray-600">Location:</span>
-                                  <span className="text-gray-800">{registration.location}</span>
+                              </div>
+
+                              {/* Course Details */}
+                              <div className="space-y-3">
+                                <h5 className="font-semibold text-primary flex items-center gap-2">
+                                  <BookOpen className="h-4 w-4" />
+                                  Course Details
+                                </h5>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-gray-600">Category:</span>
+                                    <Badge variant="outline" className="text-xs">{registration.course_category}</Badge>
+                                  </div>
+                                  {registration.course_category === 'Music' && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-600">Instrument:</span>
+                                      <span className="text-gray-800">{registration.instrument}</span>
+                                    </div>
+                                  )}
+                                  {registration.course_category === 'Production' && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-600">Production Type:</span>
+                                      <span className="text-gray-800">{registration.production_type}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-gray-600">Proficiency:</span>
+                                    <Badge variant="outline" className="text-xs">{registration.proficiency_level}</Badge>
+                                  </div>
                                 </div>
                               </div>
                             </div>
 
-                            {/* Course Details */}
-                            <div className="space-y-3">
-                              <h5 className="font-semibold text-primary flex items-center gap-2">
-                                <BookOpen className="h-4 w-4" />
-                                Course Details
-                              </h5>
-                              <div className="space-y-2 text-sm">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-gray-600">Category:</span>
-                                  <Badge variant="outline" className="text-xs">{registration.course_category}</Badge>
-                                </div>
-                                {registration.course_category === 'Music' && (
+                            {/* Learning Preferences */}
+                            <div className="grid md:grid-cols-2 gap-6">
+                              <div className="space-y-3">
+                                <h5 className="font-semibold text-primary flex items-center gap-2">
+                                  <Calendar className="h-4 w-4" />
+                                  Learning Preferences
+                                </h5>
+                                <div className="space-y-2 text-sm">
                                   <div className="flex items-center gap-2">
-                                    <span className="font-medium text-gray-600">Instrument:</span>
-                                    <span className="text-gray-800">{registration.instrument}</span>
+                                    <span className="font-medium text-gray-600">Mode:</span>
+                                    <Badge variant="outline" className="text-xs">{registration.learning_mode}</Badge>
                                   </div>
-                                )}
-                                {registration.course_category === 'Production' && (
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium text-gray-600">Production Type:</span>
-                                    <span className="text-gray-800">{registration.production_type}</span>
-                                  </div>
-                                )}
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-gray-600">Proficiency:</span>
-                                  <Badge variant="outline" className="text-xs">{registration.proficiency_level}</Badge>
+                                  {registration.course_category === 'Music' && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-600">Owns Instrument:</span>
+                                      <Badge variant={registration.owns_instrument ? "default" : "secondary"} className="text-xs">
+                                        {registration.owns_instrument ? "Yes" : "No"}
+                                      </Badge>
+                                    </div>
+                                  )}
+                                  {registration.preferred_schedule && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-600">Preferred Schedule:</span>
+                                      <span className="text-gray-800">{registration.preferred_schedule}</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                            </div>
-                          </div>
 
-                          {/* Learning Preferences */}
-                          <div className="grid md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                              <h5 className="font-semibold text-primary flex items-center gap-2">
-                                <Calendar className="h-4 w-4" />
-                                Learning Preferences
-                              </h5>
-                              <div className="space-y-2 text-sm">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-gray-600">Mode:</span>
-                                  <Badge variant="outline" className="text-xs">{registration.learning_mode}</Badge>
-                                </div>
-                                {registration.course_category === 'Music' && (
+                              {/* Medical Information */}
+                              <div className="space-y-3">
+                                <h5 className="font-semibold text-primary flex items-center gap-2">
+                                  <Shield className="h-4 w-4" />
+                                  Medical Information
+                                </h5>
+                                <div className="space-y-2 text-sm">
                                   <div className="flex items-center gap-2">
-                                    <span className="font-medium text-gray-600">Owns Instrument:</span>
-                                    <Badge variant={registration.owns_instrument ? "default" : "secondary"} className="text-xs">
-                                      {registration.owns_instrument ? "Yes" : "No"}
+                                    <span className="font-medium text-gray-600">Medical Conditions:</span>
+                                    <Badge variant={registration.medical_condition === 'yes' ? "destructive" : "default"} className="text-xs">
+                                      {registration.medical_condition === 'yes' ? "Yes" : "No"}
                                     </Badge>
                                   </div>
-                                )}
-                                {registration.preferred_schedule && (
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium text-gray-600">Preferred Schedule:</span>
-                                    <span className="text-gray-800">{registration.preferred_schedule}</span>
-                                  </div>
-                                )}
+                                  {registration.medical_condition === 'yes' && registration.medical_details && (
+                                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                                      <p className="text-sm text-red-800">{registration.medical_details}</p>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
-                            {/* Medical Information */}
-                            <div className="space-y-3">
-                              <h5 className="font-semibold text-primary flex items-center gap-2">
-                                <Shield className="h-4 w-4" />
-                                Medical Information
-                              </h5>
-                              <div className="space-y-2 text-sm">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-gray-600">Medical Conditions:</span>
-                                  <Badge variant={registration.medical_condition === 'yes' ? "destructive" : "default"} className="text-xs">
-                                    {registration.medical_condition === 'yes' ? "Yes" : "No"}
-                                  </Badge>
-                                </div>
-                                {registration.medical_condition === 'yes' && registration.medical_details && (
-                                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                                    <p className="text-sm text-red-800">{registration.medical_details}</p>
+                            {/* Parent Information (for minors) */}
+                            {registration.parent_name && (
+                              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                <h5 className="font-semibold text-blue-800 flex items-center gap-2 mb-3">
+                                  <Users className="h-4 w-4" />
+                                  Parent/Guardian Information
+                                </h5>
+                                <div className="grid md:grid-cols-2 gap-4 text-sm">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-blue-700">Name:</span>
+                                    <span className="text-blue-800">{registration.parent_name}</span>
                                   </div>
-                                )}
+                                  {registration.parent_phone && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-blue-700">Phone:</span>
+                                      <span className="text-blue-800">{registration.parent_phone}</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
+                            )}
+
+                            {/* Goals and Additional Information */}
+                            {registration.goals && (
+                              <div className="p-4 bg-primary/5 border border-primary/10 rounded-lg">
+                                <h5 className="font-semibold text-primary mb-2">Learning Goals</h5>
+                                <p className="text-sm text-gray-700">{registration.goals}</p>
+                              </div>
+                            )}
                           </div>
+                        )}
 
-                          {/* Parent Information (for minors) */}
-                          {registration.parent_name && (
-                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                              <h5 className="font-semibold text-blue-800 flex items-center gap-2 mb-3">
-                                <Users className="h-4 w-4" />
-                                Parent/Guardian Information
-                              </h5>
-                              <div className="grid md:grid-cols-2 gap-4 text-sm">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-blue-700">Name:</span>
-                                  <span className="text-blue-800">{registration.parent_name}</span>
-                                </div>
-                                {registration.parent_phone && (
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium text-blue-700">Phone:</span>
-                                    <span className="text-blue-800">{registration.parent_phone}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Goals and Additional Information */}
-                          {registration.goals && (
-                            <div className="p-4 bg-primary/5 border border-primary/10 rounded-lg">
-                              <h5 className="font-semibold text-primary mb-2">Learning Goals</h5>
-                              <p className="text-sm text-gray-700">{registration.goals}</p>
-                            </div>
-                          )}
+                        {/* Footer with Actions */}
+                        <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+                          <div className="text-sm text-muted-foreground">
+                            <span className="font-medium">Registered:</span> {new Date(registration.created_at).toLocaleDateString()} at {new Date(registration.created_at).toLocaleTimeString()}
+                          </div>
+                          <div className="space-x-2">
+                            <Button 
+                              variant="default" 
+                              size="sm"
+                              onClick={() => updateRegistrationStatus(registration.id, 'approved')}
+                              disabled={registration.status === 'approved'}
+                              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+                            >
+                              Accept Student
+                            </Button>
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => updateRegistrationStatus(registration.id, 'rejected')}
+                              disabled={registration.status === 'rejected'}
+                            >
+                              Decline
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => deleteRegistration(registration.id, registration.student_name)}
+                              className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+                            >
+                              Delete
+                            </Button>
+                          </div>
                         </div>
-                      )}
-
-                      {/* Footer with Actions */}
-                      <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-                        <div className="text-sm text-muted-foreground">
-                          <span className="font-medium">Registered:</span> {new Date(registration.created_at).toLocaleDateString()} at {new Date(registration.created_at).toLocaleTimeString()}
-                        </div>
-                        <div className="space-x-2">
-                          <Button 
-                            variant="default" 
-                            size="sm"
-                            onClick={() => updateRegistrationStatus(registration.id, 'approved')}
-                            disabled={registration.status === 'approved'}
-                            className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
-                          >
-                            Accept Student
-                          </Button>
-                          <Button 
-                            variant="destructive" 
-                            size="sm"
-                            onClick={() => updateRegistrationStatus(registration.id, 'rejected')}
-                            disabled={registration.status === 'rejected'}
-                          >
-                            Decline
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => deleteRegistration(registration.id, registration.student_name)}
-                            className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 

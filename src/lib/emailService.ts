@@ -210,9 +210,11 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
               </div>
               <div class="info-item">
                 <span class="info-label">Subject/Instrument:</span>
-                <span class="info-value">${registration.course_category === 'Music' ? registration.instrument : 
-                                         registration.course_category === 'Production' ? registration.production_type : 
-                                         'Art Course'}</span>
+                <span class="info-value">${(() => {
+                  if (registration.course_category === 'Music') return registration.instrument;
+                  if (registration.course_category === 'Production') return registration.production_type;
+                  return 'Art Course';
+                })()}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Proficiency Level:</span>
@@ -303,7 +305,7 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
               </div>
               <div class="info-item">
                 <span class="info-label">🕒 Hours:</span>
-                <span class="info-value">Sun: 8am-6pm, M-F: 7am-6pm (Academy)</span>
+                <span class="info-value">Sun: 8am-6pm, Mon-Fri: 7am-6pm (Academy)</span>
               </div>
             </div>
           </div>
@@ -319,6 +321,14 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
     `;
 
     // Call the Supabase Edge Function to send the email
+    console.log('📧 Invoking Supabase Edge Function...');
+    console.log('📧 Function payload:', {
+      to: registration.email,
+      subject: `Registration Confirmation - ${registration.receipt_number} | Damon Music Academy`,
+      htmlLength: emailHTML.length,
+      registrationId: registration.id
+    });
+    
     const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
       body: {
         to: registration.email,
@@ -328,20 +338,81 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
       }
     });
 
+    console.log('📧 Supabase function response:', { data, error });
+
     if (error) {
-      console.error('Supabase function error:', error);
+      console.error('❌ Supabase function error:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        status: error.status,
+        statusText: error.statusText,
+        details: error.details
+      });
       return false;
     }
 
     if (data && data.success) {
-      console.log('Confirmation email sent successfully via Supabase');
+      console.log('✅ Confirmation email sent successfully via Supabase');
       return true;
     } else {
-      console.error('Failed to send confirmation email:', data?.message);
+      console.error('❌ Failed to send confirmation email:', data?.message);
+      console.error('❌ Response data:', data);
       return false;
     }
   } catch (error) {
     console.error('Error sending confirmation email:', error);
+    return false;
+  }
+};
+
+export const testEmailService = async (): Promise<boolean> => {
+  try {
+    console.log('🧪 Starting email service test...');
+    
+    // Test Supabase connection first
+    console.log('🧪 Testing Supabase connection...');
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    console.log('🧪 Auth test result:', { user: !!user, error: authError });
+    
+    const testRegistration = {
+      id: 'test-123',
+      receipt_number: 'TEST-001',
+      student_name: 'Test Student',
+      age: 15,
+      email: 'test@example.com',
+      phone: '123456789',
+      country_code: '+254',
+      parent_name: 'Test Parent',
+      parent_phone: '987654321',
+      course_category: 'Music',
+      instrument: 'Piano',
+      production_type: null,
+      experience: 'beginner',
+      proficiency_level: 'beginner',
+      learning_mode: 'in-person',
+      owns_instrument: true,
+      location: 'Nakuru',
+      medical_condition: 'no',
+      medical_details: null,
+      goals: 'Learn to play piano',
+      preferred_schedule: 'Weekends',
+      status: 'pending',
+      created_at: new Date().toISOString()
+    };
+
+    console.log('🧪 Test registration data:', testRegistration);
+    console.log('🧪 Calling sendConfirmationEmail...');
+    
+    const result = await sendConfirmationEmail(testRegistration);
+    console.log('🧪 Email service test result:', result);
+    return result;
+  } catch (error) {
+    console.error('🧪 Email service test failed:', error);
+    console.error('🧪 Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
     return false;
   }
 };
