@@ -4,6 +4,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 const allowedOrigins = [
   'http://localhost:8080', // Vite dev server
   'http://localhost:5173', // Alternative Vite port
+  'https://damonmusicacademy.co.ke', // Production domain
 ];
 
 // Add production domain from environment variables if it exists.
