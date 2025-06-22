@@ -20,7 +20,7 @@ const Fees = () => {
           popular: true
         },
         {
-          name: "At the Academy",
+          name: "At Home",
           duration: "30 minutes", 
           monthly: "KSh 5,600",
           icon: Home,
@@ -55,7 +55,7 @@ const Fees = () => {
           features: ["No commitment required", "Pay as you go", "Professional facilities", "Trial friendly"]
         },
         {
-          name: "At the Academy", 
+          name: "At Home", 
           duration: "30 minutes",
           perClass: "KSh 1,600",
           icon: Home,

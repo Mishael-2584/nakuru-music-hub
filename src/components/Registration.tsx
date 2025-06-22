@@ -23,6 +23,7 @@ const Registration = () => {
     parent_phone: "",
     course_category: "",
     instrument: "",
+    custom_instrument: "",
     production_type: "",
     experience: "",
     goals: "",
@@ -188,6 +189,9 @@ const Registration = () => {
         if (formData.course_category === 'Music' && (!value || value.trim().length === 0)) {
           return { isValid: false, error: 'Please select an instrument for music courses' };
         }
+        if (formData.course_category === 'Music' && value === 'Other' && (!formData.custom_instrument || formData.custom_instrument.trim().length === 0)) {
+          return { isValid: false, error: 'Please specify your instrument' };
+        }
         break;
       
       case 'production_type':
@@ -331,7 +335,7 @@ const Registration = () => {
         parent_name: formData.parent_name?.trim() || null,
         parent_phone: formData.parent_phone?.trim() || null,
         course_category: formData.course_category,
-        instrument: formData.instrument?.trim() || "Not specified",
+        instrument: formData.instrument === "Other" ? formData.custom_instrument?.trim() : (formData.instrument?.trim() || "Not specified"),
         production_type: formData.production_type?.trim() || null,
         experience: formData.proficiency_level || "beginner",
         proficiency_level: formData.proficiency_level || "beginner",
@@ -409,6 +413,7 @@ const Registration = () => {
           parent_phone: "",
           course_category: "",
           instrument: "",
+          custom_instrument: "",
           production_type: "",
           experience: "",
           goals: "",
@@ -641,31 +646,61 @@ const Registration = () => {
           >
             <div className="relative">
               <RadioGroupItem value="Music" id="music" className="sr-only" />
-              <Label htmlFor="music" className="flex flex-col items-center p-6 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-primary transition-all duration-200 hover:shadow-lg">
-                <div className="w-12 h-12 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center mb-3">
+              <Label htmlFor="music" className={`flex flex-col items-center p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                formData.course_category === "Music" 
+                  ? "border-primary bg-primary/5 shadow-lg" 
+                  : "border-gray-200 hover:border-primary"
+              }`}>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-all duration-200 ${
+                  formData.course_category === "Music" 
+                    ? "bg-gradient-to-r from-primary to-accent scale-110" 
+                    : "bg-gradient-to-r from-primary to-accent"
+                }`}>
                   <Guitar className="w-6 h-6 text-white" />
                 </div>
-                <span className="font-medium text-gray-800">Music</span>
+                <span className={`font-medium transition-colors duration-200 ${
+                  formData.course_category === "Music" ? "text-primary" : "text-gray-800"
+                }`}>Music</span>
                 <span className="text-sm text-gray-500 text-center mt-1">Learn instruments & theory</span>
               </Label>
             </div>
             <div className="relative">
               <RadioGroupItem value="Production" id="production" className="sr-only" />
-              <Label htmlFor="production" className="flex flex-col items-center p-6 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-primary transition-all duration-200 hover:shadow-lg">
-                <div className="w-12 h-12 bg-gradient-to-r from-accent to-secondary rounded-full flex items-center justify-center mb-3">
+              <Label htmlFor="production" className={`flex flex-col items-center p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                formData.course_category === "Production" 
+                  ? "border-primary bg-primary/5 shadow-lg" 
+                  : "border-gray-200 hover:border-primary"
+              }`}>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-all duration-200 ${
+                  formData.course_category === "Production" 
+                    ? "bg-gradient-to-r from-accent to-secondary scale-110" 
+                    : "bg-gradient-to-r from-accent to-secondary"
+                }`}>
                   <Mic className="w-6 h-6 text-white" />
                 </div>
-                <span className="font-medium text-gray-800">Production</span>
+                <span className={`font-medium transition-colors duration-200 ${
+                  formData.course_category === "Production" ? "text-primary" : "text-gray-800"
+                }`}>Production</span>
                 <span className="text-sm text-gray-500 text-center mt-1">Music production & sound</span>
               </Label>
             </div>
             <div className="relative">
               <RadioGroupItem value="Art" id="art" className="sr-only" />
-              <Label htmlFor="art" className="flex flex-col items-center p-6 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-primary transition-all duration-200 hover:shadow-lg">
-                <div className="w-12 h-12 bg-gradient-to-r from-secondary to-primary rounded-full flex items-center justify-center mb-3">
+              <Label htmlFor="art" className={`flex flex-col items-center p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                formData.course_category === "Art" 
+                  ? "border-primary bg-primary/5 shadow-lg" 
+                  : "border-gray-200 hover:border-primary"
+              }`}>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-all duration-200 ${
+                  formData.course_category === "Art" 
+                    ? "bg-gradient-to-r from-secondary to-primary scale-110" 
+                    : "bg-gradient-to-r from-secondary to-primary"
+                }`}>
                   <Palette className="w-6 h-6 text-white" />
                 </div>
-                <span className="font-medium text-gray-800">Art</span>
+                <span className={`font-medium transition-colors duration-200 ${
+                  formData.course_category === "Art" ? "text-primary" : "text-gray-800"
+                }`}>Art</span>
                 <span className="text-sm text-gray-500 text-center mt-1">Visual arts & creativity</span>
               </Label>
             </div>
@@ -691,7 +726,7 @@ const Registration = () => {
               <Input
                 placeholder="Please specify your instrument"
                 className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
-                onChange={(e) => setFormData({...formData, instrument: e.target.value})}
+                onChange={(e) => setFormData({...formData, custom_instrument: e.target.value})}
               />
             )}
           </div>
@@ -740,14 +775,26 @@ const Registration = () => {
               {proficiencyLevels.map((level) => (
                 <div key={level.value} className="relative">
                   <RadioGroupItem value={level.value} id={level.value} className="sr-only" />
-                  <Label htmlFor={level.value} className="flex items-start p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-primary transition-all duration-200">
+                  <Label htmlFor={level.value} className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                    formData.proficiency_level === level.value 
+                      ? "border-primary bg-primary/5 shadow-md" 
+                      : "border-gray-200 hover:border-primary"
+                  }`}>
                     <div className="flex items-center h-5">
-                      <div className="w-4 h-4 border-2 border-gray-300 rounded-full mr-3 flex items-center justify-center">
-                        <div className="w-2 h-2 bg-primary rounded-full hidden"></div>
+                      <div className={`w-4 h-4 border-2 rounded-full mr-3 flex items-center justify-center transition-all duration-200 ${
+                        formData.proficiency_level === level.value 
+                          ? "border-primary bg-primary" 
+                          : "border-gray-300"
+                      }`}>
+                        {formData.proficiency_level === level.value && (
+                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                        )}
                       </div>
                     </div>
                     <div className="flex-1">
-                      <div className="font-medium text-gray-800">{level.label}</div>
+                      <div className={`font-medium transition-colors duration-200 ${
+                        formData.proficiency_level === level.value ? "text-primary" : "text-gray-800"
+                      }`}>{level.label}</div>
                       <div className="text-sm text-gray-500 mt-1">{level.description}</div>
                     </div>
                   </Label>
@@ -766,13 +813,25 @@ const Registration = () => {
               {learningModes.map((mode) => (
                 <div key={mode.value} className="relative">
                   <RadioGroupItem value={mode.value} id={mode.value} className="sr-only" />
-                  <Label htmlFor={mode.value} className="flex items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-primary transition-all duration-200">
+                  <Label htmlFor={mode.value} className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                    formData.learning_mode === mode.value 
+                      ? "border-primary bg-primary/5 shadow-md" 
+                      : "border-gray-200 hover:border-primary"
+                  }`}>
                     <div className="flex items-center h-5">
-                      <div className="w-4 h-4 border-2 border-gray-300 rounded-full mr-3 flex items-center justify-center">
-                        <div className="w-2 h-2 bg-primary rounded-full hidden"></div>
+                      <div className={`w-4 h-4 border-2 rounded-full mr-3 flex items-center justify-center transition-all duration-200 ${
+                        formData.learning_mode === mode.value 
+                          ? "border-primary bg-primary" 
+                          : "border-gray-300"
+                      }`}>
+                        {formData.learning_mode === mode.value && (
+                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                        )}
                       </div>
                     </div>
-                    <span className="font-medium text-gray-800">{mode.label}</span>
+                    <span className={`font-medium transition-colors duration-200 ${
+                      formData.learning_mode === mode.value ? "text-primary" : "text-gray-800"
+                    }`}>{mode.label}</span>
                   </Label>
                 </div>
               ))}
@@ -860,7 +919,7 @@ const Registration = () => {
             <>
               <div>
                 <span className="font-medium text-gray-600">Instrument:</span>
-                <p className="text-gray-800">{formData.instrument}</p>
+                <p className="text-gray-800">{formData.instrument === "Other" ? formData.custom_instrument : formData.instrument}</p>
               </div>
               <div>
                 <span className="font-medium text-gray-600">Proficiency:</span>
@@ -945,6 +1004,7 @@ const Registration = () => {
               parent_phone: "",
               course_category: "",
               instrument: "",
+              custom_instrument: "",
               production_type: "",
               experience: "",
               goals: "",

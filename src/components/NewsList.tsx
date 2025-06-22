@@ -78,6 +78,15 @@ const NewsList = () => {
   return (
     <section className="py-16 md:py-24 bg-gray-50">
       <div className="container mx-auto px-4">
+        <div className="text-center mb-12">
+          <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            Latest News & Updates
+          </h2>
+          <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
+            Stay updated with the latest happenings, events, and announcements from Damon Music Academy
+          </p>
+        </div>
+        
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {news.map((item) => (
             <Card key={item.id} className="flex flex-col rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 group bg-white">

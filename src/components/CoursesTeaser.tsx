@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +15,7 @@ const CoursesTeaser = () => {
       duration: "3-6 months",
       students: 150,
       rating: 4.9,
-      price: "From KSh 8,000/month",
+      price: "From KSh 4,800/month",
       image: "/lovable-uploads/_MWS4407.png",
       features: ["One-on-one lessons", "Group sessions", "Performance opportunities", "ABRSM certification prep"]
     },
@@ -29,7 +28,7 @@ const CoursesTeaser = () => {
       duration: "3-6 months",
       students: 120,
       rating: 4.8,
-      price: "From KSh 7,000/month",
+      price: "From KSh 4,800/month",
       image: "/lovable-uploads/40fee785-03dc-4548-8e48-b09291ee8f42.png",
       features: ["Beginner to advanced", "Multiple styles", "Song composition", "Recording techniques"]
     },
@@ -42,7 +41,7 @@ const CoursesTeaser = () => {
       duration: "4-8 months",
       students: 80,
       rating: 4.9,
-      price: "From KSh 9,000/month",
+      price: "From KSh 4,800/month",
       image: "/lovable-uploads/29861c9f-1df3-42f1-982f-ef38574fb617.png",
       features: ["Breath control", "Vocal range expansion", "Performance coaching", "Recording sessions"]
     },
@@ -55,7 +54,7 @@ const CoursesTeaser = () => {
       duration: "6-12 months",
       students: 60,
       rating: 4.7,
-      price: "From KSh 12,000/month",
+      price: "From KSh 45,500/term",
       image: "/lovable-uploads/31a53eab-3aed-45c3-b91e-339ed5bb7893.png",
       features: ["Studio software", "Mixing & mastering", "Beat making", "Professional equipment"]
     },
@@ -68,7 +67,7 @@ const CoursesTeaser = () => {
       duration: "3-6 months",
       students: 45,
       rating: 4.6,
-      price: "From KSh 10,000/month",
+      price: "From KSh 45,500/term",
       image: "/lovable-uploads/65de1b46-84a6-446b-8225-6359d2d2027d.png",
       features: ["Digital photography", "Photo editing", "Portfolio development", "Exhibition opportunities"]
     },
@@ -81,7 +80,7 @@ const CoursesTeaser = () => {
       duration: "4-8 months",
       students: 70,
       rating: 4.8,
-      price: "From KSh 8,500/month",
+      price: "From KSh 4,000/month",
       image: "/lovable-uploads/cc2f7a6b-1ce1-4921-a0b6-b29db99b5d4a.png",
       features: ["Traditional & digital art", "Design principles", "Portfolio creation", "Gallery exhibitions"]
     }
