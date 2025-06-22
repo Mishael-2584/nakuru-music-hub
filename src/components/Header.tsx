@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
 import { Menu, X, Music } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
@@ -13,6 +16,17 @@ const Header = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Close mobile menu when location changes
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [location.pathname]);
+
+  const handleNavigation = (href: string) => {
+    setIsMenuOpen(false);
+    navigate(href);
+  };
+
   const navigation = [{
     name: "Home",
     href: "/"
@@ -38,6 +52,7 @@ const Header = () => {
     name: "Fees",
     href: "/fees"
   }];
+
   return <header className={`fixed w-full z-50 transition-all duration-300 ${isScrolled ? "bg-white/95 backdrop-blur-md shadow-lg" : "bg-white/90 backdrop-blur-sm"}`}>
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
@@ -48,9 +63,15 @@ const Header = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-1">
-            {navigation.map(item => <Link key={item.name} to={item.href} className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 hover:bg-primary/10 hover:text-primary ${location.pathname === item.href ? "bg-primary/10 text-primary" : "text-gray-700 hover:text-primary"}`}>
+            {navigation.map(item => (
+              <Link 
+                key={item.name} 
+                to={item.href} 
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 hover:bg-primary/10 hover:text-primary ${location.pathname === item.href ? "bg-primary/10 text-primary" : "text-gray-700 hover:text-primary"}`}
+              >
                 {item.name}
-              </Link>)}
+              </Link>
+            ))}
           </nav>
 
           {/* CTA Buttons */}
@@ -58,8 +79,8 @@ const Header = () => {
             <Button variant="outline" size="sm" asChild className="border-primary text-primary hover:bg-primary hover:text-white">
               <Link to="/auth">Login</Link>
             </Button>
-            <Button size="sm" asChild className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-orange-500 font-semibold shadow-lg hover:scale-105 transition-all duration-200">
-              <Link to="/#registration">Enroll Now</Link>
+            <Button size="sm" asChild className="bg-orange-500 hover:bg-orange-600 text-white font-semibold shadow-lg hover:scale-105 transition-all duration-200">
+              <Link to="/registration">Enroll Now</Link>
             </Button>
           </div>
 
@@ -72,15 +93,22 @@ const Header = () => {
         {/* Mobile Navigation */}
         {isMenuOpen && <div className="md:hidden py-4 border-t border-gray-200 bg-white/95 backdrop-blur-md">
             <nav className="flex flex-col space-y-2">
-              {navigation.map(item => <Link key={item.name} to={item.href} onClick={() => setIsMenuOpen(false)} className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.pathname === item.href ? "bg-primary/10 text-primary" : "text-gray-700 hover:bg-gray-100 hover:text-primary"}`}>
+              {navigation.map(item => (
+                <Link 
+                  key={item.name} 
+                  to={item.href} 
+                  onClick={() => setIsMenuOpen(false)} 
+                  className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.pathname === item.href ? "bg-primary/10 text-primary" : "text-gray-700 hover:bg-gray-100 hover:text-primary"}`}
+                >
                   {item.name}
-                </Link>)}
+                </Link>
+              ))}
               <div className="flex flex-col space-y-2 pt-4 border-t border-gray-200">
                 <Button variant="outline" size="sm" asChild className="border-primary text-primary hover:bg-primary hover:text-white">
                   <Link to="/auth" onClick={() => setIsMenuOpen(false)}>Login</Link>
                 </Button>
-                <Button size="sm" asChild className="bg-gradient-to-r from-primary to-accent text-orange-500">
-                  <Link to="/#registration" onClick={() => setIsMenuOpen(false)}>Enroll Now</Link>
+                <Button size="sm" asChild className="bg-orange-500 hover:bg-orange-600 text-white">
+                  <Link to="/registration" onClick={() => setIsMenuOpen(false)}>Enroll Now</Link>
                 </Button>
               </div>
             </nav>
@@ -88,4 +116,5 @@ const Header = () => {
       </div>
     </header>;
 };
+
 export default Header;
