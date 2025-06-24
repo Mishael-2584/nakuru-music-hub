@@ -16,7 +16,7 @@ const CoursesTeaser = () => {
       students: 150,
       rating: 4.9,
       price: "From KSh 4,800/month",
-      image: "/lovable-uploads/_MWS4407.png",
+      image: "/lovable-uploads/piano.jpg",
       features: ["One-on-one lessons", "Group sessions", "Performance opportunities", "ABRSM certification prep"]
     },
     {
@@ -29,7 +29,7 @@ const CoursesTeaser = () => {
       students: 120,
       rating: 4.8,
       price: "From KSh 4,800/month",
-      image: "/lovable-uploads/40fee785-03dc-4548-8e48-b09291ee8f42.png",
+      image: "/lovable-uploads/guitar.jpg",
       features: ["Beginner to advanced", "Multiple styles", "Song composition", "Recording techniques"]
     },
     {
@@ -68,7 +68,7 @@ const CoursesTeaser = () => {
       students: 45,
       rating: 4.6,
       price: "From KSh 45,500/term",
-      image: "/lovable-uploads/65de1b46-84a6-446b-8225-6359d2d2027d.png",
+      image: "/lovable-uploads/photography.webp",
       features: ["Digital photography", "Photo editing", "Portfolio development", "Exhibition opportunities"]
     },
     {

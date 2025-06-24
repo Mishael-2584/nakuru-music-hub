@@ -1213,7 +1213,7 @@ const Registration = () => {
                     <Star className="h-8 w-8 text-secondary" />
                   </div>
                 </div>
-                <h3 className="text-2xl font-bold text-secondary mb-2">5.0</h3>
+                <h3 className="text-2xl font-bold text-secondary mb-2">4.8</h3>
                 <p className="text-muted-foreground">Average Rating</p>
             </CardContent>
           </Card>

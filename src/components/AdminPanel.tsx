@@ -67,7 +67,7 @@ interface ClassSchedule {
 }
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'news' | 'admins'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins'>('stats');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
@@ -501,14 +501,6 @@ const AdminPanel = () => {
             >
               <Calendar className="h-4 w-4 mr-2" />
               Events
-            </Button>
-            <Button
-              variant={activeTab === 'news' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('news')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
-            >
-              <Newspaper className="h-4 w-4 mr-2" />
-              News
             </Button>
             <Button
               variant={activeTab === 'messages' ? 'default' : 'ghost'}
