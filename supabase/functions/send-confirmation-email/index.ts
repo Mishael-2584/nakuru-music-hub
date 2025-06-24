@@ -3,6 +3,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 // List of allowed origins - more permissive for hosted environments
 const allowedOrigins = [
   'http://localhost:8080', // Vite dev server
+  'http://localhost:8081', // Alternative Vite port
+  'http://localhost:8082', // Alternative Vite port
   'http://localhost:5173', // Alternative Vite port
   'https://damonmusicacademy.co.ke', // Production domain
   'https://*.vercel.app', // Vercel deployments
@@ -49,11 +51,13 @@ serve(async (req) => {
   try {
     console.log('📧 Email function called from origin:', origin);
     console.log('📧 Request method:', req.method);
+    console.log('📧 Request headers:', Object.fromEntries(req.headers.entries()));
     
     const { to, subject, html }: EmailRequest = await req.json();
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
     console.log('📧 Email request received:', { to, subject: subject.substring(0, 50) + '...' });
+    console.log('📧 RESEND_API_KEY configured:', !!resendApiKey);
 
     if (!resendApiKey) {
       console.error('❌ RESEND_API_KEY is not configured');
@@ -68,6 +72,8 @@ serve(async (req) => {
     };
 
     console.log('📧 Sending to Resend API...');
+    console.log('📧 Resend payload:', { from: resendPayload.from, to: resendPayload.to, subject: resendPayload.subject });
+    
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
@@ -79,10 +85,12 @@ serve(async (req) => {
     console.log('📧 Resend API response:', responseText);
 
     if (!response.ok) {
+      console.error('❌ Resend API error:', response.status, responseText);
       throw new Error(`Failed to send email. Status: ${response.status}. Body: ${responseText}`);
     }
 
     if (!responseText) {
+      console.log('📧 Resend returned empty response, treating as success');
       const successResponse = { success: true, message: 'Email sent but Resend returned an empty response.' };
       return new Response(JSON.stringify(successResponse), { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
@@ -91,6 +99,7 @@ serve(async (req) => {
     }
     
     const result = JSON.parse(responseText);
+    console.log('📧 Resend API success result:', result);
     const successResult = { success: true, message: 'Email sent successfully', id: result.id };
 
     return new Response(JSON.stringify(successResult), { 
@@ -100,6 +109,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Email function error:', error);
+    console.error('❌ Error stack:', error.stack);
     return new Response(
       JSON.stringify({ success: false, message: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }

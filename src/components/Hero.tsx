@@ -38,6 +38,14 @@ const Hero = () => {
       subtitle: "COMMUNITY",
       description: "Connect with fellow musicians, participate in recitals, and be part of Nakuru's most vibrant creative community.",
       isMain: false
+    },
+    {
+      id: 5,
+      image: "/lovable-uploads/exam.png",
+      title: "GLOBAL MUSIC QUALIFICATIONS",
+      subtitle: "AT YOUR FINGERTIPS",
+      description: "Partnered with world-renowned examination bodies—ABRSM, Trinity College London, University of West London, and RSL Awards—our academy empowers students to achieve internationally recognized music certifications and excel on a global stage.",
+      isMain: false
     }
   ];
 

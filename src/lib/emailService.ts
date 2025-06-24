@@ -28,24 +28,11 @@ interface RegistrationData {
 
 export const sendConfirmationEmail = async (registration: RegistrationData): Promise<boolean> => {
   try {
-    console.log('📧 sendConfirmationEmail called with registration:', registration);
-    console.log('📧 Required fields check:', {
-      hasId: !!registration.id,
-      hasReceiptNumber: !!registration.receipt_number,
-      hasStudentName: !!registration.student_name,
-      hasEmail: !!registration.email,
-      hasCreatedAt: !!registration.created_at
-    });
+    console.log('📧 Sending confirmation email to:', registration.email);
 
     // Validate required fields
     if (!registration.id || !registration.receipt_number || !registration.student_name || !registration.email || !registration.created_at) {
-      console.error('❌ Missing required fields for email:', {
-        id: registration.id,
-        receipt_number: registration.receipt_number,
-        student_name: registration.student_name,
-        email: registration.email,
-        created_at: registration.created_at
-      });
+      console.error('❌ Missing required fields for email');
       return false;
     }
 
@@ -59,7 +46,7 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
       });
     };
 
-    const siteUrl = Deno.env.get('PRODUCTION_DOMAIN') || 'https://damonmusicacademy.co.ke';
+    const siteUrl = 'https://damonmusicacademy.co.ke';
     const logoUrl = `${siteUrl}/damon-logo.png`;
 
     // Create HTML email content
@@ -342,18 +329,6 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
     `;
 
     // Call the Supabase Edge Function to send the email
-    console.log('📧 Invoking Supabase Edge Function...');
-    console.log('📧 Function payload:', {
-      to: registration.email,
-      subject: `Registration Confirmation - ${registration.receipt_number} | Damon Music Academy`,
-      htmlLength: emailHTML.length,
-      registrationId: registration.id
-    });
-    
-    // Get the current origin for debugging
-    const currentOrigin = window.location.origin;
-    console.log('📧 Current origin:', currentOrigin);
-    
     const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
       body: {
         to: registration.email,
@@ -363,42 +338,20 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
       }
     });
 
-    console.log('📧 Supabase function response:', { data, error });
-
     if (error) {
-      console.error('❌ Supabase function error:', error);
-      console.error('❌ Error details:', {
-        message: error.message,
-        status: error.status,
-        statusText: error.statusText,
-        details: error.details,
-        name: error.name
-      });
-      
-      // Check for specific error types
-      if (error.message?.includes('CORS')) {
-        console.error('❌ CORS error detected - check function configuration');
-      }
-      if (error.status === 401) {
-        console.error('❌ Authentication error - check Supabase key');
-      }
-      if (error.status === 403) {
-        console.error('❌ Permission error - check function access');
-      }
-      
+      console.error('❌ Email sending error:', error);
       return false;
     }
 
     if (data && data.success) {
-      console.log('✅ Confirmation email sent successfully via Supabase');
+      console.log('✅ Confirmation email sent successfully');
       return true;
     } else {
       console.error('❌ Failed to send confirmation email:', data?.message);
-      console.error('❌ Response data:', data);
       return false;
     }
   } catch (error) {
-    console.error('Error sending confirmation email:', error);
+    console.error('❌ Error sending confirmation email:', error);
     return false;
   }
 };
@@ -452,5 +405,89 @@ export const testEmailService = async (): Promise<boolean> => {
       stack: error.stack
     });
     return false;
+  }
+};
+
+// Add a simple test function that can be called from browser console
+export const quickEmailTest = async (testEmail: string = 'mishaelgebre@gmail.com'): Promise<void> => {
+  console.log('🧪 Quick email test starting...');
+  console.log('🧪 Sending test email to:', testEmail);
+  
+  try {
+    const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
+      body: {
+        to: testEmail,
+        subject: 'Test Email - Damon Music Academy',
+        html: '<h1>Test Email</h1><p>This is a test email from Damon Music Academy.</p><p>If you receive this, the email service is working correctly!</p>',
+        registration: { id: 'test', receipt_number: 'TEST-001' }
+      }
+    });
+    
+    console.log('🧪 Quick test result:', { data, error });
+    
+    if (error) {
+      console.error('❌ Quick test failed:', error);
+    } else if (data?.success) {
+      console.log('✅ Quick test successful! Check your email at:', testEmail);
+    } else {
+      console.error('❌ Quick test failed:', data);
+    }
+  } catch (err) {
+    console.error('❌ Quick test error:', err);
+  }
+};
+
+// Add a comprehensive test function that sends a full registration email
+export const testFullRegistrationEmail = async (): Promise<void> => {
+  console.log('🧪 Testing full registration email...');
+  
+  const testRegistration = {
+    id: 'test-123',
+    receipt_number: 'DMA-2024-00001',
+    student_name: 'Test Student',
+    age: 15,
+    email: 'mishaelgebre@gmail.com',
+    phone: '123456789',
+    country_code: '+254',
+    parent_name: 'Test Parent',
+    parent_phone: '987654321',
+    course_category: 'Music',
+    instrument: 'Piano',
+    production_type: null,
+    experience: 'beginner',
+    proficiency_level: 'beginner',
+    learning_mode: 'in-person',
+    owns_instrument: true,
+    location: 'Nakuru',
+    medical_condition: 'no',
+    medical_details: null,
+    goals: 'Learn to play piano',
+    preferred_schedule: 'Weekends',
+    status: 'pending',
+    created_at: new Date().toISOString()
+  };
+
+  try {
+    console.log('🧪 Test registration data:', testRegistration);
+    console.log('🧪 Sending full registration email to:', testRegistration.email);
+    console.log('🧪 Calling sendConfirmationEmail function...');
+    
+    const result = await sendConfirmationEmail(testRegistration);
+    console.log('🧪 sendConfirmationEmail returned:', result);
+    
+    if (result) {
+      console.log('✅ Full registration email sent successfully!');
+      console.log('📧 Check your email at:', testRegistration.email);
+      console.log('📧 Receipt number:', testRegistration.receipt_number);
+    } else {
+      console.error('❌ Full registration email failed - sendConfirmationEmail returned false');
+    }
+  } catch (error) {
+    console.error('❌ Full registration email error:', error);
+    console.error('❌ Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
   }
 };

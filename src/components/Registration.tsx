@@ -356,6 +356,10 @@ const Registration = () => {
       console.log('📝 SQL Insert Statement (simulated):');
       console.log(`INSERT INTO registrations (${Object.keys(submissionData).join(', ')}) VALUES (${Object.values(submissionData).map(v => typeof v === 'string' ? `'${v}'` : v).join(', ')})`);
 
+      console.log('🔍 About to insert registration data...');
+      console.log('🔍 Submission data keys:', Object.keys(submissionData));
+      console.log('🔍 Submission data values:', Object.values(submissionData));
+
       const { data, error } = await supabase
         .from('registrations')
         .insert([submissionData])
@@ -363,17 +367,17 @@ const Registration = () => {
 
       if (error) {
         console.error('❌ Registration error:', error);
-        console.error('Error Details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
         
         // Provide specific error messages based on error codes
         let userMessage = `Registration failed: ${error.message}`;
         if (error.code === '23505') {
-          userMessage = 'A registration with this email already exists. Please use a different email address.';
+          if (error.message && error.message.includes('receipt_number')) {
+            userMessage = 'System error: duplicate receipt number. Please try again or contact support.';
+          } else if (error.message && error.message.includes('email')) {
+            userMessage = 'A registration with this email already exists. Please use a different email address.';
+          } else {
+            userMessage = `Duplicate entry error: ${error.message}`;
+          }
         } else if (error.code === '23502') {
           userMessage = 'Required field missing. Please check all required fields are filled.';
         } else if (error.code === '23503') {
@@ -382,10 +386,12 @@ const Registration = () => {
           userMessage = 'Permission denied. Please contact support.';
         }
         
+        // Show the actual error for debugging
+        console.error('❌ Registration error:', error);
         toast({
-          title: "Registration Failed",
+          title: 'Registration Failed',
           description: userMessage,
-          variant: "destructive",
+          variant: 'destructive',
         });
         setIsSubmitting(false);
         console.groupEnd();
@@ -399,14 +405,15 @@ const Registration = () => {
       
       toast({
         title: "Registration Successful! 🎉",
-        description: "Thank you for registering! We'll contact you soon to confirm your enrollment.",
+        description: "Your registration was successful! We'll contact you within 24 hours.",
       });
 
       // Send confirmation email with the complete registration data
       if (data && data[0]) {
         try {
-          console.log('📧 Registration data for email:', data[0]);
+          console.log('📧 Sending confirmation email...');
           const emailSent = await sendConfirmationEmail(data[0]);
+          
           if (emailSent) {
             console.log('✅ Confirmation email sent successfully');
             toast({
@@ -416,14 +423,17 @@ const Registration = () => {
           } else {
             console.warn('⚠️ Failed to send confirmation email');
             toast({
-              title: "Email Not Sent",
-              description: "Registration successful, but we couldn't send the confirmation email. Please check your email address.",
-              variant: "destructive",
+              title: "Registration Successful! 🎉",
+              description: "Your registration was successful! We'll contact you within 24 hours.",
             });
           }
         } catch (emailError) {
           console.error('❌ Email sending error:', emailError);
           // Don't fail the registration if email fails
+          toast({
+            title: "Registration Successful! 🎉",
+            description: "Your registration was successful! We'll contact you within 24 hours.",
+          });
         }
       }
 

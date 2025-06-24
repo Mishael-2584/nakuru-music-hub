@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Registration {
   id: string;
+  receipt_number: string;
   student_name: string;
   age: number;
   email: string;
@@ -720,6 +721,9 @@ const AdminPanel = () => {
                               <p className="text-muted-foreground flex items-center gap-2">
                                 Age: {registration.age} • {registration.course_category} • {registration.location}
                               </p>
+                              <p className="text-sm font-medium text-primary/80 mt-1">
+                                Receipt: {registration.receipt_number}
+                              </p>
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
@@ -772,6 +776,10 @@ const AdminPanel = () => {
                                   Contact Information
                                 </h5>
                                 <div className="space-y-2 text-sm">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-gray-600">Receipt Number:</span>
+                                    <span className="text-gray-800 font-mono bg-gray-100 px-2 py-1 rounded">{registration.receipt_number}</span>
+                                  </div>
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium text-gray-600">Email:</span>
                                     <span className="text-gray-800">{registration.email}</span>
