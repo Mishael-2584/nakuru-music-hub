@@ -58,7 +58,7 @@ const Header = () => {
         <div className="flex items-center justify-between h-20">
           {/* Logo - Updated with new logo */}
           <Link to="/" className="flex items-center group">
-            <img alt="Damon Music Academy Logo" src="/damon-logo.png" className="h-12 sm:h-14 object-contain transition-transform duration-300 group-hover:scale-105" />
+            <img alt="Damon Music Academy Logo" src="/damon-logo.png" className="h-12 sm:h-14 object-contain transition-transform duration-300 group-hover:scale-105 cursor-pointer" />
           </Link>
 
           {/* Desktop Navigation */}

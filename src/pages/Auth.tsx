@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import AuthForm from "@/components/auth/AuthForm";
 import { Music, ShieldCheck } from "lucide-react";
@@ -40,7 +40,9 @@ const Auth = () => {
       {/* Left side - Branding */}
       <div className="hidden lg:flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800 text-white p-12">
         <div className="max-w-md text-center">
-            <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-20 mx-auto mb-8 bg-white/10 rounded-lg p-2" />
+            <Link to="/" className="group">
+              <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-20 mx-auto mb-8 bg-white/10 rounded-lg p-2 transition-transform duration-300 group-hover:scale-105 cursor-pointer" />
+            </Link>
           <h1 className="text-4xl font-bold mb-4">Admin Control Panel</h1>
           <p className="text-gray-300 mb-8">
             Manage your academy's events, news, and registrations with ease.
@@ -61,7 +63,9 @@ const Auth = () => {
       {/* Right side - Auth Form */}
       <div className="flex flex-col items-center justify-center p-6 sm:p-12">
         <div className="lg:hidden mb-8 text-center">
-            <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-16 mx-auto mb-4" />
+            <Link to="/" className="group">
+              <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-16 mx-auto mb-4 transition-transform duration-300 group-hover:scale-105 cursor-pointer" />
+            </Link>
         </div>
         <AuthForm onSuccess={handleAuthSuccess} />
       </div>

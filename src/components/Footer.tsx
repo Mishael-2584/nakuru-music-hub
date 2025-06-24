@@ -6,8 +6,8 @@ const Footer = () => {
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Company Info */}
           <div className="space-y-4">
-            <Link to="/">
-              <div className="bg-white rounded-md p-2 inline-block">
+            <Link to="/" className="group">
+              <div className="bg-white rounded-md p-2 inline-block transition-transform duration-300 group-hover:scale-105 cursor-pointer">
                 <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-12 object-contain" />
               </div>
             </Link>

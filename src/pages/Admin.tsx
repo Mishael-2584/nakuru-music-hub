@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import AdminPanel from "@/components/AdminPanel";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,9 @@ const Admin = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
                 <div className="flex items-center gap-4">
-                    <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-10" />
+                    <Link to="/" className="group">
+                      <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-10 transition-transform duration-300 group-hover:scale-105 cursor-pointer" />
+                    </Link>
                     <span className="text-sm font-semibold text-gray-500 hidden sm:block">Admin Panel</span>
                 </div>
                 <DropdownMenu>
