@@ -11,6 +11,7 @@ import { useNavigate, Link } from "react-router-dom";
 import AdminEventsManager from "@/components/AdminEventsManager";
 import AdminNewsManager from "@/components/AdminNewsManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { sendAcceptedEmail, sendDeclinedEmail } from "@/lib/emailService";
 
 interface Registration {
   id: string;
@@ -212,6 +213,86 @@ const AdminPanel = () => {
         title: "Status Updated",
         description: `Registration has been ${status}`,
       });
+
+      // If approved, send acceptance email
+      if (status === 'approved') {
+        // Fetch the full registration data (with all fields)
+        const { data: regData, error: fetchError } = await supabase
+          .from('registrations')
+          .select('*')
+          .eq('id', id)
+          .single();
+        if (fetchError || !regData) {
+          console.error('Error fetching registration for email:', fetchError);
+          toast({
+            title: "Warning",
+            description: "Could not fetch registration details for acceptance email.",
+            variant: "destructive",
+          });
+          return;
+        }
+        try {
+          const emailSent = await sendAcceptedEmail(regData);
+          if (emailSent) {
+            toast({
+              title: "Acceptance Email Sent",
+              description: "The applicant has been notified of their acceptance.",
+            });
+          } else {
+            toast({
+              title: "Acceptance Email Failed",
+              description: "Could not send acceptance email to applicant.",
+              variant: "destructive",
+            });
+          }
+        } catch (emailError) {
+          console.error('Error sending acceptance email:', emailError);
+          toast({
+            title: "Acceptance Email Error",
+            description: "An error occurred while sending the acceptance email.",
+            variant: "destructive",
+          });
+        }
+      }
+      // If rejected, send declined email
+      if (status === 'rejected') {
+        const { data: regData, error: fetchError } = await supabase
+          .from('registrations')
+          .select('*')
+          .eq('id', id)
+          .single();
+        if (fetchError || !regData) {
+          console.error('Error fetching registration for declined email:', fetchError);
+          toast({
+            title: "Warning",
+            description: "Could not fetch registration details for declined email.",
+            variant: "destructive",
+          });
+          return;
+        }
+        try {
+          const emailSent = await sendDeclinedEmail(regData);
+          if (emailSent) {
+            toast({
+              title: "Declined Email Sent",
+              description: "The applicant has been notified of the decision.",
+            });
+          } else {
+            toast({
+              title: "Declined Email Failed",
+              description: "Could not send declined email to applicant.",
+              variant: "destructive",
+            });
+          }
+        } catch (emailError) {
+          console.error('Error sending declined email:', emailError);
+          toast({
+            title: "Declined Email Error",
+            description: "An error occurred while sending the declined email.",
+            variant: "destructive",
+          });
+        }
+      }
     } catch (error) {
       console.error("Unexpected error:", error);
       toast({
