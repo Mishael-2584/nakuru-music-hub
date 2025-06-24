@@ -13,6 +13,7 @@ const Fees = () => {
       courses: [
         {
           name: "At the Academy",
+          location: "",
           duration: "1 hour",
           monthly: "KSh 4,800",
           icon: Home,
@@ -20,21 +21,24 @@ const Fees = () => {
           popular: true
         },
         {
-          name: "Home lesson (Nakuru Cbd & Environs)",
+          name: "Home Lesson",
+          location: "Nakuru CBD & Environs",
           duration: "30 minutes", 
           monthly: "KSh 5,600",
           icon: Home,
           features: ["One-on-one instruction", "Professional facilities", "Perfect for beginners", "Focused sessions"]
         },
         {
-          name: "Home lesson (Nakuru Cbd & Environs)",
+          name: "Home Lesson",
+          location: "Nakuru CBD & Environs",
           duration: "1 hour",
           monthly: "KSh 10,000",
           icon: Users,
           features: ["Convenient home lessons", "Personal attention", "Comfortable environment", "Travel included"]
         },
         {
-          name: "Online (Global)",
+          name: "Online",
+          location: "Global",
           duration: "1 hour",
           monthly: "$44/month",
           icon: Globe,
@@ -49,27 +53,31 @@ const Fees = () => {
       courses: [
         {
           name: "At the Academy",
+          location: "",
           duration: "1 hour",
           perClass: "KSh 1,500",
           icon: Home,
           features: ["No commitment required", "Pay as you go", "Professional facilities", "Trial friendly"]
         },
         {
-          name: "Home lesson (Nakuru Cbd & Environs)", 
+          name: "Home Lesson", 
+          location: "Nakuru CBD & Environs",
           duration: "30 minutes",
           perClass: "KSh 1,600",
           icon: Home,
           features: ["Short focused sessions", "Perfect for busy schedules", "No commitment", "Quality instruction"]
         },
         {
-          name: "Home lesson (Nakuru Cbd & Environs)",
+          name: "Home Lesson",
+          location: "Nakuru CBD & Environs",
           duration: "1 hour", 
           perClass: "KSh 2,700",
           icon: Users,
           features: ["Home convenience", "Personal attention", "No travel needed", "Comfortable learning"]
         },
         {
-          name: "Online (Global)",
+          name: "Online",
+          location: "Global",
           duration: "1 hour",
           perClass: "$11/class", 
           icon: Globe,
@@ -172,7 +180,12 @@ const Fees = () => {
                   <CardHeader className="pb-4">
                     <div className="flex items-center gap-3 mb-3">
                        {course.icon && <div className={`p-2 bg-gradient-to-r ${getIconColor(category.category)} rounded-lg`}><course.icon className="w-5 h-5 text-white" /></div>}
-                       <CardTitle className="text-lg">{course.name}</CardTitle>
+                       <div className="flex-1">
+                         <CardTitle className="text-lg">{course.name}</CardTitle>
+                         {course.location && (
+                           <p className="text-sm text-muted-foreground mt-1">{course.location}</p>
+                         )}
+                       </div>
                     </div>
                     {course.duration && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Clock className="w-4 h-4" /><span>{course.duration}</span></div>}
                   </CardHeader>

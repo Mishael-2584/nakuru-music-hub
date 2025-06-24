@@ -2,8 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Piano, Guitar, Mic, Drum, Music, Brain, Wind, Volume2, Camera, Video, MonitorPlay, Code, Palette } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useState } from "react";
 
 const CoursesEnhanced = () => {
+  const [openDialog, setOpenDialog] = useState<number | null>(null);
+
   const courses = [
     {
       title: "Piano Lessons",
@@ -314,7 +318,7 @@ const CoursesEnhanced = () => {
                 <CardContent className="text-center">
                   <p className="text-muted-foreground mb-6">{course.description}</p>
                   
-                  <Dialog>
+                  <Dialog open={openDialog === index} onOpenChange={(open) => setOpenDialog(open ? index : null)}>
                     <DialogTrigger asChild>
                       <Button className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90">
                         Learn More
@@ -359,15 +363,11 @@ const CoursesEnhanced = () => {
                         
                         <div className="pt-4">
                           <Button 
+                            asChild
                             className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
-                            onClick={() => {
-                              const element = document.getElementById('registration');
-                              if (element) {
-                                element.scrollIntoView({ behavior: 'smooth' });
-                              }
-                            }}
+                            onClick={() => setOpenDialog(null)}
                           >
-                            Enroll Now
+                            <Link to="/registration">Enroll Now</Link>
                           </Button>
                         </div>
                       </div>
