@@ -33,7 +33,7 @@ export const FounderChatPopup = ({ children }: FounderChatPopupProps) => {
           <div className="flex items-center space-x-4 p-4 bg-primary/5 rounded-lg">
             <Avatar className="h-16 w-16">
               {/* To add the founder's image, place it in the public folder and update the path below */}
-              <AvatarImage src="/founder-musumba.jpg" />
+              <AvatarImage src="/lovable-uploads/founder.jpg" />
               <AvatarFallback className="bg-primary text-white text-2xl">MC</AvatarFallback>
             </Avatar>
             <div>

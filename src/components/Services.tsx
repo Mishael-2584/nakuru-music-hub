@@ -12,14 +12,14 @@ const services = [
   },
   {
     // icon: Video,
-    image: "https://images.unsplash.com/photo-1464983953574-0892a716854b?auto=format&fit=crop&w=400&q=80", // Livestreaming
+    image: "/lovable-uploads/livestreaming.jpg", // Livestreaming
     title: "Livestreaming Services",
     description: "Broadcast your event to a global audience with our professional multi-camera livestreaming setup.",
     color: "from-accent to-secondary"
   },
   {
     // icon: Speaker,
-    image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80", // Event Coverage
+    image: "/lovable-uploads/eventcoverage.jpg", // Event Coverage
     title: "Event Coverage",
     description: "Comprehensive photo and video coverage to capture every important moment of your event.",
     color: "from-secondary to-primary"
