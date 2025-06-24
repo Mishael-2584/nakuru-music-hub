@@ -120,7 +120,11 @@ const NewsList = () => {
                 </h3>
                 
                 <p className="text-muted-foreground line-clamp-3 mb-4">
-                  {item.excerpt || item.content.substring(0, 150) + '...'}
+                  {item.excerpt ? (
+                    <span dangerouslySetInnerHTML={{ __html: item.excerpt }} />
+                  ) : (
+                    <span dangerouslySetInnerHTML={{ __html: item.content.substring(0, 150) + '...' }} />
+                  )}
                 </p>
                 
                 <Link 

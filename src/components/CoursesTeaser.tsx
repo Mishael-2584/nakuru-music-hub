@@ -12,7 +12,6 @@ const CoursesTeaser = () => {
       description: "Master the keys with our comprehensive piano program for all skill levels.",
       icon: Piano,
       category: "Music",
-      duration: "3-6 months",
       students: 150,
       rating: 4.9,
       price: "From KSh 4,800/month",
@@ -25,7 +24,6 @@ const CoursesTeaser = () => {
       description: "Learn acoustic and electric guitar with modern teaching methods.",
       icon: Guitar,
       category: "Music",
-      duration: "3-6 months",
       students: 120,
       rating: 4.8,
       price: "From KSh 4,800/month",
@@ -38,7 +36,6 @@ const CoursesTeaser = () => {
       description: "Develop your vocal skills with professional voice coaching.",
       icon: Mic,
       category: "Music",
-      duration: "4-8 months",
       students: 80,
       rating: 4.9,
       price: "From KSh 4,800/month",
@@ -51,7 +48,6 @@ const CoursesTeaser = () => {
       description: "Learn digital music production and sound engineering.",
       icon: Music,
       category: "Production",
-      duration: "6-12 months",
       students: 60,
       rating: 4.7,
       price: "From KSh 45,500/term",
@@ -64,7 +60,6 @@ const CoursesTeaser = () => {
       description: "Capture moments with professional photography techniques.",
       icon: Camera,
       category: "Art",
-      duration: "3-6 months",
       students: 45,
       rating: 4.6,
       price: "From KSh 45,500/term",
@@ -77,7 +72,6 @@ const CoursesTeaser = () => {
       description: "Express creativity through various art forms and design principles.",
       icon: Palette,
       category: "Art",
-      duration: "4-8 months",
       students: 70,
       rating: 4.8,
       price: "From KSh 4,000/month",
@@ -143,10 +137,6 @@ const CoursesTeaser = () => {
                   <p className="text-muted-foreground mb-4 line-clamp-2">{course.description}</p>
                   
                   <div className="space-y-3 mb-4">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      <span>{course.duration}</span>
-                    </div>
                     <div className="text-lg font-bold text-primary">{course.price}</div>
                   </div>
 

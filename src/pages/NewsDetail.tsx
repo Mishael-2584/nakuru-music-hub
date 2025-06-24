@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import Header from "@/components/Header";
@@ -112,9 +111,10 @@ const NewsDetail = () => {
             <h1 className="text-4xl font-bold mb-6">{newsItem.title}</h1>
             
             <div className="prose max-w-none">
-              <div className="whitespace-pre-wrap text-lg leading-relaxed">
-                {newsItem.content}
-              </div>
+              <div 
+                className="prose prose-lg max-w-none prose-headings:text-foreground prose-headings:font-bold prose-h1:text-3xl prose-h1:mb-6 prose-h2:text-2xl prose-h2:mb-4 prose-h3:text-xl prose-h3:mb-3 prose-p:text-base prose-p:leading-relaxed prose-p:mb-4 prose-p:text-muted-foreground prose-strong:text-foreground prose-strong:font-semibold prose-ul:my-4 prose-ol:my-4 prose-li:mb-2 prose-blockquote:border-l-4 prose-blockquote:border-primary prose-blockquote:pl-4 prose-blockquote:italic prose-hr:my-8 prose-hr:border-gray-200"
+                dangerouslySetInnerHTML={{ __html: newsItem.content }}
+              />
             </div>
           </article>
         </div>

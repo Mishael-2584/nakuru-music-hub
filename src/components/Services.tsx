@@ -97,7 +97,7 @@ export const ServicesCarousel = () => {
   }, [total]);
 
   return (
-    <section id="services-carousel" className="py-16 md:py-24 bg-white mt-24">
+    <section id="services-carousel" className="py-16 md:py-24 bg-white mt-8">
       <div className="container mx-auto px-4 max-w-2xl">
         <div className="text-center mb-8">
           <h2 className="text-3xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
