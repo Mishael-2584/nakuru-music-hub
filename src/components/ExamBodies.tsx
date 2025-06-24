@@ -1,4 +1,5 @@
 import { Award } from "lucide-react";
+import { useEffect, useState } from "react";
 
 const examBodies = [
   {
@@ -16,9 +17,41 @@ const examBodies = [
     logoUrl: "https://mandm.academy/wp-content/uploads/2020/10/rockschool-logo-1.jpg",
     description: "RSL Awards is a leading global provider of contemporary music and performance arts qualifications, covering a range of popular genres and instruments.",
   },
+  {
+    name: "Trinity College London",
+    logoUrl: "https://www.trinitycollege.com/images/trinity_college_london_logo.png",
+    description: "Trinity College London is a leading international exam board and independent education charity that promotes and advances the arts, offering qualifications in music, drama, and communication.",
+  },
 ];
 
 const ExamBodies = () => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [cardsPerView, setCardsPerView] = useState(3);
+
+  useEffect(() => {
+    const updateCardsPerView = () => {
+      if (window.innerWidth < 768) {
+        setCardsPerView(1); // Mobile: 1 card
+      } else if (window.innerWidth < 1024) {
+        setCardsPerView(2); // Tablet: 2 cards
+      } else {
+        setCardsPerView(3); // Desktop: 3 cards
+      }
+    };
+
+    updateCardsPerView();
+    window.addEventListener('resize', updateCardsPerView);
+    return () => window.removeEventListener('resize', updateCardsPerView);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex((prevIndex) => (prevIndex + 1) % examBodies.length);
+    }, 3000); // Change slide every 3 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <section className="py-20 bg-gray-50">
       <div className="container mx-auto px-4">
@@ -34,15 +67,65 @@ const ExamBodies = () => {
             We are proud to prepare our students for examinations with the world's leading music and performance arts exam boards, opening doors to global opportunities.
           </p>
         </div>
-        <div className="grid md:grid-cols-3 gap-8">
-          {examBodies.map((body) => (
-            <div key={body.name} className="bg-white p-6 md:p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 flex flex-col items-center text-center group">
-              <div className="h-20 md:h-24 flex items-center justify-center mb-6">
-                <img src={body.logoUrl} alt={`${body.name} logo`} className="max-h-14 md:max-h-16 object-contain transition-transform duration-300 group-hover:scale-105" />
+        
+        {/* Carousel Container */}
+        <div className="relative overflow-hidden">
+          <div 
+            className="flex gap-4 md:gap-6 lg:gap-8 transition-transform duration-1000 ease-in-out"
+            style={{ 
+              transform: `translateX(-${currentIndex * (100 / cardsPerView)}%)`,
+              width: `${(examBodies.length * 100) / cardsPerView}%`
+            }}
+          >
+            {examBodies.map((body, index) => (
+              <div 
+                key={`${body.name}-${index}`} 
+                className="w-full sm:w-1/2 lg:w-1/3 flex-shrink-0 px-2"
+              >
+                <div className="bg-white p-6 md:p-6 lg:p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 flex flex-col items-center text-center group h-full min-h-[280px] md:min-h-[300px] lg:min-h-[320px]">
+                  <div className="h-24 md:h-20 lg:h-24 flex items-center justify-center mb-4 md:mb-6 flex-shrink-0">
+                    <img 
+                      src={body.logoUrl} 
+                      alt={`${body.name} logo`} 
+                      className="max-h-20 md:max-h-14 lg:max-h-16 object-contain transition-transform duration-300 group-hover:scale-105" 
+                      onError={(e) => {
+                        // Fallback to text if image fails to load
+                        const target = e.target as HTMLImageElement;
+                        const fallbackText = target.nextElementSibling as HTMLElement;
+                        if (target && fallbackText) {
+                          target.style.display = 'none';
+                          fallbackText.style.display = 'block';
+                        }
+                      }}
+                    />
+                    <span 
+                      className="text-gray-600 text-sm font-medium text-center hidden"
+                      style={{ display: 'none' }}
+                    >
+                      {body.name}
+                    </span>
+                  </div>
+                  <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-800 mb-2 md:mb-3">{body.name}</h3>
+                  <p className="text-gray-600 leading-relaxed text-xs md:text-sm lg:text-base">{body.description}</p>
+                </div>
               </div>
-              <h3 className="text-xl md:text-2xl font-bold text-gray-800 mb-3">{body.name}</h3>
-              <p className="text-gray-600 leading-relaxed text-sm md:text-base">{body.description}</p>
-            </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Dots Indicator */}
+        <div className="flex justify-center mt-6 md:mt-8 space-x-2">
+          {examBodies.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentIndex(index)}
+              className={`w-2 h-2 md:w-3 md:h-3 rounded-full transition-all duration-300 ${
+                index === currentIndex 
+                  ? 'bg-primary scale-125' 
+                  : 'bg-gray-300 hover:bg-gray-400'
+              }`}
+              aria-label={`Go to slide ${index + 1}`}
+            />
           ))}
         </div>
       </div>

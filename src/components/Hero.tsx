@@ -61,6 +61,11 @@ const Hero = () => {
           name: "Rockschool",
           logoUrl: "https://mandm.academy/wp-content/uploads/2020/10/rockschool-logo-1.jpg",
           alt: "RSL Awards - Rockschool"
+        },
+        {
+          name: "Trinity College London",
+          logoUrl: "https://www.trinitycollege.com/images/trinity_college_london_logo.png",
+          alt: "Trinity College London"
         }
       ]
     }
