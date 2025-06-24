@@ -1,6 +1,6 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { Camera } from "lucide-react";
+import { Camera, Facebook, Instagram, Youtube, ExternalLink } from "lucide-react";
 
 const images = [
   { src: "/lovable-uploads/29861c9f-1df3-42f1-982f-ef38574fb617.png", alt: "A vibrant classroom of young students learning music theory." },
@@ -46,8 +46,56 @@ const Gallery = () => {
 
           <div className="text-center mt-16">
             <h3 className="text-2xl font-bold text-gray-900 mb-4">Want to see more?</h3>
-            <p className="text-gray-600">Follow us on social media for the latest updates, photos, and videos!</p>
-            {/* You can add your SocialMedia component here if you have one */}
+            <p className="text-gray-600 mb-8">Follow us on social media for the latest updates, photos, and videos!</p>
+            
+            {/* Social Media Icons */}
+            <div className="flex justify-center items-center gap-6">
+              {/* Facebook */}
+              <a 
+                href="https://www.facebook.com/DamonMusicAcademy/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="group flex flex-col items-center gap-2 p-4 rounded-xl bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border border-gray-100"
+              >
+                <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center group-hover:bg-blue-700 transition-colors duration-300">
+                  <Facebook className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600 transition-colors duration-300">Facebook</span>
+                <ExternalLink className="w-3 h-3 text-gray-400 group-hover:text-blue-600 transition-colors duration-300" />
+              </a>
+
+              {/* YouTube */}
+              <a 
+                href="https://www.youtube.com/channel/UCBwFLi3WFpddfQRV7S6GFiw" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="group flex flex-col items-center gap-2 p-4 rounded-xl bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border border-gray-100"
+              >
+                <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center group-hover:bg-red-700 transition-colors duration-300">
+                  <Youtube className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-sm font-medium text-gray-700 group-hover:text-red-600 transition-colors duration-300">YouTube</span>
+                <ExternalLink className="w-3 h-3 text-gray-400 group-hover:text-red-600 transition-colors duration-300" />
+              </a>
+
+              {/* Instagram */}
+              <a 
+                href="#" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="group flex flex-col items-center gap-2 p-4 rounded-xl bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border border-gray-100"
+              >
+                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center group-hover:from-purple-600 group-hover:to-pink-600 transition-all duration-300">
+                  <Instagram className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-sm font-medium text-gray-700 group-hover:text-purple-600 transition-colors duration-300">Instagram</span>
+                <ExternalLink className="w-3 h-3 text-gray-400 group-hover:text-purple-600 transition-colors duration-300" />
+              </a>
+            </div>
+
+            <p className="text-sm text-gray-500 mt-6">
+              Stay connected for exclusive behind-the-scenes content, student performances, and academy updates!
+            </p>
           </div>
         </div>
       </main>

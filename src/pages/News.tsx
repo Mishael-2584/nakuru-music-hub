@@ -8,7 +8,7 @@ const News = () => {
       <Header />
       
       <section className="pt-24 md:pt-32 pb-20 bg-gradient-to-br from-emerald-900/20 via-teal-900/20 to-cyan-900/20 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('/lovable-uploads/70f23f35-6eb2-49a1-8bf6-677fe0c49746.png')] bg-cover bg-center opacity-10"></div>
+        <div className="absolute inset-0 bg-[url('https://cdn.pixabay.com/photo/2016/02/01/00/56/news-1172463_1280.jpg')] bg-cover bg-center opacity-10"></div>
         <div className="container mx-auto px-4 relative">
           <div className="text-center">
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 bg-clip-text text-transparent">
