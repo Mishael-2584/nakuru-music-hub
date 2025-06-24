@@ -44,8 +44,25 @@ const Hero = () => {
       image: "/lovable-uploads/exam.png",
       title: "GLOBAL MUSIC QUALIFICATIONS",
       subtitle: "AT YOUR FINGERTIPS",
-      description: "Partnered with world-renowned examination bodies—ABRSM, Trinity College London, University of West London, and RSL Awards—our academy empowers students to achieve internationally recognized music certifications and excel on a global stage.",
-      isMain: false
+      description: "Partnered with world-renowned examination bodies—ABRSM, London College of Music, and RSL Awards—our academy empowers students to achieve internationally recognized music certifications and excel on a global stage.",
+      isMain: false,
+      logos: [
+        {
+          name: "ABRSM",
+          logoUrl: "https://upload.wikimedia.org/wikipedia/en/thumb/f/f6/ABRSM_logo.svg/1200px-ABRSM_logo.svg.png",
+          alt: "ABRSM - Associated Board of the Royal Schools of Music"
+        },
+        {
+          name: "LCM",
+          logoUrl: "https://centrestagedance.org/wp-content/uploads/2016/11/lcm-logo.jpeg",
+          alt: "London College of Music Examinations"
+        },
+        {
+          name: "Rockschool",
+          logoUrl: "https://mandm.academy/wp-content/uploads/2020/10/rockschool-logo-1.jpg",
+          alt: "RSL Awards - Rockschool"
+        }
+      ]
     }
   ];
 
@@ -85,7 +102,10 @@ const Hero = () => {
             className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${
               currentSlide === index + 1 ? 'opacity-100' : 'opacity-0'
             }`}
-            style={{ backgroundImage: `url('${slide.image}')` }}
+            style={{ 
+              backgroundImage: `url('${slide.image}')`,
+              backgroundPosition: slide.id === 5 ? 'center 25%' : 'center center'
+            }}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent"></div>
           </div>
@@ -145,6 +165,42 @@ const Hero = () => {
           <p className="text-xl md:text-2xl text-white/90 mb-8 max-w-2xl leading-relaxed">
             {currentSlideData.description}
           </p>
+          
+          {/* Exam Bodies Logos - Only show on exam slide and mobile only */}
+          {currentSlideData.id === 5 && currentSlideData.logos && (
+            <div className="mb-8 block sm:hidden">
+              <h3 className="text-lg font-semibold text-white mb-4">Our Examination Partners:</h3>
+              <div className="flex flex-wrap justify-center gap-6 max-w-4xl">
+                {currentSlideData.logos.map((logo, index) => (
+                  <div 
+                    key={index} 
+                    className="flex items-center justify-center group"
+                  >
+                    <img 
+                      src={logo.logoUrl} 
+                      alt={logo.alt}
+                      className="max-h-12 w-auto object-contain opacity-85 hover:opacity-100 transition-all duration-300 drop-shadow-lg"
+                      onError={(e) => {
+                        // Fallback to text if image fails to load
+                        const target = e.target as HTMLImageElement;
+                        const fallbackText = target.nextElementSibling as HTMLElement;
+                        if (target && fallbackText) {
+                          target.style.display = 'none';
+                          fallbackText.style.display = 'block';
+                        }
+                      }}
+                    />
+                    <span 
+                      className="text-white text-sm font-medium text-center hidden"
+                      style={{ display: 'none' }}
+                    >
+                      {logo.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           
           <div className="flex flex-col sm:flex-row gap-4 mb-12">
             <Button asChild size="lg" className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold px-8 py-4 text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">

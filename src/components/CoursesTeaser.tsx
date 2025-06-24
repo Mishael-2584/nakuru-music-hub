@@ -81,7 +81,7 @@ const CoursesTeaser = () => {
       students: 70,
       rating: 4.8,
       price: "From KSh 4,000/month",
-      image: "/lovable-uploads/cc2f7a6b-1ce1-4921-a0b6-b29db99b5d4a.png",
+      image: "/about-art-class.jpg",
       features: ["Traditional & digital art", "Design principles", "Portfolio creation", "Gallery exhibitions"]
     }
   ];
