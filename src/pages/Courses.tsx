@@ -12,7 +12,7 @@ const Courses = () => {
         <div className="container mx-auto px-4 relative">
           <div className="text-center">
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-orange-400 via-red-500 to-pink-500 bg-clip-text text-transparent">
-              Our Music Programs
+              Our Programs
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
               Comprehensive music education designed for all skill levels and ages
