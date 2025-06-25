@@ -119,13 +119,13 @@ const NewsList = () => {
                   </Link>
                 </h3>
                 
-                <p className="text-muted-foreground line-clamp-3 mb-4">
+                <div className="text-muted-foreground line-clamp-3 mb-4 prose prose-sm max-w-none prose-a:text-blue-600 prose-a:font-medium prose-a:underline prose-a:decoration-blue-600 prose-a:decoration-2 hover:prose-a:text-blue-800 hover:prose-a:decoration-blue-800">
                   {item.excerpt ? (
                     <span dangerouslySetInnerHTML={{ __html: item.excerpt }} />
                   ) : (
                     <span dangerouslySetInnerHTML={{ __html: item.content.substring(0, 150) + '...' }} />
                   )}
-                </p>
+                </div>
                 
                 <Link 
                   to={`/news/${item.slug}`} 
