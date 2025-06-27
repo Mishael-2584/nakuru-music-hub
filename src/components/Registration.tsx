@@ -180,6 +180,15 @@ const Registration = () => {
         }
         break;
       
+      case 'location':
+        if (!value || value.trim().length < 2) {
+          return { isValid: false, error: 'Location must be at least 2 characters long' };
+        }
+        if (value.trim().length > 100) {
+          return { isValid: false, error: 'Location must be less than 100 characters' };
+        }
+        break;
+      
       case 'course_category':
         if (!value || !['Music', 'Production', 'Art'].includes(value)) {
           return { isValid: false, error: 'Please select a valid course category' };
@@ -215,12 +224,20 @@ const Registration = () => {
     
     switch (step) {
       case 1:
-        ['student_name', 'age', 'email', 'phone'].forEach(field => {
+        ['student_name', 'age', 'email', 'phone', 'location'].forEach(field => {
           const validation = validateField(field, formData[field as keyof typeof formData]);
           if (!validation.isValid) {
             errors.push(`${field}: ${validation.error}`);
           }
         });
+        
+        // Validate medical details if medical condition is yes
+        if (formData.medical_condition === 'yes') {
+          const validation = validateField('medical_details', formData.medical_details);
+          if (!validation.isValid) {
+            errors.push(validation.error);
+          }
+        }
         break;
       
       case 2:

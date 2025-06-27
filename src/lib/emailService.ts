@@ -504,7 +504,7 @@ export const testFullRegistrationEmail = async (): Promise<void> => {
   }
 };
 
-export const sendAcceptedEmail = async (registration: RegistrationData): Promise<boolean> => {
+export const sendAcceptedEmail = async (registration: RegistrationData, tempPassword?: string | null): Promise<boolean> => {
   try {
     console.log('📧 Sending acceptance email to:', registration.email);
 
@@ -548,6 +548,7 @@ export const sendAcceptedEmail = async (registration: RegistrationData): Promise
           .info-value { color: #495057; }
           .status-badge { background: #28a745; color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
           .next-steps { background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #28a745; }
+          .login-credentials { background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #2196f3; }
           .contact-info { background: #e3f2fd; padding: 20px; border-radius: 8px; margin-top: 25px; border-left: 4px solid #2196f3; }
           .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
           .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef; color: #6c757d; font-size: 14px; }
@@ -595,10 +596,25 @@ export const sendAcceptedEmail = async (registration: RegistrationData): Promise
           ${registration.parent_name ? `<div class="section"><div class="section-title">👨‍👩‍👧‍👦 Parent/Guardian Information</div><div class="info-grid"><div class="info-item"><span class="info-label">Name:</span><span class="info-value">${registration.parent_name}</span></div>${registration.parent_phone ? `<div class="info-item"><span class="info-label">Phone:</span><span class="info-value">${registration.parent_phone}</span></div>` : ''}</div></div>` : ''}
           ${registration.medical_condition === 'yes' ? `<div class="section"><div class="section-title">🏥 Medical Information</div><div class="info-item"><span class="info-label">Medical Conditions:</span><span class="info-value">Yes</span></div><div class="info-item"><span class="info-label">Details:</span><span class="info-value">${registration.medical_details}</span></div></div>` : ''}
           ${registration.goals ? `<div class="section"><div class="section-title">🎯 Learning Goals</div><p>${registration.goals}</p></div>` : ''}
+          ${tempPassword ? `
+          <div class="login-credentials">
+            <h3>🔐 Your Student Portal Login Credentials</h3>
+            <p><strong>Important:</strong> You can now access your personalized student portal with the following credentials:</p>
+            <div class="info-grid">
+              <div class="info-item"><span class="info-label">Login URL:</span><span class="info-value"><a href="${siteUrl}/auth" style="color: #2196f3; text-decoration: none;">${siteUrl}/auth</a></span></div>
+              <div class="info-item"><span class="info-label">Email:</span><span class="info-value">${registration.email}</span></div>
+              <div class="info-item"><span class="info-label">Temporary Password:</span><span class="info-value"><strong>${tempPassword}</strong></span></div>
+            </div>
+            <p style="margin-top: 15px; font-size: 14px; color: #666;">
+              <strong>Security Note:</strong> Please change your password on your first login for security purposes.
+            </p>
+          </div>
+          ` : ''}
           <div class="next-steps">
             <h3>✅ Next Steps</h3>
             <ul>
               <li>Your enrollment is now <strong>confirmed</strong>. We will contact you soon with your class schedule and further instructions.</li>
+              ${tempPassword ? '<li><strong>Access your student portal</strong> using the credentials provided above to view your lessons, materials, and progress.</li>' : ''}
               <li>If you have any questions, feel free to reply to this email or contact us using the information below.</li>
               <li>We look forward to seeing you at Damon Music Academy!</li>
             </ul>

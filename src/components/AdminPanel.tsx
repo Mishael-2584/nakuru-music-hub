@@ -80,6 +80,19 @@ const AdminPanel = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Redirect non-admins away from admin panel
+  useEffect(() => {
+    if (userRole && userRole !== 'admin' && userRole !== 'super_admin') {
+      if (userRole === 'student') {
+        navigate('/student', { replace: true });
+      } else if (userRole === 'teacher') {
+        navigate('/teacher', { replace: true });
+      } else {
+        navigate('/auth', { replace: true });
+      }
+    }
+  }, [userRole, navigate]);
+
   useEffect(() => {
     if (!user) {
       navigate("/auth");
@@ -94,20 +107,35 @@ const AdminPanel = () => {
     console.log("AdminPanel: Starting data fetch...");
     
     try {
-      // Get user's role
+      // Get user's role - try profiles table first, fallback to user metadata
       console.log("AdminPanel: Fetching user profile...");
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user?.id)
-        .single();
+      let userRole = 'admin'; // Default role
+      
+      try {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user?.id)
+          .single();
 
-      if (profileError) {
-        console.error("Error fetching user profile:", profileError);
-      } else {
-        console.log("AdminPanel: User role:", profile?.role);
-        setUserRole(profile?.role || 'admin');
+        if (profileError) {
+          console.log("AdminPanel: Profile not found, checking user metadata...");
+          // If profile doesn't exist, check user metadata
+          if (user?.user_metadata?.role) {
+            userRole = user.user_metadata.role;
+            console.log("AdminPanel: User role from metadata:", userRole);
+          }
+        } else {
+          userRole = profile?.role || 'admin';
+          console.log("AdminPanel: User role from profile:", userRole);
+        }
+      } catch (error) {
+        console.log("AdminPanel: Error fetching profile, using default role");
+        // If there's any error, use default admin role
+        userRole = 'admin';
       }
+
+      setUserRole(userRole);
 
       console.log("AdminPanel: Fetching registrations...");
       const { data: regData, error: regError } = await supabase
@@ -146,19 +174,23 @@ const AdminPanel = () => {
       }
 
       // Fetch admin profiles for super admin
-      if (profile?.role === 'super_admin') {
+      if (userRole === 'super_admin') {
         console.log("AdminPanel: Fetching admin profiles...");
-        const { data: adminData, error: adminError } = await supabase
-          .from('profiles')
-          .select('id, email, role, created_at')
-          .in('role', ['admin', 'super_admin'])
-          .order('created_at', { ascending: false });
+        try {
+          const { data: adminData, error: adminError } = await supabase
+            .from('profiles')
+            .select('id, email, role, created_at')
+            .in('role', ['admin', 'super_admin'])
+            .order('created_at', { ascending: false });
 
-        if (adminError) {
-          console.error("Error fetching admin profiles:", adminError);
-        } else {
-          console.log("AdminPanel: Admin profiles fetched successfully:", adminData?.length || 0, "records");
-          setAdminProfiles(adminData || []);
+          if (adminError) {
+            console.error("Error fetching admin profiles:", adminError);
+          } else {
+            console.log("AdminPanel: Admin profiles fetched successfully:", adminData?.length || 0, "records");
+            setAdminProfiles(adminData || []);
+          }
+        } catch (error) {
+          console.error("Error fetching admin profiles:", error);
         }
       }
 
@@ -214,29 +246,81 @@ const AdminPanel = () => {
         description: `Registration has been ${status}`,
       });
 
-      // If approved, send acceptance email
+      // If approved, send acceptance email with login credentials
       if (status === 'approved') {
-        // Fetch the full registration data (with all fields)
-        const { data: regData, error: fetchError } = await supabase
-          .from('registrations')
-          .select('*')
-          .eq('id', id)
-          .single();
-        if (fetchError || !regData) {
-          console.error('Error fetching registration for email:', fetchError);
+        // First, create Supabase Auth user for the student
+        let tempPassword = null;
+        try {
+          console.log('🔧 Creating Supabase Auth user for student...');
+          const { data: regData, error: fetchError } = await supabase
+            .from('registrations')
+            .select('*')
+            .eq('id', id)
+            .single();
+          
+          if (fetchError || !regData) {
+            console.error('Error fetching registration for user creation:', fetchError);
+            toast({
+              title: "Warning",
+              description: "Could not fetch registration details for user creation.",
+              variant: "destructive",
+            });
+            return;
+          }
+
+          // Call the Edge Function to create the student user
+          const { data: userData, error: userError } = await supabase.functions.invoke('create-student-user', {
+            body: {
+              email: regData.email,
+              student_name: regData.student_name
+            }
+          });
+
+          if (userError) {
+            console.error('Error creating student user:', userError);
+            toast({
+              title: "Warning",
+              description: "Student approved but could not create user account. Please contact support.",
+              variant: "destructive",
+            });
+          } else if (userData && userData.tempPassword) {
+            console.log('✅ Student user created successfully');
+            tempPassword = userData.tempPassword;
+            toast({
+              title: "Student User Created",
+              description: "Student account created with temporary password.",
+            });
+          }
+        } catch (userCreationError) {
+          console.error('Error in user creation process:', userCreationError);
           toast({
             title: "Warning",
-            description: "Could not fetch registration details for acceptance email.",
+            description: "Student approved but user creation failed. Please contact support.",
             variant: "destructive",
           });
-          return;
         }
+
+        // Then send acceptance email with login credentials
         try {
-          const emailSent = await sendAcceptedEmail(regData);
+          const { data: regData, error: fetchError } = await supabase
+            .from('registrations')
+            .select('*')
+            .eq('id', id)
+            .single();
+          if (fetchError || !regData) {
+            console.error('Error fetching registration for email:', fetchError);
+            toast({
+              title: "Warning",
+              description: "Could not fetch registration details for acceptance email.",
+              variant: "destructive",
+            });
+            return;
+          }
+          const emailSent = await sendAcceptedEmail(regData, tempPassword);
           if (emailSent) {
             toast({
               title: "Acceptance Email Sent",
-              description: "The applicant has been notified of their acceptance.",
+              description: "The applicant has been notified of their acceptance with login credentials.",
             });
           } else {
             toast({

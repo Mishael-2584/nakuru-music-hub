@@ -20,6 +20,7 @@ import NewsDetail from "./pages/NewsDetail";
 import NotFound from "./pages/NotFound";
 import RegistrationPage from "./pages/Registration";
 import EmailDebug from "./pages/EmailDebug";
+import StudentDashboard from "./pages/StudentDashboard";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/registration" element={<RegistrationPage />} />
             <Route path="/email-debug" element={<EmailDebug />} />
+            <Route path="/student" element={<StudentDashboard />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

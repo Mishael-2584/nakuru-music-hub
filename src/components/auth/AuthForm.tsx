@@ -9,9 +9,10 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 interface AuthFormProps {
   onSuccess: () => void;
+  role?: 'admin' | 'student' | 'teacher';
 }
 
-const AuthForm = ({ onSuccess }: AuthFormProps) => {
+const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -137,7 +138,17 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
       <Card className="shadow-lg border-gray-200 bg-white">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-gray-800">
-            {isLogin ? "Admin Sign In" : "Create Admin Account"}
+            {isLogin
+              ? role === 'admin'
+                ? 'Admin Sign In'
+                : role === 'student'
+                ? 'Student Sign In'
+                : 'Teacher Sign In'
+              : role === 'admin'
+                ? 'Create Admin Account'
+                : role === 'student'
+                ? 'Student Registration'
+                : 'Teacher Registration'}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
