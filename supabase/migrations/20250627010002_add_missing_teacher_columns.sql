@@ -1,0 +1,10 @@
+ALTER TABLE teachers ADD COLUMN IF NOT EXISTS name text NOT NULL;
+ALTER TABLE teachers ADD COLUMN IF NOT EXISTS email text NOT NULL;
+ALTER TABLE teachers ADD COLUMN IF NOT EXISTS phone text NOT NULL;
+ALTER TABLE teachers ADD COLUMN IF NOT EXISTS password text NOT NULL;
+ALTER TABLE teachers ADD COLUMN IF NOT EXISTS bio text;
+ALTER TABLE teachers ADD COLUMN IF NOT EXISTS experience text;
+ALTER TABLE teachers ADD COLUMN IF NOT EXISTS category text NOT NULL;
+ALTER TABLE teachers ADD COLUMN IF NOT EXISTS subjects text[] NOT NULL;
+ALTER TABLE teachers ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'approved';
+ALTER TABLE teachers ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT timezone('utc', now()); 

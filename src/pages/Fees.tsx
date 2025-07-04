@@ -2,6 +2,7 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Fees from "@/components/Fees";
+import WhatsAppChat from "@/components/WhatsAppChat";
 
 const FeesPage = () => {
   return (
@@ -25,6 +26,7 @@ const FeesPage = () => {
       <Fees />
       
       <Footer />
+      <WhatsAppChat />
     </div>
   );
 };

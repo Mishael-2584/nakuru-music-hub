@@ -1,6 +1,7 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import NewsList from "@/components/NewsList";
+import WhatsAppChat from "@/components/WhatsAppChat";
 
 const News = () => {
   return (
@@ -24,6 +25,7 @@ const News = () => {
       <NewsList />
       
       <Footer />
+      <WhatsAppChat />
     </div>
   );
 };

@@ -4,48 +4,52 @@ import { useState, useEffect } from "react";
 
 const services = [
   {
-    // icon: Music,
-    image: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80", // Live Sound
-    title: "Live Sound & PA System",
-    description: "High-quality sound reinforcement for events of all sizes. Crystal clear audio for concerts, conferences, and weddings.",
+    title: "Live Sound & Lighting",
+    image: "/lovable-uploads/livesound.webp",
+    description: "High-quality sound reinforcement and dynamic lighting for events. Clear, powerful audio and atmospheric lighting for concerts, church services, conferences, and weddings.",
     color: "from-primary to-accent"
   },
   {
-    // icon: Video,
-    image: "/lovable-uploads/livestreaming.jpg", // Livestreaming
     title: "Livestreaming Services",
-    description: "Broadcast your event to a global audience with our professional multi-camera livestreaming setup.",
+    image: "/lovable-uploads/livestreaming.jpg",
+    description: "Broadcast events live globally with multi-camera setup and clear audio.",
     color: "from-accent to-secondary"
   },
   {
-    // icon: Speaker,
-    image: "/lovable-uploads/eventcoverage.jpg", // Event Coverage
     title: "Event Coverage",
-    description: "Comprehensive photo and video coverage to capture every important moment of your event.",
+    image: "/lovable-uploads/eventcoverage.jpg",
+    description: "Comprehensive photo and video coverage for weddings, birthdays, graduations, church, and corporate events.",
     color: "from-secondary to-primary"
   },
   {
-    // icon: Mic,
-    image: "https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?auto=format&fit=crop&w=400&q=80", // Podcast
-    title: "Podcast & Voice-Over Recording",
-    description: "Professional recording and production services for podcasts, audiobooks, and commercials.",
-    color: "from-primary to-secondary"
+    title: "Photography Services",
+    image: "/lovable-uploads/photography.webp",
+    description: "Professional photography for events, portraits, branding, schools, and product marketing.",
+    color: "from-pink-400 to-yellow-400"
   },
   {
-    // icon: Film,
-    image: "https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80", // Commercials
-    title: "Commercials & Adverts",
-    description: "Creative and compelling video commercials to promote your brand, product, or service.",
-    color: "from-accent to-primary"
+    title: "Songwriting",
+    image: "/lovable-uploads/songwriting.webp",
+    description: "Professional songwriting services for artists, bands, and commercial projects. From concept to finished song.",
+    color: "from-orange-400 to-red-400"
+  },
+  {
+    title: "Studio Recording & Production",
+    image: "/lovable-uploads/piano.jpg",
+    description: "Record vocals, instruments, podcasts, choirs, and voice-overs in a professional studio with expert support.",
+    color: "from-green-400 to-blue-400"
   }
 ];
+
+// Initial services to show on landing page (first 6 with images)
+const initialServices = services.slice(0, 6);
 
 const Services = () => {
   return (
     <section id="services" className="py-16 md:py-24 bg-white">
       <div className="container mx-auto px-4">
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {services.map((service, index) => (
+          {initialServices.map((service, index) => (
             <Card key={index} className="group border-0 shadow-lg hover:shadow-2xl transition-all duration-300 rounded-xl overflow-hidden bg-gray-50 hover:-translate-y-2">
               <div className="relative overflow-hidden">
                 <img 
@@ -83,10 +87,10 @@ const Services = () => {
 
 export const ServicesCarousel = () => {
   const [index, setIndex] = useState(0);
-  const total = services.length;
+  const total = initialServices.length;
   const prev = () => setIndex((i) => (i - 1 + total) % total);
   const next = () => setIndex((i) => (i + 1) % total);
-  const service = services[index];
+  const service = initialServices[index];
 
   // Auto-advance every 5 seconds
   useEffect(() => {
@@ -130,6 +134,14 @@ export const ServicesCarousel = () => {
               Next
             </button>
           </div>
+        </div>
+        <div className="flex justify-center mt-8">
+          <a
+            href="/services"
+            className="inline-block px-8 py-3 rounded-full bg-primary text-white font-semibold shadow-lg hover:bg-primary/90 transition-colors text-lg"
+          >
+            See All Services & Details
+          </a>
         </div>
       </div>
     </section>

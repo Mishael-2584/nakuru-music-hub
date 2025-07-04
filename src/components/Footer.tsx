@@ -76,10 +76,10 @@ const Footer = () => {
             <div className="pt-4">
               <h5 className="font-semibold mb-3">Follow Us</h5>
               <div className="flex gap-3">
-                <a href="https://www.facebook.com/DamonMusicAcademy/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-primary transition-colors">
+                <a href="https://www.facebook.com/DamonMusicAcademy" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-primary transition-colors">
                   <Facebook className="h-5 w-5" />
                 </a>
-                <a href="https://www.youtube.com/channel/UCBwFLi3WFpddfQRV7S6GFiw" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-red-600 transition-colors">
+                <a href="https://www.youtube.com/@damonmusicacademy5432" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-red-600 transition-colors">
                   <Youtube className="h-5 w-5" />
                 </a>
                 <a href="#" className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-gradient-to-r hover:from-purple-500 hover:to-pink-500 transition-colors">

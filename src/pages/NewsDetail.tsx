@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import WhatsAppChat from "@/components/WhatsAppChat";
 
 interface NewsItem {
   id: string;
@@ -121,6 +122,7 @@ const NewsDetail = () => {
       </section>
       
       <Footer />
+      <WhatsAppChat />
     </div>
   );
 };

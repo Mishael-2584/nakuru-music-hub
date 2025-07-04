@@ -8,6 +8,7 @@ import { Calendar, MapPin, Users, Clock, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import EventRegistrationForm from "@/components/EventRegistrationForm";
+import WhatsAppChat from "@/components/WhatsAppChat";
 
 interface Event {
   id: string;
@@ -190,6 +191,7 @@ const EventDetail = () => {
           }}
         />
       )}
+      <WhatsAppChat />
     </div>
   );
 };

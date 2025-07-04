@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { sendConfirmationEmail, quickEmailTest, testFullRegistrationEmail } from '@/lib/emailService';
 import { supabase } from '@/integrations/supabase/client';
+import WhatsAppChat from "@/components/WhatsAppChat";
 
 export default function EmailDebug() {
   const [isLoading, setIsLoading] = useState(false);
@@ -200,6 +201,7 @@ export default function EmailDebug() {
           </div>
         </CardContent>
       </Card>
+      <WhatsAppChat />
     </div>
   );
 } 

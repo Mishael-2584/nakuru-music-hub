@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp } from "lucide-react";
+import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +11,9 @@ import { useNavigate, Link } from "react-router-dom";
 import AdminEventsManager from "@/components/AdminEventsManager";
 import AdminNewsManager from "@/components/AdminNewsManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { sendAcceptedEmail, sendDeclinedEmail } from "@/lib/emailService";
+import { sendAcceptedEmail, sendDeclinedEmail, sendTeacherAcceptedEmail, sendTeacherDeclinedEmail, sendTeacherRequestInfoEmail } from "@/lib/emailService";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Registration {
   id: string;
@@ -67,7 +69,7 @@ interface ClassSchedule {
 }
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers'>('stats');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
@@ -79,6 +81,12 @@ const AdminPanel = () => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [pendingTeachers, setPendingTeachers] = useState([]);
+  const [approvedTeachers, setApprovedTeachers] = useState([]);
+  const [teacherLoading, setTeacherLoading] = useState(false);
+  const [showRequestInfo, setShowRequestInfo] = useState(false);
+  const [requestInfoTeacher, setRequestInfoTeacher] = useState(null);
+  const [requestMessage, setRequestMessage] = useState("");
 
   // Redirect non-admins away from admin panel
   useEffect(() => {
@@ -497,6 +505,106 @@ const AdminPanel = () => {
   const pendingCount = registrations.filter(reg => reg.status === 'pending').length;
   const unreadMessages = contactMessages.filter(msg => !msg.is_read).length;
 
+  useEffect(() => {
+    const fetchTeachers = async () => {
+      setTeacherLoading(true);
+      try {
+        const { data: pending, error: pendingError } = await supabase
+          .from("pending_teachers")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (!pendingError) setPendingTeachers(pending || []);
+        const { data: approved, error: approvedError } = await supabase
+          .from("teachers")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (!approvedError) setApprovedTeachers(approved || []);
+      } catch (err) {
+        toast({ title: "Error", description: "Failed to load teachers.", variant: "destructive" });
+      } finally {
+        setTeacherLoading(false);
+      }
+    };
+    fetchTeachers();
+  }, []);
+
+  const approveTeacher = async (teacher) => {
+    setTeacherLoading(true);
+    try {
+      // Explicitly map all required fields for teachers table
+      const teacherData = {
+        id: teacher.id,
+        name: teacher.name,
+        teacher_name: teacher.name,
+        email: teacher.email,
+        phone: teacher.phone,
+        password: teacher.password,
+        bio: teacher.bio,
+        experience: teacher.experience,
+        category: teacher.category,
+        instruments: teacher.subjects,
+        subjects: teacher.subjects,
+        status: "active", // must be one of: 'active', 'inactive', 'on_leave'
+        approval_status: "approved", // must be one of: 'pending', 'approved', 'rejected'
+        created_at: teacher.created_at || new Date().toISOString(),
+      };
+      const { data, error } = await supabase.from("teachers").insert([teacherData]);
+      if (error) throw error;
+      // Remove from pending_teachers
+      await supabase.from("pending_teachers").delete().eq("id", teacher.id);
+      // Send acceptance email
+      const emailSent = await sendTeacherAcceptedEmail(teacher);
+      if (!emailSent) {
+        toast({ title: "Email Failed", description: "Could not send approval email to teacher.", variant: "destructive" });
+      }
+      toast({ title: "Teacher Approved", description: `${teacher.name} has been approved and notified.` });
+      // Refresh lists
+      setPendingTeachers((prev) => prev.filter((t) => t.id !== teacher.id));
+      setApprovedTeachers((prev) => [{ ...teacher, status: "approved" }, ...prev]);
+    } catch (err) {
+      toast({ title: "Error", description: err.message || "Failed to approve teacher.", variant: "destructive" });
+    } finally {
+      setTeacherLoading(false);
+    }
+  };
+
+  const rejectTeacher = async (teacher) => {
+    setTeacherLoading(true);
+    try {
+      await supabase.from("pending_teachers").delete().eq("id", teacher.id);
+      // Send rejection email
+      const emailSent = await sendTeacherDeclinedEmail(teacher);
+      if (!emailSent) {
+        toast({ title: "Email Failed", description: "Could not send rejection email to teacher.", variant: "destructive" });
+      }
+      toast({ title: "Teacher Rejected", description: `${teacher.name} has been notified.` });
+      setPendingTeachers((prev) => prev.filter((t) => t.id !== teacher.id));
+    } catch (err) {
+      toast({ title: "Error", description: err.message || "Failed to reject teacher.", variant: "destructive" });
+    } finally {
+      setTeacherLoading(false);
+    }
+  };
+
+  const handleRequestInfo = async () => {
+    setTeacherLoading(true);
+    try {
+      // Send custom email
+      const emailSent = await sendTeacherRequestInfoEmail(requestInfoTeacher, requestMessage);
+      if (!emailSent) {
+        toast({ title: "Email Failed", description: "Could not send request info email to teacher.", variant: "destructive" });
+      }
+      toast({ title: "Request Sent", description: `Message sent to ${requestInfoTeacher.name}.` });
+      setShowRequestInfo(false);
+      setRequestInfoTeacher(null);
+      setRequestMessage("");
+    } catch (err) {
+      toast({ title: "Error", description: err.message || "Failed to send request.", variant: "destructive" });
+    } finally {
+      setTeacherLoading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5">
@@ -612,6 +720,14 @@ const AdminPanel = () => {
                 Admins ({adminProfiles.length})
               </Button>
             )}
+            <Button
+              variant={activeTab === 'teachers' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('teachers')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+            >
+              <UserCog className="h-4 w-4 mr-2" />
+              Teachers
+            </Button>
           </div>
         </div>
 
@@ -1159,6 +1275,95 @@ const AdminPanel = () => {
             </div>
           </div>
         </div>
+
+        {/* Teachers Tab */}
+        {activeTab === 'teachers' && (
+          <div className="mt-8">
+            <Tabs defaultValue="pending" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
+                <TabsTrigger value="pending">Pending Teachers</TabsTrigger>
+                <TabsTrigger value="approved">Approved Teachers</TabsTrigger>
+              </TabsList>
+              <TabsContent value="pending" className="mt-6">
+                {teacherLoading ? (
+                  <div className="text-center text-muted-foreground">Loading...</div>
+                ) : pendingTeachers.length === 0 ? (
+                  <div className="text-center text-muted-foreground">No pending teacher applications.</div>
+                ) : (
+                  <div className="grid gap-4">
+                    {pendingTeachers.map((teacher) => (
+                      <Card key={teacher.id} className="shadow border-0 bg-white/90">
+                        <CardContent className="p-6">
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div>
+                              <div className="flex items-center gap-2 mb-2">
+                                <GraduationCap className="h-5 w-5 text-primary" />
+                                <span className="font-bold text-lg">{teacher.name}</span>
+                                <Badge className="ml-2">{teacher.category}</Badge>
+                              </div>
+                              <div className="text-sm text-muted-foreground mb-1">{teacher.email} • {teacher.phone}</div>
+                              <div className="text-sm mb-1">Experience: {teacher.experience}</div>
+                              <div className="text-sm mb-1">Subjects: {teacher.subjects?.join(", ")}</div>
+                              <div className="text-sm mb-1">Bio: {teacher.bio}</div>
+                              <div className="text-xs text-gray-400">Applied: {new Date(teacher.created_at).toLocaleString()}</div>
+                            </div>
+                            <div className="flex flex-col gap-2 min-w-[180px]">
+                              <Button size="sm" onClick={() => approveTeacher(teacher)} disabled={teacherLoading}>Approve</Button>
+                              <Button size="sm" variant="destructive" onClick={() => rejectTeacher(teacher)} disabled={teacherLoading}>Reject</Button>
+                              <Button size="sm" variant="outline" onClick={() => { setShowRequestInfo(true); setRequestInfoTeacher(teacher); }} disabled={teacherLoading}>Request More Info</Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+                <Dialog open={showRequestInfo} onOpenChange={setShowRequestInfo}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Request More Information</DialogTitle>
+                      <DialogDescription>Send a message to the teacher applicant for more documents or clarification.</DialogDescription>
+                    </DialogHeader>
+                    <Textarea value={requestMessage} onChange={e => setRequestMessage(e.target.value)} placeholder="Type your message here..." rows={4} />
+                    <DialogFooter>
+                      <Button onClick={handleRequestInfo} disabled={teacherLoading}>Send Request</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </TabsContent>
+              <TabsContent value="approved" className="mt-6">
+                {teacherLoading ? (
+                  <div className="text-center text-muted-foreground">Loading...</div>
+                ) : approvedTeachers.length === 0 ? (
+                  <div className="text-center text-muted-foreground">No approved teachers yet.</div>
+                ) : (
+                  <div className="grid gap-4">
+                    {approvedTeachers.map((teacher) => (
+                      <Card key={teacher.id} className="shadow border-0 bg-white/90">
+                        <CardContent className="p-6">
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div>
+                              <div className="flex items-center gap-2 mb-2">
+                                <GraduationCap className="h-5 w-5 text-primary" />
+                                <span className="font-bold text-lg">{teacher.name}</span>
+                                <Badge className="ml-2">{teacher.category}</Badge>
+                              </div>
+                              <div className="text-sm text-muted-foreground mb-1">{teacher.email} • {teacher.phone}</div>
+                              <div className="text-sm mb-1">Experience: {teacher.experience}</div>
+                              <div className="text-sm mb-1">Subjects: {teacher.subjects?.join(", ")}</div>
+                              <div className="text-sm mb-1">Bio: {teacher.bio}</div>
+                              <div className="text-xs text-gray-400">Approved: {new Date(teacher.created_at).toLocaleString()}</div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
       </div>
     </section>
   );

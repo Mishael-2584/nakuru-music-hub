@@ -1,6 +1,7 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import EventsList from "@/components/EventsList";
+import WhatsAppChat from "@/components/WhatsAppChat";
 
 const Events = () => {
   return (
@@ -24,6 +25,7 @@ const Events = () => {
       <EventsList />
       
       <Footer />
+      <WhatsAppChat />
     </div>
   );
 };

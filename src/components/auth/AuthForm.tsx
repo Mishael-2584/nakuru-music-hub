@@ -220,6 +220,13 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isLoading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
             </Button>
+            {role === 'teacher' && isLogin && (
+              <div className="text-center mt-2">
+                <a href="/teacher-signup" className="text-primary hover:underline text-sm font-medium">
+                  Don't have an account? Sign up as a teacher
+                </a>
+              </div>
+            )}
           </form>
           
           <div className="text-center">

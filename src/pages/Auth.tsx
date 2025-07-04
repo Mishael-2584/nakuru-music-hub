@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import AuthForm from "@/components/auth/AuthForm";
 import { Music, ShieldCheck, Users, GraduationCap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const roleOptions = [
   { value: "admin", label: "Admin", icon: ShieldCheck },
@@ -13,17 +14,21 @@ const roleOptions = [
 
 const Auth = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, loading, isAuthenticated, isInitialized } = useAuth();
   const [redirectHandled, setRedirectHandled] = useState(false);
-  const [selectedRole, setSelectedRole] = useState("admin");
+  const [selectedRole, setSelectedRole] = useState<"admin" | "student" | "teacher">("admin");
   const [determiningRole, setDeterminingRole] = useState(false);
+  
+  // Check if user was redirected due to session expiration
+  const sessionExpired = searchParams.get('session_expired') === 'true';
 
   // Function to determine user's actual role from database
   const determineUserRole = async (userId: string): Promise<string> => {
     try {
       setDeterminingRole(true);
       
-      // First try to get role from profiles table (for admins/teachers)
+      // First try to get role from profiles table (for admins/approved teachers)
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
@@ -35,7 +40,31 @@ const Auth = () => {
         return profile.role || 'student';
       }
 
-      // If not in profiles, check if user is a student by looking in registrations
+      // Check if user is a teacher (either approved or pending)
+      const { data: approvedTeacher, error: approvedTeacherError } = await supabase
+        .from('teachers')
+        .select('status')
+        .eq('email', user?.email)
+        .single();
+
+      if (approvedTeacher && !approvedTeacherError) {
+        console.log('User is an approved teacher');
+        return 'teacher';
+      }
+
+      // Check if user is a pending teacher
+      const { data: pendingTeacher, error: pendingTeacherError } = await supabase
+        .from('pending_teachers')
+        .select('id')
+        .eq('email', user?.email)
+        .single();
+
+      if (pendingTeacher && !pendingTeacherError) {
+        console.log('User is a pending teacher');
+        return 'pending_teacher';
+      }
+
+      // If not in profiles or teacher tables, check if user is a student by looking in registrations
       const { data: registration, error: registrationError } = await supabase
         .from('registrations')
         .select('id')
@@ -79,6 +108,10 @@ const Auth = () => {
           navigate("/student", { replace: true });
         } else if (actualRole === "teacher") {
           navigate("/teacher", { replace: true });
+        } else if (actualRole === "pending_teacher") {
+          // Pending teachers should see the pending approval page
+          console.log('Pending teacher, redirecting to pending teacher page');
+          navigate("/pending-teacher", { replace: true });
         } else {
           // Default to student portal for security
           console.warn('Unknown role, redirecting to student portal');
@@ -139,6 +172,16 @@ const Auth = () => {
               <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-16 mx-auto mb-4 transition-transform duration-300 group-hover:scale-105 cursor-pointer" />
             </Link>
         </div>
+        
+        {/* Session Expired Alert */}
+        {sessionExpired && (
+          <Alert className="mb-6 w-full max-w-xs">
+            <AlertDescription>
+              Your session has expired. Please sign in again to continue.
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <div className="mb-6 w-full max-w-xs">
           <div className="flex justify-center gap-2 mb-4">
             {roleOptions.map((role) => {
@@ -147,7 +190,7 @@ const Auth = () => {
                 <button
                   key={role.value}
                   className={`flex flex-col items-center px-4 py-2 rounded-lg border-2 transition-all duration-200 focus:outline-none ${selectedRole === role.value ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 bg-white text-gray-700'} hover:border-primary`}
-                  onClick={() => setSelectedRole(role.value)}
+                  onClick={() => setSelectedRole(role.value as "admin" | "student" | "teacher")}
                   type="button"
                 >
                   <Icon className="h-6 w-6 mb-1" />

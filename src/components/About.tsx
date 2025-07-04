@@ -138,9 +138,14 @@ const About = () => {
               <GraduationCap className="h-8 w-8 text-primary" />
               <h2 className="text-3xl font-bold text-gray-900">Your Creative Path Awaits: Our Programs</h2>
             </div>
-            <p className="max-w-3xl mx-auto text-lg text-gray-600">
-              Whether you dream of mastering an instrument, producing your own tracks, capturing stunning visuals, or commanding a stage, we have a tailored program for you.
-            </p>
+            <div className="max-w-3xl mx-auto">
+              <div className="bg-primary/10 border-l-4 border-primary rounded-xl p-5 mb-2">
+                <h3 className="text-xl font-bold text-primary mb-1">What We Do</h3>
+                <p className="text-gray-700 text-lg leading-relaxed">
+                  From preparing students for prestigious international exams (ABRSM, Trinity, etc.) to producing compelling audio commercials, recording studio sessions, captivating event coverage, and seamless live streams, we cover the full spectrum of music and media.
+                </p>
+              </div>
+            </div>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             {programs.map((program) => (
@@ -167,7 +172,7 @@ const About = () => {
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <Award className="h-8 w-8 text-white" />
-                <h2 className="text-3xl font-bold text-white">Beyond the Classroom: Professional AV Services</h2>
+                <h2 className="text-3xl font-bold text-white">Beyond the Classroom: Professional Audio-Visual Services</h2>
               </div>
               <p className="text-lg text-white/90">
                 Damon Music Academy is also your trusted partner for professional audio-visual services. Our skilled creative team, equipped with high-quality gear, transforms events and ideas into unforgettable experiences. From live sound and livestreaming to event coverage, podcasts, commercials, and voice-overs, we bring your vision to life with exceptional results.

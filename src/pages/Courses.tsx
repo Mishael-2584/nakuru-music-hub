@@ -1,6 +1,7 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CoursesEnhanced from "@/components/CoursesEnhanced";
+import WhatsAppChat from "@/components/WhatsAppChat";
 
 const Courses = () => {
   return (
@@ -24,6 +25,7 @@ const Courses = () => {
       <CoursesEnhanced />
       
       <Footer />
+      <WhatsAppChat />
     </div>
   );
 };
