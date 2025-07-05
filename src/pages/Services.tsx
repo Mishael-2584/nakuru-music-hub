@@ -36,25 +36,25 @@ const services = [
   },
   {
     title: "Studio Recording & Production",
-    image: "/lovable-uploads/piano.jpg",
+    image: "/lovable-uploads/studiorecording.jpg",
     description: "Record vocals, instruments, podcasts, choirs, and voice-overs in a professional studio with expert support.",
     color: "from-green-400 to-blue-400"
   },
   {
     title: "Audio Mixing & Mastering",
-    image: "/lovable-uploads/guitar.jpg",
+    image: "/lovable-uploads/mixingmastering.webp",
     description: "Polish recordings with industry-standard mixing and mastering for a clean, balanced, and commercial sound.",
     color: "from-yellow-500 to-red-500"
   },
   {
     title: "Voice-over Production",
-    image: "/lovable-uploads/founder.jpg",
+    image: "/lovable-uploads/voiceover.jpg",
     description: "Voice-over services for commercials, documentaries, audiobooks, and YouTube content, recorded and edited.",
     color: "from-pink-500 to-purple-500"
   },
   {
     title: "Podcast Production",
-    image: "/lovable-uploads/piano.jpg",
+    image: "/lovable-uploads/podcast.jpg",
     description: "End-to-end podcast creation: recording, editing, sound design, and publishing.",
     color: "from-green-500 to-blue-500"
   },
@@ -72,7 +72,7 @@ const services = [
   },
   {
     title: "LED Screen Rental",
-    image: "/lovable-uploads/livestreaming.jpg",
+    image: "/lovable-uploads/ledscreen.jpg",
     description: "High-resolution LED display screens for lyrics, visuals, presentations, and advertisements.",
     color: "from-purple-400 to-blue-400"
   },
@@ -84,19 +84,19 @@ const services = [
   },
   {
     title: "Music Production for Artists",
-    image: "/lovable-uploads/guitar.jpg",
+    image: "/lovable-uploads/29861c9f-1df3-42f1-982f-ef38574fb617.png",
     description: "From beat creation to full track arrangement and mastering, bringing artists' sound to life.",
     color: "from-pink-500 to-blue-500"
   },
   {
     title: "DJ & MC Services",
-    image: "/lovable-uploads/livestreaming.jpg",
+    image: "/lovable-uploads/Dj.webp",
     description: "Professional DJ and MC services to energize weddings, parties, or corporate events.",
     color: "from-yellow-500 to-red-500"
   },
   {
     title: "Music Arrangement & Transcription",
-    image: "/lovable-uploads/piano.jpg",
+    image: "/lovable-uploads/musicarrangement.webp",
     description: "Custom arrangements and accurate transcription for choirs, instrumentalists, or original songs.",
     color: "from-blue-400 to-green-400"
   },
@@ -108,7 +108,7 @@ const services = [
   },
   {
     title: "Session & Event Musicians",
-    image: "/lovable-uploads/founder.jpg",
+    image: "/lovable-uploads/guitar.jpg",
     description: "Skilled musicians for recordings or live performances, from soloists to full bands, for weddings, worship, studio sessions, and special events.",
     color: "from-green-500 to-blue-500"
   }
@@ -126,7 +126,7 @@ const ServicesPage = () => {
               Our Services
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Complete music solutions for all your creative needs
+              Complete Production and Creative Solutions for Every Vision and Event.
             </p>
           </div>
         </div>

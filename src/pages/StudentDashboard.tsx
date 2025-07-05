@@ -5,10 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp } from 'lucide-react';
+import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import PasswordChangePrompt from '../components/PasswordChangePrompt';
 import { useNavigate } from 'react-router-dom';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 interface StudentProfile {
   id: string;
@@ -41,39 +46,72 @@ interface StudentProfile {
 interface Lesson {
   id: string;
   title: string;
-  date: string;
-  time: string;
-  duration: number;
-  instructor: string;
-  status: 'scheduled' | 'completed' | 'cancelled';
+  description?: string;
+  lesson_date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  lesson_type: string;
   notes?: string;
+  materials_url?: string[];
+  attendance_status: string;
+  teacher_id?: string;
 }
 
 interface PracticeLog {
   id: string;
-  date: string;
-  duration: number;
-  piece: string;
-  notes: string;
+  practice_date: string;
+  duration_minutes: number;
+  practice_type: string;
+  notes?: string;
+  pieces_practiced?: string[];
+  difficulty_rating?: number;
+  mood_rating?: number;
   created_at: string;
 }
 
 interface Message {
   id: string;
-  from: string;
   subject: string;
   message: string;
   is_read: boolean;
   created_at: string;
+  sender_id: string;
+  recipient_id: string;
 }
 
 interface Payment {
   id: string;
   amount: number;
-  description: string;
-  status: 'paid' | 'pending' | 'overdue';
+  currency: string;
+  payment_type: string;
+  payment_method: string;
+  status: string;
   due_date: string;
   paid_date?: string;
+  receipt_number?: string;
+  notes?: string;
+}
+
+interface Assignment {
+  id: string;
+  title: string;
+  description?: string;
+  due_date?: string;
+  status: string;
+  difficulty_level: string;
+  assigned_by?: string;
+}
+
+interface LessonMaterial {
+  id: string;
+  title: string;
+  description?: string;
+  file_url?: string;
+  file_type?: string;
+  file_size?: number;
+  uploaded_by?: string;
+  created_at: string;
 }
 
 const StudentDashboard = () => {
@@ -85,16 +123,74 @@ const StudentDashboard = () => {
   const [practiceLogs, setPracticeLogs] = useState<PracticeLog[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [materials, setMaterials] = useState<LessonMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [passwordChecked, setPasswordChecked] = useState(false);
+  
+  // Practice log modal state
+  const [showPracticeModal, setShowPracticeModal] = useState(false);
+  const [newPracticeLog, setNewPracticeLog] = useState({
+    practice_date: new Date().toISOString().split('T')[0],
+    duration_minutes: 30,
+    practice_type: 'regular',
+    notes: '',
+    pieces_practiced: [''],
+    difficulty_rating: 3,
+    mood_rating: 3
+  });
+
+  // Message modal state
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [newMessage, setNewMessage] = useState({
+    subject: '',
+    message: '',
+    recipient_id: ''
+  });
 
   useEffect(() => {
     if (user) {
-      checkPasswordStatus();
+      checkUserRole();
     }
   }, [user]);
+
+  const checkUserRole = async () => {
+    try {
+      // First check if user is a teacher
+      const { data: teacherProfile, error: teacherError } = await supabase
+        .from("teachers")
+        .select("id")
+        .eq("email", user.email)
+        .single();
+      
+      if (teacherProfile && !teacherError) {
+        // User is a teacher, redirect to teacher dashboard
+        navigate("/teacher", { replace: true });
+        return;
+      }
+
+      // Check if user is an admin
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      
+      if (profile && !profileError && profile.role === 'admin') {
+        navigate("/admin", { replace: true });
+        return;
+      }
+
+      // If not teacher or admin, proceed with student authentication
+      checkPasswordStatus();
+    } catch (error) {
+      console.error('Error checking user role:', error);
+      // If there's an error, proceed with student authentication
+      checkPasswordStatus();
+    }
+  };
 
   const checkPasswordStatus = async () => {
     try {
@@ -118,7 +214,6 @@ const StudentDashboard = () => {
 
   const handlePasswordChanged = async () => {
     setShowPasswordPrompt(false);
-    // Update user metadata to set password_changed: true
     try {
       const { error } = await supabase.auth.updateUser({
         data: { password_changed: true }
@@ -155,68 +250,71 @@ const StudentDashboard = () => {
 
       setStudentProfile(profile);
 
-      // Mock data for now - in production, these would come from your database
-      setLessons([
-        {
-          id: '1',
-          title: 'Piano Fundamentals',
-          date: '2024-01-15',
-          time: '14:00',
-          duration: 60,
-          instructor: 'Ms. Sarah Johnson',
-          status: 'scheduled',
-          notes: 'Focus on hand positioning and basic scales'
-        },
-        {
-          id: '2',
-          title: 'Music Theory',
-          date: '2024-01-17',
-          time: '15:30',
-          duration: 45,
-          instructor: 'Mr. David Chen',
-          status: 'scheduled'
-        }
-      ]);
+      // Fetch lessons
+      const { data: lessonsData, error: lessonsError } = await supabase
+        .from('lessons')
+        .select('*')
+        .eq('student_id', profile.id)
+        .order('lesson_date', { ascending: true });
 
-      setPracticeLogs([
-        {
-          id: '1',
-          date: '2024-01-14',
-          duration: 45,
-          piece: 'Minuet in G Major',
-          notes: 'Practiced scales and worked on dynamics',
-          created_at: '2024-01-14T10:00:00Z'
-        }
-      ]);
+      if (!lessonsError && lessonsData) {
+        setLessons(lessonsData);
+      }
 
-      setMessages([
-        {
-          id: '1',
-          from: 'Ms. Sarah Johnson',
-          subject: 'Great progress this week!',
-          message: 'Your technique has improved significantly. Keep up the good work!',
-          is_read: false,
-          created_at: '2024-01-13T09:00:00Z'
-        }
-      ]);
+      // Fetch practice logs
+      const { data: practiceData, error: practiceError } = await supabase
+        .from('practice_logs')
+        .select('*')
+        .eq('student_id', profile.id)
+        .order('practice_date', { ascending: false });
 
-      setPayments([
-        {
-          id: '1',
-          amount: 15000,
-          description: 'January 2024 Tuition',
-          status: 'paid',
-          due_date: '2024-01-05',
-          paid_date: '2024-01-03'
-        },
-        {
-          id: '2',
-          amount: 15000,
-          description: 'February 2024 Tuition',
-          status: 'pending',
-          due_date: '2024-02-05'
-        }
-      ]);
+      if (!practiceError && practiceData) {
+        setPracticeLogs(practiceData);
+      }
+
+      // Fetch messages
+      const { data: messagesData, error: messagesError } = await supabase
+        .from('portal_messages')
+        .select('*')
+        .eq('recipient_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (!messagesError && messagesData) {
+        setMessages(messagesData);
+      }
+
+      // Fetch payments
+      const { data: paymentsData, error: paymentsError } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('student_id', profile.id)
+        .order('created_at', { ascending: false });
+
+      if (!paymentsError && paymentsData) {
+        setPayments(paymentsData);
+      }
+
+      // Fetch assignments
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from('assignments')
+        .select('*')
+        .eq('student_id', profile.id)
+        .order('due_date', { ascending: true });
+
+      if (!assignmentsError && assignmentsData) {
+        setAssignments(assignmentsData);
+      }
+
+      // Fetch lesson materials
+      const { data: materialsData, error: materialsError } = await supabase
+        .from('lesson_materials')
+        .select('*')
+        .in('lesson_id', lessonsData?.map(l => l.id) || [])
+        .order('created_at', { ascending: false });
+
+      if (!materialsError && materialsData) {
+        setMaterials(materialsData);
+      }
 
     } catch (error) {
       console.error('Error fetching student data:', error);
@@ -243,6 +341,95 @@ const StudentDashboard = () => {
     }
   };
 
+  const handleAddPracticeLog = async () => {
+    if (!studentProfile) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('practice_logs')
+        .insert({
+          student_id: studentProfile.id,
+          practice_date: newPracticeLog.practice_date,
+          duration_minutes: newPracticeLog.duration_minutes,
+          practice_type: newPracticeLog.practice_type,
+          notes: newPracticeLog.notes,
+          pieces_practiced: newPracticeLog.pieces_practiced.filter(p => p.trim()),
+          difficulty_rating: newPracticeLog.difficulty_rating,
+          mood_rating: newPracticeLog.mood_rating
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setPracticeLogs([data, ...practiceLogs]);
+      setShowPracticeModal(false);
+      setNewPracticeLog({
+        practice_date: new Date().toISOString().split('T')[0],
+        duration_minutes: 30,
+        practice_type: 'regular',
+        notes: '',
+        pieces_practiced: [''],
+        difficulty_rating: 3,
+        mood_rating: 3
+      });
+
+      toast({
+        title: "Success",
+        description: "Practice session logged successfully!",
+      });
+    } catch (error) {
+      console.error('Error adding practice log:', error);
+      toast({
+        title: "Error",
+        description: "Failed to log practice session",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('portal_messages')
+        .insert({
+          sender_id: user.id,
+          recipient_id: newMessage.recipient_id,
+          subject: newMessage.subject,
+          message: newMessage.message
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setShowMessageModal(false);
+      setNewMessage({
+        subject: '',
+        message: '',
+        recipient_id: ''
+      });
+
+      toast({
+        title: "Success",
+        description: "Message sent successfully!",
+      });
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send message",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'scheduled': return 'bg-blue-100 text-blue-800';
@@ -251,6 +438,8 @@ const StudentDashboard = () => {
       case 'paid': return 'bg-green-100 text-green-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'overdue': return 'bg-red-100 text-red-800';
+      case 'assigned': return 'bg-blue-100 text-blue-800';
+      case 'in_progress': return 'bg-yellow-100 text-yellow-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -289,7 +478,6 @@ const StudentDashboard = () => {
     );
   }
 
-  // Show password change prompt if needed
   if (showPasswordPrompt) {
     return <PasswordChangePrompt onPasswordChanged={handlePasswordChanged} />;
   }
@@ -391,8 +579,8 @@ const StudentDashboard = () => {
                   <Clock className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{practiceLogs.reduce((acc, log) => acc + log.duration, 0)}</div>
-                  <p className="text-xs text-muted-foreground">Hours this month</p>
+                  <div className="text-2xl font-bold">{practiceLogs.reduce((acc, log) => acc + log.duration_minutes, 0)}</div>
+                  <p className="text-xs text-muted-foreground">Minutes this month</p>
                 </CardContent>
               </Card>
               <Card>
@@ -430,8 +618,8 @@ const StudentDashboard = () => {
                         <div key={lesson.id} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
                           <div>
                             <h4 className="font-semibold">{lesson.title}</h4>
-                            <p className="text-sm text-gray-600">{formatDate(lesson.date)} at {formatTime(lesson.time)}</p>
-                            <p className="text-sm text-gray-600">with {lesson.instructor}</p>
+                            <p className="text-sm text-gray-600">{formatDate(lesson.lesson_date)} at {formatTime(lesson.start_time)}</p>
+                            <p className="text-sm text-gray-600">Duration: {lesson.start_time} - {lesson.end_time}</p>
                           </div>
                           <Badge className={getStatusColor(lesson.status)}>{lesson.status}</Badge>
                         </div>
@@ -454,9 +642,9 @@ const StudentDashboard = () => {
                       {practiceLogs.slice(0, 3).map(log => (
                         <div key={log.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                           <div>
-                            <h4 className="font-semibold">{log.piece}</h4>
-                            <p className="text-sm text-gray-600">{log.duration} minutes</p>
-                            <p className="text-sm text-gray-600">{formatDate(log.date)}</p>
+                            <h4 className="font-semibold">{log.pieces_practiced?.join(', ') || 'Practice Session'}</h4>
+                            <p className="text-sm text-gray-600">{log.duration_minutes} minutes</p>
+                            <p className="text-sm text-gray-600">{formatDate(log.practice_date)}</p>
                           </div>
                           <Clock className="w-4 h-4 text-green-600" />
                         </div>
@@ -479,25 +667,29 @@ const StudentDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {lessons.map(lesson => (
-                    <div key={lesson.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <CalendarIcon className="w-5 h-5 text-blue-600" />
-                        <div>
-                          <h4 className="font-semibold">{lesson.title}</h4>
-                          <p className="text-sm text-gray-600">{formatDate(lesson.date)} at {formatTime(lesson.time)}</p>
-                          <p className="text-sm text-gray-600">Duration: {lesson.duration} minutes</p>
-                          <p className="text-sm text-gray-600">Instructor: {lesson.instructor}</p>
+                  {lessons.length > 0 ? (
+                    lessons.map(lesson => (
+                      <div key={lesson.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center space-x-4">
+                          <CalendarIcon className="w-5 h-5 text-blue-600" />
+                          <div>
+                            <h4 className="font-semibold">{lesson.title}</h4>
+                            <p className="text-sm text-gray-600">{formatDate(lesson.lesson_date)} at {formatTime(lesson.start_time)}</p>
+                            <p className="text-sm text-gray-600">Duration: {lesson.start_time} - {lesson.end_time}</p>
+                            <p className="text-sm text-gray-600">Type: {lesson.lesson_type}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge className={getStatusColor(lesson.status)}>{lesson.status}</Badge>
+                          {lesson.notes && (
+                            <Button variant="outline" size="sm">View Notes</Button>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge className={getStatusColor(lesson.status)}>{lesson.status}</Badge>
-                        {lesson.notes && (
-                          <Button variant="outline" size="sm">View Notes</Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-gray-500">No lessons scheduled</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -512,42 +704,32 @@ const StudentDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-3">
-                        <FileText className="w-8 h-8 text-blue-600" />
-                        <div>
-                          <h4 className="font-semibold">Piano Fundamentals</h4>
-                          <p className="text-sm text-gray-600">Basic hand positioning guide</p>
-                          <p className="text-xs text-gray-500">Updated 2 days ago</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-3">
-                        <Music className="w-8 h-8 text-green-600" />
-                        <div>
-                          <h4 className="font-semibold">Scales Practice</h4>
-                          <p className="text-sm text-gray-600">C major scale exercises</p>
-                          <p className="text-xs text-gray-500">Updated 1 week ago</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-3">
-                        <Target className="w-8 h-8 text-purple-600" />
-                        <div>
-                          <h4 className="font-semibold">Theory Assignment</h4>
-                          <p className="text-sm text-gray-600">Week 3 homework</p>
-                          <p className="text-xs text-gray-500">Due in 3 days</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  {materials.length > 0 ? (
+                    materials.map(material => (
+                      <Card key={material.id} className="hover:shadow-md transition-shadow cursor-pointer">
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-3">
+                            <FileText className="w-8 h-8 text-blue-600" />
+                            <div className="flex-1">
+                              <h4 className="font-semibold">{material.title}</h4>
+                              <p className="text-sm text-gray-600">{material.description}</p>
+                              <p className="text-xs text-gray-500">Updated {formatDate(material.created_at)}</p>
+                            </div>
+                            {material.file_url && (
+                              <Button size="sm" variant="outline">
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  ) : (
+                    <div className="col-span-full text-center py-8">
+                      <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">No materials available yet</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -562,23 +744,93 @@ const StudentDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <Button className="w-full">
-                    <Clock className="w-4 h-4 mr-2" />
-                    Log New Practice Session
-                  </Button>
+                  <Dialog open={showPracticeModal} onOpenChange={setShowPracticeModal}>
+                    <DialogTrigger asChild>
+                      <Button className="w-full">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Log New Practice Session
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Log Practice Session</DialogTitle>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="practice_date" className="text-right">Date</Label>
+                          <Input
+                            id="practice_date"
+                            type="date"
+                            value={newPracticeLog.practice_date}
+                            onChange={(e) => setNewPracticeLog({...newPracticeLog, practice_date: e.target.value})}
+                            className="col-span-3"
+                          />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="duration" className="text-right">Duration (min)</Label>
+                          <Input
+                            id="duration"
+                            type="number"
+                            value={newPracticeLog.duration_minutes}
+                            onChange={(e) => setNewPracticeLog({...newPracticeLog, duration_minutes: parseInt(e.target.value)})}
+                            className="col-span-3"
+                          />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="practice_type" className="text-right">Type</Label>
+                          <Select value={newPracticeLog.practice_type} onValueChange={(value) => setNewPracticeLog({...newPracticeLog, practice_type: value})}>
+                            <SelectTrigger className="col-span-3">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="regular">Regular Practice</SelectItem>
+                              <SelectItem value="assignment">Assignment</SelectItem>
+                              <SelectItem value="performance_prep">Performance Prep</SelectItem>
+                              <SelectItem value="technique">Technique</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="notes" className="text-right">Notes</Label>
+                          <Textarea
+                            id="notes"
+                            value={newPracticeLog.notes}
+                            onChange={(e) => setNewPracticeLog({...newPracticeLog, notes: e.target.value})}
+                            className="col-span-3"
+                            placeholder="What did you practice today?"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => setShowPracticeModal(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleAddPracticeLog}>
+                          Log Session
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                   
                   <div className="space-y-4">
-                    {practiceLogs.map(log => (
-                      <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h4 className="font-semibold">{log.piece}</h4>
-                          <p className="text-sm text-gray-600">{log.duration} minutes</p>
-                          <p className="text-sm text-gray-600">{formatDate(log.date)}</p>
-                          <p className="text-sm text-gray-600">{log.notes}</p>
+                    {practiceLogs.length > 0 ? (
+                      practiceLogs.map(log => (
+                        <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div>
+                            <h4 className="font-semibold">{log.pieces_practiced?.join(', ') || 'Practice Session'}</h4>
+                            <p className="text-sm text-gray-600">{log.duration_minutes} minutes</p>
+                            <p className="text-sm text-gray-600">{formatDate(log.practice_date)}</p>
+                            {log.notes && <p className="text-sm text-gray-600">{log.notes}</p>}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Badge variant="secondary">{log.practice_type}</Badge>
+                            <Clock className="w-5 h-5 text-green-600" />
+                          </div>
                         </div>
-                        <Clock className="w-5 h-5 text-green-600" />
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-gray-500 text-center py-8">No practice sessions recorded yet</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -599,18 +851,21 @@ const StudentDashboard = () => {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span>Total Lessons</span>
-                        <span className="font-semibold">24</span>
+                        <span className="font-semibold">{lessons.length}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Attended</span>
-                        <span className="font-semibold text-green-600">22</span>
+                        <span>Completed</span>
+                        <span className="font-semibold text-green-600">{lessons.filter(l => l.status === 'completed').length}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Attendance Rate</span>
-                        <span className="font-semibold text-blue-600">91.7%</span>
+                        <span className="font-semibold text-blue-600">
+                          {lessons.length > 0 ? Math.round((lessons.filter(l => l.status === 'completed').length / lessons.length) * 100) : 0}%
+                        </span>
                       </div>
                     </div>
                   </div>
+                  
                   <div>
                     <h4 className="font-semibold mb-4">Progress Overview</h4>
                     <div className="space-y-2">
@@ -619,12 +874,12 @@ const StudentDashboard = () => {
                         <span className="font-semibold">{studentProfile.proficiency_level}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Pieces Mastered</span>
-                        <span className="font-semibold">8</span>
+                        <span>Practice Sessions</span>
+                        <span className="font-semibold">{practiceLogs.length}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Practice Hours</span>
-                        <span className="font-semibold">45</span>
+                        <span>Total Practice Time</span>
+                        <span className="font-semibold">{practiceLogs.reduce((acc, log) => acc + log.duration_minutes, 0)} minutes</span>
                       </div>
                     </div>
                   </div>
@@ -642,25 +897,67 @@ const StudentDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <Button className="w-full">
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    Send New Message
-                  </Button>
+                  <Dialog open={showMessageModal} onOpenChange={setShowMessageModal}>
+                    <DialogTrigger asChild>
+                      <Button className="w-full">
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                        Send New Message
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Send Message</DialogTitle>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="subject" className="text-right">Subject</Label>
+                          <Input
+                            id="subject"
+                            value={newMessage.subject}
+                            onChange={(e) => setNewMessage({...newMessage, subject: e.target.value})}
+                            className="col-span-3"
+                            placeholder="Message subject"
+                          />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="message" className="text-right">Message</Label>
+                          <Textarea
+                            id="message"
+                            value={newMessage.message}
+                            onChange={(e) => setNewMessage({...newMessage, message: e.target.value})}
+                            className="col-span-3"
+                            placeholder="Your message..."
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => setShowMessageModal(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSendMessage}>
+                          Send Message
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                   
                   <div className="space-y-4">
-                    {messages.map(message => (
-                      <div key={message.id} className={`p-4 border rounded-lg ${!message.is_read ? 'bg-blue-50 border-blue-200' : ''}`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold">{message.subject}</h4>
-                          <div className="flex items-center space-x-2">
-                            {!message.is_read && <Badge variant="secondary">New</Badge>}
-                            <span className="text-sm text-gray-500">{formatDate(message.created_at)}</span>
+                    {messages.length > 0 ? (
+                      messages.map(message => (
+                        <div key={message.id} className={`p-4 border rounded-lg ${!message.is_read ? 'bg-blue-50 border-blue-200' : ''}`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold">{message.subject}</h4>
+                            <div className="flex items-center space-x-2">
+                              {!message.is_read && <Badge variant="secondary">New</Badge>}
+                              <span className="text-sm text-gray-500">{formatDate(message.created_at)}</span>
+                            </div>
                           </div>
+                          <p className="text-gray-700">{message.message}</p>
                         </div>
-                        <p className="text-sm text-gray-600 mb-2">From: {message.from}</p>
-                        <p className="text-gray-700">{message.message}</p>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-gray-500 text-center py-8">No messages yet</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -679,7 +976,7 @@ const StudentDashboard = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <Card>
                       <CardContent className="p-4">
-                        <div className="text-2xl font-bold text-green-600">{formatCurrency(payments.filter(p => p.status === 'paid').reduce((acc, p) => acc + p.amount, 0))}</div>
+                        <div className="text-2xl font-bold text-green-600">{formatCurrency(payments.filter(p => p.status === 'completed').reduce((acc, p) => acc + p.amount, 0))}</div>
                         <p className="text-sm text-gray-600">Total Paid</p>
                       </CardContent>
                     </Card>
@@ -698,24 +995,28 @@ const StudentDashboard = () => {
                   </div>
 
                   <div className="space-y-4">
-                    {payments.map(payment => (
-                      <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h4 className="font-semibold">{payment.description}</h4>
-                          <p className="text-sm text-gray-600">Due: {formatDate(payment.due_date)}</p>
-                          {payment.paid_date && (
-                            <p className="text-sm text-gray-600">Paid: {formatDate(payment.paid_date)}</p>
-                          )}
+                    {payments.length > 0 ? (
+                      payments.map(payment => (
+                        <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div>
+                            <h4 className="font-semibold">{payment.payment_type}</h4>
+                            <p className="text-sm text-gray-600">Due: {formatDate(payment.due_date)}</p>
+                            {payment.paid_date && (
+                              <p className="text-sm text-gray-600">Paid: {formatDate(payment.paid_date)}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-4">
+                            <span className="text-lg font-semibold">{formatCurrency(payment.amount)}</span>
+                            <Badge className={getStatusColor(payment.status)}>{payment.status}</Badge>
+                            {payment.status === 'pending' && (
+                              <Button size="sm">Pay Now</Button>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-4">
-                          <span className="text-lg font-semibold">{formatCurrency(payment.amount)}</span>
-                          <Badge className={getStatusColor(payment.status)}>{payment.status}</Badge>
-                          {payment.status === 'pending' && (
-                            <Button size="sm">Pay Now</Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-gray-500 text-center py-8">No payment records found</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -776,10 +1077,10 @@ const StudentDashboard = () => {
                     <h4 className="font-semibold mb-4">Course Information</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Course Category</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Experience Level</label>
                         <input
                           type="text"
-                          value={studentProfile.course_category}
+                          value={studentProfile.experience}
                           className="w-full p-2 border rounded-md"
                           readOnly
                         />
