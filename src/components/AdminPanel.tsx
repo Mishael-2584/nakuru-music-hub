@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap } from "lucide-react";
+import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,9 +11,10 @@ import { useNavigate, Link } from "react-router-dom";
 import AdminEventsManager from "@/components/AdminEventsManager";
 import AdminNewsManager from "@/components/AdminNewsManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { sendAcceptedEmail, sendDeclinedEmail, sendTeacherAcceptedEmail, sendTeacherDeclinedEmail, sendTeacherRequestInfoEmail } from "@/lib/emailService";
+import { sendAcceptedEmail, sendDeclinedEmail, sendTeacherAcceptedEmail, sendTeacherDeclinedEmail, sendTeacherRequestInfoEmail, sendQuoteEmail } from "@/lib/emailService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Registration {
   id: string;
@@ -51,6 +52,29 @@ interface ContactMessage {
   created_at: string;
 }
 
+interface Quote {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  service_category: string;
+  project_type: string | null;
+  event_date: string | null;
+  location: string | null;
+  budget_range: string | null;
+  timeline: string | null;
+  specific_requirements: string | null;
+  reference_materials_url: string | null;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  admin_notes: string | null;
+  quote_amount: number | null;
+  quote_sent_at: string | null;
+  preferred_contact_method: string;
+  additional_notes: string | null;
+}
+
 interface AdminProfile {
   id: string;
   email: string;
@@ -69,10 +93,11 @@ interface ClassSchedule {
 }
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes'>('stats');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [adminProfiles, setAdminProfiles] = useState<AdminProfile[]>([]);
   const [classSchedule, setClassSchedule] = useState<ClassSchedule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -87,6 +112,18 @@ const AdminPanel = () => {
   const [showRequestInfo, setShowRequestInfo] = useState(false);
   const [requestInfoTeacher, setRequestInfoTeacher] = useState(null);
   const [requestMessage, setRequestMessage] = useState("");
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const [showQuoteDialog, setShowQuoteDialog] = useState(false);
+  const [quoteAmount, setQuoteAmount] = useState("");
+  const [adminNotes, setAdminNotes] = useState("");
+
+  // Function to open quote dialog with existing data
+  const openQuoteDialog = (quote: Quote) => {
+    setSelectedQuote(quote);
+    setQuoteAmount(quote.quote_amount?.toString() || "");
+    setAdminNotes(quote.admin_notes || "");
+    setShowQuoteDialog(true);
+  };
 
   // Redirect non-admins away from admin panel
   useEffect(() => {
@@ -177,11 +214,29 @@ const AdminPanel = () => {
           variant: "destructive",
         });
       } else {
-        console.log("AdminPanel: Messages fetched successfully:", msgData?.length || 0, "records");
-        setContactMessages(msgData || []);
-      }
+              console.log("AdminPanel: Messages fetched successfully:", msgData?.length || 0, "records");
+      setContactMessages(msgData || []);
+    }
 
-      // Fetch admin profiles for super admin
+    console.log("AdminPanel: Fetching quotes...");
+    const { data: quotesData, error: quotesError } = await supabase
+      .from('quotes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (quotesError) {
+      console.error("Error fetching quotes:", quotesError);
+      toast({
+        title: "Error",
+        description: "Failed to load quotes: " + quotesError.message,
+        variant: "destructive",
+      });
+    } else {
+      console.log("AdminPanel: Quotes fetched successfully:", quotesData?.length || 0, "records");
+      setQuotes(quotesData || []);
+    }
+
+    // Fetch admin profiles for super admin
       if (userRole === 'super_admin') {
         console.log("AdminPanel: Fetching admin profiles...");
         try {
@@ -727,6 +782,14 @@ const AdminPanel = () => {
             >
               <UserCog className="h-4 w-4 mr-2" />
               Teachers
+            </Button>
+            <Button
+              variant={activeTab === 'quotes' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('quotes')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+            >
+              <Quote className="h-4 w-4 mr-2" />
+              Quotes ({quotes.length})
             </Button>
           </div>
         </div>
@@ -1364,6 +1427,187 @@ const AdminPanel = () => {
             </Tabs>
           </div>
         )}
+
+        {/* Quotes Tab */}
+        <div style={{ display: activeTab === 'quotes' ? 'block' : 'none' }}>
+          <div className="space-y-6">
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Quote Management
+            </h3>
+            
+            <div className="grid gap-4">
+              {quotes.map((quote) => (
+                <Card key={quote.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
+                  <CardContent className="p-6">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h4 className="text-xl font-bold text-primary">{quote.name}</h4>
+                        <p className="text-muted-foreground flex items-center gap-2">
+                          <Mail className="h-4 w-4" />
+                          {quote.email}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{new Date(quote.created_at).toLocaleDateString()}</Badge>
+                      </div>
+                    </div>
+                    
+                    <div className="p-3 bg-accent/5 rounded-lg border border-accent/10 mb-4">
+                      <h5 className="font-semibold text-accent mb-2">Service: {quote.service_category}</h5>
+                      <p className="text-muted-foreground">
+                        Project Type: {quote.project_type || 'N/A'}, Event Date: {quote.event_date || 'N/A'}, Location: {quote.location || 'N/A'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Budget: {quote.budget_range || 'N/A'}, Timeline: {quote.timeline || 'N/A'}</p>
+                      <p className="text-sm text-muted-foreground">Preferred Contact: {quote.preferred_contact_method}</p>
+                      {quote.additional_notes && (
+                        <p className="text-sm text-muted-foreground mt-2">Additional Notes: {quote.additional_notes}</p>
+                      )}
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <Badge variant="outline">Status: {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}</Badge>
+                      <div className="space-x-2">
+                        {quote.status === 'pending' && (
+                          <>
+                            <Button size="sm" onClick={() => openQuoteDialog(quote)}>Accept Quote</Button>
+                            <Button size="sm" variant="destructive" onClick={() => openQuoteDialog(quote)}>Reject Quote</Button>
+                          </>
+                        )}
+                        {quote.status === 'in_progress' && (
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => openQuoteDialog(quote)}>Mark as Completed</Button>
+                            <Button size="sm" variant="destructive" onClick={() => openQuoteDialog(quote)}>Cancel Quote</Button>
+                          </>
+                        )}
+                        {(quote.status === 'completed' || quote.status === 'cancelled') && (
+                          <Button size="sm" variant="outline" onClick={() => openQuoteDialog(quote)}>View/Edit</Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Quote Dialog */}
+        <Dialog open={showQuoteDialog} onOpenChange={setShowQuoteDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Manage Quote</DialogTitle>
+              <DialogDescription>Update the status and notes for this quote.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4">
+              <div>
+                <label htmlFor="quoteStatus" className="font-semibold text-primary">Status:</label>
+                <Select onValueChange={(value) => {
+                  if (selectedQuote) {
+                    setSelectedQuote(prev => ({ ...prev!, status: value as 'pending' | 'in_progress' | 'completed' | 'cancelled' }));
+                  }
+                }} value={selectedQuote?.status}>
+                  <SelectTrigger id="quoteStatus" className="w-full">
+                    <SelectValue placeholder="Select a status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label htmlFor="quoteAmount" className="font-semibold text-primary">Quote Amount:</label>
+                <Input
+                  id="quoteAmount"
+                  type="number"
+                  value={quoteAmount}
+                  onChange={(e) => setQuoteAmount(e.target.value)}
+                  placeholder="Enter quote amount"
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label htmlFor="adminNotes" className="font-semibold text-primary">Admin Notes:</label>
+                <Textarea
+                  id="adminNotes"
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                  placeholder="Enter admin notes for this quote"
+                  rows={4}
+                  className="w-full"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => {
+                if (selectedQuote) {
+                  supabase
+                    .from('quotes')
+                    .update({
+                      status: selectedQuote.status,
+                      quote_amount: quoteAmount ? parseFloat(quoteAmount) : null,
+                      admin_notes: adminNotes,
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', selectedQuote.id)
+                    .select()
+                    .single()
+                    .then(async (res) => {
+                      if (res.data) {
+                        setQuotes(prev => prev.map(q => q.id === selectedQuote.id ? res.data : q));
+                        toast({
+                          title: "Quote Updated",
+                          description: `Quote status updated to ${selectedQuote.status}.`,
+                        });
+                        
+                        // Send email if quote amount is provided
+                        if (quoteAmount && parseFloat(quoteAmount) > 0) {
+                          try {
+                            const emailSent = await sendQuoteEmail(res.data, parseFloat(quoteAmount), adminNotes);
+                            if (emailSent) {
+                              toast({
+                                title: "Quote Email Sent",
+                                description: "Quote has been sent to the customer via email.",
+                              });
+                            } else {
+                              toast({
+                                title: "Email Error",
+                                description: "Quote updated but email could not be sent.",
+                                variant: "destructive",
+                              });
+                            }
+                          } catch (error) {
+                            console.error("Error sending quote email:", error);
+                            toast({
+                              title: "Email Error",
+                              description: "Quote updated but email could not be sent.",
+                              variant: "destructive",
+                            });
+                          }
+                        }
+                      }
+                    })
+                    .catch(err => {
+                      console.error("Error updating quote:", err);
+                      toast({
+                        title: "Error",
+                        description: "Failed to update quote status.",
+                        variant: "destructive",
+                      });
+                    });
+                  setShowQuoteDialog(false);
+                  setSelectedQuote(null);
+                  setQuoteAmount("");
+                  setAdminNotes("");
+                }
+              }}>
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </section>
   );

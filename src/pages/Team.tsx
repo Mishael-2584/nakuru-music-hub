@@ -24,6 +24,7 @@ import {
   Facebook,
   Twitter
 } from "lucide-react";
+import WhatsAppChat from "@/components/WhatsAppChat";
 
 interface TeamMember {
   id: string;
@@ -783,6 +784,7 @@ const Team = () => {
           </div>
         </div>
       </main>
+      <WhatsAppChat />
     </>
   );
 };

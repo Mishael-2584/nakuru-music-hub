@@ -25,7 +25,12 @@ interface EmailRequest {
   to: string;
   subject: string;
   html: string;
-  registration: any;
+  registration?: any;
+  attachments?: Array<{
+    filename: string;
+    content: string;
+    contentType: string;
+  }>;
 }
 
 serve(async (req) => {
@@ -53,23 +58,30 @@ serve(async (req) => {
     console.log('📧 Request method:', req.method);
     console.log('📧 Request headers:', Object.fromEntries(req.headers.entries()));
     
-    const { to, subject, html }: EmailRequest = await req.json();
+    const { to, subject, html, attachments }: EmailRequest = await req.json();
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
     console.log('📧 Email request received:', { to, subject: subject.substring(0, 50) + '...' });
     console.log('📧 RESEND_API_KEY configured:', !!resendApiKey);
+    console.log('📧 Attachments included:', attachments ? attachments.length : 0);
 
     if (!resendApiKey) {
       console.error('❌ RESEND_API_KEY is not configured');
       throw new Error('RESEND_API_KEY is not configured in Supabase secrets.');
     }
 
-    const resendPayload = {
+    const resendPayload: any = {
       from: 'Damon Music Academy <noreply@damonmusicacademy.co.ke>',
       to: [to],
       subject: subject,
       html: html.replace('{{LOGO_URL}}', logoUrl),
     };
+
+    // Add attachments if provided
+    if (attachments && attachments.length > 0) {
+      resendPayload.attachments = attachments;
+      console.log('📧 Adding attachments to email:', attachments.map(a => a.filename));
+    }
 
     console.log('📧 Sending to Resend API...');
     console.log('📧 Resend payload:', { from: resendPayload.from, to: resendPayload.to, subject: resendPayload.subject });

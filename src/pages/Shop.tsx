@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ShoppingCart, Music, Headphones, Shirt, Globe, MapPin, Download, Clock, AlertCircle, Play, Package, Star, Users, FileAudio, Guitar, Piano, Drum, Mic, Volume2 } from "lucide-react";
+import WhatsAppChat from "@/components/WhatsAppChat";
 
 const Shop = () => {
   const [activeTab, setActiveTab] = useState("digital");
@@ -496,6 +497,7 @@ const Shop = () => {
           </Tabs>
         </div>
       </main>
+      <WhatsAppChat />
       <Footer />
     </>
   );

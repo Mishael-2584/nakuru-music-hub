@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { generateQuotePDF } from "./pdfGenerator";
 
 interface RegistrationData {
   id: string;
@@ -904,4 +905,112 @@ export const sendTeacherRequestInfoEmail = async (teacher, message) => {
     return false;
   }
   return data && data.success;
+};
+
+export const sendQuoteEmail = async (quoteData: any, quoteAmount: number, adminNotes?: string) => {
+  try {
+    // Generate PDF
+    const pdfBlob = await generateQuotePDF(quoteData, quoteAmount, adminNotes);
+    
+    // Convert blob to base64 for email attachment
+    const reader = new FileReader();
+    const pdfBase64 = await new Promise<string>((resolve) => {
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove the data:application/pdf;base64, prefix
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.readAsDataURL(pdfBlob);
+    });
+
+    const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
+      body: {
+        to: quoteData.email,
+        subject: `Your Quote for ${quoteData.service_category} - Damon Music Academy`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <img src="https://damonmusicacademy.co.ke/damon-logo.png" alt="Damon Music Academy" style="height: 60px;">
+              <h1 style="color: #333; margin-top: 20px;">Your Quote is Ready!</h1>
+            </div>
+            
+            <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <h2 style="color: #2563eb; margin-bottom: 20px;">Quote Details</h2>
+              
+              <div style="margin-bottom: 20px;">
+                <h3 style="color: #333; margin-bottom: 10px;">Service Requested</h3>
+                <p style="color: #666; margin: 5px 0;"><strong>Service:</strong> ${quoteData.service_category}</p>
+                ${quoteData.project_type ? `<p style="color: #666; margin: 5px 0;"><strong>Project Type:</strong> ${quoteData.project_type}</p>` : ''}
+                ${quoteData.event_date ? `<p style="color: #666; margin: 5px 0;"><strong>Event Date:</strong> ${quoteData.event_date}</p>` : ''}
+                ${quoteData.location ? `<p style="color: #666; margin: 5px 0;"><strong>Location:</strong> ${quoteData.location}</p>` : ''}
+              </div>
+              
+              <div style="margin-bottom: 20px;">
+                <h3 style="color: #333; margin-bottom: 10px;">Quote Amount</h3>
+                <div style="background-color: #f0f9ff; padding: 15px; border-radius: 8px; border-left: 4px solid #2563eb;">
+                  <p style="font-size: 24px; font-weight: bold; color: #2563eb; margin: 0;">
+                    KES ${quoteAmount.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              
+              ${adminNotes ? `
+                <div style="margin-bottom: 20px;">
+                  <h3 style="color: #333; margin-bottom: 10px;">Additional Notes</h3>
+                  <p style="color: #666; background-color: #f8f9fa; padding: 15px; border-radius: 8px;">${adminNotes}</p>
+                </div>
+              ` : ''}
+              
+              <div style="margin-bottom: 20px;">
+                <h3 style="color: #333; margin-bottom: 10px;">Next Steps</h3>
+                <ol style="color: #666; padding-left: 20px;">
+                  <li>Review the quote details above</li>
+                  <li>Download the attached PDF for your records</li>
+                  <li>Contact us to confirm your acceptance</li>
+                  <li>We'll schedule your project and begin work</li>
+                </ol>
+              </div>
+              
+              <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="color: #2563eb; margin-bottom: 10px;">Contact Information</h3>
+                <p style="color: #666; margin: 5px 0;"><strong>Email:</strong> admin@damonmusicacademy.co.ke</p>
+                <p style="color: #666; margin: 5px 0;"><strong>Phone:</strong> +254 701 195 460</p>
+                <p style="color: #666; margin: 5px 0;"><strong>Location:</strong> Nakuru, Kenya</p>
+              </div>
+              
+              <div style="text-align: center; margin-top: 30px;">
+                <p style="color: #666; font-size: 14px;">
+                  Thank you for choosing Damon Music Academy for your ${quoteData.service_category} needs!
+                </p>
+              </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px; color: #666; font-size: 12px;">
+              <p>This quote is valid for 30 days from the date of issue.</p>
+              <p>&copy; 2024 Damon Music Academy. All rights reserved.</p>
+            </div>
+          </div>
+        `,
+        attachments: [
+          {
+            filename: `quote-${quoteData.service_category}-${Date.now()}.pdf`,
+            content: pdfBase64,
+            contentType: 'application/pdf'
+          }
+        ]
+      }
+    });
+
+    if (error) {
+      console.error('Error sending quote email:', error);
+      return false;
+    }
+
+    console.log('Quote email with PDF attachment sent successfully');
+    return true;
+  } catch (error) {
+    console.error('Error in sendQuoteEmail:', error);
+    return false;
+  }
 };
