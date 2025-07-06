@@ -21,7 +21,7 @@ const CoursesEnhanced = () => {
       color: "primary",
       category: "Music",
       details: {
-        duration: "Individual 45-minute sessions",
+        duration: "Individual 30min/60 min sessions",
         levels: "Beginner to Advanced",
         features: [
           "Classical and contemporary repertoire",
@@ -31,7 +31,7 @@ const CoursesEnhanced = () => {
           "Certified instructors with performance backgrounds"
         ],
         instruments: "Grand pianos, digital pianos, keyboards available",
-        schedule: "Monday to Saturday, 9 AM - 6 PM"
+        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
       }
     },
     {
@@ -51,7 +51,7 @@ const CoursesEnhanced = () => {
           "Guitar maintenance and care"
         ],
         instruments: "Acoustic guitars, electric guitars, amplifiers provided",
-        schedule: "Monday to Saturday, 9 AM - 6 PM"
+        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
       }
     },
     {
@@ -71,7 +71,7 @@ const CoursesEnhanced = () => {
           "Recording studio sessions included"
         ],
         instruments: "Professional microphones, vocal booths, recording equipment",
-        schedule: "Monday to Saturday, 9 AM - 6 PM"
+        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
       }
     },
     {
@@ -91,7 +91,7 @@ const CoursesEnhanced = () => {
           "Play-along with popular songs"
         ],
         instruments: "Acoustic and electronic drum kits available",
-        schedule: "Monday to Saturday, 9 AM - 6 PM"
+        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
       }
     },
     {
@@ -111,7 +111,7 @@ const CoursesEnhanced = () => {
           "Performance preparation"
         ],
         instruments: "Quality violins in various sizes available for rent",
-        schedule: "Monday to Saturday, 9 AM - 6 PM"
+        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
       }
     },
     {
@@ -131,7 +131,7 @@ const CoursesEnhanced = () => {
           "Exam preparation (ABRSM, LCM)"
         ],
         instruments: "Piano, notation software, theory workbooks",
-        schedule: "Monday to Friday, 2 PM - 5 PM (Group), Individual times flexible"
+        schedule: "Mon-Fri: 2pm-5pm (Group) | Individual times flexible"
       }
     },
     {
@@ -151,7 +151,7 @@ const CoursesEnhanced = () => {
           "Breathing and embouchure techniques"
         ],
         instruments: "Student and professional saxophones available",
-        schedule: "Monday to Saturday, 9 AM - 6 PM"
+        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
       }
     },
     {
@@ -171,7 +171,7 @@ const CoursesEnhanced = () => {
           "Mute techniques and effects"
         ],
         instruments: "Student and intermediate brass instruments available",
-        schedule: "Monday to Saturday, 9 AM - 6 PM"
+        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
       }
     },
     // Production Category
@@ -192,7 +192,7 @@ const CoursesEnhanced = () => {
           "Access to our fully-equipped studio"
         ],
         instruments: "DAWs (Logic Pro X, Ableton Live), MIDI controllers, studio monitors",
-        schedule: "Flexible scheduling, project-based learning"
+        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
       }
     },
     {
@@ -212,7 +212,7 @@ const CoursesEnhanced = () => {
           "Hands-on experience at real events"
         ],
         instruments: "Digital mixing consoles, PA systems, stage monitors, microphones",
-        schedule: "Evening classes and weekend practicals"
+        schedule: "Mon-Fri: 7am-6pm | Evening practicals available"
       }
     },
     {
@@ -232,7 +232,7 @@ const CoursesEnhanced = () => {
           "Portfolio development"
         ],
         instruments: "DSLR/Mirrorless cameras, gimbals, lighting kits, editing software",
-        schedule: "Weekend workshops and weekday evening classes"
+        schedule: "Mon-Fri: 7am-6pm | Weekend workshops available"
       }
     },
     // Art Category
@@ -253,7 +253,7 @@ const CoursesEnhanced = () => {
           "Building a professional portfolio"
         ],
         instruments: "Access to various lenses and lighting equipment",
-        schedule: "Flexible one-on-one sessions and monthly workshops"
+        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
       }
     },
     {
@@ -273,7 +273,7 @@ const CoursesEnhanced = () => {
           "Exhibition opportunities"
         ],
         instruments: "All materials provided (canvases, paints, sketchbooks, digital tablets)",
-        schedule: "After-school classes and weekend workshops"
+        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
       }
     },
     {
@@ -293,7 +293,7 @@ const CoursesEnhanced = () => {
           "Develop problem-solving and logic skills"
         ],
         instruments: "Access to online coding platforms",
-        schedule: "Saturdays (Morning and Afternoon sessions)"
+        schedule: "Sat: 8am-6pm | Sun: 8am-6pm"
       }
     }
   ];

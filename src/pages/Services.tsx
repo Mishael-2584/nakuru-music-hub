@@ -60,13 +60,13 @@ const services = [
   },
   {
     title: "Live Feed Services",
-    image: "/lovable-uploads/livesound.webp",
+    image: "/lovable-uploads/livefeed.png",
     description: "Real-time video feed for projecting visuals to large screens at weddings, church services, and conferences.",
     color: "from-blue-400 to-green-400"
   },
   {
     title: "Stage Lighting Setup",
-    image: "/lovable-uploads/livesound.webp",
+    image: "/lovable-uploads/stageandlighting.jpg",
     description: "Dynamic stage lighting to match event atmosphere for performances, worship, and ceremonies.",
     color: "from-yellow-400 to-pink-400"
   },
@@ -102,7 +102,7 @@ const services = [
   },
   {
     title: "Music Composition Services",
-    image: "/lovable-uploads/guitar.jpg",
+    image: "/lovable-uploads/musiccomposition.jpg",
     description: "Original music composition for film, theatre, choirs, adverts, or personal projects.",
     color: "from-purple-400 to-yellow-400"
   },

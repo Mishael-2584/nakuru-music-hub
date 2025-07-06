@@ -24,6 +24,7 @@ import StudentDashboard from "./pages/StudentDashboard";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import TeacherSignup from "./pages/TeacherSignup";
 import Shop from "./pages/Shop";
+import Team from "./pages/Team";
 
 const queryClient = new QueryClient();
 
@@ -71,6 +72,7 @@ const App = () => (
             <Route path="/fees" element={<FeesPage />} />
             <Route path="/gallery" element={<Gallery />} />
             <Route path="/shop" element={<Shop />} />
+            <Route path="/team" element={<Team />} />
             <Route path="/events" element={<Events />} />
             <Route path="/events/:slug" element={<EventDetail />} />
             <Route path="/news" element={<News />} />
