@@ -450,11 +450,11 @@ const Team = () => {
     {
       id: "8",
       name: "Deejay Brixx",
-      role: "Technical Support & Audio Specialist",
+      role: "Events DJ & Audio Consultant",
       image: "/lovable-uploads/brix.jpg",
-      bio: "Experienced technical support specialist and audio equipment expert. Provides comprehensive technical support for all academy audio systems, equipment maintenance, and technical troubleshooting. Ensures smooth operation of all technical infrastructure.",
-      specialties: ["Technical Support", "Audio Equipment", "System Maintenance", "Technical Troubleshooting", "Equipment Setup", "Audio Systems"],
-      experience: "Technical support specialist and audio equipment expert",
+      bio: "As our official DJ, Brixx provides engaging musical experiences for all live events, from internal showcases to external client functions.",
+      specialties: ["Live Event DJ", "Corporate Events", "Music Curation", "Atmosphere Creation", "Live Sound Mixing"],
+      experience: "Events DJ & Audio Consultant",
       education: "Diploma in Audio Technology",
       contact: {
         email: "brixx@damonmusicacademy.com",
@@ -467,26 +467,18 @@ const Team = () => {
         facebook: "#"
       },
       achievements: [
-        "Provides technical support for all academy systems",
-        "Maintains audio equipment and technical infrastructure",
-        "Expert in audio system troubleshooting",
-        "Ensures smooth operation of technical systems",
-        "Specialist in equipment setup and maintenance",
-        "Technical support for all academy events"
+        "Provides premium DJ services for a wide range of corporate and private clients",
+        "Known for creating a vibrant and professional atmosphere at every performance"
       ],
       categories: ["support"],
       categoryInfo: {
         support: {
-          role: "Technical Support & Audio Specialist",
-          bio: "Experienced technical support specialist and audio equipment expert. Provides comprehensive technical support for all academy audio systems, equipment maintenance, and technical troubleshooting. Ensures smooth operation of all technical infrastructure.",
-          specialties: ["Technical Support", "Audio Equipment", "System Maintenance", "Technical Troubleshooting", "Equipment Setup", "Audio Systems"],
+          role: "Events DJ & Audio Consultant",
+          bio: "As our official DJ, Brixx provides engaging musical experiences for all live events, from internal showcases to external client functions.",
+          specialties: ["Live Event DJ", "Corporate Events", "Music Curation", "Atmosphere Creation", "Live Sound Mixing"],
           achievements: [
-            "Provides technical support for all academy systems",
-            "Maintains audio equipment and technical infrastructure",
-            "Expert in audio system troubleshooting",
-            "Ensures smooth operation of technical systems",
-            "Specialist in equipment setup and maintenance",
-            "Technical support for all academy events"
+            "Provides premium DJ services for a wide range of corporate and private clients",
+            "Known for creating a vibrant and professional atmosphere at every performance"
           ]
         }
       }
@@ -494,11 +486,11 @@ const Team = () => {
     {
       id: "9",
       name: "Moses Ogoti",
-      role: "Spoken Word Poet & Performance Artist",
+      role: "Official MC & Event Host",
       image: "/lovable-uploads/ogoti.jpg",
-      bio: "Ogoti the Boychild is a spoken word poet, performer, Corporate MC and event curator who uses his voice to spark conversations on youth empowerment, mental health, and social change. He is the founder and CEO of Bleeding Rhymes Creatives, a platform that embraces creatives and pushes the boundaries of poetry and performance.",
-      specialties: ["Spoken Word Poetry", "Performance Art", "Corporate MC", "Event Curation", "Youth Empowerment", "Creative Writing"],
-      experience: "Spoken word poet and performance artist",
+      bio: "The professional voice of our live events. Ogoti expertly hosts everything from student showcases to formal ceremonies, ensuring a seamless and engaging program.",
+      specialties: ["Event Hosting", "Master of Ceremonies (MC)", "Audience Engagement", "Corporate Events", "Stage Presence", "Public Speaking"],
+      experience: "Official MC & Event Host",
       education: "Bachelor of Pharmacy, Creative Arts",
       contact: {
         email: "ogoti@damonmusicacademy.com",
@@ -511,70 +503,18 @@ const Team = () => {
         facebook: "#"
       },
       achievements: [
-        "Founder and CEO of Bleeding Rhymes Creatives",
-        "Released debut album 'The First Chronicles of Ogoti the Boychild'",
-        "Performed 4 successful concept shows",
-        "Available on all digital streaming platforms",
-        "Strong stage presence and storytelling gift",
-        "Professional Pharmacist and Creative Artist"
+        "Provides professional MC services for the academy's corporate clients and partners",
+        "Released debut album 'The First Chronicles of Ogoti the Boychild'"
       ],
       categories: ["support"],
       categoryInfo: {
         support: {
-          role: "Spoken Word Poet & Performance Artist",
-          bio: "Ogoti the Boychild is a spoken word poet, performer, Corporate MC and event curator who uses his voice to spark conversations on youth empowerment, mental health, and social change. He is the founder and CEO of Bleeding Rhymes Creatives, a platform that embraces creatives and pushes the boundaries of poetry and performance.",
-          specialties: ["Spoken Word Poetry", "Performance Art", "Corporate MC", "Event Curation", "Youth Empowerment", "Creative Writing"],
+          role: "Official MC & Event Host",
+          bio: "The professional voice of our live events. Ogoti expertly hosts everything from student showcases to formal ceremonies, ensuring a seamless and engaging program.",
+          specialties: ["Event Hosting", "Master of Ceremonies (MC)", "Audience Engagement", "Corporate Events", "Stage Presence", "Public Speaking"],
           achievements: [
-            "Founder and CEO of Bleeding Rhymes Creatives",
-            "Released debut album 'The First Chronicles of Ogoti the Boychild'",
-            "Performed 4 successful concept shows",
-            "Available on all digital streaming platforms",
-            "Strong stage presence and storytelling gift",
-            "Professional Pharmacist and Creative Artist"
-          ]
-        }
-      }
-    },
-    {
-      id: "10",
-      name: "Academy Administration",
-      role: "Official Administrative Contact",
-      image: "/damon-logo.png",
-      bio: "This office handles all business operations for the academy, including financial matters, student registration, and institutional records.",
-      specialties: ["Finance & Accounting", "Enrollment", "Student Records", "Institutional Policy"],
-      experience: "Official administrative contact for all business operations",
-      education: "Academy Administration",
-      contact: {
-        email: "admin@damonmusicacademy.co.ke",
-        phone: "+254 701 195 460",
-        location: "Nakuru, Kenya"
-      },
-      social: {
-        linkedin: "#",
-        instagram: "#",
-        facebook: "#"
-      },
-      achievements: [
-        "Areas of Responsibility: Finance & Accounting, Enrollment, Student Records, Institutional Policy",
-        "Contact: Please direct all administrative inquiries to our official email or phone number for prompt assistance",
-        "Email: admin@damonmusicacademy.co.ke",
-        "Phone: +254 701 195 460",
-        "This office handles all business operations for the academy",
-        "Official Administrative Contact"
-      ],
-      categories: ["admin"],
-      categoryInfo: {
-        admin: {
-          role: "Official Administrative Contact",
-          bio: "This office handles all business operations for the academy, including financial matters, student registration, and institutional records.",
-          specialties: ["Finance & Accounting", "Enrollment", "Student Records", "Institutional Policy"],
-          achievements: [
-            "Areas of Responsibility: Finance & Accounting, Enrollment, Student Records, Institutional Policy",
-            "Contact: Please direct all administrative inquiries to our official email or phone number for prompt assistance",
-            "Email: admin@damonmusicacademy.co.ke",
-            "Phone: +254 701 195 460",
-            "This office handles all business operations for the academy",
-            "Official Administrative Contact"
+            "Provides professional MC services for the academy's corporate clients and partners",
+            "Released debut album 'The First Chronicles of Ogoti the Boychild'"
           ]
         }
       }
@@ -785,9 +725,9 @@ const Team = () => {
                 <h2 className="text-3xl font-bold text-gray-900 mb-4">Join Our Team</h2>
                 <p className="text-lg text-gray-600 mb-6 max-w-2xl mx-auto">
                   Our team is a diverse blend of passionate educators and professionals dedicated to excellence in the creative arts and technology. 
-                  If you are driven to inspire creativity and want to contribute to a vibrant learning community, we invite you to connect with us.
+                  If you are driven to inspire creativity and want to contribute to a vibrant learning community, we invite you to connect with us.
                 </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
                   <Button size="lg" className="bg-primary hover:bg-primary/90">
                     <Mail className="w-5 h-5 mr-2" />
                     <a href="mailto:info@damonmusicacademy.com" className="text-white">Send Application</a>
@@ -796,6 +736,47 @@ const Team = () => {
                     <Phone className="w-5 h-5 mr-2" />
                     <a href="tel:+254701195460" className="text-gray-700">Contact Us</a>
                   </Button>
+                </div>
+
+                {/* Academy Administration Section */}
+                <div className="border-t border-gray-200/50 pt-8">
+                  <div className="max-w-4xl mx-auto">
+                    <div className="flex flex-col md:flex-row items-center gap-6 bg-white/30 rounded-lg p-6 border border-gray-200/30">
+                      <div className="flex-shrink-0">
+                        <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="w-20 h-20 rounded-lg object-contain bg-white/80 p-2 shadow-sm" />
+                      </div>
+                      <div className="flex-1 text-center md:text-left">
+                        <h3 className="text-2xl font-bold text-gray-900 mb-1">Academy Administration</h3>
+                        <div className="text-primary font-semibold mb-3">Official Administrative Contact</div>
+                        <p className="text-gray-700 mb-4 leading-relaxed">
+                          This office handles all business operations for the academy, including financial matters, student registration, and institutional records.
+                        </p>
+                        <div className="mb-4">
+                          <div className="font-semibold text-sm text-gray-900 mb-2">Areas of Responsibility:</div>
+                          <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                            <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-semibold border border-yellow-200">Finance & Accounting</span>
+                            <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-semibold border border-yellow-200">Enrollment</span>
+                            <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-semibold border border-yellow-200">Student Records</span>
+                            <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-semibold border border-yellow-200">Institutional Policy</span>
+                          </div>
+                        </div>
+                        <div className="bg-white/50 rounded-lg p-4 border border-gray-100">
+                          <div className="font-semibold text-sm text-gray-900 mb-2">Contact Information:</div>
+                          <p className="text-gray-700 text-sm mb-3">Please direct all administrative inquiries to our official email or phone number for prompt assistance.</p>
+                          <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
+                            <div className="flex items-center gap-2">
+                              <Mail className="w-4 h-4 text-primary" />
+                              <span className="text-sm text-gray-700 font-medium">admin@damonmusicacademy.co.ke</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Phone className="w-4 h-4 text-primary" />
+                              <span className="text-sm text-gray-700 font-medium">+254 701 195 460</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
