@@ -518,22 +518,9 @@ const Team = () => {
         "Strong stage presence and storytelling gift",
         "Professional Pharmacist and Creative Artist"
       ],
-      categories: ["teaching", "leadership"],
+      categories: ["support"],
       categoryInfo: {
-        leadership: {
-          role: "Creative Arts Director",
-          bio: "Experienced creative arts director and performance leader with expertise in spoken word poetry and event curation. Specializes in creative arts programming, performance coordination, and youth empowerment initiatives. Leads creative arts programs and coordinates performance events.",
-          specialties: ["Creative Arts Direction", "Performance Coordination", "Event Curation", "Spoken Word Poetry", "Youth Empowerment", "Creative Programming"],
-          achievements: [
-            "Creative Arts Director",
-            "Founder and CEO of Bleeding Rhymes Creatives",
-            "Led 4 successful concept shows",
-            "Developed youth empowerment programs",
-            "Expert in creative arts coordination",
-            "Specialist in performance event management"
-          ]
-        },
-        teaching: {
+        support: {
           role: "Spoken Word Poet & Performance Artist",
           bio: "Ogoti the Boychild is a spoken word poet, performer, Corporate MC and event curator who uses his voice to spark conversations on youth empowerment, mental health, and social change. He is the founder and CEO of Bleeding Rhymes Creatives, a platform that embraces creatives and pushes the boundaries of poetry and performance.",
           specialties: ["Spoken Word Poetry", "Performance Art", "Corporate MC", "Event Curation", "Youth Empowerment", "Creative Writing"],

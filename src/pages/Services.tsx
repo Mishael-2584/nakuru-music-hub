@@ -66,7 +66,7 @@ const services = [
   },
   {
     title: "Stage Lighting Setup",
-    image: "/lovable-uploads/stageandlighting.jpg",
+    image: "/lovable-uploads/stageandlighting.png",
     description: "Dynamic stage lighting to match event atmosphere for performances, worship, and ceremonies.",
     color: "from-yellow-400 to-pink-400"
   },
