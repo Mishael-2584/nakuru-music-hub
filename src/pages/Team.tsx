@@ -165,6 +165,34 @@ const Team = () => {
         "Expert in vocal breathing and piano technique"
       ],
       categories: ["teaching"]
+    },
+    {
+      id: "5",
+      name: "Vincent Kipkoech",
+      role: "Brass & Strings Instructor",
+      image: "/lovable-uploads/vincent.jpg",
+      bio: "Skilled brass and strings instructor with expertise in music production. Specializes in trumpet, violin, and music production techniques. Passionate about teaching both classical and contemporary music styles.",
+      specialties: ["Brass Instruments", "String Instruments", "Music Production", "Trumpet", "Violin", "Studio Recording"],
+      experience: "Senior in brass and strings instruction",
+      education: "Graduate in Music Production",
+      contact: {
+        email: "vincent@damonmusicacademy.com",
+        phone: "+254 700 000 004",
+        location: "Nakuru, Kenya"
+      },
+      social: {
+        linkedin: "#",
+        instagram: "#",
+        facebook: "#"
+      },
+      achievements: [
+        "Expert in brass and string instrument instruction",
+        "Specialist in music production and studio recording",
+        "Trained 150+ students in brass and strings",
+        "Produced 3 original music compositions",
+        "Performed with renowned orchestras and bands"
+      ],
+      categories: ["teaching"]
     }
   ];
 
@@ -242,7 +270,7 @@ const Team = () => {
                       src={member.image} 
                       alt={member.name}
                       className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${
-                        member.id === "1" || member.id === "2" 
+                        member.id === "1" || member.id === "2" || member.id === "5"
                           ? "object-top" 
                           : ""
                       }`}
