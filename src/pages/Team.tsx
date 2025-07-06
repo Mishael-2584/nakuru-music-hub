@@ -58,7 +58,7 @@ const Team = () => {
       id: "1",
       name: "Musumba Collince",
       role: "Founder, Director & Senior Music Teacher",
-      image: "/lovable-uploads/founder.jpg",
+      image: "/lovable-uploads/founder2.jpg",
       bio: "Passionate music educator and entrepreneur with over 15 years of experience in music education. Founded Damon Music Academy with the vision of making quality music education accessible to all. Specializes in piano, guitar, and music theory instruction.",
       specialties: ["Piano", "Guitar", "Music Theory", "Composition", "Academy Management", "Vocal Training"],
       experience: "15+ years in music education and academy management",
