@@ -767,24 +767,8 @@ const Team = () => {
           <div className="mt-16 text-center">
             <Card className="bg-gradient-to-r from-primary/10 via-accent/10 to-secondary/10 border-0">
               <CardContent className="py-12">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Join Our Team</h2>
-                <p className="text-lg text-gray-600 mb-6 max-w-2xl mx-auto">
-                  Our team is a diverse blend of passionate educators and professionals dedicated to excellence in the creative arts and technology. 
-                  If you are driven to inspire creativity and want to contribute to a vibrant learning community, we invite you to connect with us.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-                  <Button size="lg" className="bg-primary hover:bg-primary/90">
-                    <Mail className="w-5 h-5 mr-2" />
-                    <a href="mailto:info@damonmusicacademy.com" className="text-white">Send Application</a>
-                  </Button>
-                  <Button size="lg" variant="outline">
-                    <Phone className="w-5 h-5 mr-2" />
-                    <a href="tel:+254701195460" className="text-gray-700">Contact Us</a>
-                  </Button>
-                </div>
-
                 {/* Academy Administration Section */}
-                <div className="border-t border-gray-200/50 pt-8">
+                <div className="mb-8">
                   <div className="max-w-4xl mx-auto">
                     <div className="flex flex-col md:flex-row items-center gap-6 bg-white/30 rounded-lg p-6 border border-gray-200/30">
                       <div className="flex-shrink-0">
@@ -821,6 +805,25 @@ const Team = () => {
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                {/* Join Our Team Section */}
+                <div className="border-t border-gray-200/50 pt-8">
+                  <h2 className="text-3xl font-bold text-gray-900 mb-4">Join Our Team</h2>
+                  <p className="text-lg text-gray-600 mb-6 max-w-2xl mx-auto">
+                    Our team is a diverse blend of passionate educators and professionals dedicated to excellence in the creative arts and technology. 
+                    If you are driven to inspire creativity and want to contribute to a vibrant learning community, we invite you to connect with us.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+                    <Button size="lg" className="bg-primary hover:bg-primary/90">
+                      <Mail className="w-5 h-5 mr-2" />
+                      <a href="mailto:info@damonmusicacademy.com" className="text-white">Send Application</a>
+                    </Button>
+                    <Button size="lg" variant="outline">
+                      <Phone className="w-5 h-5 mr-2" />
+                      <a href="tel:+254701195460" className="text-gray-700">Contact Us</a>
+                    </Button>
                   </div>
                 </div>
               </CardContent>
