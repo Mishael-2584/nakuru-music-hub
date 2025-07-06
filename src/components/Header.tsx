@@ -37,6 +37,9 @@ const Header = () => {
     name: "Courses",
     href: "/courses"
   }, {
+    name: "Fees",
+    href: "/fees"
+  }, {
     name: "Services",
     href: "/services"
   }, {
@@ -49,14 +52,11 @@ const Header = () => {
     name: "Gallery",
     href: "/gallery"
   }, {
-    name: "Shop",
-    href: "/shop"
-  }, {
     name: "Team",
     href: "/team"
   }, {
-    name: "Fees",
-    href: "/fees"
+    name: "Shop",
+    href: "/shop"
   }];
 
   return <header className={`fixed w-full z-50 transition-all duration-300 ${isScrolled ? "bg-white/95 backdrop-blur-md shadow-lg" : "bg-white/90 backdrop-blur-sm"}`}>
