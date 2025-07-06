@@ -137,6 +137,34 @@ const Team = () => {
         "Specialist in responsive design and accessibility"
       ],
       categories: ["teaching", "support"]
+    },
+    {
+      id: "4",
+      name: "Nahurira Shiphrah",
+      role: "Voice & Piano Instructor",
+      image: "/lovable-uploads/shiphrah.jpg",
+      bio: "Talented vocalist and pianist with a passion for developing musical talent. Specializes in classical and contemporary vocal techniques, piano instruction, and performance coaching.",
+      specialties: ["Voice Training", "Piano Instruction", "Performance Coaching", "Music Theory", "Vocal Technique"],
+      experience: "8+ years in vocal and piano instruction",
+      education: "Bachelor of Music, Vocal Performance & Piano",
+      contact: {
+        email: "shiphrah@damonmusicacademy.com",
+        phone: "+254 700 000 003",
+        location: "Nakuru, Kenya"
+      },
+      social: {
+        linkedin: "#",
+        instagram: "#",
+        facebook: "#"
+      },
+      achievements: [
+        "Specialist in classical and contemporary vocal techniques",
+        "Trained 120+ students in voice and piano",
+        "Performed at prestigious music festivals",
+        "Developed innovative teaching methodologies",
+        "Expert in vocal breathing and piano technique"
+      ],
+      categories: ["teaching"]
     }
   ];
 
