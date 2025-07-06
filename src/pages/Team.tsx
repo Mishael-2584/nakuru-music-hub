@@ -291,7 +291,7 @@ const Team = () => {
         "Expert in digital and analog sound systems",
         "Trained 100+ sound engineering students"
       ],
-      categories: ["teaching"],
+      categories: ["teaching", "support"],
       categoryInfo: {
         teaching: {
           role: "Bass Guitarist & Sound Engineer",
@@ -303,6 +303,19 @@ const Team = () => {
             "Produced 5 studio albums",
             "Expert in digital and analog sound systems",
             "Trained 100+ sound engineering students"
+          ]
+        },
+        support: {
+          role: "FOH Engineer",
+          bio: "Experienced Front of House engineer responsible for live sound mixing and audio system management during performances and events. Specializes in live sound engineering, audio mixing, and ensuring optimal sound quality for all academy events.",
+          specialties: ["Live Sound Mixing", "FOH Engineering", "Audio System Management", "Live Performance Audio", "Sound Quality Control", "Event Audio Coordination"],
+          achievements: [
+            "FOH Engineer for all academy performances",
+            "Manages live sound systems during events",
+            "Ensures optimal sound quality for performances",
+            "Coordinates audio setup for major events",
+            "Expert in live sound mixing and control",
+            "FOH Engineer for academy events"
           ]
         }
       }
@@ -459,6 +472,50 @@ const Team = () => {
           ]
         }
       }
+    },
+    {
+      id: "8",
+      name: "Deejay Brix",
+      role: "Technical Support & Audio Specialist",
+      image: "/lovable-uploads/brix.jpg",
+      bio: "Experienced technical support specialist and audio equipment expert. Provides comprehensive technical support for all academy audio systems, equipment maintenance, and technical troubleshooting. Ensures smooth operation of all technical infrastructure.",
+      specialties: ["Technical Support", "Audio Equipment", "System Maintenance", "Technical Troubleshooting", "Equipment Setup", "Audio Systems"],
+      experience: "Technical support specialist and audio equipment expert",
+      education: "Diploma in Audio Technology",
+      contact: {
+        email: "brix@damonmusicacademy.com",
+        phone: "+254 700 000 007",
+        location: "Nakuru, Kenya"
+      },
+      social: {
+        linkedin: "#",
+        instagram: "#",
+        facebook: "#"
+      },
+      achievements: [
+        "Provides technical support for all academy systems",
+        "Maintains audio equipment and technical infrastructure",
+        "Expert in audio system troubleshooting",
+        "Ensures smooth operation of technical systems",
+        "Specialist in equipment setup and maintenance",
+        "Technical support for all academy events"
+      ],
+      categories: ["support"],
+      categoryInfo: {
+        support: {
+          role: "Technical Support & Audio Specialist",
+          bio: "Experienced technical support specialist and audio equipment expert. Provides comprehensive technical support for all academy audio systems, equipment maintenance, and technical troubleshooting. Ensures smooth operation of all technical infrastructure.",
+          specialties: ["Technical Support", "Audio Equipment", "System Maintenance", "Technical Troubleshooting", "Equipment Setup", "Audio Systems"],
+          achievements: [
+            "Provides technical support for all academy systems",
+            "Maintains audio equipment and technical infrastructure",
+            "Expert in audio system troubleshooting",
+            "Ensures smooth operation of technical systems",
+            "Specialist in equipment setup and maintenance",
+            "Technical support for all academy events"
+          ]
+        }
+      }
     }
   ];
 
@@ -568,7 +625,7 @@ const Team = () => {
                         src={member.image} 
                         alt={member.name}
                         className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${
-                          member.id === "1" || member.id === "2" || member.id === "3" || member.id === "4" || member.id === "5" || member.id === "6" || member.id === "7"
+                          member.id === "1" || member.id === "2" || member.id === "3" || member.id === "4" || member.id === "5" || member.id === "6" || member.id === "7" || member.id === "8"
                             ? "object-top" 
                             : ""
                         }`}
