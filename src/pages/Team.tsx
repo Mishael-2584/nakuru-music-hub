@@ -59,9 +59,9 @@ const Team = () => {
       name: "Musumba Collince",
       role: "Founder, Director & Senior Music Teacher",
       image: "/lovable-uploads/founder2.jpg",
-      bio: "Passionate music educator and entrepreneur with over 15 years of experience in music education. Founded Damon Music Academy with the vision of making quality music education accessible to all. Specializes in piano, guitar, and music theory instruction.",
+      bio: "Passionate music educator and entrepreneur with extensive experience in music education. Founded Damon Music Academy with the vision of making quality music education accessible to all. Specializes in piano, guitar, and music theory instruction.",
       specialties: ["Piano", "Guitar", "Music Theory", "Composition", "Academy Management", "Vocal Training"],
-      experience: "15+ years in music education and academy management",
+      experience: "Senior music educator and academy director",
       education: "Bachelor of Music, Music Education",
       contact: {
         email: "musumba@damonmusicacademy.com",
@@ -74,7 +74,7 @@ const Team = () => {
         facebook: "#"
       },
       achievements: [
-        "Founded Damon Music Academy in 2018",
+        "Founded Damon Music Academy in 2016",
         "Trained over 500 students in music",
         "Recipient of Music Education Excellence Award 2022",
         "Published composer with 3 original compositions",
@@ -84,13 +84,71 @@ const Team = () => {
       categories: ["leadership", "teaching", "admin"]
     },
     {
+      id: "4",
+      name: "Nahurira Shiphrah",
+      role: "Voice & Piano Instructor",
+      image: "/lovable-uploads/shiphrah.jpg",
+      bio: "Talented vocalist and pianist with a passion for developing musical talent. Specializes in classical and contemporary vocal techniques, piano instruction, and performance coaching. Director of the Children's Choir.",
+      specialties: ["Voice Training", "Piano Instruction", "Performance Coaching", "Music Theory", "Vocal Technique", "Choir Direction"],
+      experience: "Professional vocal and piano instructor",
+      education: "Bachelor of Music, Vocal Performance & Piano",
+      contact: {
+        email: "shiphrah@damonmusicacademy.com",
+        phone: "+254 700 000 003",
+        location: "Nakuru, Kenya"
+      },
+      social: {
+        linkedin: "#",
+        instagram: "#",
+        facebook: "#"
+      },
+      achievements: [
+        "Specialist in classical and contemporary vocal techniques",
+        "Trained 120+ students in voice and piano",
+        "Performed at prestigious music festivals",
+        "Developed innovative teaching methodologies",
+        "Expert in vocal breathing and piano technique",
+        "Director of the Children's Choir"
+      ],
+      categories: ["teaching", "leadership"]
+    },
+    {
+      id: "5",
+      name: "Vincent Kipkoech",
+      role: "Brass & Strings Instructor",
+      image: "/lovable-uploads/vincent.jpg",
+      bio: "Skilled brass and strings instructor with expertise in music production. Specializes in trumpet, violin, and music production techniques. Passionate about teaching both classical and contemporary music styles. Head of Instrument Ensemble.",
+      specialties: ["Brass Instruments", "String Instruments", "Music Production", "Trumpet", "Violin", "Studio Recording", "Ensemble Direction"],
+      experience: "Senior brass and strings instructor",
+      education: "Graduate in Music Production",
+      contact: {
+        email: "vincent@damonmusicacademy.com",
+        phone: "+254 700 000 004",
+        location: "Nakuru, Kenya"
+      },
+      social: {
+        linkedin: "#",
+        instagram: "#",
+        facebook: "#"
+      },
+      achievements: [
+        "Expert in brass and string instrument instruction",
+        "Specialist in music production and studio recording",
+        "Trained 150+ students in brass and strings",
+        "Produced 3 original music compositions",
+        "Performed with renowned orchestras and bands",
+        "Head of Instrument Ensemble"
+      ],
+      categories: ["teaching", "leadership"]
+    },
+    {
       id: "2",
       name: "Thomas Machache Tsuma",
       role: "Bass Guitarist & Sound Engineer",
       image: "/lovable-uploads/soundengineer.jpg",
       bio: "Experienced bass guitarist and sound engineer with expertise in live sound, studio recording, and music production. Passionate about creating exceptional audio experiences and teaching the next generation of sound professionals.",
       specialties: ["Bass Guitar", "Live Sound Engineering", "Studio Recording", "Music Production", "Audio Mixing"],
-      experience: "12+ years in live sound and studio recording",
+      experience: "Professional sound engineer and bass instructor",
       education: "Diploma in Sound Engineering, Music Production",
       contact: {
         email: "thomas@damonmusicacademy.com",
@@ -118,7 +176,7 @@ const Team = () => {
       image: "/lovable-uploads/mishael.jpg",
       bio: "Creative web designer and full-stack developer with expertise in modern web technologies. Passionate about creating beautiful, functional, and user-friendly digital experiences.",
       specialties: ["Web Design", "Frontend Development", "Backend Development", "UI/UX Design"],
-      experience: "5+ years in web development and design",
+      experience: "Professional web developer and designer",
       education: "Bachelor of Computer Science, Web Development",
       contact: {
         email: "mishaelgebre@gmail.com",
@@ -139,45 +197,17 @@ const Team = () => {
       categories: ["teaching", "support"]
     },
     {
-      id: "4",
-      name: "Nahurira Shiphrah",
-      role: "Voice & Piano Instructor",
-      image: "/lovable-uploads/shiphrah.jpg",
-      bio: "Talented vocalist and pianist with a passion for developing musical talent. Specializes in classical and contemporary vocal techniques, piano instruction, and performance coaching.",
-      specialties: ["Voice Training", "Piano Instruction", "Performance Coaching", "Music Theory", "Vocal Technique"],
-      experience: "8+ years in vocal and piano instruction",
-      education: "Bachelor of Music, Vocal Performance & Piano",
-      contact: {
-        email: "shiphrah@damonmusicacademy.com",
-        phone: "+254 700 000 003",
-        location: "Nakuru, Kenya"
-      },
-      social: {
-        linkedin: "#",
-        instagram: "#",
-        facebook: "#"
-      },
-      achievements: [
-        "Specialist in classical and contemporary vocal techniques",
-        "Trained 120+ students in voice and piano",
-        "Performed at prestigious music festivals",
-        "Developed innovative teaching methodologies",
-        "Expert in vocal breathing and piano technique"
-      ],
-      categories: ["teaching"]
-    },
-    {
-      id: "5",
-      name: "Vincent Kipkoech",
-      role: "Brass & Strings Instructor",
-      image: "/lovable-uploads/vincent.jpg",
-      bio: "Skilled brass and strings instructor with expertise in music production. Specializes in trumpet, violin, and music production techniques. Passionate about teaching both classical and contemporary music styles.",
-      specialties: ["Brass Instruments", "String Instruments", "Music Production", "Trumpet", "Violin", "Studio Recording"],
-      experience: "Senior in brass and strings instruction",
+      id: "6",
+      name: "Sydney Chitechi",
+      role: "Saxophonist & Brass Instructor",
+      image: "/lovable-uploads/sydney.jpg",
+      bio: "Talented saxophonist and brass instructor with expertise in music production. Specializes in saxophone, brass instruments, and contemporary music styles. Passionate about teaching both classical and jazz techniques.",
+      specialties: ["Saxophone", "Brass Instruments", "Music Production", "Jazz Techniques", "Classical Saxophone", "Studio Recording"],
+      experience: "Professional saxophone and brass instructor",
       education: "Graduate in Music Production",
       contact: {
-        email: "vincent@damonmusicacademy.com",
-        phone: "+254 700 000 004",
+        email: "sydney@damonmusicacademy.com",
+        phone: "+254 700 000 005",
         location: "Nakuru, Kenya"
       },
       social: {
@@ -186,11 +216,12 @@ const Team = () => {
         facebook: "#"
       },
       achievements: [
-        "Expert in brass and string instrument instruction",
-        "Specialist in music production and studio recording",
-        "Trained 150+ students in brass and strings",
-        "Produced 3 original music compositions",
-        "Performed with renowned orchestras and bands"
+        "Expert in saxophone and brass instrument instruction",
+        "Specialist in jazz and contemporary music styles",
+        "Trained 100+ students in saxophone and brass",
+        "Produced 2 original jazz compositions",
+        "Performed with renowned jazz ensembles",
+        "Graduate in Music Production"
       ],
       categories: ["teaching"]
     }
@@ -270,16 +301,26 @@ const Team = () => {
                       src={member.image} 
                       alt={member.name}
                       className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${
-                        member.id === "1" || member.id === "2" || member.id === "5"
+                        member.id === "1" || member.id === "2" || member.id === "3" || member.id === "4" || member.id === "5" || member.id === "6"
                           ? "object-top" 
                           : ""
                       }`}
                     />
                   </div>
-                  <div className={`absolute top-4 right-4 ${getCategoryColor(member.categories[0])} text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1`}>
-                    {getCategoryIcon(member.categories[0])}
-                    {member.categories[0].charAt(0).toUpperCase() + member.categories[0].slice(1)}
+                  <div className={`absolute top-4 right-4 ${getCategoryColor(activeTab === "all" ? member.categories[0] : activeTab)} text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1`}>
+                    {getCategoryIcon(activeTab === "all" ? member.categories[0] : activeTab)}
+                    {(activeTab === "all" ? member.categories[0] : activeTab).charAt(0).toUpperCase() + (activeTab === "all" ? member.categories[0] : activeTab).slice(1)}
                   </div>
+                  {activeTab === "all" && member.categories.length > 1 && (
+                    <div className="absolute top-4 right-4 flex flex-col gap-1 mt-8">
+                      {member.categories.slice(1).map((category, index) => (
+                        <div key={index} className={`${getCategoryColor(category)} text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1`}>
+                          {getCategoryIcon(category)}
+                          {category.charAt(0).toUpperCase() + category.slice(1)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 
                 <CardHeader className="pb-3">
@@ -362,11 +403,11 @@ const Team = () => {
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button size="lg" className="bg-primary hover:bg-primary/90">
                     <Mail className="w-5 h-5 mr-2" />
-                    Send Application
+                    <a href="mailto:info@damonmusicacademy.com" className="text-white">Send Application</a>
                   </Button>
                   <Button size="lg" variant="outline">
                     <Phone className="w-5 h-5 mr-2" />
-                    Contact Us
+                    <a href="tel:+254701195460" className="text-gray-700">Contact Us</a>
                   </Button>
                 </div>
               </CardContent>
