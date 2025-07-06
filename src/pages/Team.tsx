@@ -84,7 +84,7 @@ const Team = () => {
     {
       id: "1",
       name: "Musumba Collince",
-      role: "Founder, Director & Senior Music Teacher",
+      role: "Founder & Director of Music & Media Production",
       image: "/lovable-uploads/founder2.jpg",
       bio: "Passionate music educator and entrepreneur with extensive experience in music education. Founded Damon Music Academy with the vision of making quality music education accessible to all. Specializes in piano, guitar, and music theory instruction.",
       specialties: ["Piano", "Guitar", "Music Theory", "Composition", "Academy Management", "Vocal Training"],
@@ -108,10 +108,10 @@ const Team = () => {
         "Certified ABRSM Examiner",
         "Specialist in classical and contemporary music"
       ],
-      categories: ["leadership", "teaching", "admin"],
+      categories: ["leadership", "teaching"],
       categoryInfo: {
         leadership: {
-          role: "Founder, Director & Senior Music Teacher",
+          role: "Founder & Director of Music & Media Production",
           bio: "Passionate music educator and entrepreneur with extensive experience in music education. Founded Damon Music Academy with the vision of making quality music education accessible to all. Specializes in piano, guitar, and music theory instruction.",
           specialties: ["Piano", "Guitar", "Music Theory", "Composition", "Academy Management", "Vocal Training"],
           achievements: [
@@ -124,7 +124,7 @@ const Team = () => {
           ]
         },
         teaching: {
-          role: "Founder, Director & Senior Music Teacher",
+          role: "Founder & Director of Music & Media Production",
           bio: "Passionate music educator and entrepreneur with extensive experience in music education. Founded Damon Music Academy with the vision of making quality music education accessible to all. Specializes in piano, guitar, and music theory instruction.",
           specialties: ["Piano", "Guitar", "Music Theory", "Composition", "Academy Management", "Vocal Training"],
           achievements: [
@@ -134,19 +134,6 @@ const Team = () => {
             "Published composer with 3 original compositions",
             "Certified ABRSM Examiner",
             "Specialist in classical and contemporary music"
-          ]
-        },
-        admin: {
-          role: "Academy Director & Administrator",
-          bio: "Senior administrator and academy director responsible for overall academy operations, strategic planning, and administrative oversight. Manages academy policies, finances, and organizational development.",
-          specialties: ["Academy Management", "Strategic Planning", "Administrative Oversight", "Policy Development", "Financial Management", "Organizational Leadership"],
-          achievements: [
-            "Founded Damon Music Academy in 2016",
-            "Manages academy operations and policies",
-            "Oversees strategic planning and development",
-            "Coordinates administrative functions",
-            "Leads organizational growth initiatives",
-            "Academy Director & Administrator"
           ]
         }
       }
@@ -158,7 +145,7 @@ const Team = () => {
       image: "/lovable-uploads/shiphrah.jpg",
       bio: "Talented vocalist and pianist with a passion for developing musical talent. Specializes in classical and contemporary vocal techniques, piano instruction, and performance coaching. Director of the Children's Choir.",
       specialties: ["Voice Training", "Piano Instruction", "Performance Coaching", "Music Theory", "Vocal Technique", "Choir Direction"],
-      experience: "Professional vocal and piano instructor",
+      experience: "Vocal and piano instructor",
       education: "Bachelor of Music, Vocal Performance & Piano",
       contact: {
         email: "shiphrah@damonmusicacademy.com",
@@ -272,7 +259,7 @@ const Team = () => {
       image: "/lovable-uploads/soundengineer.jpg",
       bio: "Experienced bass guitarist and sound engineer with expertise in live sound, studio recording, and music production. Passionate about creating exceptional audio experiences and teaching the next generation of sound professionals.",
       specialties: ["Bass Guitar", "Live Sound Engineering", "Studio Recording", "Music Production", "Audio Mixing"],
-      experience: "Professional sound engineer and bass instructor",
+      experience: "Sound engineer and bass instructor",
       education: "Diploma in Sound Engineering, Music Production",
       contact: {
         email: "thomas@damonmusicacademy.com",
@@ -327,7 +314,7 @@ const Team = () => {
       image: "/lovable-uploads/mishael.jpg",
       bio: "Creative web designer and full-stack developer with expertise in modern web technologies. Passionate about creating beautiful, functional, and user-friendly digital experiences.",
       specialties: ["Web Design", "Frontend Development", "Backend Development", "UI/UX Design"],
-      experience: "Professional web developer and designer",
+      experience: "Web developer and designer",
       education: "Bachelor of Computer Science, Web Development",
       contact: {
         email: "mishaelgebre@gmail.com",
@@ -379,7 +366,7 @@ const Team = () => {
       image: "/lovable-uploads/sydney.jpg",
       bio: "Talented saxophonist and brass instructor with expertise in music production. Specializes in saxophone, brass instruments, and contemporary music styles. Passionate about teaching both classical and jazz techniques.",
       specialties: ["Saxophone", "Brass Instruments", "Music Production", "Jazz Techniques", "Classical Saxophone", "Studio Recording"],
-      experience: "Professional saxophone and brass instructor",
+      experience: "Saxophone and brass instructor",
       education: "Graduate in Music Production",
       contact: {
         email: "sydney@damonmusicacademy.com",
@@ -423,7 +410,7 @@ const Team = () => {
       image: "/lovable-uploads/newton.jpg",
       bio: "Skilled drummer and percussionist with expertise in various drumming styles and percussion techniques. Specializes in teaching rhythm, timing, and coordination. Passionate about developing students' musical foundation through percussion education.",
       specialties: ["Drum Kit", "Percussion Instruments", "Rhythm Training", "Timing Development", "Coordination Skills", "Drumming Styles"],
-      experience: "Professional drummer and percussion instructor",
+      experience: "Drummer and percussion instructor",
       education: "Diploma in Music Performance, Percussion",
       contact: {
         email: "newton@damonmusicacademy.com",
@@ -443,21 +430,8 @@ const Team = () => {
         "Developed innovative percussion teaching methods",
         "Expert in various drumming styles and techniques"
       ],
-      categories: ["teaching", "leadership"],
+      categories: ["teaching"],
       categoryInfo: {
-        leadership: {
-          role: "Head of Percussion Department",
-          bio: "Experienced percussion department leader with expertise in coordinating percussion programs and ensemble direction. Specializes in percussion ensemble management, rhythm coordination, and percussion program development. Leads the academy's percussion department and coordinates percussion performances.",
-          specialties: ["Percussion Department Management", "Rhythm Coordination", "Ensemble Direction", "Drum Kit", "Percussion Instruments", "Department Leadership"],
-          achievements: [
-            "Head of Percussion Department",
-            "Led 2 major percussion ensembles",
-            "Coordinated 10+ percussion performances",
-            "Developed comprehensive percussion programs",
-            "Expert in percussion ensemble dynamics",
-            "Specialist in rhythm coordination and timing"
-          ]
-        },
         teaching: {
           role: "Drums & Percussions Instructor",
           bio: "Skilled drummer and percussionist with expertise in various drumming styles and percussion techniques. Specializes in teaching rhythm, timing, and coordination. Passionate about developing students' musical foundation through percussion education.",
@@ -475,7 +449,7 @@ const Team = () => {
     },
     {
       id: "8",
-      name: "Deejay Brix",
+      name: "Deejay Brixx",
       role: "Technical Support & Audio Specialist",
       image: "/lovable-uploads/brix.jpg",
       bio: "Experienced technical support specialist and audio equipment expert. Provides comprehensive technical support for all academy audio systems, equipment maintenance, and technical troubleshooting. Ensures smooth operation of all technical infrastructure.",
@@ -483,7 +457,7 @@ const Team = () => {
       experience: "Technical support specialist and audio equipment expert",
       education: "Diploma in Audio Technology",
       contact: {
-        email: "brix@damonmusicacademy.com",
+        email: "brixx@damonmusicacademy.com",
         phone: "+254 700 000 007",
         location: "Nakuru, Kenya"
       },
@@ -513,6 +487,107 @@ const Team = () => {
             "Ensures smooth operation of technical systems",
             "Specialist in equipment setup and maintenance",
             "Technical support for all academy events"
+          ]
+        }
+      }
+    },
+    {
+      id: "9",
+      name: "Moses Ogoti",
+      role: "Spoken Word Poet & Performance Artist",
+      image: "/lovable-uploads/ogoti.jpg",
+      bio: "Ogoti the Boychild is a spoken word poet, performer, Corporate MC and event curator who uses his voice to spark conversations on youth empowerment, mental health, and social change. He is the founder and CEO of Bleeding Rhymes Creatives, a platform that embraces creatives and pushes the boundaries of poetry and performance.",
+      specialties: ["Spoken Word Poetry", "Performance Art", "Corporate MC", "Event Curation", "Youth Empowerment", "Creative Writing"],
+      experience: "Spoken word poet and performance artist",
+      education: "Bachelor of Pharmacy, Creative Arts",
+      contact: {
+        email: "ogoti@damonmusicacademy.com",
+        phone: "+254 700 000 008",
+        location: "Nakuru, Kenya"
+      },
+      social: {
+        linkedin: "#",
+        instagram: "#",
+        facebook: "#"
+      },
+      achievements: [
+        "Founder and CEO of Bleeding Rhymes Creatives",
+        "Released debut album 'The First Chronicles of Ogoti the Boychild'",
+        "Performed 4 successful concept shows",
+        "Available on all digital streaming platforms",
+        "Strong stage presence and storytelling gift",
+        "Professional Pharmacist and Creative Artist"
+      ],
+      categories: ["teaching", "leadership"],
+      categoryInfo: {
+        leadership: {
+          role: "Creative Arts Director",
+          bio: "Experienced creative arts director and performance leader with expertise in spoken word poetry and event curation. Specializes in creative arts programming, performance coordination, and youth empowerment initiatives. Leads creative arts programs and coordinates performance events.",
+          specialties: ["Creative Arts Direction", "Performance Coordination", "Event Curation", "Spoken Word Poetry", "Youth Empowerment", "Creative Programming"],
+          achievements: [
+            "Creative Arts Director",
+            "Founder and CEO of Bleeding Rhymes Creatives",
+            "Led 4 successful concept shows",
+            "Developed youth empowerment programs",
+            "Expert in creative arts coordination",
+            "Specialist in performance event management"
+          ]
+        },
+        teaching: {
+          role: "Spoken Word Poet & Performance Artist",
+          bio: "Ogoti the Boychild is a spoken word poet, performer, Corporate MC and event curator who uses his voice to spark conversations on youth empowerment, mental health, and social change. He is the founder and CEO of Bleeding Rhymes Creatives, a platform that embraces creatives and pushes the boundaries of poetry and performance.",
+          specialties: ["Spoken Word Poetry", "Performance Art", "Corporate MC", "Event Curation", "Youth Empowerment", "Creative Writing"],
+          achievements: [
+            "Founder and CEO of Bleeding Rhymes Creatives",
+            "Released debut album 'The First Chronicles of Ogoti the Boychild'",
+            "Performed 4 successful concept shows",
+            "Available on all digital streaming platforms",
+            "Strong stage presence and storytelling gift",
+            "Professional Pharmacist and Creative Artist"
+          ]
+        }
+      }
+    },
+    {
+      id: "10",
+      name: "Academy Administration",
+      role: "Official Administrative Contact",
+      image: "/damon-logo.png",
+      bio: "This office handles all business operations for the academy, including financial matters, student registration, and institutional records.",
+      specialties: ["Finance & Accounting", "Enrollment", "Student Records", "Institutional Policy"],
+      experience: "Official administrative contact for all business operations",
+      education: "Academy Administration",
+      contact: {
+        email: "admin@damonmusicacademy.co.ke",
+        phone: "+254 701 195 460",
+        location: "Nakuru, Kenya"
+      },
+      social: {
+        linkedin: "#",
+        instagram: "#",
+        facebook: "#"
+      },
+      achievements: [
+        "Areas of Responsibility: Finance & Accounting, Enrollment, Student Records, Institutional Policy",
+        "Contact: Please direct all administrative inquiries to our official email or phone number for prompt assistance",
+        "Email: admin@damonmusicacademy.co.ke",
+        "Phone: +254 701 195 460",
+        "This office handles all business operations for the academy",
+        "Official Administrative Contact"
+      ],
+      categories: ["admin"],
+      categoryInfo: {
+        admin: {
+          role: "Official Administrative Contact",
+          bio: "This office handles all business operations for the academy, including financial matters, student registration, and institutional records.",
+          specialties: ["Finance & Accounting", "Enrollment", "Student Records", "Institutional Policy"],
+          achievements: [
+            "Areas of Responsibility: Finance & Accounting, Enrollment, Student Records, Institutional Policy",
+            "Contact: Please direct all administrative inquiries to our official email or phone number for prompt assistance",
+            "Email: admin@damonmusicacademy.co.ke",
+            "Phone: +254 701 195 460",
+            "This office handles all business operations for the academy",
+            "Official Administrative Contact"
           ]
         }
       }
@@ -625,7 +700,7 @@ const Team = () => {
                         src={member.image} 
                         alt={member.name}
                         className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${
-                          member.id === "1" || member.id === "2" || member.id === "3" || member.id === "4" || member.id === "5" || member.id === "6" || member.id === "7" || member.id === "8"
+                          member.id === "1" || member.id === "2" || member.id === "3" || member.id === "4" || member.id === "5" || member.id === "6" || member.id === "7" || member.id === "8" || member.id === "9" || member.id === "10"
                             ? "object-top" 
                             : ""
                         }`}
@@ -722,8 +797,8 @@ const Team = () => {
               <CardContent className="py-12">
                 <h2 className="text-3xl font-bold text-gray-900 mb-4">Join Our Team</h2>
                 <p className="text-lg text-gray-600 mb-6 max-w-2xl mx-auto">
-                  We're always looking for passionate music educators and professionals to join our growing team. 
-                  If you share our vision for quality music education, we'd love to hear from you.
+                  Our team is a diverse blend of passionate educators and professionals dedicated to excellence in the creative arts and technology. 
+                  If you are driven to inspire creativity and want to contribute to a vibrant learning community, we invite you to connect with us.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button size="lg" className="bg-primary hover:bg-primary/90">
