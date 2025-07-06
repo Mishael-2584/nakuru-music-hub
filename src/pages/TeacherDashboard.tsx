@@ -25,6 +25,7 @@ interface TeacherProfile {
   subjects: string[];
   status: string;
   created_at: string;
+  notFound?: boolean;
 }
 
 interface Student {
@@ -65,10 +66,14 @@ interface Message {
 
 interface TimeSlot {
   id: string;
+  teacher_id?: string;
   day_of_week: string;
   start_time: string;
   end_time: string;
   is_available: boolean;
+  slot_type?: string;
+  max_students?: number;
+  description?: string;
 }
 
 const TeacherDashboard = () => {
@@ -111,64 +116,224 @@ const TeacherDashboard = () => {
     file_url: ''
   });
 
+  // Time slot management functions
+  const handleAddTimeSlot = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('time_slots')
+        .insert({
+          teacher_id: user.id,
+          day_of_week: newTimeSlot.day_of_week,
+          start_time: newTimeSlot.start_time,
+          end_time: newTimeSlot.end_time,
+          is_available: true,
+          slot_type: newTimeSlot.slot_type || 'regular',
+          max_students: newTimeSlot.max_students || 1,
+          description: newTimeSlot.description
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setTimeSlots([...timeSlots, data]);
+      setShowTimeSlotModal(false);
+      setNewTimeSlot({
+        day_of_week: 'Monday',
+        start_time: '',
+        end_time: '',
+        slot_type: 'regular',
+        max_students: 1,
+        description: ''
+      });
+
+      toast({
+        title: "Success",
+        description: "Time slot added successfully!",
+      });
+    } catch (error) {
+      console.error('Error adding time slot:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add time slot",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUpdateTimeSlot = async (slotId: string, updates: Partial<TimeSlot>) => {
+    try {
+      const { data, error } = await supabase
+        .from('time_slots')
+        .update(updates)
+        .eq('id', slotId)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setTimeSlots(timeSlots.map(slot => 
+        slot.id === slotId ? { ...slot, ...data } : slot
+      ));
+
+      toast({
+        title: "Success",
+        description: "Time slot updated successfully!",
+      });
+    } catch (error) {
+      console.error('Error updating time slot:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update time slot",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteTimeSlot = async (slotId: string) => {
+    try {
+      const { error } = await supabase
+        .from('time_slots')
+        .delete()
+        .eq('id', slotId);
+
+      if (error) {
+        throw error;
+      }
+
+      setTimeSlots(timeSlots.filter(slot => slot.id !== slotId));
+
+      toast({
+        title: "Success",
+        description: "Time slot deleted successfully!",
+      });
+    } catch (error) {
+      console.error('Error deleting time slot:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete time slot",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Add state for time slot management
+  const [showTimeSlotModal, setShowTimeSlotModal] = useState(false);
+  const [editingTimeSlot, setEditingTimeSlot] = useState<TimeSlot | null>(null);
+  const [newTimeSlot, setNewTimeSlot] = useState({
+    day_of_week: 'Monday',
+    start_time: '',
+    end_time: '',
+    slot_type: 'regular',
+    max_students: 1,
+    description: ''
+  });
+
   useEffect(() => {
     const checkUserRole = async () => {
       if (!user) {
-        setIsTeacher(false);
-        setIsApproved(false);
         setChecking(false);
         return;
       }
       setChecking(true);
       try {
-        // First check if user is a teacher by email
-        const { data: teacherProfile, error: teacherError } = await supabase
-          .from("teachers")
-          .select("*")
-          .eq("email", user.email)
-          .single();
-        
-        if (teacherProfile && !teacherError && teacherProfile.status === "approved") {
-          setIsTeacher(true);
-          setIsApproved(true);
-          setProfile(teacherProfile);
-          fetchTeacherData(teacherProfile.id);
-          return; // Exit early if teacher is found and approved
-        }
-
-        // Check if user is a pending teacher
-        const { data: pendingTeacher, error: pendingTeacherError } = await supabase
-          .from("pending_teachers")
-          .select("id")
-          .eq("email", user.email)
-          .single();
-        
-        if (pendingTeacher && !pendingTeacherError) {
-          setIsTeacher(false);
-          setIsApproved(false);
-          navigate("/pending-teacher", { replace: true });
-          return;
-        }
-
-        // If not a teacher, check if user is an admin
+        // 1. Check profiles table for role
+        console.log('[TeacherDashboard] Checking profiles table for user:', user.id);
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', user.id)
           .single();
-        
-        if (profile && !profileError && profile.role === 'admin') {
-          navigate("/admin", { replace: true });
+        if (profile && !profileError) {
+          console.log('[TeacherDashboard] User role from profiles:', profile.role);
+          if (profile.role === 'teacher') {
+            // Fetch teacher profile by email
+            const { data: teacherProfile, error: teacherError } = await supabase
+              .from('teachers')
+              .select('*')
+              .eq('email', user.email)
+              .single();
+            console.log('[TeacherDashboard] teacherProfile:', teacherProfile, 'teacherError:', teacherError);
+            if (teacherProfile && !teacherError && (teacherProfile.status === 'approved' || teacherProfile.status === 'active')) {
+              setIsTeacher(true);
+              setIsApproved(true);
+              setProfile(teacherProfile);
+              fetchTeacherData(teacherProfile.id);
+              return;
+            } else {
+              // If not found in teachers table, treat as teacher anyway (profile is source of truth)
+              setIsTeacher(true);
+              setIsApproved(true);
+              setProfile({
+                id: 'not-found',
+                email: user.email,
+                name: user.user_metadata?.name || user.email,
+                phone: '',
+                bio: '',
+                experience: '',
+                category: '',
+                subjects: [],
+                status: 'approved',
+                created_at: '',
+                notFound: true
+              });
+              return;
+            }
+          } else if (profile.role === 'admin') {
+            navigate('/admin', { replace: true });
+            return;
+          } else if (profile.role === 'student') {
+            navigate('/student', { replace: true });
+            return;
+          }
+        } else {
+          console.log('[TeacherDashboard] No profile found or error:', profileError);
+        }
+
+        // 2. Only check teachers table if no profile role found
+        console.log('[TeacherDashboard] Checking teachers table...');
+        const { data: teacherProfile, error: teacherError } = await supabase
+          .from('teachers')
+          .select('*')
+          .eq('email', user.email)
+          .single();
+        if (teacherProfile && !teacherError && (teacherProfile.status === 'approved' || teacherProfile.status === 'active')) {
+          setIsTeacher(true);
+          setIsApproved(true);
+          setProfile(teacherProfile);
+          fetchTeacherData(teacherProfile.id);
           return;
         }
 
-        // If not admin or teacher, redirect to student dashboard
-        navigate("/student", { replace: true });
-        
+        // 3. Only check pending_teachers if not found in teachers table
+        try {
+          const { data: pendingTeacher, error: pendingTeacherError } = await supabase
+            .from('pending_teachers')
+            .select('id')
+            .eq('email', user.email)
+            .single();
+          if (pendingTeacher && !pendingTeacherError) {
+            setIsTeacher(false);
+            setIsApproved(false);
+            navigate('/pending-teacher', { replace: true });
+            return;
+          }
+        } catch (err) {
+          console.warn('[TeacherDashboard] Skipping pending_teachers check due to error:', err);
+        }
+
+        // 4. If not admin or teacher, redirect to student dashboard
+        navigate('/student', { replace: true });
       } catch (error) {
-        console.error('Error checking user role:', error);
+        console.error('[TeacherDashboard] Error checking user role:', error);
         // If there's an error, redirect to student dashboard as fallback
-        navigate("/student", { replace: true });
+        navigate('/student', { replace: true });
       } finally {
         setChecking(false);
       }
@@ -222,20 +387,44 @@ const TeacherDashboard = () => {
         })));
       }
 
-      // Mock time slots for now
-      setTimeSlots([
-        { id: '1', day_of_week: 'Monday', start_time: '09:00', end_time: '10:00', is_available: true },
-        { id: '2', day_of_week: 'Monday', start_time: '10:00', end_time: '11:00', is_available: true },
-        { id: '3', day_of_week: 'Tuesday', start_time: '14:00', end_time: '15:00', is_available: true },
-        { id: '4', day_of_week: 'Wednesday', start_time: '16:00', end_time: '17:00', is_available: false },
-      ]);
+      // Fetch real time slots from database
+      const { data: timeSlotsData, error: timeSlotsError } = await supabase
+        .from('time_slots')
+        .select('*')
+        .eq('teacher_id', user?.id)
+        .order('day_of_week', { ascending: true })
+        .order('start_time', { ascending: true });
 
-      // Mock materials
-      setMaterials([
-        { id: '1', title: 'Piano Fundamentals Guide', description: 'Basic hand positioning and technique', file_url: '/materials/piano-fundamentals.pdf' },
-        { id: '2', title: 'Music Theory Basics', description: 'Introduction to reading music', file_url: '/materials/music-theory.pdf' },
-        { id: '3', title: 'Practice Schedule Template', description: 'Weekly practice planning sheet', file_url: '/materials/practice-schedule.pdf' },
-      ]);
+      if (!timeSlotsError && timeSlotsData) {
+        setTimeSlots(timeSlotsData);
+      } else {
+        console.log('No time slots found, using default slots');
+        // Set default time slots if none exist
+        setTimeSlots([
+          { id: '1', teacher_id: user?.id, day_of_week: 'Monday', start_time: '09:00', end_time: '10:00', is_available: true, slot_type: 'regular', max_students: 1, description: 'Morning slot' },
+          { id: '2', teacher_id: user?.id, day_of_week: 'Monday', start_time: '10:00', end_time: '11:00', is_available: true, slot_type: 'regular', max_students: 1, description: 'Late morning slot' },
+          { id: '3', teacher_id: user?.id, day_of_week: 'Tuesday', start_time: '14:00', end_time: '15:00', is_available: true, slot_type: 'regular', max_students: 1, description: 'Afternoon slot' },
+          { id: '4', teacher_id: user?.id, day_of_week: 'Wednesday', start_time: '16:00', end_time: '17:00', is_available: false, slot_type: 'regular', max_students: 1, description: 'Evening slot' },
+        ]);
+      }
+
+      // Fetch materials
+      const { data: materialsData, error: materialsError } = await supabase
+        .from('lesson_materials')
+        .select('*')
+        .eq('uploaded_by', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (!materialsError && materialsData) {
+        setMaterials(materialsData);
+      } else {
+        // Set default materials if none exist
+        setMaterials([
+          { id: '1', title: 'Piano Fundamentals Guide', description: 'Basic hand positioning and technique', file_url: '/materials/piano-fundamentals.pdf' },
+          { id: '2', title: 'Music Theory Basics', description: 'Introduction to reading music', file_url: '/materials/music-theory.pdf' },
+          { id: '3', title: 'Practice Schedule Template', description: 'Weekly practice planning sheet', file_url: '/materials/practice-schedule.pdf' },
+        ]);
+      }
 
     } catch (error) {
       console.error('Error fetching teacher data:', error);
@@ -458,6 +647,11 @@ const TeacherDashboard = () => {
               </div>
             </CardContent>
           </Card>
+          {profile?.notFound && (
+            <div className="p-4 bg-yellow-100 border border-yellow-300 rounded text-yellow-800 mb-4">
+              No teacher profile found for this account in the teachers table. Please contact admin if this is an error.
+            </div>
+          )}
         </aside>
 
         {/* Main Content */}

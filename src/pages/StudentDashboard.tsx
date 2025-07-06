@@ -114,6 +114,49 @@ interface LessonMaterial {
   created_at: string;
 }
 
+interface AvailableTimeSlot {
+  id: string;
+  teacher_id: string;
+  teacher_name: string;
+  teacher_email: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  is_available: boolean;
+  slot_type: string;
+  max_students: number;
+  description?: string;
+  current_bookings: number;
+}
+
+interface Booking {
+  id: string;
+  time_slot_id: string;
+  student_id: string;
+  teacher_id: string;
+  booking_date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  lesson_type: string;
+  notes?: string;
+  created_at: string;
+  teacher_name?: string;
+  day_of_week?: string;
+}
+
+interface Teacher {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  bio?: string;
+  experience?: string;
+  category: string;
+  subjects: string[];
+  status: string;
+}
+
 const StudentDashboard = () => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
@@ -129,6 +172,19 @@ const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [passwordChecked, setPasswordChecked] = useState(false);
+  
+  // Booking system state
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<AvailableTimeSlot[]>([]);
+  const [myBookings, setMyBookings] = useState<Booking[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [selectedTeacher, setSelectedTeacher] = useState<string>('all');
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<AvailableTimeSlot | null>(null);
+  const [newBooking, setNewBooking] = useState({
+    booking_date: '',
+    lesson_type: 'regular',
+    notes: ''
+  });
   
   // Practice log modal state
   const [showPracticeModal, setShowPracticeModal] = useState(false);
@@ -309,12 +365,16 @@ const StudentDashboard = () => {
       const { data: materialsData, error: materialsError } = await supabase
         .from('lesson_materials')
         .select('*')
-        .in('lesson_id', lessonsData?.map(l => l.id) || [])
         .order('created_at', { ascending: false });
 
       if (!materialsError && materialsData) {
         setMaterials(materialsData);
       }
+
+      // Fetch available time slots and teachers
+      await fetchAvailableTimeSlots();
+      await fetchTeachers();
+      await fetchMyBookings();
 
     } catch (error) {
       console.error('Error fetching student data:', error);
@@ -325,6 +385,191 @@ const StudentDashboard = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fetch available time slots with teacher information
+  const fetchAvailableTimeSlots = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('time_slots')
+        .select(`
+          *,
+          teachers!inner(
+            name,
+            email,
+            bio,
+            experience,
+            category,
+            subjects
+          )
+        `)
+        .eq('is_available', true)
+        .order('day_of_week', { ascending: true })
+        .order('start_time', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching time slots:', error);
+        return;
+      }
+
+      // Transform data to include teacher information and booking count
+      const slotsWithTeacherInfo = await Promise.all(
+        data.map(async (slot) => {
+          // Get current booking count for this slot
+          const { count: bookingCount } = await supabase
+            .from('bookings')
+            .select('*', { count: 'exact', head: true })
+            .eq('time_slot_id', slot.id)
+            .eq('status', 'confirmed');
+
+          return {
+            id: slot.id,
+            teacher_id: slot.teacher_id,
+            teacher_name: slot.teachers?.name || 'Unknown Teacher',
+            teacher_email: slot.teachers?.email || '',
+            day_of_week: slot.day_of_week,
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+            is_available: slot.is_available,
+            slot_type: slot.slot_type,
+            max_students: slot.max_students,
+            description: slot.description,
+            current_bookings: bookingCount || 0
+          };
+        })
+      );
+
+      setAvailableTimeSlots(slotsWithTeacherInfo);
+    } catch (error) {
+      console.error('Error fetching available time slots:', error);
+    }
+  };
+
+  // Fetch all teachers
+  const fetchTeachers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('teachers')
+        .select('*')
+        .eq('status', 'active')
+        .order('name', { ascending: true });
+
+      if (!error && data) {
+        setTeachers(data);
+      }
+    } catch (error) {
+      console.error('Error fetching teachers:', error);
+    }
+  };
+
+  // Fetch student's bookings
+  const fetchMyBookings = async () => {
+    if (!studentProfile) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          time_slots!inner(
+            day_of_week,
+            teachers!inner(name)
+          )
+        `)
+        .eq('student_id', studentProfile.id)
+        .order('booking_date', { ascending: true });
+
+      if (!error && data) {
+        const bookingsWithTeacherInfo = data.map(booking => ({
+          ...booking,
+          teacher_name: booking.time_slots?.teachers?.name || 'Unknown Teacher',
+          day_of_week: booking.time_slots?.day_of_week || ''
+        }));
+        setMyBookings(bookingsWithTeacherInfo);
+      }
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+    }
+  };
+
+  // Handle booking a time slot
+  const handleBookTimeSlot = async () => {
+    if (!selectedTimeSlot || !studentProfile) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert({
+          time_slot_id: selectedTimeSlot.id,
+          student_id: studentProfile.id,
+          teacher_id: selectedTimeSlot.teacher_id,
+          booking_date: newBooking.booking_date,
+          start_time: selectedTimeSlot.start_time,
+          end_time: selectedTimeSlot.end_time,
+          status: 'confirmed',
+          lesson_type: newBooking.lesson_type,
+          notes: newBooking.notes
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      // Update available time slots
+      await fetchAvailableTimeSlots();
+      await fetchMyBookings();
+
+      setShowBookingModal(false);
+      setSelectedTimeSlot(null);
+      setNewBooking({
+        booking_date: '',
+        lesson_type: 'regular',
+        notes: ''
+      });
+
+      toast({
+        title: "Success",
+        description: "Lesson booked successfully!",
+      });
+    } catch (error) {
+      console.error('Error booking time slot:', error);
+      toast({
+        title: "Error",
+        description: "Failed to book lesson",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle canceling a booking
+  const handleCancelBooking = async (bookingId: string) => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'cancelled' })
+        .eq('id', bookingId);
+
+      if (error) {
+        throw error;
+      }
+
+      await fetchMyBookings();
+      await fetchAvailableTimeSlots();
+
+      toast({
+        title: "Success",
+        description: "Booking cancelled successfully!",
+      });
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      toast({
+        title: "Error",
+        description: "Failed to cancel booking",
+        variant: "destructive",
+      });
     }
   };
 
@@ -525,13 +770,17 @@ const StudentDashboard = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8 bg-white shadow-sm">
+          <TabsList className="grid w-full grid-cols-9 bg-white shadow-sm">
             <TabsTrigger value="dashboard" className="flex items-center space-x-2">
               <BarChart3 className="w-4 h-4" />
               <span className="hidden sm:inline">Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value="schedule" className="flex items-center space-x-2">
+            <TabsTrigger value="bookings" className="flex items-center space-x-2">
               <Calendar className="w-4 h-4" />
+              <span className="hidden sm:inline">Bookings</span>
+            </TabsTrigger>
+            <TabsTrigger value="schedule" className="flex items-center space-x-2">
+              <CalendarDays className="w-4 h-4" />
               <span className="hidden sm:inline">Schedule</span>
             </TabsTrigger>
             <TabsTrigger value="materials" className="flex items-center space-x-2">
@@ -653,6 +902,143 @@ const StudentDashboard = () => {
                   ) : (
                     <p className="text-gray-500">No practice sessions recorded</p>
                   )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Bookings Tab */}
+          <TabsContent value="bookings" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Available Time Slots */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Available Time Slots</CardTitle>
+                  <CardDescription>Book lessons with our teachers</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4">
+                    <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Filter by teacher" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Teachers</SelectItem>
+                        {teachers.map(teacher => (
+                          <SelectItem key={teacher.id} value={teacher.id}>
+                            {teacher.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {availableTimeSlots
+                      .filter(slot => selectedTeacher === 'all' || slot.teacher_id === selectedTeacher)
+                      .filter(slot => slot.current_bookings < slot.max_students)
+                      .map(slot => (
+                        <div key={slot.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold">{slot.teacher_name}</h4>
+                            <Badge variant="secondary">{slot.slot_type}</Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
+                            <div>
+                              <span className="font-medium">Day:</span> {slot.day_of_week}
+                            </div>
+                            <div>
+                              <span className="font-medium">Time:</span> {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
+                            </div>
+                            <div>
+                              <span className="font-medium">Available:</span> {slot.max_students - slot.current_bookings} spots
+                            </div>
+                            <div>
+                              <span className="font-medium">Type:</span> {slot.slot_type}
+                            </div>
+                          </div>
+                          {slot.description && (
+                            <p className="text-sm text-gray-600 mb-3">{slot.description}</p>
+                          )}
+                          <Button 
+                            onClick={() => {
+                              setSelectedTimeSlot(slot);
+                              setNewBooking({
+                                booking_date: '',
+                                lesson_type: 'regular',
+                                notes: ''
+                              });
+                              setShowBookingModal(true);
+                            }}
+                            disabled={slot.current_bookings >= slot.max_students}
+                            className="w-full"
+                          >
+                            {slot.current_bookings >= slot.max_students ? 'Full' : 'Book This Slot'}
+                          </Button>
+                        </div>
+                      ))}
+                    {availableTimeSlots.filter(slot => 
+                      (selectedTeacher === 'all' || slot.teacher_id === selectedTeacher) &&
+                      slot.current_bookings < slot.max_students
+                    ).length === 0 && (
+                      <p className="text-gray-500 text-center py-8">No available time slots found</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* My Bookings */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>My Bookings</CardTitle>
+                  <CardDescription>View and manage your booked lessons</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {myBookings.length > 0 ? (
+                      myBookings.map(booking => (
+                        <div key={booking.id} className="p-4 border rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold">{booking.teacher_name}</h4>
+                            <Badge className={getStatusColor(booking.status)}>{booking.status}</Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
+                            <div>
+                              <span className="font-medium">Date:</span> {formatDate(booking.booking_date)}
+                            </div>
+                            <div>
+                              <span className="font-medium">Time:</span> {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
+                            </div>
+                            <div>
+                              <span className="font-medium">Day:</span> {booking.day_of_week}
+                            </div>
+                            <div>
+                              <span className="font-medium">Type:</span> {booking.lesson_type}
+                            </div>
+                          </div>
+                          {booking.notes && (
+                            <p className="text-sm text-gray-600 mb-3">{booking.notes}</p>
+                          )}
+                          <div className="flex space-x-2">
+                            {booking.status === 'confirmed' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleCancelBooking(booking.id)}
+                              >
+                                Cancel Booking
+                              </Button>
+                            )}
+                            <Button variant="outline" size="sm">
+                              View Details
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-gray-500 text-center py-8">No bookings found</p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -1107,6 +1493,81 @@ const StudentDashboard = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Booking Modal */}
+      <Dialog open={showBookingModal} onOpenChange={setShowBookingModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Book Lesson</DialogTitle>
+          </DialogHeader>
+          {selectedTimeSlot && (
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <h4 className="font-semibold mb-2">Selected Time Slot</h4>
+                <div className="text-sm text-gray-600">
+                  <p><span className="font-medium">Teacher:</span> {selectedTimeSlot.teacher_name}</p>
+                  <p><span className="font-medium">Day:</span> {selectedTimeSlot.day_of_week}</p>
+                  <p><span className="font-medium">Time:</span> {formatTime(selectedTimeSlot.start_time)} - {formatTime(selectedTimeSlot.end_time)}</p>
+                  <p><span className="font-medium">Type:</span> {selectedTimeSlot.slot_type}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="booking_date" className="text-right">Booking Date</Label>
+                <Input
+                  id="booking_date"
+                  type="date"
+                  value={newBooking.booking_date}
+                  onChange={(e) => setNewBooking({...newBooking, booking_date: e.target.value})}
+                  className="col-span-3"
+                  min={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="lesson_type" className="text-right">Lesson Type</Label>
+                <Select 
+                  value={newBooking.lesson_type} 
+                  onValueChange={(value) => setNewBooking({...newBooking, lesson_type: value})}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="regular">Regular Lesson</SelectItem>
+                    <SelectItem value="practice">Practice Session</SelectItem>
+                    <SelectItem value="assessment">Assessment</SelectItem>
+                    <SelectItem value="recital">Recital Preparation</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="notes" className="text-right">Notes</Label>
+                <Textarea
+                  id="notes"
+                  value={newBooking.notes}
+                  onChange={(e) => setNewBooking({...newBooking, notes: e.target.value})}
+                  className="col-span-3"
+                  placeholder="Any special requests or notes..."
+                />
+              </div>
+              
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowBookingModal(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleBookTimeSlot}
+                  disabled={!newBooking.booking_date}
+                >
+                  Confirm Booking
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

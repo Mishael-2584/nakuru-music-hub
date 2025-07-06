@@ -48,6 +48,33 @@ interface TeamMember {
   };
   achievements: string[];
   categories: ('leadership' | 'teaching' | 'support' | 'admin')[];
+  // Category-specific information
+  categoryInfo: {
+    leadership?: {
+      role: string;
+      bio: string;
+      specialties: string[];
+      achievements: string[];
+    };
+    teaching?: {
+      role: string;
+      bio: string;
+      specialties: string[];
+      achievements: string[];
+    };
+    support?: {
+      role: string;
+      bio: string;
+      specialties: string[];
+      achievements: string[];
+    };
+    admin?: {
+      role: string;
+      bio: string;
+      specialties: string[];
+      achievements: string[];
+    };
+  };
 }
 
 const Team = () => {
@@ -81,7 +108,48 @@ const Team = () => {
         "Certified ABRSM Examiner",
         "Specialist in classical and contemporary music"
       ],
-      categories: ["leadership", "teaching", "admin"]
+      categories: ["leadership", "teaching", "admin"],
+      categoryInfo: {
+        leadership: {
+          role: "Founder, Director & Senior Music Teacher",
+          bio: "Passionate music educator and entrepreneur with extensive experience in music education. Founded Damon Music Academy with the vision of making quality music education accessible to all. Specializes in piano, guitar, and music theory instruction.",
+          specialties: ["Piano", "Guitar", "Music Theory", "Composition", "Academy Management", "Vocal Training"],
+          achievements: [
+            "Founded Damon Music Academy in 2016",
+            "Trained over 500 students in music",
+            "Recipient of Music Education Excellence Award 2022",
+            "Published composer with 3 original compositions",
+            "Certified ABRSM Examiner",
+            "Specialist in classical and contemporary music"
+          ]
+        },
+        teaching: {
+          role: "Founder, Director & Senior Music Teacher",
+          bio: "Passionate music educator and entrepreneur with extensive experience in music education. Founded Damon Music Academy with the vision of making quality music education accessible to all. Specializes in piano, guitar, and music theory instruction.",
+          specialties: ["Piano", "Guitar", "Music Theory", "Composition", "Academy Management", "Vocal Training"],
+          achievements: [
+            "Founded Damon Music Academy in 2016",
+            "Trained over 500 students in music",
+            "Recipient of Music Education Excellence Award 2022",
+            "Published composer with 3 original compositions",
+            "Certified ABRSM Examiner",
+            "Specialist in classical and contemporary music"
+          ]
+        },
+        admin: {
+          role: "Academy Director & Administrator",
+          bio: "Senior administrator and academy director responsible for overall academy operations, strategic planning, and administrative oversight. Manages academy policies, finances, and organizational development.",
+          specialties: ["Academy Management", "Strategic Planning", "Administrative Oversight", "Policy Development", "Financial Management", "Organizational Leadership"],
+          achievements: [
+            "Founded Damon Music Academy in 2016",
+            "Manages academy operations and policies",
+            "Oversees strategic planning and development",
+            "Coordinates administrative functions",
+            "Leads organizational growth initiatives",
+            "Academy Director & Administrator"
+          ]
+        }
+      }
     },
     {
       id: "4",
@@ -110,7 +178,35 @@ const Team = () => {
         "Expert in vocal breathing and piano technique",
         "Director of the Children's Choir"
       ],
-      categories: ["teaching", "leadership"]
+      categories: ["teaching", "leadership"],
+      categoryInfo: {
+        leadership: {
+          role: "Head of Voice Ensembles",
+          bio: "Experienced vocal director and ensemble leader with a passion for developing choral excellence. Specializes in vocal ensemble direction, choir management, and performance coordination. Leads multiple vocal groups and coordinates major performances.",
+          specialties: ["Vocal Ensemble Direction", "Choir Management", "Performance Coordination", "Vocal Technique", "Choir Direction", "Ensemble Leadership"],
+          achievements: [
+            "Director of the Children's Choir",
+            "Led 3 major vocal ensembles",
+            "Coordinated 15+ choir performances",
+            "Developed innovative ensemble training programs",
+            "Expert in vocal ensemble dynamics",
+            "Head of Voice Ensembles"
+          ]
+        },
+        teaching: {
+          role: "Voice & Piano Instructor",
+          bio: "Talented vocalist and pianist with a passion for developing musical talent. Specializes in classical and contemporary vocal techniques, piano instruction, and performance coaching. Director of the Children's Choir.",
+          specialties: ["Voice Training", "Piano Instruction", "Performance Coaching", "Music Theory", "Vocal Technique", "Choir Direction"],
+          achievements: [
+            "Specialist in classical and contemporary vocal techniques",
+            "Trained 120+ students in voice and piano",
+            "Performed at prestigious music festivals",
+            "Developed innovative teaching methodologies",
+            "Expert in vocal breathing and piano technique",
+            "Director of the Children's Choir"
+          ]
+        }
+      }
     },
     {
       id: "5",
@@ -139,7 +235,35 @@ const Team = () => {
         "Performed with renowned orchestras and bands",
         "Head of Instrument Ensemble"
       ],
-      categories: ["teaching", "leadership"]
+      categories: ["teaching", "leadership"],
+      categoryInfo: {
+        leadership: {
+          role: "Head of Instrument Ensembles",
+          bio: "Experienced ensemble director and instrumental leader with expertise in coordinating multiple instrument groups. Specializes in ensemble direction, instrumental coordination, and performance management. Leads the academy's instrumental ensembles and coordinates major performances.",
+          specialties: ["Ensemble Direction", "Instrumental Coordination", "Performance Management", "Brass Instruments", "String Instruments", "Ensemble Leadership"],
+          achievements: [
+            "Head of Instrument Ensemble",
+            "Led 4 major instrumental ensembles",
+            "Coordinated 20+ ensemble performances",
+            "Developed comprehensive ensemble training programs",
+            "Expert in instrumental ensemble dynamics",
+            "Specialist in brass and string coordination"
+          ]
+        },
+        teaching: {
+          role: "Brass & Strings Instructor",
+          bio: "Skilled brass and strings instructor with expertise in music production. Specializes in trumpet, violin, and music production techniques. Passionate about teaching both classical and contemporary music styles. Head of Instrument Ensemble.",
+          specialties: ["Brass Instruments", "String Instruments", "Music Production", "Trumpet", "Violin", "Studio Recording", "Ensemble Direction"],
+          achievements: [
+            "Expert in brass and string instrument instruction",
+            "Specialist in music production and studio recording",
+            "Trained 150+ students in brass and strings",
+            "Produced 3 original music compositions",
+            "Performed with renowned orchestras and bands",
+            "Head of Instrument Ensemble"
+          ]
+        }
+      }
     },
     {
       id: "2",
@@ -167,7 +291,21 @@ const Team = () => {
         "Expert in digital and analog sound systems",
         "Trained 100+ sound engineering students"
       ],
-      categories: ["teaching"]
+      categories: ["teaching"],
+      categoryInfo: {
+        teaching: {
+          role: "Bass Guitarist & Sound Engineer",
+          bio: "Experienced bass guitarist and sound engineer with expertise in live sound, studio recording, and music production. Passionate about creating exceptional audio experiences and teaching the next generation of sound professionals.",
+          specialties: ["Bass Guitar", "Live Sound Engineering", "Studio Recording", "Music Production", "Audio Mixing"],
+          achievements: [
+            "Engineered over 200 live performances",
+            "Specialist in bass guitar instruction",
+            "Produced 5 studio albums",
+            "Expert in digital and analog sound systems",
+            "Trained 100+ sound engineering students"
+          ]
+        }
+      }
     },
     {
       id: "3",
@@ -194,7 +332,32 @@ const Team = () => {
         "Created multiple successful web applications",
         "Specialist in responsive design and accessibility"
       ],
-      categories: ["teaching", "support"]
+      categories: ["teaching", "support"],
+      categoryInfo: {
+        teaching: {
+          role: "Web Designer & Programmer",
+          bio: "Creative web designer and full-stack developer with expertise in modern web technologies. Passionate about creating beautiful, functional, and user-friendly digital experiences.",
+          specialties: ["Web Design", "Frontend Development", "Backend Development", "UI/UX Design"],
+          achievements: [
+            "Designed and developed academy website",
+            "Expert in React, TypeScript, and modern web technologies",
+            "Created multiple successful web applications",
+            "Specialist in responsive design and accessibility"
+          ]
+        },
+        support: {
+          role: "IT Support & Technical Lead",
+          bio: "Technical expert and IT support specialist responsible for maintaining the academy's digital infrastructure. Ensures smooth operation of all technical systems and provides support for digital learning platforms.",
+          specialties: ["IT Support", "Technical Infrastructure", "Digital Platform Management", "System Maintenance", "Technical Troubleshooting"],
+          achievements: [
+            "Maintains academy's digital infrastructure",
+            "Provides technical support for all systems",
+            "Ensures smooth operation of digital platforms",
+            "Expert in technical troubleshooting",
+            "Manages IT security and data protection"
+          ]
+        }
+      }
     },
     {
       id: "6",
@@ -223,13 +386,115 @@ const Team = () => {
         "Performed with renowned jazz ensembles",
         "Graduate in Music Production"
       ],
-      categories: ["teaching"]
+      categories: ["teaching"],
+      categoryInfo: {
+        teaching: {
+          role: "Saxophonist & Brass Instructor",
+          bio: "Talented saxophonist and brass instructor with expertise in music production. Specializes in saxophone, brass instruments, and contemporary music styles. Passionate about teaching both classical and jazz techniques.",
+          specialties: ["Saxophone", "Brass Instruments", "Music Production", "Jazz Techniques", "Classical Saxophone", "Studio Recording"],
+          achievements: [
+            "Expert in saxophone and brass instrument instruction",
+            "Specialist in jazz and contemporary music styles",
+            "Trained 100+ students in saxophone and brass",
+            "Produced 2 original jazz compositions",
+            "Performed with renowned jazz ensembles",
+            "Graduate in Music Production"
+          ]
+        }
+      }
+    },
+    {
+      id: "7",
+      name: "Newton Egesa",
+      role: "Drums & Percussions Instructor",
+      image: "/lovable-uploads/newton.jpg",
+      bio: "Skilled drummer and percussionist with expertise in various drumming styles and percussion techniques. Specializes in teaching rhythm, timing, and coordination. Passionate about developing students' musical foundation through percussion education.",
+      specialties: ["Drum Kit", "Percussion Instruments", "Rhythm Training", "Timing Development", "Coordination Skills", "Drumming Styles"],
+      experience: "Professional drummer and percussion instructor",
+      education: "Diploma in Music Performance, Percussion",
+      contact: {
+        email: "newton@damonmusicacademy.com",
+        phone: "+254 700 000 006",
+        location: "Nakuru, Kenya"
+      },
+      social: {
+        linkedin: "#",
+        instagram: "#",
+        facebook: "#"
+      },
+      achievements: [
+        "Expert in drum kit and percussion instruction",
+        "Trained 80+ students in drums and percussion",
+        "Performed with renowned bands and ensembles",
+        "Specialist in rhythm and timing development",
+        "Developed innovative percussion teaching methods",
+        "Expert in various drumming styles and techniques"
+      ],
+      categories: ["teaching", "leadership"],
+      categoryInfo: {
+        leadership: {
+          role: "Head of Percussion Department",
+          bio: "Experienced percussion department leader with expertise in coordinating percussion programs and ensemble direction. Specializes in percussion ensemble management, rhythm coordination, and percussion program development. Leads the academy's percussion department and coordinates percussion performances.",
+          specialties: ["Percussion Department Management", "Rhythm Coordination", "Ensemble Direction", "Drum Kit", "Percussion Instruments", "Department Leadership"],
+          achievements: [
+            "Head of Percussion Department",
+            "Led 2 major percussion ensembles",
+            "Coordinated 10+ percussion performances",
+            "Developed comprehensive percussion programs",
+            "Expert in percussion ensemble dynamics",
+            "Specialist in rhythm coordination and timing"
+          ]
+        },
+        teaching: {
+          role: "Drums & Percussions Instructor",
+          bio: "Skilled drummer and percussionist with expertise in various drumming styles and percussion techniques. Specializes in teaching rhythm, timing, and coordination. Passionate about developing students' musical foundation through percussion education.",
+          specialties: ["Drum Kit", "Percussion Instruments", "Rhythm Training", "Timing Development", "Coordination Skills", "Drumming Styles"],
+          achievements: [
+            "Expert in drum kit and percussion instruction",
+            "Trained 80+ students in drums and percussion",
+            "Performed with renowned bands and ensembles",
+            "Specialist in rhythm and timing development",
+            "Developed innovative percussion teaching methods",
+            "Expert in various drumming styles and techniques"
+          ]
+        }
+      }
     }
   ];
 
   const filteredMembers = activeTab === "all" 
     ? teamMembers 
     : teamMembers.filter(member => member.categories.includes(activeTab as 'leadership' | 'teaching' | 'support' | 'admin'));
+
+  // Function to get dynamic content based on category
+  const getMemberContent = (member: TeamMember, category: string) => {
+    if (category === "all") {
+      return {
+        role: member.role,
+        bio: member.bio,
+        specialties: member.specialties,
+        achievements: member.achievements
+      };
+    }
+
+    const categoryData = member.categoryInfo[category as keyof typeof member.categoryInfo];
+    if (categoryData) {
+      return {
+        role: categoryData.role,
+        bio: categoryData.bio,
+        specialties: categoryData.specialties,
+        achievements: categoryData.achievements
+      };
+    }
+
+    // Fallback to default content
+    return {
+      role: member.role,
+      bio: member.bio,
+      specialties: member.specialties,
+      achievements: member.achievements
+    };
+  };
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -293,102 +558,105 @@ const Team = () => {
 
           {/* Team Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredMembers.map((member) => (
-              <Card key={member.id} className="group hover:shadow-xl transition-all duration-300 border-0 bg-white/95 overflow-hidden">
-                <div className="relative">
-                  <div className="aspect-square overflow-hidden">
-                    <img 
-                      src={member.image} 
-                      alt={member.name}
-                      className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${
-                        member.id === "1" || member.id === "2" || member.id === "3" || member.id === "4" || member.id === "5" || member.id === "6"
-                          ? "object-top" 
-                          : ""
-                      }`}
-                    />
+            {filteredMembers.map((member) => {
+              const content = getMemberContent(member, activeTab);
+              return (
+                <Card key={member.id} className="group hover:shadow-xl transition-all duration-300 border-0 bg-white/95 overflow-hidden">
+                  <div className="relative">
+                    <div className="aspect-square overflow-hidden">
+                      <img 
+                        src={member.image} 
+                        alt={member.name}
+                        className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${
+                          member.id === "1" || member.id === "2" || member.id === "3" || member.id === "4" || member.id === "5" || member.id === "6" || member.id === "7"
+                            ? "object-top" 
+                            : ""
+                        }`}
+                      />
+                    </div>
+                    <div className={`absolute top-4 right-4 ${getCategoryColor(activeTab === "all" ? member.categories[0] : activeTab)} text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1`}>
+                      {getCategoryIcon(activeTab === "all" ? member.categories[0] : activeTab)}
+                      {(activeTab === "all" ? member.categories[0] : activeTab).charAt(0).toUpperCase() + (activeTab === "all" ? member.categories[0] : activeTab).slice(1)}
+                    </div>
+                    {activeTab === "all" && member.categories.length > 1 && (
+                      <div className="absolute top-4 right-4 flex flex-col gap-1 mt-8">
+                        {member.categories.slice(1).map((category, index) => (
+                          <div key={index} className={`${getCategoryColor(category)} text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1`}>
+                            {getCategoryIcon(category)}
+                            {category.charAt(0).toUpperCase() + category.slice(1)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className={`absolute top-4 right-4 ${getCategoryColor(activeTab === "all" ? member.categories[0] : activeTab)} text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1`}>
-                    {getCategoryIcon(activeTab === "all" ? member.categories[0] : activeTab)}
-                    {(activeTab === "all" ? member.categories[0] : activeTab).charAt(0).toUpperCase() + (activeTab === "all" ? member.categories[0] : activeTab).slice(1)}
-                  </div>
-                  {activeTab === "all" && member.categories.length > 1 && (
-                    <div className="absolute top-4 right-4 flex flex-col gap-1 mt-8">
-                      {member.categories.slice(1).map((category, index) => (
-                        <div key={index} className={`${getCategoryColor(category)} text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1`}>
-                          {getCategoryIcon(category)}
-                          {category.charAt(0).toUpperCase() + category.slice(1)}
+                  
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-xl font-bold text-gray-900">{member.name}</CardTitle>
+                    <CardDescription className="text-primary font-semibold">{content.role}</CardDescription>
+                  </CardHeader>
+                  
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-gray-600 line-clamp-3">{content.bio}</p>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <h4 className="font-semibold text-sm text-gray-900 mb-2">Specialties</h4>
+                        <div className="flex flex-wrap gap-1">
+                          {content.specialties.map((specialty, index) => (
+                            <Badge key={index} variant="secondary" className="text-xs">
+                              {specialty}
+                            </Badge>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-xl font-bold text-gray-900">{member.name}</CardTitle>
-                  <CardDescription className="text-primary font-semibold">{member.role}</CardDescription>
-                </CardHeader>
-                
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-gray-600 line-clamp-3">{member.bio}</p>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <h4 className="font-semibold text-sm text-gray-900 mb-2">Specialties</h4>
-                      <div className="flex flex-wrap gap-1">
-                        {member.specialties.map((specialty, index) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
-                            {specialty}
-                          </Badge>
-                        ))}
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-semibold text-sm text-gray-900 mb-2">Experience</h4>
+                        <p className="text-xs text-gray-600">{member.experience}</p>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-semibold text-sm text-gray-900 mb-2">Key Achievements</h4>
+                        <ul className="text-xs text-gray-600 space-y-1">
+                          {content.achievements.slice(0, 2).map((achievement, index) => (
+                            <li key={index} className="flex items-start gap-2">
+                              <Award className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+                              <span>{achievement}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     </div>
                     
-                    <div>
-                      <h4 className="font-semibold text-sm text-gray-900 mb-2">Experience</h4>
-                      <p className="text-xs text-gray-600">{member.experience}</p>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-semibold text-sm text-gray-900 mb-2">Key Achievements</h4>
-                      <ul className="text-xs text-gray-600 space-y-1">
-                        {member.achievements.slice(0, 2).map((achievement, index) => (
-                          <li key={index} className="flex items-start gap-2">
-                            <Award className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
-                            <span>{achievement}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                  
-                  <div className="pt-4 border-t border-gray-100">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-gray-400" />
-                        <span className="text-xs text-gray-600">{member.contact.email}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        {member.social.linkedin && (
-                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                            <Linkedin className="w-4 h-4" />
-                          </Button>
-                        )}
-                        {member.social.instagram && (
-                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                            <Instagram className="w-4 h-4" />
-                          </Button>
-                        )}
-                        {member.social.facebook && (
-                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                            <Facebook className="w-4 h-4" />
-                          </Button>
-                        )}
+                    <div className="pt-4 border-t border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-gray-400" />
+                          <span className="text-xs text-gray-600">{member.contact.email}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          {member.social.linkedin && (
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                              <Linkedin className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {member.social.instagram && (
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                              <Instagram className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {member.social.facebook && (
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                              <Facebook className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           {/* Call to Action */}
