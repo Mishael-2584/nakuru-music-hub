@@ -519,6 +519,50 @@ const Team = () => {
           ]
         }
       }
+    },
+    {
+      id: "10",
+      name: "Caleb Keganda",
+      role: "Art & Design Instructor & Guitarist",
+      image: "/lovable-uploads/caleb.png",
+      bio: "Creative art and design instructor with a passion for visual arts and music. Specializes in teaching art fundamentals, design principles, and guitar instruction. Combines artistic creativity with musical expression to provide a well-rounded creative education.",
+      specialties: ["Art Fundamentals", "Design Principles", "Guitar Instruction", "Visual Arts", "Creative Expression", "Digital Design"],
+      experience: "Art and design instructor, guitarist",
+      education: "Diploma in Fine Arts & Design",
+      contact: {
+        email: "caleb@damonmusicacademy.com",
+        phone: "+254 700 000 008",
+        location: "Nakuru, Kenya"
+      },
+      social: {
+        linkedin: "#",
+        instagram: "#",
+        facebook: "#"
+      },
+      achievements: [
+        "Expert in art and design instruction",
+        "Trained 60+ students in visual arts",
+        "Specialist in guitar instruction and technique",
+        "Developed innovative art and music integration programs",
+        "Expert in creative expression and design principles",
+        "Combines visual arts with musical education"
+      ],
+      categories: ["teaching"],
+      categoryInfo: {
+        teaching: {
+          role: "Art & Design Instructor & Guitarist",
+          bio: "Creative art and design instructor with a passion for visual arts and music. Specializes in teaching art fundamentals, design principles, and guitar instruction. Combines artistic creativity with musical expression to provide a well-rounded creative education.",
+          specialties: ["Art Fundamentals", "Design Principles", "Guitar Instruction", "Visual Arts", "Creative Expression", "Digital Design"],
+          achievements: [
+            "Expert in art and design instruction",
+            "Trained students in visual arts",
+            "Specialist in guitar instruction and technique",
+            "Developed innovative art and music integration programs",
+            "Expert in creative expression and design principles",
+            "Combines visual arts with musical education"
+          ]
+        }
+      }
     }
   ];
 

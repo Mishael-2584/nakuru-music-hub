@@ -17,11 +17,6 @@ const Gallery = () => {
       src: "/lovable-uploads/31a53eab-3aed-45c3-b91e-339ed5bb7893.png",
       alt: "Professional recording studio setup",
       title: "Recording Studio"
-    },
-    {
-      src: "/lovable-uploads/70f23f35-6eb2-49a1-8bf6-677fe0c49746.png",
-      alt: "Damon Music Academy promotional poster",
-      title: "Our Programs"
     }
   ];
 
