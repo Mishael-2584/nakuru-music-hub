@@ -99,6 +99,29 @@ const About = () => {
         </div>
       </div>
 
+      {/* Global Online Campus & Nairobi Section */}
+      <section className="py-12 bg-gradient-to-br from-blue-50 via-white to-purple-50 border-y border-primary/10">
+        <div className="container mx-auto px-4 flex flex-col md:flex-row items-center gap-8">
+          <div className="flex-shrink-0 flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary to-accent shadow-lg mb-4 md:mb-0">
+            <Globe className="w-10 h-10 text-white" />
+          </div>
+          <div className="flex-1 text-center md:text-left">
+            <h2 className="text-2xl md:text-3xl font-bold text-primary mb-2">Learn With Us, From Anywhere in the World</h2>
+            <p className="text-lg text-gray-700 mb-2">
+              To make our unique creative education more accessible, we are proud to offer new ways to join the Damon Music Academy community.
+            </p>
+            <div className="mb-2">
+              <span className="font-semibold text-primary">Our Global Online Campus</span>
+              <span className="block text-gray-700">Join our global classroom. Our online program connects students from anywhere in the world with our expert instructors in Kenya. Through live, interactive sessions, you can access our unique curriculum in music, arts, and tech, no matter your location.</span>
+            </div>
+            <div>
+              <span className="font-semibold text-primary">Now in Nairobi</span>
+              <span className="block text-gray-700">We are thrilled to announce that we are now offering in-person classes in Nairobi. Led by our top faculty, we're bringing the same passion and vibrant creative community that defines our Nakuru campus to students in the city.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Why Damon is Different Section */}
       <section className="py-20">
         <div className="container mx-auto px-4">
@@ -160,11 +183,21 @@ const About = () => {
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <Award className="h-8 w-8 text-white" />
-                <h2 className="text-3xl font-bold text-white">Beyond the Classroom: Professional Audio-Visual Services</h2>
+                <h2 className="text-3xl font-bold text-white">Your Vision, Amplified.</h2>
               </div>
               <p className="text-lg text-white/90">
-                Damon Music Academy is also your trusted partner for professional audio-visual services. Our skilled creative team, equipped with high-quality gear, transforms events and ideas into unforgettable experiences. From live sound and livestreaming to event coverage, podcasts, commercials, and voice-overs, we bring your vision to life with exceptional results.
+                Our professional AV division offers expert production services for events, brands, and creators. We combine a skilled creative team with high-quality gear to bring your vision to life.
               </p>
+              <div className="mt-4">
+                <p className="text-white/90 font-semibold mb-2">Our services include:</p>
+                <ul className="space-y-1 text-white/80">
+                  <li>• Live Sound & Event Production</li>
+                  <li>• Professional Livestreaming Services</li>
+                  <li>• Event Videography & Photography</li>
+                  <li>• Podcast & Voice-Over Recording</li>
+                  <li>• Commercial Audio Production</li>
+                </ul>
+              </div>
             </div>
             <div className="text-center md:text-right">
                 <Button size="lg" variant="outline" className="text-primary bg-white hover:bg-white/90" asChild>
@@ -180,8 +213,8 @@ const About = () => {
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Ready to unleash your creative potential or elevate your event?</h2>
           <Button size="lg" asChild>
-            <Link to="/#registration">
-              Explore Our Programs & Services Today!
+            <Link to="/services">
+              Explore Our Services Today!
               <ChevronRight className="w-5 h-5 ml-2" />
             </Link>
           </Button>

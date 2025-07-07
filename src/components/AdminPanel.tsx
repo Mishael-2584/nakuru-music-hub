@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote } from "lucide-react";
+import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,7 @@ import { sendAcceptedEmail, sendDeclinedEmail, sendTeacherAcceptedEmail, sendTea
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { generateQuotePDF } from "@/lib/pdfGenerator";
 
 interface Registration {
   id: string;
@@ -116,6 +117,19 @@ const AdminPanel = () => {
   const [showQuoteDialog, setShowQuoteDialog] = useState(false);
   const [quoteAmount, setQuoteAmount] = useState("");
   const [adminNotes, setAdminNotes] = useState("");
+  const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
+  const [invoiceDetails, setInvoiceDetails] = useState({
+    lineItems: [{ description: "", quantity: 1, unitPrice: 0, amount: 0 }],
+    subtotal: 0,
+    tax: 0,
+    total: 0,
+    paymentTerms: "50% deposit required to confirm booking",
+    validUntil: "30 days from date of issue",
+    serviceBreakdown: "",
+    equipmentBreakdown: "",
+    additionalInfo: ""
+  });
+  const [invoicePDFUrl, setInvoicePDFUrl] = useState<string | null>(null);
 
   // Function to open quote dialog with existing data
   const openQuoteDialog = (quote: Quote) => {
@@ -123,6 +137,71 @@ const AdminPanel = () => {
     setQuoteAmount(quote.quote_amount?.toString() || "");
     setAdminNotes(quote.admin_notes || "");
     setShowQuoteDialog(true);
+  };
+
+  // Function to open invoice dialog
+  const openInvoiceDialog = (quote: Quote) => {
+    setSelectedQuote(quote);
+    setQuoteAmount(quote.quote_amount?.toString() || "");
+    setAdminNotes(quote.admin_notes || "");
+    
+    // Initialize invoice details
+    const amount = quote.quote_amount || 0;
+    setInvoiceDetails({
+      lineItems: [{ description: quote.service_category, quantity: 1, unitPrice: amount, amount: amount }],
+      subtotal: amount,
+      tax: 0,
+      total: amount,
+      paymentTerms: "50% deposit required to confirm booking",
+      validUntil: "30 days from date of issue",
+      serviceBreakdown: "",
+      equipmentBreakdown: "",
+      additionalInfo: ""
+    });
+    setShowInvoiceDialog(true);
+  };
+
+  // Function to calculate invoice totals
+  const calculateInvoiceTotals = () => {
+    const subtotal = invoiceDetails.lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    const total = subtotal; // No tax calculation
+    
+    setInvoiceDetails(prev => ({
+      ...prev,
+      subtotal,
+      total
+    }));
+  };
+
+  // Function to add line item
+  const addLineItem = () => {
+    setInvoiceDetails(prev => ({
+      ...prev,
+      lineItems: [...prev.lineItems, { description: "", quantity: 1, unitPrice: 0, amount: 0 }]
+    }));
+  };
+
+  // Function to remove line item
+  const removeLineItem = (index: number) => {
+    setInvoiceDetails(prev => ({
+      ...prev,
+      lineItems: prev.lineItems.filter((_, i) => i !== index)
+    }));
+  };
+
+  // Function to update line item
+  const updateLineItem = (index: number, field: string, value: string | number) => {
+    setInvoiceDetails(prev => {
+      const newLineItems = [...prev.lineItems];
+      newLineItems[index] = { ...newLineItems[index], [field]: value };
+      
+      // Calculate amount for this line item
+      if (field === 'quantity' || field === 'unitPrice') {
+        newLineItems[index].amount = newLineItems[index].quantity * newLineItems[index].unitPrice;
+      }
+      
+      return { ...prev, lineItems: newLineItems };
+    });
   };
 
   // Redirect non-admins away from admin panel
@@ -1482,6 +1561,7 @@ const AdminPanel = () => {
                         {(quote.status === 'completed' || quote.status === 'cancelled') && (
                           <Button size="sm" variant="outline" onClick={() => openQuoteDialog(quote)}>View/Edit</Button>
                         )}
+                        <Button size="sm" variant="outline" onClick={() => openInvoiceDialog(quote)}>Generate Invoice</Button>
                       </div>
                     </div>
                   </CardContent>
@@ -1608,6 +1688,183 @@ const AdminPanel = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Invoice Dialog */}
+        <Dialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Generate Detailed Invoice</DialogTitle>
+              <DialogDescription>Configure and generate a detailed invoice for this quote.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="invoiceSubtotal" className="font-semibold text-primary">Subtotal:</label>
+                  <Input
+                    id="invoiceSubtotal"
+                    type="number"
+                    value={invoiceDetails.subtotal}
+                    onChange={(e) => updateLineItem(0, 'unitPrice', parseFloat(e.target.value))}
+                    placeholder="Enter subtotal"
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="invoiceTotal" className="font-semibold text-primary">Total:</label>
+                  <Input
+                    id="invoiceTotal"
+                    type="number"
+                    value={invoiceDetails.total}
+                    onChange={(e) => updateLineItem(0, 'unitPrice', parseFloat(e.target.value))}
+                    placeholder="Enter total amount"
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label htmlFor="serviceBreakdown" className="font-semibold text-primary">Service Breakdown Details:</label>
+                <Textarea
+                  id="serviceBreakdown"
+                  value={invoiceDetails.serviceBreakdown}
+                  onChange={(e) => setInvoiceDetails(prev => ({ ...prev, serviceBreakdown: e.target.value }))}
+                  placeholder="Describe the services included in this invoice..."
+                  rows={3}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="equipmentBreakdown" className="font-semibold text-primary">Equipment Breakdown Details:</label>
+                <Textarea
+                  id="equipmentBreakdown"
+                  value={invoiceDetails.equipmentBreakdown}
+                  onChange={(e) => setInvoiceDetails(prev => ({ ...prev, equipmentBreakdown: e.target.value }))}
+                  placeholder="List equipment and technical details included..."
+                  rows={3}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="additionalInfo" className="font-semibold text-primary">Additional Information:</label>
+                <Textarea
+                  id="additionalInfo"
+                  value={invoiceDetails.additionalInfo}
+                  onChange={(e) => setInvoiceDetails(prev => ({ ...prev, additionalInfo: e.target.value }))}
+                  placeholder="Any additional notes, special requirements, or important information..."
+                  rows={3}
+                  className="w-full"
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="paymentTerms" className="font-semibold text-primary">Payment Terms:</label>
+                  <Textarea
+                    id="paymentTerms"
+                    value={invoiceDetails.paymentTerms}
+                    onChange={(e) => setInvoiceDetails(prev => ({ ...prev, paymentTerms: e.target.value }))}
+                    placeholder="Enter payment terms"
+                    rows={2}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="validUntil" className="font-semibold text-primary">Valid Until:</label>
+                  <Input
+                    id="validUntil"
+                    type="date"
+                    value={invoiceDetails.validUntil}
+                    onChange={(e) => setInvoiceDetails(prev => ({ ...prev, validUntil: e.target.value }))}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="font-semibold text-primary">Line Items:</label>
+                <div className="max-h-60 overflow-y-auto border rounded-lg p-2">
+                  {invoiceDetails.lineItems.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2 bg-gray-50 p-2 rounded-md mb-2">
+                      <Input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) => updateLineItem(index, 'description', e.target.value)}
+                        placeholder="Item description"
+                        className="flex-1 min-w-0"
+                      />
+                      <Input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => updateLineItem(index, 'quantity', parseFloat(e.target.value))}
+                        placeholder="Qty"
+                        className="w-20"
+                      />
+                      <Input
+                        type="number"
+                        value={item.unitPrice}
+                        onChange={(e) => updateLineItem(index, 'unitPrice', parseFloat(e.target.value))}
+                        placeholder="Price"
+                        className="w-24"
+                      />
+                      <Input
+                        type="number"
+                        value={item.amount}
+                        onChange={(e) => updateLineItem(index, 'amount', parseFloat(e.target.value))}
+                        placeholder="Amount"
+                        className="w-24"
+                      />
+                      <Button variant="ghost" size="sm" onClick={() => removeLineItem(index)}>
+                        <X className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" onClick={addLineItem} className="w-full">Add Line Item</Button>
+              </div>
+            </div>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2">
+              <Button onClick={calculateInvoiceTotals}>Calculate Totals</Button>
+              <Button onClick={async () => {
+                if (selectedQuote) {
+                  const pdfBlob = await generateQuotePDF(selectedQuote, Number(quoteAmount), adminNotes, invoiceDetails);
+                  const url = URL.createObjectURL(pdfBlob);
+                  setInvoicePDFUrl(url);
+                  
+                  // Send email with invoice PDF
+                  try {
+                    const emailSent = await sendQuoteEmail(selectedQuote, Number(quoteAmount), adminNotes, invoiceDetails);
+                    if (emailSent) {
+                      toast({
+                        title: "Invoice Generated & Sent",
+                        description: `Invoice has been generated and sent to ${selectedQuote.email}`,
+                      });
+                    } else {
+                      toast({
+                        title: "Invoice Generated",
+                        description: `Invoice generated but email could not be sent.`,
+                        variant: "destructive",
+                      });
+                    }
+                  } catch (error) {
+                    console.error("Error sending invoice email:", error);
+                    toast({
+                      title: "Invoice Generated",
+                      description: `Invoice generated but email could not be sent.`,
+                      variant: "destructive",
+                    });
+                  }
+                }
+              }}>
+                Generate & Send Invoice
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        {invoicePDFUrl && (
+          <a href={invoicePDFUrl} download={`invoice-${selectedQuote?.id}.pdf`} className="mt-2 inline-block text-blue-600 underline">Download Invoice PDF</a>
+        )}
       </div>
     </section>
   );

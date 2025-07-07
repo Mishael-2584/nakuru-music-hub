@@ -907,10 +907,10 @@ export const sendTeacherRequestInfoEmail = async (teacher, message) => {
   return data && data.success;
 };
 
-export const sendQuoteEmail = async (quoteData: any, quoteAmount: number, adminNotes?: string) => {
+export const sendQuoteEmail = async (quoteData: any, quoteAmount: number, adminNotes?: string, invoiceDetails?: any) => {
   try {
     // Generate PDF
-    const pdfBlob = await generateQuotePDF(quoteData, quoteAmount, adminNotes);
+    const pdfBlob = await generateQuotePDF(quoteData, quoteAmount, adminNotes, invoiceDetails);
     
     // Convert blob to base64 for email attachment
     const reader = new FileReader();

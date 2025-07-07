@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Piano, Guitar, Mic, Drum, Music, Brain, Wind, Volume2, Camera, Video, MonitorPlay, Code, Palette, Search, Filter } from "lucide-react";
+import { Piano, Guitar, Mic, Drum, Music, Brain, Wind, Volume2, Camera, Video, MonitorPlay, Code, Palette, Search, Filter, Headphones, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
@@ -13,287 +13,233 @@ const CoursesEnhanced = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   const courses = [
-    // Music Category
     {
-      title: "Piano Lessons",
-      description: "Master the keys with professional instruction",
-      icon: Piano,
-      color: "primary",
-      category: "Music",
-      details: {
-        duration: "Individual 30min/60 min sessions",
-        levels: "Beginner to Advanced",
-        features: [
-          "Classical and contemporary repertoire",
-          "Music theory integration",
-          "Performance opportunities",
-          "Individual practice rooms available",
-          "Certified instructors with performance backgrounds"
-        ],
-        instruments: "Grand pianos, digital pianos, keyboards available",
-        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
-      }
-    },
-    {
-      title: "Guitar Lessons",
-      description: "Acoustic and electric guitar mastery",
       icon: Guitar,
-      color: "accent",
+      title: "Guitar Lessons",
+      description: "Learn acoustic and electric guitar from beginner to advanced.",
       category: "Music",
-      details: {
-        duration: "Individual 45-minute sessions",
-        levels: "Beginner to Advanced",
-        features: [
-          "Acoustic and electric guitar instruction",
-          "Rock, pop, jazz, and classical styles",
-          "Chord progressions and lead guitar",
-          "Recording techniques",
-          "Guitar maintenance and care"
-        ],
-        instruments: "Acoustic guitars, electric guitars, amplifiers provided",
-        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
-      }
-    },
-    {
-      title: "Voice Training",
-      description: "Develop your unique vocal style",
-      icon: Mic,
-      color: "secondary",
-      category: "Music",
-      details: {
-        duration: "Individual 45-minute sessions",
-        levels: "Beginner to Professional",
-        features: [
-          "Breath control and vocal techniques",
-          "Stage presence and performance skills",
-          "Microphone techniques",
-          "Genre-specific vocal styles",
-          "Recording studio sessions included"
-        ],
-        instruments: "Professional microphones, vocal booths, recording equipment",
-        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
-      }
-    },
-    {
-      title: "Drums",
-      description: "Keep the rhythm with expert instruction",
-      icon: Drum,
       color: "primary",
-      category: "Music",
       details: {
-        duration: "Individual 45-minute sessions",
-        levels: "Beginner to Advanced",
+        availability: "Available online and in-person (Nakuru & Nairobi)",
+        duration: "Choice of individual 30 or 60-minute sessions, tailored to your progress.",
+        levels: "Open to all, from complete beginners to advanced players.",
         features: [
-          "Complete drum kit instruction",
-          "Rock, jazz, Latin rhythms",
-          "Hand and foot coordination",
-          "Reading drum notation",
-          "Play-along with popular songs"
+          "Our instructors create a custom lesson plan based on your personal goals and musical interests, allowing you to learn at your own pace.",
+          "Core Fundamentals: Acoustic & electric guitar instruction",
+          "Stylistic Exploration: Rock, pop, jazz, and classical styles",
+          "Musicianship: Chord progressions, music theory, and lead guitar",
+          "Practical Skills: Basic recording techniques and instrument care",
+          "Internationally Recognized Exams: ABRSM, Trinity College London, LCM, Rockschool (RSL)"
         ],
-        instruments: "Acoustic and electronic drum kits available",
-        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
+        instruments: "All necessary guitars, amplifiers, and equipment are provided for use during lessons.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
       }
     },
     {
-      title: "Violin",
-      description: "Classical and contemporary violin techniques",
-      icon: Music,
-      color: "accent",
+      icon: Piano,
+      title: "Piano & Keyboard Lessons",
+      description: "Master the keys with our comprehensive piano and keyboard lessons.",
       category: "Music",
-      details: {
-        duration: "Individual 45-minute sessions",
-        levels: "Beginner to Advanced",
-        features: [
-          "Proper bow technique and posture",
-          "Classical and modern repertoire",
-          "Ensemble playing opportunities",
-          "Music theory for strings",
-          "Performance preparation"
-        ],
-        instruments: "Quality violins in various sizes available for rent",
-        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
-      }
-    },
-    {
-      title: "Music Theory",
-      description: "Understand the language of music",
-      icon: Brain,
-      color: "secondary",
-      category: "Music",
-      details: {
-        duration: "Group sessions (1 hour) or individual (45 minutes)",
-        levels: "Basic to Advanced",
-        features: [
-          "Note reading and rhythm",
-          "Scales, intervals, and chords",
-          "Harmonic analysis",
-          "Composition techniques",
-          "Exam preparation (ABRSM, LCM)"
-        ],
-        instruments: "Piano, notation software, theory workbooks",
-        schedule: "Mon-Fri: 2pm-5pm (Group) | Individual times flexible"
-      }
-    },
-    {
-      title: "Saxophone",
-      description: "Jazz up your musical journey",
-      icon: Wind,
       color: "primary",
-      category: "Music",
       details: {
-        duration: "Individual 45-minute sessions",
-        levels: "Beginner to Advanced",
+        availability: "Available online and in-person (Nakuru & Nairobi)",
+        duration: "Choice of individual 30 or 60-minute sessions, tailored to your progress.",
+        levels: "Open to all, from complete beginners to advanced players.",
         features: [
-          "Alto, tenor, and soprano saxophone",
-          "Jazz improvisation techniques",
-          "Classical saxophone repertoire",
-          "Ensemble playing",
-          "Breathing and embouchure techniques"
+          "Our instructors create a custom lesson plan based on your personal goals and musical interests, allowing you to learn at your own pace.",
+          "Core Fundamentals: Piano technique, posture, reading sheet music, and developing hand independence.",
+          "Stylistic Exploration: Classical, jazz, pop, gospel, and contemporary styles.",
+          "Musicianship: Music theory, chord voicings, improvisation, and ear training.",
+          "Practical Skills: Accompaniment techniques, using digital keyboards, and performance skills.",
+          "Internationally Recognized Exams: ABRSM, Trinity College London, LCM, Rockschool (RSL)"
         ],
-        instruments: "Student and professional saxophones available",
-        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
+        instruments: "Acoustic pianos and professional-grade digital keyboards are provided for all lessons.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
       }
     },
     {
-      title: "Trumpet & Brass",
-      description: "Master the art of brass instruments",
       icon: Volume2,
-      color: "accent",
+      title: "Drum & Percussion Lessons",
+      description: "Develop rhythm and technique with expert drum instruction.",
       category: "Music",
+      color: "primary",
       details: {
-        duration: "Individual 45-minute sessions",
-        levels: "Beginner to Advanced",
+        availability: "Available online and in-person (Nakuru & Nairobi)",
+        duration: "Choice of individual 30 or 60-minute sessions, tailored to your progress.",
+        levels: "Open to all, from complete beginners to advanced players.",
         features: [
-          "Trumpet, trombone, and French horn",
-          "Classical and jazz techniques",
-          "Lip flexibility exercises",
-          "Orchestra and band preparation",
-          "Mute techniques and effects"
+          "Our instructors create a custom lesson plan based on your personal goals and musical interests, allowing you to learn at your own pace.",
+          "Core Fundamentals: Grip, posture, coordination, drum rudiments, and reading rhythms.",
+          "Stylistic Exploration: Rock, funk, jazz, Latin, and African rhythmic styles.",
+          "Musicianship: Developing solid time-keeping, playing with a band, and understanding dynamics.",
+          "Practical Skills: Drum kit tuning, maintenance, and basic microphone setup for recording.",
+          "Internationally Recognized Exams: ABRSM, Trinity College London, LCM, Rockschool (RSL)"
         ],
-        instruments: "Student and intermediate brass instruments available",
-        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
+        instruments: "Fully-equipped acoustic drum kits and practice pads are provided for use during lessons.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
       }
     },
-    // Production Category
     {
-      title: "Music Production",
-      description: "From beat making to final mixdown",
       icon: Mic,
-      color: "secondary",
-      category: "Production",
-      details: {
-        duration: "Individual (1 hour) or Group (2 hours) sessions",
-        levels: "Beginner to Advanced",
-        features: [
-          "Digital Audio Workstation (DAW) basics",
-          "Recording, mixing, and mastering techniques",
-          "Beat making and sound design",
-          "Vocal production and effects",
-          "Access to our fully-equipped studio"
-        ],
-        instruments: "DAWs (Logic Pro X, Ableton Live), MIDI controllers, studio monitors",
-        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
-      }
-    },
-    {
-      title: "Live Sound Engineering",
-      description: "Become the master of event audio",
-      icon: MonitorPlay,
+      title: "Vocal (Singing) Lessons",
+      description: "Develop your voice with professional vocal coaching.",
+      category: "Music",
       color: "primary",
-      category: "Production",
       details: {
-        duration: "8-week intensive course",
-        levels: "Beginner to Intermediate",
+        availability: "Available online and in-person (Nakuru & Nairobi)",
+        duration: "Choice of individual 30 or 60-minute sessions, tailored to your progress.",
+        levels: "Open to all, from complete beginners to advanced players.",
         features: [
-          "Live sound setup and mixing",
-          "Mixer operation (analog and digital)",
-          "Microphone placement and techniques",
-          "Live broadcasting and streaming",
-          "Hands-on experience at real events"
+          "Our instructors create a custom lesson plan based on your personal goals and musical interests, allowing you to learn at your own pace.",
+          "Core Fundamentals: Healthy breath control, pitch accuracy, tone production, and vocal health.",
+          "Stylistic Exploration: Pop, R&B, gospel, jazz, musical theatre, and classical styles.",
+          "Musicianship: Ear training, sight-singing, understanding harmony, and microphone technique.",
+          "Practical Skills: Building performance confidence, stage presence, and lyric interpretation.",
+          "Internationally Recognized Exams: ABRSM, Trinity College London, LCM, Rockschool (RSL)"
         ],
-        instruments: "Digital mixing consoles, PA systems, stage monitors, microphones",
-        schedule: "Mon-Fri: 7am-6pm | Evening practicals available"
+        instruments: "Our vocal studios are equipped with professional sound systems, microphones, and pianos for accompaniment.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
       }
     },
     {
-      title: "Videography",
-      description: "Tell stories through moving images",
-      icon: Video,
+      icon: Volume2,
+      title: "Violin Lessons",
+      description: "Classical and contemporary violin instruction.",
+      category: "Music",
       color: "primary",
-      category: "Production",
       details: {
-        duration: "4-week workshops or individual projects",
-        levels: "Beginner to Intermediate",
+        availability: "Available online and in-person (Nakuru & Nairobi)",
+        duration: "Choice of individual 30 or 60-minute sessions, tailored to your progress.",
+        levels: "Open to all, from complete beginners to advanced players.",
         features: [
-          "Camera operation and settings",
-          "Cinematic composition and lighting",
-          "Video editing with Adobe Premiere Pro",
-          "Storyboarding and pre-production",
-          "Portfolio development"
+          "Our instructors create a custom lesson plan based on your personal goals and musical interests, allowing you to learn at your own pace.",
+          "Core Fundamentals: Proper posture, bow hold, intonation, and producing a clear tone.",
+          "Stylistic Exploration: Classical, folk, pop, and orchestral music.",
+          "Musicianship: Reading sheet music, music theory, scales, and ear training.",
+          "Practical Skills: Instrument care, tuning, playing in ensembles, and performance techniques.",
+          "Internationally Recognized Exams: ABRSM, Trinity College London, LCM, Rockschool (RSL)"
         ],
-        instruments: "DSLR/Mirrorless cameras, gimbals, lighting kits, editing software",
-        schedule: "Mon-Fri: 7am-6pm | Weekend workshops available"
+        instruments: "High-quality violins in various sizes are available for use during lessons.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
       }
     },
-    // Art Category
     {
-      title: "Photography",
-      description: "Capture moments, create art",
+      icon: Headphones,
+      title: "Saxophone Lessons",
+      description: "Jazz, classical, and contemporary saxophone lessons.",
+      category: "Music",
+      color: "primary",
+      details: {
+        availability: "Available online and in-person (Nakuru & Nairobi)",
+        duration: "Choice of individual 30 or 60-minute sessions, tailored to your progress.",
+        levels: "Open to all, from complete beginners to advanced players.",
+        features: [
+          "Our instructors create a custom lesson plan based on your personal goals and musical interests, allowing you to learn at your own pace.",
+          "Core Fundamentals: Embouchure, breath control, tone production, and fingerings.",
+          "Stylistic Exploration: Jazz, blues, pop, funk, and classical saxophone.",
+          "Musicianship: Improvisation, reading charts, music theory, and understanding harmony.",
+          "Practical Skills: Reed selection and care, instrument maintenance, and playing in a band setting.",
+          "Internationally Recognized Exams: ABRSM, Trinity College London, LCM, Rockschool (RSL)"
+        ],
+        instruments: "For practice and hygiene purposes, students are required to have their own instrument. Our team is happy to provide guidance on selecting and purchasing a suitable instrument for beginners.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
+      }
+    },
+    {
+      icon: Wind,
+      title: "Trumpet & Brass Lessons",
+      description: "Brass and wind instrument instruction.",
+      category: "Music",
+      color: "primary",
+      details: {
+        availability: "Available online and in-person (Nakuru & Nairobi)",
+        duration: "Choice of individual 30 or 60-minute sessions, tailored to your progress.",
+        levels: "Open to all, from complete beginners to advanced players.",
+        features: [
+          "Our instructors create a custom lesson plan based on your personal goals and musical interests, allowing you to learn at your own pace.",
+          "Core Fundamentals: Proper embouchure, breath support, tone quality, and articulation.",
+          "Stylistic Exploration: Classical, jazz, marching band, funk, and big band styles.",
+          "Musicianship: Reading music, scales, music theory, and playing in horn sections.",
+          "Practical Skills: Instrument maintenance, valve oiling, mouthpiece selection, and performance skills.",
+          "Internationally Recognized Exams: ABRSM, Trinity College London, LCM, Rockschool (RSL)"
+        ],
+        instruments: "For practice and hygiene purposes, students are required to have their own instrument. Our team is happy to provide guidance on selecting and purchasing a suitable instrument for beginners.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
+      }
+    },
+    {
+      icon: BookOpen,
+      title: "Music Theory & Musicianship",
+      description: "Comprehensive music theory and composition.",
+      category: "Music",
+      color: "primary",
+      details: {
+        availability: "Available online and in-person (Nakuru & Nairobi)",
+        duration: "Choice of individual 30 or 60-minute sessions, tailored to your progress.",
+        levels: "Open to all, from complete beginners to advanced musicians seeking to deepen their knowledge.",
+        features: [
+          "A strong theoretical foundation enhances every musical journey. Our instructors create a custom lesson plan based on your current knowledge and goals, allowing you to learn at your own pace.",
+          "Core Fundamentals: Mastering music notation, rhythm, scales, key signatures, and intervals.",
+          "Harmony & Composition: Understanding chord construction, progressions, song form, and basic songwriting techniques.",
+          "Aural Skills (Ear Training): Developing the ability to recognize notes, chords, and rhythms by ear.",
+          "Advanced Studies: Exploring counterpoint, musical form and analysis, and advanced harmonic concepts.",
+          "Internationally Recognized Exams: ABRSM, Trinity College London, LCM, Rockschool (RSL)"
+        ],
+        instruments: "No specific instrument required. Our studio utilizes a piano for demonstrations, and students will need manuscript paper and writing materials.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
+      }
+    },
+    // Videography, Art, Live Sound (in-person only)
+    {
       icon: Camera,
+      title: "Videography & Photography",
+      description: "Learn to tell powerful stories through images and film.",
+      category: "Production",
       color: "accent",
-      category: "Art",
       details: {
-        duration: "Individual sessions and themed workshops",
-        levels: "All levels",
+        availability: "In-person only (Nakuru & Nairobi campuses)",
+        duration: "3 sessions/week · 1 hour each",
+        levels: "Open to all, from complete beginners to advanced students.",
         features: [
-          "Understanding your camera (manual mode)",
-          "Principles of composition and light",
-          "Portrait, landscape, and street photography",
-          "Editing with Adobe Lightroom and Photoshop",
-          "Building a professional portfolio"
+          "Camera techniques, composition skills, editing software, and portfolio building.",
+          "Advanced techniques, professional editing, business skills, and industry networking."
         ],
-        instruments: "Access to various lenses and lighting equipment",
-        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
+        instruments: "All necessary cameras and equipment are provided for use during lessons.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
       }
     },
     {
-      title: "Art & Design",
-      description: "Unleash your visual creativity",
       icon: Palette,
-      color: "secondary",
+      title: "Art Classes",
+      description: "Creative art and design instruction for all ages.",
       category: "Art",
+      color: "secondary",
       details: {
-        duration: "Weekly classes and holiday camps",
-        levels: "Kids, Teens, and Adults",
+        availability: "In-person only (Nakuru & Nairobi campuses)",
+        duration: "1 session/week · 2–3 hours per session",
+        levels: "All Levels",
         features: [
-          "Drawing and sketching fundamentals",
-          "Painting with acrylics and watercolors",
-          "Digital art and illustration",
-          "Crafts and mixed media projects",
-          "Exhibition opportunities"
+          "Extended sessions, various mediums, creative expression, and exhibition opportunities."
         ],
-        instruments: "All materials provided (canvases, paints, sketchbooks, digital tablets)",
-        schedule: "Mon-Fri: 7am-6pm | Sun: 8am-6pm"
+        instruments: "All art materials provided during lessons.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
       }
     },
     {
-      title: "Code Kids: Web Wizards",
-      description: "The Art & Science of Web Development",
-      icon: Code,
+      icon: Music,
+      title: "Live Sound",
+      description: "Hands-on training with live sound gear and event production.",
+      category: "Production",
       color: "accent",
-      category: "Art",
       details: {
-        duration: "Weekly classes (90 minutes)",
-        levels: "Beginner (Ages 10-16)",
+        availability: "In-person only (Nakuru & Nairobi campuses)",
+        duration: "3 sessions/week · 1 hour each",
+        levels: "Open to all, from complete beginners to advanced students.",
         features: [
-          "Learn HTML, CSS, and JavaScript",
-          "Build and deploy your own websites",
-          "Introduction to web design principles",
-          "Fun, project-based learning",
-          "Develop problem-solving and logic skills"
+          "Hands-on training with live sound gear, microphone techniques & placement, understanding mixers & signal flow, FOH & monitor speaker setup, practical soundcheck procedures."
         ],
-        instruments: "Access to online coding platforms",
-        schedule: "Sat: 8am-6pm | Sun: 8am-6pm"
+        instruments: "All necessary live sound equipment provided during lessons.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
       }
     }
   ];
@@ -435,6 +381,10 @@ const CoursesEnhanced = () => {
                           </Badge>
                         </DialogHeader>
                         <div className="space-y-6 pt-4">
+                          <div>
+                            <h4 className="font-semibold text-lg mb-2">Availability</h4>
+                            <p className="text-muted-foreground">{course.details.availability}</p>
+                          </div>
                           <div>
                             <h4 className="font-semibold text-lg mb-2">Course Duration</h4>
                             <p className="text-muted-foreground">{course.details.duration}</p>

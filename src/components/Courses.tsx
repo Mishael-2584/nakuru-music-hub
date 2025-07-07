@@ -98,6 +98,12 @@ const Courses = () => {
           <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
             We Offer Courses In:
           </h2>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 text-primary font-semibold text-base shadow-sm border border-primary/10">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3C7.03 3 3 7.03 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-4.97-4.03-9-9-9zm0 0v18m0-18C7.03 3 3 7.03 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-4.97-4.03-9-9-9z" /></svg>
+              Now enrolling students worldwide! Join us online or in-person in Nakuru & Nairobi.
+            </span>
+          </div>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             Comprehensive music education for students aged 3 years and above with expert instruction and modern facilities
           </p>
