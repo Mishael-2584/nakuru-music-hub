@@ -90,19 +90,91 @@ const Fees = () => {
       category: "🎧 Music Production & Sound Engineering",
       subtitle: "3 sessions/week · 1 hour each",
       courses: [
+        // Live Sound (Short Course)
         {
-          name: "1st Term",
-          level: "Foundation Level",
+          name: "Live Sound (Short Course)",
+          duration: "3 sessions/week - 1 hour each",
+          monthly: "KSh 18,000",
+          features: [
+            "Hands-on training with live sound gear",
+            "Microphone techniques & placement",
+            "Understanding mixers & signal flow",
+            "FOH & monitor speaker setup",
+            "Practical soundcheck procedures"
+          ],
+          icon: Award,
+        },
+        // Live Sound Engineering 1st Term
+        {
+          name: "Live Sound Engineering",
+          duration: "2 sessions/week - 2 hours each",
+          termly: "KSh 28,000",
+          features: [
+            "Sound physics & fundamentals",
+            "Advanced mixing techniques",
+            "Microphone types & placement",
+            "In-depth signal processing (FX)",
+            "Analog & digital mixing consoles",
+            "Front of House (FOH) & monitor mixing",
+            "Signal flow & gain staging",
+            "System setup & troubleshooting",
+            "Intro to EQ, compression & gates",
+            "Final project: Mix a live band",
+            "1st Term: Foundation & core skills"
+          ],
+          icon: Users,
+          level: "1st Term",
+        },
+        // Live Sound Engineering Final Term
+        {
+          name: "Live Sound Engineering",
+          duration: "2 sessions/week - 2 hours each",
+          termly: "KSh 26,000",
+          features: [
+            "Sound physics & fundamentals",
+            "Advanced mixing techniques",
+            "Microphone types & placement",
+            "In-depth signal processing (FX)",
+            "Analog & digital mixing consoles",
+            "Front of House (FOH) & monitor mixing",
+            "Signal flow & gain staging",
+            "System setup & troubleshooting",
+            "Intro to EQ, compression & gates",
+            "Final project: Mix a live band",
+            "Final Term: Advanced topics for returning students"
+          ],
+          icon: Users,
+          level: "Final Term",
+        },
+        // Music Production 1st Term (add label)
+        {
+          name: "Music Production",
+          duration: "3 sessions/week · 1 hour each",
           termly: "KSh 45,500",
-          features: ["Professional software training", "Studio access", "Industry techniques", "Portfolio development"],
+          features: [
+            "Professional software training",
+            "Studio access",
+            "Industry techniques",
+            "Portfolio development"
+          ],
+          icon: Award,
+          level: "1st Term",
           premium: true
         },
+        // Music Production Final Term (add label)
         {
-          name: "Final Term", 
-          level: "Advanced Level",
+          name: "Music Production",
+          duration: "3 sessions/week · 1 hour each",
           termly: "KSh 42,500",
-          features: ["Advanced production", "Mixing & mastering", "Industry certification", "Career guidance"]
-        }
+          features: [
+            "Advanced production",
+            "Mixing & mastering",
+            "Industry certification",
+            "Career guidance"
+          ],
+          icon: Award,
+          level: "Final Term",
+        },
       ]
     },
     {
@@ -182,6 +254,9 @@ const Fees = () => {
                        {course.icon && <div className={`p-2 bg-gradient-to-r ${getIconColor(category.category)} rounded-lg`}><course.icon className="w-5 h-5 text-white" /></div>}
                        <div className="flex-1">
                          <CardTitle className="text-lg">{course.name}</CardTitle>
+                         {course.level && (
+                           <div className={`inline-block mt-1 mb-2 px-3 py-1 rounded-full text-xs font-semibold ${course.level === '1st Term' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{course.level}</div>
+                         )}
                          {course.location && (
                            <p className="text-sm text-muted-foreground mt-1">{course.location}</p>
                          )}
