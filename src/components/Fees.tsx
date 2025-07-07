@@ -271,7 +271,7 @@ const Fees = () => {
                         <div key={featureIndex} className="flex items-center gap-2 text-sm"><Check className="w-4 h-4 text-green-500 flex-shrink-0" /><span>{feature}</span></div>
                       ))}
                     </div>
-                    <Button asChild className="w-full mt-6 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold"><Link to="/#registration">Enroll Now</Link></Button>
+                    <Button asChild className="w-full mt-6 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold"><Link to="/registration">Enroll Now</Link></Button>
                   </CardContent>
                 </Card>
               ))}

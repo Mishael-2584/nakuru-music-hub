@@ -142,6 +142,7 @@ interface Booking {
   notes?: string;
   created_at: string;
   teacher_name?: string;
+  teacher_email?: string;
   day_of_week?: string;
 }
 
@@ -179,12 +180,16 @@ const StudentDashboard = () => {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [selectedTeacher, setSelectedTeacher] = useState<string>('all');
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showRecurringBookingModal, setShowRecurringBookingModal] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<AvailableTimeSlot | null>(null);
   const [newBooking, setNewBooking] = useState({
     booking_date: '',
     lesson_type: 'regular',
-    notes: ''
+    notes: '',
+    frequency: 'weekly',
+    end_date: ''
   });
+  const [makeupCredits, setMakeupCredits] = useState<any[]>([]);
   
   // Practice log modal state
   const [showPracticeModal, setShowPracticeModal] = useState(false);
@@ -527,7 +532,9 @@ const StudentDashboard = () => {
       setNewBooking({
         booking_date: '',
         lesson_type: 'regular',
-        notes: ''
+        notes: '',
+        frequency: 'weekly',
+        end_date: ''
       });
 
       toast({
@@ -544,13 +551,126 @@ const StudentDashboard = () => {
     }
   };
 
-  // Handle canceling a booking
-  const handleCancelBooking = async (bookingId: string) => {
+  // Handle canceling a booking with 24-hour policy
+  const handleCancelBooking = async (bookingId: string, bookingDate: string, startTime: string) => {
     try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'cancelled' })
-        .eq('id', bookingId);
+      // Check if it's within 24 hours
+      const lessonDateTime = new Date(`${bookingDate}T${startTime}`);
+      const currentDateTime = new Date();
+      const hoursDiff = (lessonDateTime.getTime() - currentDateTime.getTime()) / (1000 * 60 * 60);
+      
+      if (hoursDiff < 24) {
+        // Late cancellation - show warning
+        const confirmed = window.confirm(
+          "This lesson is within the 24-hour window. As per our policy, cancelling now will forfeit the lesson and the full fee will be charged. Are you sure you want to cancel?"
+        );
+        
+        if (!confirmed) {
+          return;
+        }
+      }
+      
+      // Call the enhanced cancellation function
+      const { data, error } = await supabase.rpc('cancel_booking_with_policy', {
+        booking_id: bookingId,
+        cancellation_reason: hoursDiff < 24 ? 'Late cancellation' : 'Student cancellation'
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Send notification emails
+      await sendCancellationNotifications(bookingId, hoursDiff < 24);
+      
+      await fetchMyBookings();
+      await fetchAvailableTimeSlots();
+      
+      const message = hoursDiff < 24 
+        ? "Lesson cancelled. As this was within the 24-hour window, the lesson has been forfeited."
+        : "Lesson cancelled successfully. A make-up lesson credit has been added to your account.";
+      
+      toast({
+        title: "Booking Cancelled",
+        description: message,
+      });
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      toast({
+        title: "Error",
+        description: "Failed to cancel booking",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Send cancellation notifications
+  const sendCancellationNotifications = async (bookingId: string, isLateCancellation: boolean) => {
+    try {
+      const booking = myBookings.find(b => b.id === bookingId);
+      if (!booking) return;
+      
+      // Send notification to admin
+      await supabase.rpc('send_booking_notification', {
+        booking_id: bookingId,
+        notification_type: 'cancellation',
+        recipient_type: 'admin',
+        recipient_email: 'admin@damonmusicacademy.co.ke',
+        subject: `Lesson Cancellation - ${isLateCancellation ? 'Late' : 'Timely'}`,
+        message: `Student ${studentProfile?.student_name} cancelled their lesson with ${booking.teacher_name} on ${formatDate(booking.booking_date)}. ${isLateCancellation ? 'This was a late cancellation and the lesson is forfeited.' : 'This was a timely cancellation and a make-up credit was issued.'}`
+      });
+      
+      // Send notification to teacher
+      await supabase.rpc('send_booking_notification', {
+        booking_id: bookingId,
+        notification_type: 'cancellation',
+        recipient_type: 'teacher',
+        recipient_email: booking.teacher_email || '',
+        subject: 'Lesson Cancellation',
+        message: `Your lesson with ${studentProfile?.student_name} on ${formatDate(booking.booking_date)} has been cancelled.`
+      });
+      
+    } catch (error) {
+      console.error('Error sending cancellation notifications:', error);
+    }
+  };
+
+  // Handle booking a recurring slot
+  const handleBookRecurringSlot = async (timeSlot: AvailableTimeSlot) => {
+    if (!studentProfile) return;
+    
+    setSelectedTimeSlot(timeSlot);
+    setNewBooking({
+      booking_date: '',
+      lesson_type: 'regular',
+      notes: ''
+    });
+    setShowRecurringBookingModal(true);
+  };
+
+  // Handle recurring booking submission
+  const handleSubmitRecurringBooking = async () => {
+    if (!selectedTimeSlot || !studentProfile) return;
+    
+    try {
+      // Create recurring booking pattern
+      const { data, error } = await supabase
+        .from('recurring_booking_patterns')
+        .insert({
+          student_id: studentProfile.id,
+          teacher_id: selectedTimeSlot.teacher_id,
+          time_slot_id: selectedTimeSlot.id,
+          day_of_week: selectedTimeSlot.day_of_week,
+          start_time: selectedTimeSlot.start_time,
+          end_time: selectedTimeSlot.end_time,
+          frequency: newBooking.frequency || 'weekly',
+          start_date: newBooking.booking_date,
+          end_date: newBooking.end_date,
+          lesson_type: newBooking.lesson_type,
+          notes: newBooking.notes
+        })
+        .select()
+        .single();
 
       if (error) {
         throw error;
@@ -559,15 +679,25 @@ const StudentDashboard = () => {
       await fetchMyBookings();
       await fetchAvailableTimeSlots();
 
+      setShowRecurringBookingModal(false);
+      setSelectedTimeSlot(null);
+      setNewBooking({
+        booking_date: '',
+        lesson_type: 'regular',
+        notes: '',
+        frequency: 'weekly',
+        end_date: ''
+      });
+
       toast({
         title: "Success",
-        description: "Booking cancelled successfully!",
+        description: "Recurring lessons booked successfully!",
       });
     } catch (error) {
-      console.error('Error cancelling booking:', error);
+      console.error('Error booking recurring slot:', error);
       toast({
         title: "Error",
-        description: "Failed to cancel booking",
+        description: "Failed to book recurring lessons",
         variant: "destructive",
       });
     }
@@ -966,7 +1096,9 @@ const StudentDashboard = () => {
                               setNewBooking({
                                 booking_date: '',
                                 lesson_type: 'regular',
-                                notes: ''
+                                notes: '',
+                                frequency: 'weekly',
+                                end_date: ''
                               });
                               setShowBookingModal(true);
                             }}
@@ -975,6 +1107,17 @@ const StudentDashboard = () => {
                           >
                             {slot.current_bookings >= slot.max_students ? 'Full' : 'Book This Slot'}
                           </Button>
+                          
+                          {/* Add recurring booking option for instruments */}
+                          {slot.slot_type === 'regular' && slot.current_bookings < slot.max_students && (
+                            <Button 
+                              variant="outline"
+                              onClick={() => handleBookRecurringSlot(slot)}
+                              className="w-full mt-2"
+                            >
+                              Book Recurring
+                            </Button>
+                          )}
                         </div>
                       ))}
                     {availableTimeSlots.filter(slot => 
@@ -1024,7 +1167,7 @@ const StudentDashboard = () => {
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                onClick={() => handleCancelBooking(booking.id)}
+                                onClick={() => handleCancelBooking(booking.id, booking.booking_date, booking.start_time)}
                               >
                                 Cancel Booking
                               </Button>
@@ -1037,6 +1180,45 @@ const StudentDashboard = () => {
                       ))
                     ) : (
                       <p className="text-gray-500 text-center py-8">No bookings found</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Make-up Credits */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Make-up Credits</CardTitle>
+                  <CardDescription>Available credits from cancelled lessons</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {makeupCredits.length > 0 ? (
+                      makeupCredits.map(credit => (
+                        <div key={credit.id} className="p-4 border rounded-lg bg-green-50">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold text-green-800">Make-up Credit</h4>
+                            <Badge variant="secondary" className="bg-green-200 text-green-800">
+                              {credit.is_used ? 'Used' : 'Available'}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-green-700">
+                            <p>Expires: {formatDate(credit.expires_at)}</p>
+                            <p>Type: {credit.credit_type}</p>
+                          </div>
+                          {!credit.is_used && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="mt-2 border-green-300 text-green-700 hover:bg-green-100"
+                            >
+                              Use Credit
+                            </Button>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-gray-500 text-center py-8">No make-up credits available</p>
                     )}
                   </div>
                 </CardContent>
@@ -1562,6 +1744,92 @@ const StudentDashboard = () => {
                   disabled={!newBooking.booking_date}
                 >
                   Confirm Booking
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Recurring Booking Modal */}
+      <Dialog open={showRecurringBookingModal} onOpenChange={setShowRecurringBookingModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Book Recurring Lessons</DialogTitle>
+          </DialogHeader>
+          {selectedTimeSlot && (
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <h4 className="font-semibold mb-2">Selected Time Slot</h4>
+                <div className="text-sm text-gray-600">
+                  <p><span className="font-medium">Teacher:</span> {selectedTimeSlot.teacher_name}</p>
+                  <p><span className="font-medium">Day:</span> {selectedTimeSlot.day_of_week}</p>
+                  <p><span className="font-medium">Time:</span> {formatTime(selectedTimeSlot.start_time)} - {formatTime(selectedTimeSlot.end_time)}</p>
+                  <p><span className="font-medium">Type:</span> {selectedTimeSlot.slot_type}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="recurring_booking_date" className="text-right">Start Date</Label>
+                <Input
+                  id="recurring_booking_date"
+                  type="date"
+                  value={newBooking.booking_date}
+                  onChange={(e) => setNewBooking({...newBooking, booking_date: e.target.value})}
+                  className="col-span-3"
+                  min={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="recurring_end_date" className="text-right">End Date (optional)</Label>
+                <Input
+                  id="recurring_end_date"
+                  type="date"
+                  value={newBooking.end_date}
+                  onChange={(e) => setNewBooking({...newBooking, end_date: e.target.value})}
+                  className="col-span-3"
+                  placeholder="Leave empty for indefinite recurring"
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="recurring_frequency" className="text-right">Frequency</Label>
+                <Select 
+                  value={newBooking.frequency} 
+                  onValueChange={(value) => setNewBooking({...newBooking, frequency: value})}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="biweekly">Bi-weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="recurring_notes" className="text-right">Notes</Label>
+                <Textarea
+                  id="recurring_notes"
+                  value={newBooking.notes}
+                  onChange={(e) => setNewBooking({...newBooking, notes: e.target.value})}
+                  className="col-span-3"
+                  placeholder="Any special requests or notes for recurring lessons..."
+                />
+              </div>
+              
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowRecurringBookingModal(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSubmitRecurringBooking}
+                  disabled={!newBooking.booking_date}
+                >
+                  Confirm Recurring Booking
                 </Button>
               </div>
             </div>
