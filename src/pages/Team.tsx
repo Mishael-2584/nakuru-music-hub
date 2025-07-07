@@ -563,6 +563,58 @@ const Team = () => {
           ]
         }
       }
+    },
+    {
+      id: "11",
+      name: "Job Sagini",
+      role: "Director of Nairobi Operations & Online Learning | Multi-Instrumentalist & Music Educator",
+      image: "/lovable-uploads/job.jpg",
+      bio: "A highly experienced music educator and gifted clarinetist specializing in curriculum-based instruction. Job is a versatile multi-instrumentalist with a passion for helping students achieve excellence.",
+      specialties: [
+        "Clarinet", "Woodwind Instruments", "Piano Instruction", "String Instruments", "Ensemble Direction", "Conducting", "Choral Training", "Music Theory", "Curriculum Development",
+        "Nairobi Operations", "Online Education", "Curriculum Strategy", "Ensemble Management", "Student Mentorship"
+      ],
+      experience: "Experienced in formal music education, providing expert mentorship across multiple instruments and ensembles. His expertise includes conducting, choral training, and developing structured, curriculum-based lesson plans.",
+      education: "Bachelor of Music, Music Education",
+      contact: {
+        email: "job@damonmusicacademy.com",
+        phone: "+254 700 000 011",
+        location: "Nairobi, Kenya"
+      },
+      social: {
+        linkedin: "#",
+        instagram: "#",
+        facebook: "#"
+      },
+      achievements: [
+        "Guided students to achieve top honors in regional music competitions.",
+        "Served as Musical Director for several successful student stage productions."
+      ],
+      categories: ["leadership", "teaching"],
+      categoryInfo: {
+        leadership: {
+          role: "Director of Nairobi Operations & Online Learning",
+          bio: "As Director of Nairobi Operations, Job establishes and leads our programs in the city, ensuring all students receive the signature standard of excellence Damon is known for.",
+          specialties: [
+            "Nairobi Operations", "Online Education", "Curriculum Strategy", "Ensemble Management", "Student Mentorship"
+          ],
+          achievements: [
+            "Guided students to achieve top honors in regional music competitions.",
+            "Served as Musical Director for several successful student stage productions."
+          ]
+        },
+        teaching: {
+          role: "Multi-Instrumentalist & Music Educator",
+          bio: "A highly experienced music educator and gifted clarinetist specializing in curriculum-based instruction. Job is a versatile multi-instrumentalist with a passion for helping students achieve excellence.",
+          specialties: [
+            "Clarinet", "Woodwind Instruments", "Piano Instruction", "String Instruments", "Ensemble Direction", "Conducting", "Choral Training", "Music Theory", "Curriculum Development"
+          ],
+          achievements: [
+            "Guided students to achieve top honors in regional music competitions.",
+            "Served as Musical Director for several successful student stage productions."
+          ]
+        }
+      }
     }
   ];
 
@@ -672,7 +724,7 @@ const Team = () => {
                         src={member.image} 
                         alt={member.name}
                         className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${
-                          member.id === "1" || member.id === "2" || member.id === "3" || member.id === "4" || member.id === "5" || member.id === "6" || member.id === "7" || member.id === "8" || member.id === "9" || member.id === "10"
+                          member.id === "1" || member.id === "2" || member.id === "3" || member.id === "4" || member.id === "5" || member.id === "6" || member.id === "7" || member.id === "8" || member.id === "9" || member.id === "10" || member.id === "11"
                             ? "object-top" 
                             : ""
                         }`}

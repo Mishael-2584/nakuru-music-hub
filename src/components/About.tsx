@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Users, Award, Music, Calendar, Heart, Star, Globe, Target, Sparkles, GraduationCap, Mic, Camera, Video, MonitorPlay, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
+import { ProgramsCarousel } from "./ProgramsCarousel";
 
 const stats = [
   {
@@ -90,10 +91,10 @@ const About = () => {
             About Damon Music Academy
           </div>
           <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 leading-tight tracking-tight mb-6">
-            Are you ready for a creative journey?
+            Where Creativity Finds Its Voice
           </h1>
           <p className="max-w-3xl mx-auto text-lg md:text-xl text-gray-600">
-            Welcome to Damon Music Academy, Nakuru's premier destination for music and creative arts. Since our establishment in 2016, we've grown into a vibrant hub where passion meets purpose, and where every individual's unique potential is celebrated and nurtured.
+            Welcome to Damon Music Academy, Nakuru's premier destination for music, creative arts, and digital technology. Since 2016, our academy has been a vibrant hub where passion meets purpose, and where the unique potential of every student is celebrated and nurtured.
           </p>
         </div>
       </div>
@@ -108,10 +109,10 @@ const About = () => {
                 <h2 className="text-3xl font-bold text-gray-900">Your Search Ends Here: Why Damon is Different</h2>
               </div>
               <p className="text-lg text-gray-600 leading-relaxed">
-                At Damon, our philosophy is simple yet profound: <strong className="text-gray-800">No one should leave the same way they came.</strong> We firmly believe that everyone possesses an incredible capacity for creativity. That's why we've cultivated an encouraging, growth-focused, and creatively charged environment where you will feel supported and inspired every step of the way.
+                Our philosophy is simple yet profound: <strong className="text-gray-800">No one should leave the same way they came.</strong> We believe everyone has a deep well of creativity waiting to be unlocked. That's why we’ve built an encouraging, growth-focused environment where you will feel supported and inspired every step of your journey.
               </p>
               <p className="text-gray-600 leading-relaxed">
-                What sets us apart? It's our deeply passionate and experienced tutors. They don't just teach; they mentor, guide, and ignite the spark within. We are especially devoted to empowering children and youth, knowing that the skills and confidence we instill today will profoundly shape the world they lead tomorrow.
+                What truly sets us apart are our tutors. They are more than just teachers; they are passionate mentors dedicated to igniting the creative spark in every student. Whether in a music lesson, a design session, or a coding class, their mission is to guide and empower. The skills and confidence our students build here will profoundly shape the world they lead tomorrow.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4 md:gap-6 items-center">
@@ -147,21 +148,8 @@ const About = () => {
               </div>
             </div>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {programs.map((program) => (
-              <Card key={program.title} className="bg-gray-50 border-0 rounded-xl shadow-sm hover:shadow-lg transition-shadow duration-300">
-                <CardContent className="p-6">
-                  <div className="mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent text-white rounded-lg flex items-center justify-center">
-                      <program.icon className="w-6 h-6" />
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{program.title}</h3>
-                  <p className="text-gray-600">{program.description}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {/* Carousel for Programs */}
+          <ProgramsCarousel />
         </div>
       </section>
 

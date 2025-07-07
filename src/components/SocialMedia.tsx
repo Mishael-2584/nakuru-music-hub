@@ -42,7 +42,7 @@ const SocialMedia = () => {
           Connect With Us
         </h2>
         <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-          Follow our musical journey and stay updated with the latest news, events, and student performances
+            Connect with the sound, vision, and code of our academy. Follow us for updates on events, workshops, and student success stories.
         </p>
         
         <div className="flex flex-wrap justify-center gap-4 mb-8">
