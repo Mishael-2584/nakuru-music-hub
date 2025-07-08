@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import SocialShare from "@/components/SocialShare";
 import { Button } from "@/components/ui/button";
 import { Calendar, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,8 +13,10 @@ interface NewsItem {
   id: string;
   title: string;
   content: string;
+  excerpt?: string;
   image_url: string;
   created_at: string;
+  slug: string;
 }
 
 const NewsDetail = () => {
@@ -84,6 +87,9 @@ const NewsDetail = () => {
     );
   }
 
+  const currentUrl = window.location.href;
+  const shareDescription = newsItem.excerpt || newsItem.content.substring(0, 150) + '...';
+
   return (
     <div className="min-h-screen">
       <Header />
@@ -111,13 +117,35 @@ const NewsDetail = () => {
             
             <h1 className="text-4xl font-bold mb-6">{newsItem.title}</h1>
             
-            <div className="prose max-w-none">
+            <div className="prose max-w-none mb-8">
               <div 
                 className="prose prose-lg max-w-none prose-headings:text-foreground prose-headings:font-bold prose-h1:text-3xl prose-h1:mb-6 prose-h2:text-2xl prose-h2:mb-4 prose-h3:text-xl prose-h3:mb-3 prose-p:text-base prose-p:leading-relaxed prose-p:mb-4 prose-p:text-muted-foreground prose-strong:text-foreground prose-strong:font-semibold prose-ul:my-4 prose-ol:my-4 prose-li:mb-2 prose-blockquote:border-l-4 prose-blockquote:border-primary prose-blockquote:pl-4 prose-blockquote:italic prose-hr:my-8 prose-hr:border-gray-200 prose-a:text-blue-600 prose-a:font-medium prose-a:underline prose-a:decoration-blue-600 prose-a:decoration-2 hover:prose-a:text-blue-800 hover:prose-a:decoration-blue-800"
                 dangerouslySetInnerHTML={{ __html: newsItem.content }}
               />
             </div>
+
+            {/* Social Share Section */}
+            <div className="border-t pt-8 mt-8">
+              <SocialShare
+                url={currentUrl}
+                title={newsItem.title}
+                description={shareDescription}
+                imageUrl={newsItem.image_url}
+                className="bg-gray-50 p-6 rounded-lg"
+              />
+            </div>
           </article>
+
+          {/* Floating share button for mobile */}
+          <div className="md:hidden">
+            <SocialShare
+              url={currentUrl}
+              title={newsItem.title}
+              description={shareDescription}
+              imageUrl={newsItem.image_url}
+              variant="floating"
+            />
+          </div>
         </div>
       </section>
       

@@ -13,10 +13,10 @@ const News = () => {
         <div className="container mx-auto px-4 relative">
           <div className="text-center">
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 bg-clip-text text-transparent">
-              Latest News
+              Damon Music Academy Blog: Music, Arts & Creative Growth
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-              Stay updated with the latest happenings at Damon Music Academy
+            Explore expert articles, insightful tips, and program updates from our campuses in Nakuru and Nairobi, and our online learning platform.
             </p>
           </div>
         </div>
