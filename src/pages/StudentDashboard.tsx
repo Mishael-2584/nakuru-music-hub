@@ -9,7 +9,7 @@ import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, Cred
 import { useToast } from '../hooks/use-toast';
 import PasswordChangePrompt from '../components/PasswordChangePrompt';
 import { useNavigate } from 'react-router-dom';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
@@ -144,6 +144,8 @@ interface Booking {
   teacher_name?: string;
   teacher_email?: string;
   day_of_week?: string;
+  mode?: string;
+  meeting_link?: string;
 }
 
 interface Teacher {
@@ -211,11 +213,46 @@ const StudentDashboard = () => {
     recipient_id: ''
   });
 
+  // Add state for booking details modal
+  const [showBookingDetailsModal, setShowBookingDetailsModal] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+
+  const [editMode, setEditMode] = useState(false);
+  const [editProfile, setEditProfile] = useState({ phone: '', proficiency_level: '', experience: '', location: '', learning_mode: '' });
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [pendingProfileUpdate, setPendingProfileUpdate] = useState(null);
+
+  // Add learningModes array
+  const learningModes = [
+    { value: "in-person", label: "In Person at the Academy" },
+    { value: "home", label: "Home Lesson" },
+    { value: "online", label: "Online" }
+  ];
+
   useEffect(() => {
     if (user) {
       checkUserRole();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (studentProfile) {
+      fetchMyBookings();
+    }
+  }, [studentProfile]);
+
+  useEffect(() => {
+    if (studentProfile) {
+      setEditProfile({
+        phone: studentProfile.phone || '',
+        proficiency_level: studentProfile.proficiency_level || '',
+        experience: studentProfile.experience || '',
+        location: studentProfile.location || '',
+        learning_mode: studentProfile.learning_mode || ''
+      });
+    }
+  }, [studentProfile]);
 
   const checkUserRole = async () => {
     try {
@@ -477,9 +514,9 @@ const StudentDashboard = () => {
         .from('bookings')
         .select(`
           *,
-          time_slots!inner(
+          time_slots(
             day_of_week,
-            teachers!inner(name)
+            teachers(name)
           )
         `)
         .eq('student_id', studentProfile.id)
@@ -503,6 +540,8 @@ const StudentDashboard = () => {
     if (!selectedTimeSlot || !studentProfile) return;
 
     try {
+      const isOnline = studentProfile.learning_mode === 'online';
+      const meetingLink = isOnline ? `https://meet.jit.si/damon-music-${Math.random().toString(36).substring(2, 8)}` : null;
       const { data, error } = await supabase
         .from('bookings')
         .insert({
@@ -514,7 +553,9 @@ const StudentDashboard = () => {
           end_time: selectedTimeSlot.end_time,
           status: 'confirmed',
           lesson_type: newBooking.lesson_type,
-          notes: newBooking.notes
+          notes: newBooking.notes,
+          mode: studentProfile.learning_mode,
+          meeting_link: meetingLink
         })
         .select()
         .single();
@@ -529,6 +570,7 @@ const StudentDashboard = () => {
 
       setShowBookingModal(false);
       setSelectedTimeSlot(null);
+      // When resetting newBooking, always include all required fields
       setNewBooking({
         booking_date: '',
         lesson_type: 'regular',
@@ -868,6 +910,228 @@ const StudentDashboard = () => {
     );
   }
 
+  const handleEditProfile = () => setEditMode(true);
+  const handleCancelEdit = () => {
+    setEditMode(false);
+    setEditProfile({
+      phone: studentProfile?.phone || '',
+      proficiency_level: studentProfile?.proficiency_level || '',
+      experience: studentProfile?.experience || '',
+      location: studentProfile?.location || '',
+      learning_mode: studentProfile?.learning_mode || ''
+    });
+  };
+  const handleSaveProfile = () => {
+    setPendingProfileUpdate({ ...editProfile });
+    setShowPasswordModal(true);
+  };
+  const handleConfirmPassword = async () => {
+    if (!pendingProfileUpdate || !studentProfile) return;
+    
+    console.log('🔍 Debug: Updating profile with data:', pendingProfileUpdate);
+    console.log('🔍 Debug: Current student profile:', studentProfile);
+    console.log('🔍 Debug: Learning mode being set to:', pendingProfileUpdate.learning_mode);
+    
+    // Re-authenticate user
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: studentProfile.email,
+      password: passwordInput
+    });
+    if (authError) {
+      console.error('❌ Auth error:', authError);
+      toast({ title: 'Error', description: 'Incorrect password. Please try again.', variant: 'destructive' });
+      return;
+    }
+    
+    console.log('✅ Auth successful, updating profile...');
+    
+    // Try using the RPC function first for learning_mode
+    const { data: rpcData, error: rpcError } = await supabase.rpc('test_student_update', {
+      student_id: studentProfile.id,
+      new_learning_mode: pendingProfileUpdate.learning_mode
+    });
+    
+    console.log('🔍 Debug: RPC update result:', { data: rpcData, error: rpcError });
+    
+    if (rpcError) {
+      console.error('❌ RPC error:', rpcError);
+    } else {
+      console.log('✅ RPC update successful:', rpcData);
+    }
+    
+    // Also try the direct update approach
+    const { data: updateData, error: updateError } = await supabase
+      .from('students')
+      .update({
+        learning_mode: pendingProfileUpdate.learning_mode
+      })
+      .eq('id', studentProfile.id)
+      .select();
+      
+    console.log('🔍 Debug: Direct update result:', { data: updateData, error: updateError });
+    
+    if (updateError) {
+      console.error('❌ Update error:', updateError);
+      toast({ title: 'Error', description: 'Failed to update profile.', variant: 'destructive' });
+    } else {
+      console.log('✅ Update successful:', updateData);
+      
+      // Now update the other fields
+      const { data: otherUpdateData, error: otherUpdateError } = await supabase
+        .from('students')
+        .update({
+          phone: pendingProfileUpdate.phone,
+          proficiency_level: pendingProfileUpdate.proficiency_level,
+          experience: pendingProfileUpdate.experience,
+          location: pendingProfileUpdate.location
+        })
+        .eq('id', studentProfile.id)
+        .select();
+      
+      console.log('🔍 Debug: Other fields update result:', { data: otherUpdateData, error: otherUpdateError });
+      
+      // Let's check the database again after update
+      const { data: afterUpdateData, error: afterUpdateError } = await supabase
+        .from('students')
+        .select('*')
+        .eq('id', studentProfile.id)
+        .single();
+      
+      console.log('🔍 Debug: Final database state:', afterUpdateData);
+      console.log('🔍 Debug: Final database error:', afterUpdateError);
+      
+      toast({ title: 'Success', description: 'Profile updated successfully.' });
+      setEditMode(false);
+      await fetchStudentData(); // Force refresh the data
+    }
+    setShowPasswordModal(false);
+    setPasswordInput('');
+    setPendingProfileUpdate(null);
+  };
+
+  // Add a test function that can be called from console
+  const testLearningModeUpdate = async () => {
+    if (!studentProfile) {
+      console.log('❌ No student profile available');
+      return;
+    }
+    
+    console.log('🧪 Testing learning mode update...');
+    console.log('Current learning_mode:', studentProfile.learning_mode);
+    
+    // Try direct update without RPC
+    const { data, error } = await supabase
+      .from('students')
+      .update({ learning_mode: 'online' })
+      .eq('id', studentProfile.id)
+      .eq('user_id', studentProfile.user_id)
+      .select();
+    
+    console.log('🧪 Direct update result:', { data, error });
+    
+    // Check the result
+    const { data: checkData, error: checkError } = await supabase
+      .from('students')
+      .select('learning_mode')
+      .eq('id', studentProfile.id)
+      .single();
+    
+    console.log('🧪 After update check:', { data: checkData, error: checkError });
+  };
+
+  // Add another test function that tries different approaches
+  const testMultipleUpdateMethods = async () => {
+    if (!studentProfile) {
+      console.log('❌ No student profile available');
+      return;
+    }
+    
+    console.log('🧪 Testing multiple update methods...');
+    
+    // Method 1: Direct update
+    console.log('Method 1: Direct update');
+    const { data: data1, error: error1 } = await supabase
+      .from('students')
+      .update({ learning_mode: 'online' })
+      .eq('id', studentProfile.id)
+      .select();
+    console.log('Result 1:', { data: data1, error: error1 });
+    
+    // Method 2: Update with user_id check
+    console.log('Method 2: Update with user_id check');
+    const { data: data2, error: error2 } = await supabase
+      .from('students')
+      .update({ learning_mode: 'home' })
+      .eq('id', studentProfile.id)
+      .eq('user_id', studentProfile.user_id)
+      .select();
+    console.log('Result 2:', { data: data2, error: error2 });
+    
+    // Method 3: Try with different field
+    console.log('Method 3: Update phone instead');
+    const { data: data3, error: error3 } = await supabase
+      .from('students')
+      .update({ phone: 'TEST_PHONE' })
+      .eq('id', studentProfile.id)
+      .select();
+    console.log('Result 3:', { data: data3, error: error3 });
+    
+    // Final check
+    const { data: finalCheck, error: finalError } = await supabase
+      .from('students')
+      .select('learning_mode, phone')
+      .eq('id', studentProfile.id)
+      .single();
+    console.log('Final check:', { data: finalCheck, error: finalError });
+  };
+
+  // Add a function to test with RLS disabled
+  const testWithRLSDisabled = async () => {
+    if (!studentProfile) {
+      console.log('❌ No student profile available');
+      return;
+    }
+    
+    console.log('🧪 Testing with RLS disabled...');
+    
+    // Try to disable RLS temporarily (this might not work from client)
+    const { data: disableData, error: disableError } = await supabase.rpc('exec_sql', {
+      sql: 'ALTER TABLE public.students DISABLE ROW LEVEL SECURITY;'
+    });
+    
+    console.log('Disable RLS result:', { data: disableData, error: disableError });
+    
+    // Try the update
+    const { data: updateData, error: updateError } = await supabase
+      .from('students')
+      .update({ learning_mode: 'online' })
+      .eq('id', studentProfile.id)
+      .select();
+    
+    console.log('Update with RLS disabled:', { data: updateData, error: updateError });
+    
+    // Re-enable RLS
+    const { data: enableData, error: enableError } = await supabase.rpc('exec_sql', {
+      sql: 'ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;'
+    });
+    
+    console.log('Enable RLS result:', { data: enableData, error: enableError });
+    
+    // Final check
+    const { data: finalCheck, error: finalError } = await supabase
+      .from('students')
+      .select('learning_mode')
+      .eq('id', studentProfile.id)
+      .single();
+    
+    console.log('Final check:', { data: finalCheck, error: finalError });
+  };
+
+  // Make them available globally for testing
+  (window as any).testLearningModeUpdate = testLearningModeUpdate;
+  (window as any).testMultipleUpdateMethods = testMultipleUpdateMethods;
+  (window as any).testWithRLSDisabled = testWithRLSDisabled;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -1172,7 +1436,7 @@ const StudentDashboard = () => {
                                 Cancel Booking
                               </Button>
                             )}
-                            <Button variant="outline" size="sm">
+                            <Button variant="outline" size="sm" onClick={() => { setSelectedBooking(booking); setShowBookingDetailsModal(true); }}>
                               View Details
                             </Button>
                           </div>
@@ -1313,12 +1577,10 @@ const StudentDashboard = () => {
               <CardContent>
                 <div className="space-y-4">
                   <Dialog open={showPracticeModal} onOpenChange={setShowPracticeModal}>
-                    <DialogTrigger asChild>
-                      <Button className="w-full">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Log New Practice Session
-                      </Button>
-                    </DialogTrigger>
+                    <Button className="w-full">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Log New Practice Session
+                    </Button>
                     <DialogContent className="sm:max-w-[425px]">
                       <DialogHeader>
                         <DialogTitle>Log Practice Session</DialogTitle>
@@ -1466,12 +1728,10 @@ const StudentDashboard = () => {
               <CardContent>
                 <div className="space-y-4">
                   <Dialog open={showMessageModal} onOpenChange={setShowMessageModal}>
-                    <DialogTrigger asChild>
-                      <Button className="w-full">
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        Send New Message
-                      </Button>
-                    </DialogTrigger>
+                    <Button className="w-full">
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      Send New Message
+                    </Button>
                     <DialogContent className="sm:max-w-[425px]">
                       <DialogHeader>
                         <DialogTitle>Send Message</DialogTitle>
@@ -1605,73 +1865,91 @@ const StudentDashboard = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                        <input
-                          type="text"
-                          value={studentProfile.student_name}
-                          className="w-full p-2 border rounded-md"
-                          readOnly
-                        />
+                        <input type="text" value={studentProfile.student_name} className="w-full p-2 border rounded-md" readOnly />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                        <input
-                          type="email"
-                          value={studentProfile.email}
-                          className="w-full p-2 border rounded-md"
-                          readOnly
-                        />
+                        <input type="email" value={studentProfile.email} className="w-full p-2 border rounded-md" readOnly />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                        <input
-                          type="tel"
-                          value={studentProfile.phone}
-                          className="w-full p-2 border rounded-md"
-                        />
+                        <input type="tel" value={editMode ? editProfile.phone : studentProfile.phone} onChange={e => setEditProfile({ ...editProfile, phone: e.target.value })} className="w-full p-2 border rounded-md" readOnly={!editMode} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Instrument</label>
-                        <input
-                          type="text"
-                          value={studentProfile.instrument}
-                          className="w-full p-2 border rounded-md"
-                          readOnly
-                        />
+                        <input type="text" value={studentProfile.instrument} className="w-full p-2 border rounded-md" readOnly />
                       </div>
                     </div>
                   </div>
-
                   <div>
                     <h4 className="font-semibold mb-4">Course Information</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Experience Level</label>
-                        <input
-                          type="text"
-                          value={studentProfile.experience}
-                          className="w-full p-2 border rounded-md"
-                          readOnly
-                        />
+                        <input type="text" value={editMode ? editProfile.experience : studentProfile.experience} onChange={e => setEditProfile({ ...editProfile, experience: e.target.value })} className="w-full p-2 border rounded-md" readOnly={!editMode} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Proficiency Level</label>
-                        <input
-                          type="text"
-                          value={studentProfile.proficiency_level}
-                          className="w-full p-2 border rounded-md"
-                          readOnly
-                        />
+                        <input type="text" value={editMode ? editProfile.proficiency_level : studentProfile.proficiency_level} onChange={e => setEditProfile({ ...editProfile, proficiency_level: e.target.value })} className="w-full p-2 border rounded-md" readOnly={!editMode} />
                       </div>
                     </div>
                   </div>
-
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                    <input type="text" value={editMode ? editProfile.location : studentProfile.location || ''} onChange={e => setEditProfile({ ...editProfile, location: e.target.value })} className="w-full p-2 border rounded-md" readOnly={!editMode} />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-4">Learning Mode</h4>
+                    <div className="space-y-3">
+                      {learningModes.map((mode) => (
+                        <div key={mode.value} className="flex items-center space-x-3">
+                          <input
+                            type="radio"
+                            id={mode.value}
+                            name="learning_mode"
+                            value={mode.value}
+                            checked={editMode ? editProfile.learning_mode === mode.value : studentProfile.learning_mode === mode.value}
+                            onChange={(e) => editMode && setEditProfile({ ...editProfile, learning_mode: e.target.value })}
+                            disabled={!editMode}
+                            className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
+                          />
+                          <label htmlFor={mode.value} className="text-sm font-medium text-gray-700">
+                            {mode.label}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                   <div className="flex space-x-4">
-                    <Button>Update Profile</Button>
+                    {!editMode ? (
+                      <Button onClick={handleEditProfile}>Edit</Button>
+                    ) : (
+                      <>
+                        <Button onClick={handleSaveProfile}>Save</Button>
+                        <Button variant="outline" onClick={handleCancelEdit}>Cancel</Button>
+                      </>
+                    )}
                     <Button variant="outline">Change Password</Button>
                   </div>
                 </div>
               </CardContent>
             </Card>
+            {/* Password Confirmation Modal */}
+            <Dialog open={showPasswordModal} onOpenChange={setShowPasswordModal}>
+              <DialogContent className="sm:max-w-[400px]">
+                <DialogHeader>
+                  <DialogTitle>Confirm Password</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <label className="block text-sm font-medium text-gray-700">Enter your password to confirm changes:</label>
+                  <input type="password" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} className="w-full p-2 border rounded-md" autoFocus />
+                </div>
+                <DialogFooter>
+                  <Button onClick={handleConfirmPassword}>Confirm</Button>
+                  <Button variant="outline" onClick={() => setShowPasswordModal(false)}>Cancel</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
         </Tabs>
       </main>
@@ -1832,6 +2110,33 @@ const StudentDashboard = () => {
                   Confirm Recurring Booking
                 </Button>
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Booking Details Modal */}
+      <Dialog open={showBookingDetailsModal} onOpenChange={setShowBookingDetailsModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Booking Details</DialogTitle>
+          </DialogHeader>
+          {selectedBooking && (
+            <div className="space-y-2">
+              <div><span className="font-medium">Teacher:</span> {selectedBooking.teacher_name}</div>
+              <div><span className="font-medium">Date:</span> {formatDate(selectedBooking.booking_date)}</div>
+              <div><span className="font-medium">Time:</span> {formatTime(selectedBooking.start_time)} - {formatTime(selectedBooking.end_time)}</div>
+              <div><span className="font-medium">Day:</span> {selectedBooking.day_of_week}</div>
+              <div><span className="font-medium">Type:</span> {selectedBooking.lesson_type}</div>
+              <div><span className="font-medium">Status:</span> {selectedBooking.status}</div>
+              {selectedBooking.mode === 'online' ? (
+                <div><span className="font-medium">Location:</span> Online<br />
+                  <span className="font-medium">Meeting Link:</span> <a href={selectedBooking.meeting_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{selectedBooking.meeting_link}</a>
+                </div>
+              ) : selectedBooking.mode === 'in-person' ? (
+                <div><span className="font-medium">Location:</span> Damon Music Academy, 2nd Floor, XYZ Building, Nakuru</div>
+              ) : null}
+              {selectedBooking.notes && <div><span className="font-medium">Notes:</span> {selectedBooking.notes}</div>}
             </div>
           )}
         </DialogContent>

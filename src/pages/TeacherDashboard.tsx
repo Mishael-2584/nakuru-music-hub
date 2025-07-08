@@ -120,24 +120,76 @@ const TeacherDashboard = () => {
   const handleAddTimeSlot = async () => {
     if (!user) return;
 
+    // Validation: required fields
+    if (!newTimeSlot.day_of_week || !newTimeSlot.start_time || !newTimeSlot.end_time) {
+      toast({
+        title: "Missing Fields",
+        description: "Please fill in all required fields (day, start time, end time).",
+        variant: "destructive",
+      });
+      return;
+    }
+    // Validation: start < end
+    if (newTimeSlot.start_time >= newTimeSlot.end_time) {
+      toast({
+        title: "Invalid Time",
+        description: "Start time must be before end time.",
+        variant: "destructive",
+      });
+      return;
+    }
+    // Validation: overlap
+    const overlap = timeSlots.some(slot =>
+      slot.day_of_week === newTimeSlot.day_of_week &&
+      // Check if times overlap
+      ((newTimeSlot.start_time < slot.end_time && newTimeSlot.end_time > slot.start_time))
+    );
+    if (overlap) {
+      toast({
+        title: "Overlapping Slot",
+        description: "This time slot overlaps with an existing slot.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Prepare payload
+    const dayMap = {
+      'Monday': 1,
+      'Tuesday': 2,
+      'Wednesday': 3,
+      'Thursday': 4,
+      'Friday': 5,
+      'Saturday': 6,
+      'Sunday': 7
+    };
+    const payload = {
+      teacher_id: profile?.id,
+      day_of_week: dayMap[newTimeSlot.day_of_week] || 1,
+      start_time: newTimeSlot.start_time,
+      end_time: newTimeSlot.end_time,
+      is_available: true,
+      slot_type: newTimeSlot.slot_type || 'regular',
+      max_students: newTimeSlot.max_students || 1,
+      description: newTimeSlot.description
+    };
+    console.log('[handleAddTimeSlot] Payload:', payload);
+
     try {
       const { data, error } = await supabase
         .from('time_slots')
-        .insert({
-          teacher_id: user.id,
-          day_of_week: newTimeSlot.day_of_week,
-          start_time: newTimeSlot.start_time,
-          end_time: newTimeSlot.end_time,
-          is_available: true,
-          slot_type: newTimeSlot.slot_type || 'regular',
-          max_students: newTimeSlot.max_students || 1,
-          description: newTimeSlot.description
-        })
+        .insert(payload)
         .select()
         .single();
 
       if (error) {
-        throw error;
+        console.error('[handleAddTimeSlot] Supabase error:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to add time slot",
+          variant: "destructive",
+        });
+        return;
       }
 
       setTimeSlots([...timeSlots, data]);
@@ -156,10 +208,10 @@ const TeacherDashboard = () => {
         description: "Time slot added successfully!",
       });
     } catch (error) {
-      console.error('Error adding time slot:', error);
+      console.error('[handleAddTimeSlot] JS error:', error);
       toast({
         title: "Error",
-        description: "Failed to add time slot",
+        description: error.message || "Failed to add time slot",
         variant: "destructive",
       });
     }
@@ -234,6 +286,14 @@ const TeacherDashboard = () => {
     max_students: 1,
     description: ''
   });
+
+  // Helper to map day_of_week integer to day name
+  const getDayName = (dayNum: number | string) => {
+    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    // Accept both string and number
+    const idx = typeof dayNum === 'string' ? parseInt(dayNum, 10) : dayNum;
+    return days[(idx || 1) - 1] || "Monday";
+  };
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -360,7 +420,7 @@ const TeacherDashboard = () => {
           *,
           students!inner(student_name)
         `)
-        .eq('teacher_id', user?.id)
+        .eq('teacher_id', teacherId)
         .order('lesson_date', { ascending: true });
 
       if (!lessonsError && lessonsData) {
@@ -391,7 +451,7 @@ const TeacherDashboard = () => {
       const { data: timeSlotsData, error: timeSlotsError } = await supabase
         .from('time_slots')
         .select('*')
-        .eq('teacher_id', user?.id)
+        .eq('teacher_id', teacherId)
         .order('day_of_week', { ascending: true })
         .order('start_time', { ascending: true });
 
@@ -449,7 +509,7 @@ const TeacherDashboard = () => {
         .from('lessons')
         .insert({
           student_id: newLesson.student_id,
-          teacher_id: user.id,
+          teacher_id: profile?.id,
           title: newLesson.title,
           description: newLesson.description,
           lesson_date: newLesson.lesson_date,
@@ -1154,6 +1214,66 @@ const TeacherDashboard = () => {
                     <CardDescription>Request time off or update your availability.</CardDescription>
                   </CardHeader>
                   <CardContent>
+                    {/* Add Time Slot Button and Modal */}
+                    <div className="flex justify-end mb-4">
+                      <Dialog open={showTimeSlotModal} onOpenChange={setShowTimeSlotModal}>
+                        <DialogTrigger asChild>
+                          <Button variant="default">+ Add Time Slot</Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                          <DialogHeader>
+                            <DialogTitle>Add New Time Slot</DialogTitle>
+                          </DialogHeader>
+                          <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                              <Label htmlFor="day_of_week" className="text-right">Day</Label>
+                              <Select value={newTimeSlot.day_of_week} onValueChange={v => setNewTimeSlot({...newTimeSlot, day_of_week: v})}>
+                                <SelectTrigger className="col-span-3">
+                                  <SelectValue placeholder="Select day" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map(day => (
+                                    <SelectItem key={day} value={day}>{day}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                              <Label htmlFor="start_time" className="text-right">Start Time</Label>
+                              <Input id="start_time" type="time" value={newTimeSlot.start_time} onChange={e => setNewTimeSlot({...newTimeSlot, start_time: e.target.value})} className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                              <Label htmlFor="end_time" className="text-right">End Time</Label>
+                              <Input id="end_time" type="time" value={newTimeSlot.end_time} onChange={e => setNewTimeSlot({...newTimeSlot, end_time: e.target.value})} className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                              <Label htmlFor="slot_type" className="text-right">Type</Label>
+                              <Select value={newTimeSlot.slot_type} onValueChange={v => setNewTimeSlot({...newTimeSlot, slot_type: v})}>
+                                <SelectTrigger className="col-span-3">
+                                  <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="regular">Regular</SelectItem>
+                                  <SelectItem value="group">Group</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                              <Label htmlFor="max_students" className="text-right">Max Students</Label>
+                              <Input id="max_students" type="number" min={1} value={newTimeSlot.max_students} onChange={e => setNewTimeSlot({...newTimeSlot, max_students: Number(e.target.value)})} className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                              <Label htmlFor="description" className="text-right">Description</Label>
+                              <Textarea id="description" value={newTimeSlot.description} onChange={e => setNewTimeSlot({...newTimeSlot, description: e.target.value})} className="col-span-3" />
+                            </div>
+                          </div>
+                          <div className="flex justify-end space-x-2">
+                            <Button variant="outline" onClick={() => setShowTimeSlotModal(false)}>Cancel</Button>
+                            <Button onClick={handleAddTimeSlot}>Add Slot</Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                     <div className="space-y-4">
                       {timeSlots.length > 0 ? (
                         timeSlots.map(slot => (
@@ -1161,16 +1281,21 @@ const TeacherDashboard = () => {
                             <div className="flex items-center space-x-4">
                               <ClockIcon className="w-5 h-5 text-blue-600" />
                               <div>
-                                <h4 className="font-semibold">{slot.day_of_week}</h4>
+                                <h4 className="font-semibold">{getDayName(slot.day_of_week)}</h4>
                                 <p className="text-sm text-gray-600">{slot.start_time} - {slot.end_time}</p>
+                                <p className="text-xs text-gray-500">{slot.slot_type} | Max: {slot.max_students}</p>
+                                {slot.description && <p className="text-xs text-gray-500">{slot.description}</p>}
                               </div>
                             </div>
                             <div className="flex items-center space-x-2">
                               <Badge className={slot.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
                                 {slot.is_available ? 'Available' : 'Unavailable'}
                               </Badge>
-                              <Button variant="outline" size="sm">
+                              <Button variant="outline" size="sm" onClick={() => setEditingTimeSlot(slot)}>
                                 <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button variant="destructive" size="sm" onClick={() => handleDeleteTimeSlot(slot.id)}>
+                                <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
                           </div>
