@@ -4,7 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, X, Image as ImageIcon } from "lucide-react";
+import { Upload, X, Image as ImageIcon, Crop, RotateCw, Download } from "lucide-react";
+import ReactCrop, { Crop as CropType, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 
 interface ImageUploadProps {
   value: string;
@@ -13,6 +15,7 @@ interface ImageUploadProps {
   placeholder?: string;
   maxSize?: number;
   className?: string;
+  aspectRatio?: number; // width/height ratio
 }
 
 const ImageUpload = ({
@@ -21,11 +24,18 @@ const ImageUpload = ({
   label = "Image",
   placeholder = "Upload an image",
   maxSize = 5,
-  className = ""
+  className = "",
+  aspectRatio = 16 / 9 // Default to 16:9 aspect ratio
 }: ImageUploadProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(value || null);
+  const [originalImage, setOriginalImage] = useState<string | null>(null);
+  const [crop, setCrop] = useState<CropType>();
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+  const [isEditing, setIsEditing] = useState(false);
+  const [rotation, setRotation] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const { toast } = useToast();
 
   // Test storage bucket connection on component mount
@@ -82,6 +92,29 @@ const ImageUpload = ({
     testStorageConnection();
   }, [toast]);
 
+  const centerAspectCrop = (mediaWidth: number, mediaHeight: number, aspect: number) => {
+    return centerCrop(
+      makeAspectCrop(
+        {
+          unit: '%',
+          width: 90,
+        },
+        aspect,
+        mediaWidth,
+        mediaHeight,
+      ),
+      mediaWidth,
+      mediaHeight,
+    )
+  }
+
+  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    if (aspectRatio) {
+      const { width, height } = e.currentTarget;
+      setCrop(centerAspectCrop(width, height, aspectRatio));
+    }
+  };
+
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -123,9 +156,75 @@ const ImageUpload = ({
       return;
     }
 
+    // Create preview URL for editing
+    const previewUrl = URL.createObjectURL(file);
+    setOriginalImage(previewUrl);
+    setPreview(previewUrl);
+    setIsEditing(true);
+    setRotation(0);
+    setCrop(undefined);
+    setCompletedCrop(undefined);
+  };
+
+  const getCroppedImg = (image: HTMLImageElement, crop: PixelCrop, rotation = 0): Promise<Blob> => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      throw new Error('No 2d context');
+    }
+
+    const maxSize = Math.max(image.width, image.height);
+    const safeArea = 2 * ((maxSize / 2) * Math.sqrt(2));
+
+    canvas.width = safeArea;
+    canvas.height = safeArea;
+
+    ctx.translate(safeArea / 2, safeArea / 2);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.translate(-safeArea / 2, -safeArea / 2);
+
+    ctx.drawImage(
+      image,
+      safeArea / 2 - image.width * 0.5,
+      safeArea / 2 - image.height * 0.5
+    );
+
+    const data = ctx.getImageData(0, 0, safeArea, safeArea);
+
+    canvas.width = crop.width;
+    canvas.height = crop.height;
+
+    ctx.putImageData(
+      data,
+      0 - safeArea / 2 + image.width * 0.5 - crop.x,
+      0 - safeArea / 2 + image.height * 0.5 - crop.y
+    );
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        }
+      }, 'image/jpeg', 0.9);
+    });
+  };
+
+  const handleSaveCrop = async () => {
+    if (!imgRef.current || !completedCrop) {
+      toast({
+        title: "No crop selected",
+        description: "Please select an area to crop",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsUploading(true);
 
     try {
+      const croppedBlob = await getCroppedImg(imgRef.current, completedCrop, rotation);
+      
       // Check authentication before upload
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
@@ -138,45 +237,25 @@ const ImageUpload = ({
         return;
       }
 
-      const fileExt = file.name.split(".").pop()?.toLowerCase();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.jpg`;
       const filePath = `images/${fileName}`;
 
-      console.log("Attempting upload to:", filePath);
-      console.log("File details for upload:", {
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        lastModified: file.lastModified
-      });
+      console.log("Attempting upload of cropped image to:", filePath);
 
       const { data, error } = await supabase.storage
         .from("images")
-        .upload(filePath, file, {
+        .upload(filePath, croppedBlob, {
           cacheControl: "3600",
           upsert: false
         });
 
       if (error) {
         console.error("Upload error details:", error);
-        console.error("Error code:", error.statusCode);
-        console.error("Error message:", error.message);
-        console.error("Error details:", error.details);
-        
-        // Check for specific MIME type errors
-        if (error.message.includes("mime type") || error.message.includes("content type")) {
-          toast({
-            title: "File Type Error",
-            description: `The file type "${file.type}" is not allowed by your storage bucket. Please check your Supabase storage settings.`,
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "Upload failed",
-            description: `Error: ${error.message || "Unknown error occurred"}`,
-            variant: "destructive",
-          });
-        }
+        toast({
+          title: "Upload failed",
+          description: `Error: ${error.message || "Unknown error occurred"}`,
+          variant: "destructive",
+        });
         return;
       }
 
@@ -190,10 +269,12 @@ const ImageUpload = ({
 
       onChange(publicUrl);
       setPreview(publicUrl);
+      setIsEditing(false);
+      setOriginalImage(null);
 
       toast({
         title: "Success",
-        description: "Image uploaded successfully",
+        description: "Image cropped and uploaded successfully",
       });
 
     } catch (error) {
@@ -208,9 +289,25 @@ const ImageUpload = ({
     }
   };
 
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setOriginalImage(null);
+    setCrop(undefined);
+    setCompletedCrop(undefined);
+    setRotation(0);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleRemove = () => {
     onChange("");
     setPreview(null);
+    setOriginalImage(null);
+    setIsEditing(false);
+    setCrop(undefined);
+    setCompletedCrop(undefined);
+    setRotation(0);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -219,6 +316,10 @@ const ImageUpload = ({
   const handleUrlChange = (url: string) => {
     onChange(url);
     setPreview(url);
+  };
+
+  const handleRotate = () => {
+    setRotation((prev) => (prev + 90) % 360);
   };
 
   return (
@@ -240,13 +341,13 @@ const ImageUpload = ({
             type="button"
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
+            disabled={isUploading || isEditing}
             className="flex items-center gap-2"
           >
             <Upload className="h-4 w-4" />
             {isUploading ? "Uploading..." : "Upload Image"}
           </Button>
-          {value && (
+          {value && !isEditing && (
             <Button
               type="button"
               variant="outline"
@@ -267,7 +368,75 @@ const ImageUpload = ({
         />
       </div>
 
-      {preview && (
+      {/* Image Editor */}
+      {isEditing && originalImage && (
+        <div className="space-y-4 border rounded-lg p-4 bg-gray-50">
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium">Edit Image</h4>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleRotate}
+                className="flex items-center gap-1"
+              >
+                <RotateCw className="h-3 w-3" />
+                Rotate
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCancelEdit}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSaveCrop}
+                disabled={isUploading || !completedCrop}
+                size="sm"
+                className="flex items-center gap-1"
+              >
+                <Download className="h-3 w-3" />
+                {isUploading ? "Saving..." : "Save & Upload"}
+              </Button>
+            </div>
+          </div>
+          
+          <div className="max-w-md mx-auto">
+            <ReactCrop
+              crop={crop}
+              onChange={(_, percentCrop) => setCrop(percentCrop)}
+              onComplete={(c) => setCompletedCrop(c)}
+              aspect={aspectRatio}
+              minWidth={100}
+              minHeight={100}
+            >
+              <img
+                ref={imgRef}
+                alt="Crop me"
+                src={originalImage}
+                style={{ 
+                  transform: `rotate(${rotation}deg)`,
+                  maxWidth: '100%',
+                  maxHeight: '400px',
+                  objectFit: 'contain'
+                }}
+                onLoad={onImageLoad}
+              />
+            </ReactCrop>
+          </div>
+          
+          <div className="text-sm text-gray-600 text-center">
+            <p>Drag to reposition • Resize handles to scale • Aspect ratio: {aspectRatio.toFixed(2)}:1</p>
+          </div>
+        </div>
+      )}
+
+      {/* Preview */}
+      {preview && !isEditing && (
         <div className="relative">
           <img
             src={preview}
@@ -275,10 +444,28 @@ const ImageUpload = ({
             className="w-full max-w-xs h-auto rounded-lg border"
             onError={() => setPreview(null)}
           />
+          <div className="mt-2 flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setOriginalImage(preview);
+                setIsEditing(true);
+                setRotation(0);
+                setCrop(undefined);
+                setCompletedCrop(undefined);
+              }}
+              className="flex items-center gap-1"
+            >
+              <Crop className="h-3 w-3" />
+              Edit Image
+            </Button>
+          </div>
         </div>
       )}
 
-      {!preview && (
+      {!preview && !isEditing && (
         <div className="w-full max-w-xs h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
           <div className="text-center text-gray-500">
             <ImageIcon className="h-8 w-8 mx-auto mb-2" />

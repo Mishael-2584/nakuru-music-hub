@@ -37,7 +37,7 @@ const CoursesEnhanced = () => {
     },
     {
       icon: Piano,
-      title: "Piano & Keyboard Lessons",
+      title: "Piano",
       description: "Master the keys with our comprehensive piano and keyboard lessons.",
       category: "Music",
       color: "primary",
@@ -239,6 +239,28 @@ const CoursesEnhanced = () => {
           "Hands-on training with live sound gear, microphone techniques & placement, understanding mixers & signal flow, FOH & monitor speaker setup, practical soundcheck procedures."
         ],
         instruments: "All necessary live sound equipment provided during lessons.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
+      }
+    },
+    {
+      icon: MonitorPlay,
+      title: "Music Production",
+      description: "Learn digital music production, recording, and mixing with professional software.",
+      category: "Production",
+      color: "accent",
+      details: {
+        availability: "In-person only (Nakuru & Nairobi campuses)",
+        duration: "3 sessions/week · 1 hour each",
+        levels: "Open to all, from complete beginners to advanced students.",
+        features: [
+          "Comprehensive digital music production course covering recording, mixing, and mastering",
+          "DAW operation (Logic Pro, Ableton Live, Pro Tools)",
+          "Recording techniques, microphone placement, and signal flow",
+          "Mixing and mastering, sound design, and music arrangement",
+          "Project-based learning with portfolio development",
+          "Professional studio access with industry-standard equipment"
+        ],
+        instruments: "Professional studio equipment and software provided (Logic Pro, Ableton Live, Pro Tools).",
         schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
       }
     }

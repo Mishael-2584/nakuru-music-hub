@@ -1,17 +1,28 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Music, Guitar, Headphones, Mic, Piano, Wind, Volume2, BookOpen } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Music, Guitar, Headphones, Mic, Piano, Wind, Volume2, BookOpen, Monitor, Zap } from "lucide-react";
+import { useState } from "react";
+import React from "react";
 
 const courses = [
   {
     icon: Piano,
-    name: "Piano & Keyboard",
+    name: "Piano",
     description: "Master the keys with our comprehensive piano and keyboard lessons",
     level: "All Levels",
     duration: "Mon-Fri: 7AM-7PM",
     color: "from-primary to-accent",
-    popular: true
+    popular: true,
+    category: "Instruments",
+    details: {
+      overview: "Comprehensive piano instruction covering classical, jazz, and contemporary styles",
+      skills: ["Sight reading", "Music theory", "Performance techniques", "Composition basics"],
+      requirements: "No prior experience needed",
+      equipment: "Pianos available at our facility",
+      schedule: "Flexible scheduling available"
+    }
   },
   {
     icon: Guitar,
@@ -19,7 +30,15 @@ const courses = [
     description: "Learn acoustic and electric guitar from beginner to advanced",
     level: "All Levels", 
     duration: "Mon-Fri: 7AM-7PM",
-    color: "from-accent to-secondary"
+    color: "from-accent to-secondary",
+    category: "Instruments",
+    details: {
+      overview: "Learn acoustic and electric guitar with personalized instruction",
+      skills: ["Chord progressions", "Fingerpicking", "Strumming techniques", "Music theory"],
+      requirements: "No prior experience needed",
+      equipment: "Guitars available for practice",
+      schedule: "Flexible scheduling available"
+    }
   },
   {
     icon: Mic,
@@ -27,7 +46,15 @@ const courses = [
     description: "Develop your vocal skills with professional voice coaching",
     level: "All Levels",
     duration: "Mon-Fri: 7AM-7PM",
-    color: "from-secondary to-primary"
+    color: "from-secondary to-primary",
+    category: "Vocal",
+    details: {
+      overview: "Professional voice training for singers of all levels",
+      skills: ["Vocal technique", "Breath control", "Performance skills", "Stage presence"],
+      requirements: "No prior experience needed",
+      equipment: "Professional recording equipment available",
+      schedule: "Flexible scheduling available"
+    }
   },
   {
     icon: Volume2,
@@ -35,7 +62,15 @@ const courses = [
     description: "Classical and contemporary violin instruction",
     level: "All Levels",
     duration: "Mon-Fri: 7AM-7PM",
-    color: "from-primary to-secondary"
+    color: "from-primary to-secondary",
+    category: "Instruments",
+    details: {
+      overview: "Classical and contemporary violin instruction for all ages",
+      skills: ["Bow technique", "Finger placement", "Music theory", "Performance skills"],
+      requirements: "No prior experience needed",
+      equipment: "Violins available for beginners",
+      schedule: "Flexible scheduling available"
+    }
   },
   {
     icon: Headphones,
@@ -43,7 +78,15 @@ const courses = [
     description: "Jazz, classical, and contemporary saxophone lessons",
     level: "All Levels",
     duration: "Mon-Fri: 7AM-7PM",
-    color: "from-accent to-primary"
+    color: "from-accent to-primary",
+    category: "Instruments",
+    details: {
+      overview: "Jazz, classical, and contemporary saxophone instruction",
+      skills: ["Embouchure technique", "Breath control", "Jazz improvisation", "Music theory"],
+      requirements: "No prior experience needed",
+      equipment: "Saxophones available for beginners",
+      schedule: "Flexible scheduling available"
+    }
   },
   {
     icon: Wind,
@@ -51,7 +94,15 @@ const courses = [
     description: "Brass and wind instrument instruction",
     level: "All Levels",
     duration: "Mon-Fri: 7AM-7PM",
-    color: "from-secondary to-accent"
+    color: "from-secondary to-accent",
+    category: "Instruments",
+    details: {
+      overview: "Comprehensive brass and wind instrument instruction",
+      skills: ["Embouchure technique", "Breath control", "Music theory", "Performance skills"],
+      requirements: "No prior experience needed",
+      equipment: "Instruments available for beginners",
+      schedule: "Flexible scheduling available"
+    }
   },
   {
     icon: BookOpen,
@@ -59,7 +110,34 @@ const courses = [
     description: "Comprehensive music theory and composition",
     level: "All Levels",
     duration: "Mon-Fri: 7AM-7PM",
-    color: "from-primary to-accent"
+    color: "from-primary to-accent",
+    category: "Theory",
+    details: {
+      overview: "Comprehensive music theory and composition instruction",
+      skills: ["Reading music", "Harmony and chord progressions", "Composition", "Ear training"],
+      requirements: "No prior experience needed",
+      equipment: "Theory materials provided",
+      schedule: "Flexible scheduling available"
+    }
+  },
+  {
+    icon: Monitor,
+    name: "Music Production",
+    description: "Learn digital music production, recording, and mixing",
+    level: "All Levels",
+    duration: "Mon-Fri: 7AM-7PM",
+    color: "from-secondary to-primary",
+    category: "Production",
+    popular: true,
+    details: {
+      overview: "Comprehensive digital music production course covering recording, mixing, and mastering",
+      skills: ["DAW operation (Logic Pro, Ableton)", "Recording techniques", "Mixing and mastering", "Sound design", "Music arrangement", "Digital audio workstations"],
+      requirements: "Basic computer skills recommended",
+      equipment: "Professional studio equipment and software provided",
+      schedule: "Flexible scheduling available",
+      software: "Logic Pro, Ableton Live, Pro Tools",
+      features: ["Professional studio access", "Industry-standard equipment", "Project-based learning", "Portfolio development"]
+    }
   },
   {
     icon: Music,
@@ -68,16 +146,32 @@ const courses = [
     level: "All Levels",
     duration: "Sun: From Noon",
     color: "from-accent to-secondary",
-    special: true
+    special: true,
+    category: "Flexible",
+    details: {
+      overview: "Special weekend sessions designed for busy professionals and students",
+      skills: ["Flexible learning", "Weekend scheduling", "All instrument types", "Theory and practice"],
+      requirements: "No prior experience needed",
+      equipment: "All instruments available",
+      schedule: "Weekend scheduling available"
+    }
   }
 ];
 
 const Courses = () => {
+  const [selectedCourse, setSelectedCourse] = useState<any>(null);
+  const [showModal, setShowModal] = useState(false);
+
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
     }
+  };
+
+  const handleLearnMore = (course: any) => {
+    setSelectedCourse(course);
+    setShowModal(true);
   };
 
   return (
@@ -142,14 +236,24 @@ const Courses = () => {
                   </div>
                   <p className="text-xs text-muted-foreground font-medium">{course.duration}</p>
                 </div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="w-full group-hover:bg-primary group-hover:text-white transition-all duration-300 border-primary/20"
-                  onClick={() => scrollToSection('registration')}
-                >
-                  Enroll Now
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1 group-hover:bg-primary group-hover:text-white transition-all duration-300 border-primary/20"
+                    onClick={() => scrollToSection('registration')}
+                  >
+                    Enroll Now
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="group-hover:bg-accent/10 transition-all duration-300"
+                    onClick={() => handleLearnMore(course)}
+                  >
+                    Learn More
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -181,6 +285,98 @@ const Courses = () => {
           </div>
         </div>
       </div>
+
+      {/* Course Details Modal */}
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <div className={`p-2 bg-gradient-to-r ${selectedCourse?.color} rounded-full`}>
+                {selectedCourse?.icon && (
+                  <selectedCourse.icon className="h-5 w-5 text-white" />
+                )}
+              </div>
+              {selectedCourse?.name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedCourse && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Course Overview</h3>
+                <p className="text-muted-foreground">{selectedCourse.details.overview}</p>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Skills You'll Learn</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {selectedCourse.details.skills.map((skill: string, index: number) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-primary" />
+                      <span className="text-sm">{skill}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {selectedCourse.details.software && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Software & Tools</h3>
+                  <p className="text-muted-foreground">{selectedCourse.details.software}</p>
+                </div>
+              )}
+
+              {selectedCourse.details.features && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Course Features</h3>
+                  <div className="space-y-2">
+                    {selectedCourse.details.features.map((feature: string, index: number) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-primary rounded-full"></div>
+                        <span className="text-sm">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Requirements</h3>
+                  <p className="text-sm text-muted-foreground">{selectedCourse.details.requirements}</p>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Equipment</h3>
+                  <p className="text-sm text-muted-foreground">{selectedCourse.details.equipment}</p>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Schedule</h3>
+                <p className="text-sm text-muted-foreground">{selectedCourse.details.schedule}</p>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  className="flex-1 bg-gradient-to-r from-primary to-accent"
+                  onClick={() => {
+                    setShowModal(false);
+                    scrollToSection('registration');
+                  }}
+                >
+                  Enroll Now
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowModal(false)}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 };
