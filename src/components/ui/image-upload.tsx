@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, X, Image as ImageIcon, Crop, RotateCw, Download } from "lucide-react";
 import ReactCrop, { Crop as CropType, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
+import { createImageWithCORS } from "@/lib/corsConfig";
 import 'react-image-crop/dist/ReactCrop.css';
 
 interface ImageUploadProps {
@@ -174,54 +175,88 @@ const ImageUpload = ({
       throw new Error('No 2d context');
     }
 
-    // Handle CORS issues by creating a new image with proper crossOrigin
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      
-      img.onload = () => {
-        const maxSize = Math.max(img.width, img.height);
-        const safeArea = 2 * ((maxSize / 2) * Math.sqrt(2));
-
-        canvas.width = safeArea;
-        canvas.height = safeArea;
-
-        ctx.translate(safeArea / 2, safeArea / 2);
-        ctx.rotate((rotation * Math.PI) / 180);
-        ctx.translate(-safeArea / 2, -safeArea / 2);
-
-        ctx.drawImage(
-          img,
-          safeArea / 2 - img.width * 0.5,
-          safeArea / 2 - img.height * 0.5
-        );
-
-        const data = ctx.getImageData(0, 0, safeArea, safeArea);
-
-        canvas.width = crop.width;
-        canvas.height = crop.height;
-
-        ctx.putImageData(
-          data,
-          0 - safeArea / 2 + img.width * 0.5 - crop.x,
-          0 - safeArea / 2 + img.height * 0.5 - crop.y
-        );
-
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(blob);
+    // Use the CORS helper to load the image properly
+    return createImageWithCORS(image.src).then((img) => {
+      return new Promise((resolve, reject) => {
+        try {
+          // Calculate the actual crop dimensions based on the image's natural size
+          const imageAspectRatio = img.naturalWidth / img.naturalHeight;
+          const displayAspectRatio = image.width / image.height;
+          
+          // Calculate the scale factor between natural and displayed image
+          const scaleX = img.naturalWidth / image.width;
+          const scaleY = img.naturalHeight / image.height;
+          
+          // Convert crop coordinates from display size to natural size
+          const naturalCropX = crop.x * scaleX;
+          const naturalCropY = crop.y * scaleY;
+          const naturalCropWidth = crop.width * scaleX;
+          const naturalCropHeight = crop.height * scaleY;
+          
+          // Set canvas size to the crop dimensions
+          canvas.width = naturalCropWidth;
+          canvas.height = naturalCropHeight;
+          
+          // Clear the canvas
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          
+          // Apply rotation if needed
+          if (rotation !== 0) {
+            // For rotation, we need a larger canvas to accommodate the rotated image
+            const maxSize = Math.max(naturalCropWidth, naturalCropHeight);
+            const rotatedCanvas = document.createElement('canvas');
+            const rotatedCtx = rotatedCanvas.getContext('2d');
+            
+            if (!rotatedCtx) {
+              reject(new Error('Failed to create rotated canvas context'));
+              return;
+            }
+            
+            rotatedCanvas.width = maxSize;
+            rotatedCanvas.height = maxSize;
+            
+            // Move to center and rotate
+            rotatedCtx.translate(maxSize / 2, maxSize / 2);
+            rotatedCtx.rotate((rotation * Math.PI) / 180);
+            rotatedCtx.translate(-maxSize / 2, -maxSize / 2);
+            
+            // Draw the full image
+            rotatedCtx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, maxSize, maxSize);
+            
+            // Get the rotated image data
+            const rotatedData = rotatedCtx.getImageData(0, 0, maxSize, maxSize);
+            
+            // Create final canvas with crop dimensions
+            canvas.width = naturalCropWidth;
+            canvas.height = naturalCropHeight;
+            
+            // Draw the cropped portion from the rotated image
+            ctx.putImageData(rotatedData, -naturalCropX, -naturalCropY);
           } else {
-            reject(new Error('Failed to create blob'));
+            // No rotation - direct crop
+            ctx.drawImage(
+              img,
+              naturalCropX, naturalCropY, naturalCropWidth, naturalCropHeight,
+              0, 0, naturalCropWidth, naturalCropHeight
+            );
           }
-        }, 'image/jpeg', 0.9);
-      };
-
-      img.onerror = () => {
-        reject(new Error('Failed to load image for cropping'));
-      };
-
-      // Set the source after setting up event handlers
-      img.src = image.src;
+          
+          // Convert to blob
+          canvas.toBlob((blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to create blob'));
+            }
+          }, 'image/jpeg', 0.9);
+          
+        } catch (error) {
+          console.error('Error during cropping:', error);
+          reject(new Error('Failed to crop image: ' + error.message));
+        }
+      });
+    }).catch((error) => {
+      throw new Error('Failed to load image for cropping: ' + error.message);
     });
   };
 
