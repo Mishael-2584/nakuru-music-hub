@@ -177,7 +177,7 @@ const ImageUpload = ({
 
     // Use the CORS helper to load the image properly
     return createImageWithCORS(image.src).then((img) => {
-      return new Promise((resolve, reject) => {
+      return new Promise<Blob>((resolve, reject) => {
         try {
           // Calculate the actual crop dimensions based on the image's natural size
           const imageAspectRatio = img.naturalWidth / img.naturalHeight;
@@ -511,11 +511,20 @@ const ImageUpload = ({
               variant="outline"
               size="sm"
               onClick={() => {
+                // Use the same CORS handling for editing existing images
                 setOriginalImage(preview);
                 setIsEditing(true);
                 setRotation(0);
                 setCrop(undefined);
                 setCompletedCrop(undefined);
+                
+                // Ensure the image loads with proper CORS settings
+                if (preview) {
+                  createImageWithCORS(preview).catch((error) => {
+                    console.warn('CORS warning for editing:', error);
+                    // Continue anyway - the image might still work
+                  });
+                }
               }}
               className="flex items-center gap-1"
             >
