@@ -174,39 +174,54 @@ const ImageUpload = ({
       throw new Error('No 2d context');
     }
 
-    const maxSize = Math.max(image.width, image.height);
-    const safeArea = 2 * ((maxSize / 2) * Math.sqrt(2));
+    // Handle CORS issues by creating a new image with proper crossOrigin
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      img.onload = () => {
+        const maxSize = Math.max(img.width, img.height);
+        const safeArea = 2 * ((maxSize / 2) * Math.sqrt(2));
 
-    canvas.width = safeArea;
-    canvas.height = safeArea;
+        canvas.width = safeArea;
+        canvas.height = safeArea;
 
-    ctx.translate(safeArea / 2, safeArea / 2);
-    ctx.rotate((rotation * Math.PI) / 180);
-    ctx.translate(-safeArea / 2, -safeArea / 2);
+        ctx.translate(safeArea / 2, safeArea / 2);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.translate(-safeArea / 2, -safeArea / 2);
 
-    ctx.drawImage(
-      image,
-      safeArea / 2 - image.width * 0.5,
-      safeArea / 2 - image.height * 0.5
-    );
+        ctx.drawImage(
+          img,
+          safeArea / 2 - img.width * 0.5,
+          safeArea / 2 - img.height * 0.5
+        );
 
-    const data = ctx.getImageData(0, 0, safeArea, safeArea);
+        const data = ctx.getImageData(0, 0, safeArea, safeArea);
 
-    canvas.width = crop.width;
-    canvas.height = crop.height;
+        canvas.width = crop.width;
+        canvas.height = crop.height;
 
-    ctx.putImageData(
-      data,
-      0 - safeArea / 2 + image.width * 0.5 - crop.x,
-      0 - safeArea / 2 + image.height * 0.5 - crop.y
-    );
+        ctx.putImageData(
+          data,
+          0 - safeArea / 2 + img.width * 0.5 - crop.x,
+          0 - safeArea / 2 + img.height * 0.5 - crop.y
+        );
 
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        if (blob) {
-          resolve(blob);
-        }
-      }, 'image/jpeg', 0.9);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Failed to create blob'));
+          }
+        }, 'image/jpeg', 0.9);
+      };
+
+      img.onerror = () => {
+        reject(new Error('Failed to load image for cropping'));
+      };
+
+      // Set the source after setting up event handlers
+      img.src = image.src;
     });
   };
 
@@ -279,11 +294,21 @@ const ImageUpload = ({
 
     } catch (error) {
       console.error("Unexpected error:", error);
-      toast({
-        title: "Error",
-        description: `An unexpected error occurred: ${error instanceof Error ? error.message : "Unknown error"}`,
-        variant: "destructive",
-      });
+      
+      // Check if it's a CORS error
+      if (error instanceof Error && error.message.includes('tainted')) {
+        toast({
+          title: "CORS Error",
+          description: "Cannot edit this image due to security restrictions. Try uploading a new image instead.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: `An unexpected error occurred: ${error instanceof Error ? error.message : "Unknown error"}`,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsUploading(false);
     }
@@ -418,6 +443,7 @@ const ImageUpload = ({
                 ref={imgRef}
                 alt="Crop me"
                 src={originalImage}
+                crossOrigin="anonymous"
                 style={{ 
                   transform: `rotate(${rotation}deg)`,
                   maxWidth: '100%',
