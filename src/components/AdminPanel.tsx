@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X } from "lucide-react";
+import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X, Image } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate, Link } from "react-router-dom";
 import AdminEventsManager from "@/components/AdminEventsManager";
 import AdminNewsManager from "@/components/AdminNewsManager";
+import AdminGalleryManager from "@/components/AdminGalleryManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { sendAcceptedEmail, sendDeclinedEmail, sendTeacherAcceptedEmail, sendTeacherDeclinedEmail, sendTeacherRequestInfoEmail, sendQuoteEmail } from "@/lib/emailService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -94,7 +95,7 @@ interface ClassSchedule {
 }
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes' | 'gallery'>('stats');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
@@ -869,6 +870,14 @@ const AdminPanel = () => {
             >
               <Quote className="h-4 w-4 mr-2" />
               Quotes ({quotes.length})
+            </Button>
+            <Button
+              variant={activeTab === 'gallery' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('gallery')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+            >
+              <Image className="h-4 w-4 mr-2" />
+              Gallery
             </Button>
           </div>
         </div>
@@ -1865,6 +1874,11 @@ const AdminPanel = () => {
         {invoicePDFUrl && (
           <a href={invoicePDFUrl} download={`invoice-${selectedQuote?.id}.pdf`} className="mt-2 inline-block text-blue-600 underline">Download Invoice PDF</a>
         )}
+
+        {/* Gallery Tab */}
+        <div style={{ display: activeTab === 'gallery' ? 'block' : 'none' }}>
+          <AdminGalleryManager />
+        </div>
       </div>
     </section>
   );

@@ -2,19 +2,9 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Camera, Facebook, Instagram, Youtube, ExternalLink } from "lucide-react";
 import WhatsAppChat from "@/components/WhatsAppChat";
+import DynamicGallery from "@/components/Gallery";
 
-const images = [
-  { src: "/lovable-uploads/29861c9f-1df3-42f1-982f-ef38574fb617.png", alt: "A vibrant classroom of young students learning music theory." },
-  { src: "/lovable-uploads/cc2f7a6b-1ce1-4921-a0b6-b29db99b5d4a.png", alt: "A student practicing guitar with an instructor." },
-  { src: "/lovable-uploads/31a53eab-3aed-45c3-b91e-339ed5bb7893.png", alt: "A young girl smiling while playing the piano." },
-  { src: "/lovable-uploads/70f23f35-6eb2-49a1-8bf6-677fe0c49746.png", alt: "A group of students performing together on stage." },
-  { src: "/about-art-class.jpg", alt: "An art class in session with a teacher guiding a young student." },
-  { src: "/about-happy-kids.jpg", alt: "A group of happy Damon Music Academy students posing outdoors." },
-  { src: "/lovable-uploads/SMC02260.png", alt: "A student receiving one-on-one violin instruction." },
-  { src: "/lovable-uploads/_MWS4407.png", alt: "A young student concentrating during a piano lesson." },
-];
-
-const Gallery = () => {
+const GalleryPage = () => {
   return (
     <div className="bg-gray-50">
       <Header />
@@ -34,16 +24,8 @@ const Gallery = () => {
             </p>
           </div>
 
-          <div className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
-            {images.map((image, index) => (
-              <img
-                key={index}
-                className="w-full h-auto object-cover rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 transform hover:scale-105"
-                src={image.src}
-                alt={image.alt}
-              />
-            ))}
-          </div>
+          {/* Dynamic Gallery Component */}
+          <DynamicGallery />
 
           <div className="text-center mt-16">
             <h3 className="text-2xl font-bold text-gray-900 mb-4">Want to see more?</h3>
@@ -101,4 +83,4 @@ const Gallery = () => {
   );
 };
 
-export default Gallery;
+export default GalleryPage;
