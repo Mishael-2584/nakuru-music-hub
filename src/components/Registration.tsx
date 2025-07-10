@@ -35,7 +35,8 @@ const Registration = () => {
     owns_instrument: false,
     location: "",
     medical_condition: "no",
-    medical_details: ""
+    medical_details: "",
+    date_of_birth: '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -218,6 +219,16 @@ const Registration = () => {
           return { isValid: false, error: 'Please provide details about your medical condition' };
         }
         break;
+      case 'goals':
+        if (!value || value.trim().length === 0) {
+          return { isValid: false, error: 'Learning Goals is required' };
+        }
+        break;
+      case 'preferred_schedule':
+        if (!value || value.trim().length === 0) {
+          return { isValid: false, error: 'Preferred Schedule is required' };
+        }
+        break;
     }
     return { isValid: true, error: '' };
   };
@@ -290,6 +301,16 @@ const Registration = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+
+    if (!agreedToTerms) {
+      toast({
+        title: "Agreement Required",
+        description: "You must agree to the Terms of Service and Cancellation Policy to proceed.",
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+      return;
+    }
 
     // Comprehensive validation before submission
     console.group('🚀 Form Submission Started');
@@ -367,6 +388,7 @@ const Registration = () => {
         medical_details: formData.medical_condition === "yes" ? formData.medical_details?.trim() : null,
         goals: formData.goals?.trim() || null,
         preferred_schedule: formData.preferred_schedule?.trim() || null,
+        date_of_birth: formData.date_of_birth,
         status: 'pending'
       };
 
@@ -485,7 +507,8 @@ const Registration = () => {
           owns_instrument: false,
           location: "",
           medical_condition: "no",
-          medical_details: ""
+          medical_details: "",
+          date_of_birth: '',
         });
         setCurrentStep(1);
         setIsSubmitted(false);
@@ -624,6 +647,18 @@ const Registration = () => {
       </div>
 
       <div className="space-y-4">
+        <Label htmlFor="date_of_birth" className="text-sm font-medium text-gray-700">Date of Birth</Label>
+        <Input
+          id="date_of_birth"
+          type="date"
+          value={formData.date_of_birth}
+          onChange={e => setFormData({ ...formData, date_of_birth: e.target.value })}
+          required
+          className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
+        />
+      </div>
+
+      <div className="space-y-4">
         <Label className="text-sm font-medium text-gray-700">Medical Conditions</Label>
         <RadioGroup 
           value={formData.medical_condition} 
@@ -658,32 +693,33 @@ const Registration = () => {
       </div>
 
       {parseInt(formData.age) < 18 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
-          <h4 className="font-medium text-blue-800">Parent/Guardian Information</h4>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="parent_name" className="text-sm font-medium text-gray-700">Parent/Guardian Name</Label>
-              <Input
-                id="parent_name"
-                value={formData.parent_name}
-                onChange={(e) => setFormData({...formData, parent_name: e.target.value})}
-                className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
-                placeholder="Parent or guardian name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="parent_phone" className="text-sm font-medium text-gray-700">Parent/Guardian Phone</Label>
-              <Input
-                id="parent_phone"
-                type="tel"
-                value={formData.parent_phone}
-                onChange={(e) => setFormData({...formData, parent_phone: e.target.value})}
-                className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
-                placeholder="Parent or guardian phone"
-              />
+        <>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
+            <h4 className="font-medium text-blue-800">Parent/Guardian Information</h4>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="parent_name" className="text-sm font-medium text-gray-700">Parent/Guardian Name</Label>
+                <Input
+                  id="parent_name"
+                  value={formData.parent_name}
+                  onChange={e => setFormData({ ...formData, parent_name: e.target.value })}
+                  required
+                  className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="parent_phone" className="text-sm font-medium text-gray-700">Parent/Guardian Phone</Label>
+                <Input
+                  id="parent_phone"
+                  value={formData.parent_phone}
+                  onChange={e => setFormData({ ...formData, parent_phone: e.target.value })}
+                  required
+                  className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
+                />
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
@@ -923,6 +959,7 @@ const Registration = () => {
           placeholder="What would you like to achieve? (e.g., learn specific songs, prepare for exams, performance goals, career development)"
           rows={4}
           className="border-gray-300 focus:border-primary focus:ring-primary resize-none"
+          required
         />
       </div>
 
@@ -934,6 +971,7 @@ const Registration = () => {
           onChange={(e) => setFormData({...formData, preferred_schedule: e.target.value})}
           placeholder="e.g., Weekday evenings, Saturday mornings, Flexible"
           className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
+          required
         />
       </div>
     </div>
@@ -1022,7 +1060,6 @@ const Registration = () => {
             type="checkbox"
             checked={agreedToTerms}
             onChange={e => setAgreedToTerms(e.target.checked)}
-            required
             className="mt-1 accent-primary"
           />
           <span>
@@ -1109,7 +1146,8 @@ const Registration = () => {
               owns_instrument: false,
               location: "",
               medical_condition: "no",
-              medical_details: ""
+              medical_details: "",
+              date_of_birth: '',
             });
             setCurrentStep(1);
             setIsSubmitted(false);
