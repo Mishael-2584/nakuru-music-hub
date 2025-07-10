@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2 } from 'lucide-react';
+import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import PasswordChangePrompt from '../components/PasswordChangePrompt';
 import { useNavigate } from 'react-router-dom';
@@ -16,6 +16,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Link } from 'react-router-dom';
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
+import { calculateStudentInvoice, InvoiceCalculationResult } from '../lib/invoiceUtils';
 
 interface StudentProfile {
   id: string;
@@ -43,6 +44,8 @@ interface StudentProfile {
   enrollment_date: string;
   created_at: string;
   updated_at: string;
+  date_of_birth?: string;
+  profile_photo_url?: string;
 }
 
 interface Lesson {
@@ -264,6 +267,16 @@ const StudentDashboard = () => {
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [invoiceDetails, setInvoiceDetails] = useState<InvoiceCalculationResult | null>(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+
+  // Profile photo upload state
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
   useEffect(() => {
     if (user) {
       checkUserRole();
@@ -362,31 +375,29 @@ const StudentDashboard = () => {
   const fetchStudentData = async () => {
     try {
       setLoading(true);
-      
-      // Fetch student profile
-      const { data: profile, error: profileError } = await supabase
+      // Fetch student profile from students table
+      const { data: student, error: studentError } = await supabase
         .from('students')
         .select('*')
         .eq('user_id', user?.id)
         .single();
-
-      if (profileError) {
-        console.error('Error fetching student profile:', profileError);
-        toast({
-          title: "Error",
-          description: "Failed to load student profile",
-          variant: "destructive",
-        });
+      if (studentError || !student) {
+        toast({ title: 'Error', description: 'Failed to load student profile', variant: 'destructive' });
         return;
       }
-
-      setStudentProfile(profile);
-
+      // Fetch profile from profiles table
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('profile_photo_url, date_of_birth')
+        .eq('id', user?.id)
+        .single();
+      setStudentProfile({ ...student, ...profile });
+      
       // Fetch lessons
       const { data: lessonsData, error: lessonsError } = await supabase
         .from('lessons')
         .select('*')
-        .eq('student_id', profile.id)
+        .eq('student_id', student.id)
         .order('lesson_date', { ascending: true });
 
       if (!lessonsError && lessonsData) {
@@ -397,7 +408,7 @@ const StudentDashboard = () => {
       const { data: practiceData, error: practiceError } = await supabase
         .from('practice_logs')
         .select('*')
-        .eq('student_id', profile.id)
+        .eq('student_id', student.id)
         .order('practice_date', { ascending: false });
 
       if (!practiceError && practiceData) {
@@ -419,7 +430,7 @@ const StudentDashboard = () => {
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('payments')
         .select('*')
-        .eq('student_id', profile.id)
+        .eq('student_id', student.id)
         .order('created_at', { ascending: false });
 
       if (!paymentsError && paymentsData) {
@@ -430,7 +441,7 @@ const StudentDashboard = () => {
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('assignments')
         .select('*')
-        .eq('student_id', profile.id)
+        .eq('student_id', student.id)
         .order('due_date', { ascending: true });
 
       if (!assignmentsError && assignmentsData) {
@@ -441,16 +452,21 @@ const StudentDashboard = () => {
       const { data: materialsData, error: materialsError } = await supabase
         .from('lesson_materials')
         .select('*')
+        .eq('lesson_id', student.id)
         .order('created_at', { ascending: false });
 
       if (!materialsError && materialsData) {
         setMaterials(materialsData);
       }
 
-      // Fetch available time slots and teachers
+      // Fetch available time slots
       await fetchAvailableTimeSlots();
+      
+      // Fetch teachers
       await fetchTeachers();
-      await fetchMyBookings();
+      
+      // Fetch invoices
+      await fetchInvoices(student.id);
 
     } catch (error) {
       console.error('Error fetching student data:', error);
@@ -461,6 +477,178 @@ const StudentDashboard = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Photo upload functions
+  const handlePhotoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('📸 Photo select triggered:', event.target.files);
+    const file = event.target.files?.[0];
+    if (file) {
+      console.log('📸 File selected:', file.name, file.type, file.size);
+      
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        console.log('❌ Invalid file type:', file.type);
+        toast({
+          title: "Invalid File",
+          description: "Please select an image file",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        console.log('❌ File too large:', file.size);
+        toast({
+          title: "File Too Large",
+          description: "Please select an image smaller than 5MB",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('✅ File validation passed, setting photo file');
+      setPhotoFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        console.log('✅ Preview created');
+        setPhotoPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      console.log('❌ No file selected');
+    }
+  };
+
+  const handlePhotoUpload = async () => {
+    if (!photoFile || !studentProfile) return;
+    try {
+      setUploadingPhoto(true);
+      
+      // Use the correct bucket and path structure like events
+      const fileName = `student-photos/${Date.now()}-${Math.random().toString(36).substring(2)}.jpg`;
+      const filePath = `images/${fileName}`;
+      
+      console.log('📸 Uploading photo to:', filePath);
+      
+      const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(fileName, photoFile, { 
+          cacheControl: '3600', 
+          upsert: false 
+        });
+        
+      if (uploadError) {
+        console.error('❌ Upload error:', uploadError);
+        toast({ 
+          title: 'Upload Failed', 
+          description: 'Failed to upload photo. Please try again.', 
+          variant: 'destructive' 
+        });
+        return;
+      }
+      
+      // Get the public URL from the images bucket
+      const { data: urlData } = supabase.storage
+        .from('images')
+        .getPublicUrl(fileName);
+        
+      console.log('✅ Photo uploaded successfully:', urlData.publicUrl);
+      
+      // Update profiles table
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ profile_photo_url: urlData.publicUrl })
+        .eq('id', user?.id);
+        
+      if (updateError) {
+        console.error('❌ Update error:', updateError);
+        toast({ 
+          title: 'Update Failed', 
+          description: 'Failed to update profile. Please try again.', 
+          variant: 'destructive' 
+        });
+        return;
+      }
+      
+      // Update local state
+      setStudentProfile(prev => prev ? { ...prev, profile_photo_url: urlData.publicUrl } : prev);
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      
+      toast({ 
+        title: 'Success', 
+        description: 'Profile photo uploaded successfully!' 
+      });
+      
+    } catch (error) {
+      console.error('❌ Unexpected error:', error);
+      toast({ 
+        title: 'Upload Failed', 
+        description: 'An error occurred while uploading the photo.', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const removePhoto = async () => {
+    if (!studentProfile?.profile_photo_url) return;
+    try {
+      // Extract the file path from the URL
+      const url = new URL(studentProfile.profile_photo_url);
+      const pathParts = url.pathname.split('/');
+      const fileName = pathParts[pathParts.length - 1];
+      const filePath = `student-photos/${fileName}`;
+      
+      console.log('🗑️ Removing photo from storage:', filePath);
+      
+      // Remove from storage
+      const { error: storageError } = await supabase.storage
+        .from('images')
+        .remove([filePath]);
+        
+      if (storageError) {
+        console.error('❌ Storage removal error:', storageError);
+        // Continue with database update even if storage removal fails
+      }
+      
+      // Update database
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ profile_photo_url: null })
+        .eq('id', user?.id);
+        
+      if (updateError) {
+        console.error('❌ Database update error:', updateError);
+        toast({ 
+          title: 'Remove Failed', 
+          description: 'Failed to remove photo. Please try again.', 
+          variant: 'destructive' 
+        });
+        return;
+      }
+      
+      // Update local state
+      setStudentProfile(prev => prev ? { ...prev, profile_photo_url: null } : prev);
+      
+      toast({ 
+        title: 'Success', 
+        description: 'Profile photo removed successfully!' 
+      });
+      
+    } catch (error) {
+      console.error('❌ Unexpected error:', error);
+      toast({ 
+        title: 'Remove Failed', 
+        description: 'An error occurred while removing the photo.', 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -993,6 +1181,24 @@ const StudentDashboard = () => {
   const upcomingBookings = myBookings.filter(booking => !isPastBooking(booking));
   const pastBookings = myBookings.filter(booking => isPastBooking(booking));
 
+  const fetchInvoices = async (studentId: string) => {
+    // Fetch invoices from Supabase
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('period_start', { ascending: false });
+    if (!error && data) setInvoices(data);
+  };
+
+  // Handler to view invoice breakdown
+  const handleViewInvoice = async (invoice: any) => {
+    setSelectedInvoice(invoice);
+    // Optionally recalculate details for display
+    setInvoiceDetails(invoice.lessons_summary || null);
+    setShowInvoiceModal(true);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -1315,6 +1521,10 @@ const StudentDashboard = () => {
               <TabsTrigger value="account" className="flex items-center space-x-2">
                 <User className="w-4 h-4" />
                 <span className="hidden sm:inline">Account</span>
+              </TabsTrigger>
+              <TabsTrigger value="invoices" className="flex items-center space-x-2">
+                <FileText className="w-4 h-4" />
+                <span className="hidden sm:inline">Invoices</span>
               </TabsTrigger>
             </TabsList>
 
@@ -2032,6 +2242,70 @@ const StudentDashboard = () => {
                   <div className="space-y-6">
                     <div>
                       <h4 className="font-semibold mb-4">Personal Information</h4>
+                      
+                      {/* Profile Photo Section */}
+                      <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-3">Profile Photo</label>
+                        <div className="flex items-center space-x-4">
+                          <div className="relative">
+                            {studentProfile?.profile_photo_url || photoPreview ? (
+                              <img
+                                src={photoPreview || studentProfile?.profile_photo_url}
+                                alt="Profile"
+                                className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                              />
+                            ) : (
+                              <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
+                                <Camera className="w-8 h-8 text-gray-400" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col space-y-2">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handlePhotoSelect}
+                              className="hidden"
+                              id="photo-upload"
+                            />
+                            <label htmlFor="photo-upload" className="cursor-pointer" onClick={() => console.log('📸 Upload button clicked')}>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="flex items-center"
+                                onClick={() => {
+                                  console.log('📸 Button clicked, triggering file input');
+                                  document.getElementById('photo-upload')?.click();
+                                }}
+                              >
+                                <Upload className="w-4 h-4 mr-2" />
+                                {studentProfile?.profile_photo_url ? 'Change Photo' : 'Upload Photo'}
+                              </Button>
+                            </label>
+                            {photoFile && (
+                              <Button 
+                                onClick={handlePhotoUpload} 
+                                disabled={uploadingPhoto}
+                                size="sm"
+                                className="flex items-center"
+                              >
+                                {uploadingPhoto ? 'Uploading...' : 'Save Photo'}
+                              </Button>
+                            )}
+                            {studentProfile?.profile_photo_url && !photoFile && (
+                              <Button 
+                                onClick={removePhoto} 
+                                variant="destructive" 
+                                size="sm"
+                                className="flex items-center"
+                              >
+                                Remove Photo
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
@@ -2044,6 +2318,10 @@ const StudentDashboard = () => {
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                           <input type="tel" value={editMode ? editProfile.phone : studentProfile.phone} onChange={e => setEditProfile({ ...editProfile, phone: e.target.value })} className="w-full p-2 border rounded-md" readOnly={!editMode} />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                          <input type="date" value={studentProfile.date_of_birth || ''} className="w-full p-2 border rounded-md" readOnly />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Instrument</label>
@@ -2132,6 +2410,85 @@ const StudentDashboard = () => {
                 />
                 <EventDetailsModal open={eventModalOpen} onClose={() => setEventModalOpen(false)} event={selectedEvent} />
               </Card>
+            </TabsContent>
+
+            <TabsContent value="invoices" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Invoices</CardTitle>
+                  <CardDescription>View your lesson invoices and download PDFs</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {invoices.length > 0 ? (
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr>
+                            <th className="text-left">Period</th>
+                            <th className="text-right">Amount Due</th>
+                            <th className="text-center">Status</th>
+                            <th className="text-center">Due Date</th>
+                            <th className="text-center">PDF</th>
+                            <th className="text-center">Details</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {invoices.map(inv => (
+                            <tr key={inv.id}>
+                              <td>{inv.period_start} - {inv.period_end}</td>
+                              <td className="text-right">KES {inv.amount_due.toLocaleString()}</td>
+                              <td className="text-center">{inv.status}</td>
+                              <td className="text-center">{inv.due_date}</td>
+                              <td className="text-center">{inv.pdf_url ? <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer">Download</a> : '-'}</td>
+                              <td className="text-center"><Button size="sm" variant="outline" onClick={() => handleViewInvoice(inv)}>View</Button></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="text-gray-500 text-center py-8">No invoices found</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              {/* Invoice details modal */}
+              <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Invoice Breakdown</DialogTitle>
+                  </DialogHeader>
+                  {invoiceDetails ? (
+                    <div className="space-y-4">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr>
+                            <th>Description</th>
+                            <th>Quantity</th>
+                            <th>Unit Price</th>
+                            <th>Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {invoiceDetails.lineItems.map((item, idx) => (
+                            <tr key={idx}>
+                              <td>{item.description}</td>
+                              <td>{item.quantity}</td>
+                              <td>KES {item.unitPrice.toLocaleString()}</td>
+                              <td>KES {item.amount.toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div className="text-right font-bold">Total: KES {invoiceDetails.total.toLocaleString()}</div>
+                    </div>
+                  ) : <p>No breakdown available.</p>}
+                  {selectedInvoice && selectedInvoice.pdf_url && (
+                    <a href={selectedInvoice.pdf_url} target="_blank" rel="noopener noreferrer">
+                      <Button variant="outline">Download PDF</Button>
+                    </a>
+                  )}
+                </DialogContent>
+              </Dialog>
             </TabsContent>
           </Tabs>
         </div>

@@ -1,5 +1,5 @@
 
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useCallback, useMemo } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +11,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isInitialized: boolean;
   signOut: () => Promise<{ error: any }>;
+  clearAllData: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,11 +23,80 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const navigate = useNavigate();
 
+  // Memoized values to prevent unnecessary re-renders
+  const isAuthenticated = useMemo(() => !!user, [user]);
+  
+  // Clear all cached data and storage
+  const clearAllData = useCallback(() => {
+    console.log('🧹 Clearing all cached data...');
+    
+    // Clear localStorage
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Clear specific Supabase items
+      localStorage.removeItem('supabase.auth.token');
+      localStorage.removeItem('supabase.auth.expires_at');
+      localStorage.removeItem('supabase.auth.refresh_token');
+      
+      // Clear any other potential auth items
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('supabase') || key.includes('auth') || key.includes('session'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+    } catch (error) {
+      console.error('Error clearing localStorage:', error);
+    }
+    
+    // Clear state
+    setSession(null);
+    setUser(null);
+    setLoading(false);
+    setIsInitialized(true);
+  }, []);
+
+  // Optimized sign out function
+  const signOut = useCallback(async () => {
+    try {
+      console.log('🔐 Starting sign out process...');
+      
+      // First try to refresh the session to ensure we have a valid token
+      const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.getSession();
+      
+      if (refreshError) {
+        console.error('Session refresh error:', refreshError);
+      }
+      
+      // Attempt to sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      // Clear all cached data regardless of the result
+      clearAllData();
+      
+      console.log('✅ Sign out completed');
+      return { error };
+    } catch (error) {
+      console.error('Sign out error:', error);
+      // Clear all cached data even if there's an error
+      clearAllData();
+      return { error };
+    }
+  }, [clearAllData]);
+
   useEffect(() => {
+    let mounted = true;
+    
     // Get initial session
     const getInitialSession = async () => {
       try {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
         
         // Check if session is expired
         if (initialSession && initialSession.expires_at) {
@@ -37,23 +107,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // Session is expired, sign out and redirect to login
             console.log('Session expired, signing out user');
             await supabase.auth.signOut();
-            setSession(null);
-            setUser(null);
-            navigate('/auth?session_expired=true', { replace: true });
+            if (mounted) {
+              setSession(null);
+              setUser(null);
+              navigate('/auth?session_expired=true', { replace: true });
+            }
             return;
           } else {
+            if (mounted) {
+              setSession(initialSession);
+              setUser(initialSession?.user ?? null);
+            }
+          }
+        } else {
+          if (mounted) {
             setSession(initialSession);
             setUser(initialSession?.user ?? null);
           }
-        } else {
-          setSession(initialSession);
-          setUser(initialSession?.user ?? null);
         }
       } catch (error) {
         console.error('Error getting initial session:', error);
       } finally {
-        setLoading(false);
-        setIsInitialized(true);
+        if (mounted) {
+          setLoading(false);
+          setIsInitialized(true);
+        }
       }
     };
 
@@ -62,6 +140,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
+        
         console.log('Auth state change:', event, session?.user?.email);
         
         // Handle session expiration
@@ -74,9 +154,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (expiresAt <= now) {
               console.log('Refreshed session is expired, signing out user');
               await supabase.auth.signOut();
-              setSession(null);
-              setUser(null);
-              navigate('/auth?session_expired=true', { replace: true });
+              if (mounted) {
+                setSession(null);
+                setUser(null);
+                navigate('/auth?session_expired=true', { replace: true });
+              }
               return;
             }
           }
@@ -84,34 +166,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         // Handle sign out
         if (event === 'SIGNED_OUT') {
-          setSession(null);
-          setUser(null);
+          if (mounted) {
+            setSession(null);
+            setUser(null);
+          }
         } else {
-          setSession(session);
-          setUser(session?.user ?? null);
+          if (mounted) {
+            setSession(session);
+            setUser(session?.user ?? null);
+          }
         }
         
-        setLoading(false);
-        setIsInitialized(true);
+        if (mounted) {
+          setLoading(false);
+          setIsInitialized(true);
+        }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
-  const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    return { error };
-  };
-
-  const value = {
+  const value = useMemo(() => ({
     user,
     session,
     loading,
-    isAuthenticated: !!user,
+    isAuthenticated,
     isInitialized,
-    signOut
-  };
+    signOut,
+    clearAllData
+  }), [user, session, loading, isAuthenticated, isInitialized, signOut, clearAllData]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

@@ -1014,3 +1014,87 @@ export const sendQuoteEmail = async (quoteData: any, quoteAmount: number, adminN
     return false;
   }
 };
+
+/**
+ * Send an invoice email (with PDF attachment) to a student.
+ * @param invoice - The invoice object (should include amount_due, period, etc.)
+ * @param student - The student object (should include email, name, etc.)
+ * @param options - { subject?: string, body?: string, isReminder?: boolean }
+ * @returns boolean (success)
+ */
+export const sendInvoiceEmail = async (
+  invoice: any,
+  student: any,
+  options: { subject?: string; body?: string; isReminder?: boolean } = {}
+): Promise<boolean> => {
+  try {
+    // Generate PDF
+    const invoiceDetails = invoice.lessons_summary || invoice.invoice_details || [];
+    const pdfBlob = await generateQuotePDF(
+      {
+        name: student.student_name,
+        email: student.email,
+        phone: student.phone || '',
+        service_category: 'Music Lessons',
+        project_type: '',
+        event_date: '',
+        location: '',
+        budget_range: '',
+        timeline: '',
+        specific_requirements: '',
+        reference_materials_url: '',
+        status: '',
+        admin_notes: '',
+        quote_amount: invoice.amount_due,
+        quote_sent_at: '',
+        preferred_contact_method: 'email',
+        additional_notes: ''
+      },
+      invoice.amount_due,
+      '',
+      invoiceDetails
+    );
+    // Convert blob to base64 for email attachment
+    const reader = new FileReader();
+    const pdfBase64 = await new Promise<string>((resolve) => {
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.readAsDataURL(pdfBlob);
+    });
+    // Email content
+    const subject = options.subject || (options.isReminder
+      ? `Payment Reminder: Invoice for ${student.student_name} - Damon Music Academy`
+      : `Your Invoice for ${student.student_name} - Damon Music Academy`);
+    const body = options.body || (options.isReminder
+      ? `<p>Dear ${student.student_name},</p><p>This is a friendly reminder that your invoice for the current period is due. Please find the attached invoice PDF for details.</p><p>If you have already paid, please disregard this message.</p>`
+      : `<p>Dear ${student.student_name},</p><p>Please find attached your invoice for the current period. If you have any questions, let us know.</p>`);
+    // Send email
+    const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
+      body: {
+        to: student.email,
+        subject,
+        html: `<!DOCTYPE html><html><body>${body}<br/><br/><p>Thank you for being part of Damon Music Academy!</p></body></html>`,
+        invoice,
+        student,
+        attachments: [
+          {
+            filename: `invoice-${student.student_name.replace(/\s+/g, '_')}-${Date.now()}.pdf`,
+            content: pdfBase64,
+            contentType: 'application/pdf'
+          }
+        ]
+      }
+    });
+    if (error) {
+      console.error('Error sending invoice email:', error);
+      return false;
+    }
+    return data && data.success;
+  } catch (error) {
+    console.error('Error in sendInvoiceEmail:', error);
+    return false;
+  }
+};

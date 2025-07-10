@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X, Image } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -12,11 +12,13 @@ import AdminEventsManager from "@/components/AdminEventsManager";
 import AdminNewsManager from "@/components/AdminNewsManager";
 import AdminGalleryManager from "@/components/AdminGalleryManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { sendAcceptedEmail, sendDeclinedEmail, sendTeacherAcceptedEmail, sendTeacherDeclinedEmail, sendTeacherRequestInfoEmail, sendQuoteEmail } from "@/lib/emailService";
+import { sendAcceptedEmail, sendDeclinedEmail, sendTeacherAcceptedEmail, sendTeacherDeclinedEmail, sendTeacherRequestInfoEmail, sendQuoteEmail, sendInvoiceEmail } from "@/lib/emailService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { generateQuotePDF } from "@/lib/pdfGenerator";
+import AdminFeesManager from './AdminFeesManager';
+import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
 
 interface Registration {
   id: string;
@@ -42,6 +44,7 @@ interface Registration {
   preferred_schedule?: string;
   status: string;
   created_at: string;
+  date_of_birth?: string;
 }
 
 interface ContactMessage {
@@ -95,7 +98,7 @@ interface ClassSchedule {
 }
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes' | 'gallery'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes' | 'gallery' | 'finances'>('stats');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
@@ -105,7 +108,7 @@ const AdminPanel = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState<string>('admin');
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
-  const { user, signOut } = useAuth();
+  const { user, signOut, clearAllData } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [pendingTeachers, setPendingTeachers] = useState([]);
@@ -131,6 +134,32 @@ const AdminPanel = () => {
     additionalInfo: ""
   });
   const [invoicePDFUrl, setInvoicePDFUrl] = useState<string | null>(null);
+  const [studentInvoices, setStudentInvoices] = useState<Record<string, any>>({});
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showExcuseModal, setShowExcuseModal] = useState(false);
+  const [editInvoice, setEditInvoice] = useState<any>(null);
+  const [excuseReason, setExcuseReason] = useState('');
+  const [activeStudents, setActiveStudents] = useState<Registration[]>([]);
+
+  // Filter registrations based on search term
+  const filteredRegistrations = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return registrations;
+    }
+    
+    const searchLower = searchTerm.toLowerCase();
+    return registrations.filter(registration => 
+      registration.student_name.toLowerCase().includes(searchLower) ||
+      registration.email.toLowerCase().includes(searchLower) ||
+      registration.course_category.toLowerCase().includes(searchLower) ||
+      registration.location.toLowerCase().includes(searchLower) ||
+      registration.instrument?.toLowerCase().includes(searchLower) ||
+      registration.production_type?.toLowerCase().includes(searchLower) ||
+      registration.receipt_number.toLowerCase().includes(searchLower)
+    );
+  }, [registrations, searchTerm]);
 
   // Function to open quote dialog with existing data
   const openQuoteDialog = (quote: Quote) => {
@@ -337,6 +366,19 @@ const AdminPanel = () => {
         }
       }
 
+      // Fetch students data
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('students')
+        .select('id, student_name, email, age, instrument, location, status, created_at, date_of_birth')
+        .order('created_at', { ascending: false });
+      if (!studentsError && studentsData) {
+        setActiveStudents(studentsData.map(s => ({
+          ...s,
+          profile_photo_url: null, // Students table doesn't have profile photos yet
+          date_of_birth: s.date_of_birth
+        })));
+      }
+
     } catch (error) {
       console.error("AdminPanel: Unexpected error:", error);
       toast({
@@ -351,13 +393,51 @@ const AdminPanel = () => {
   };
 
   const handleSignOut = async () => {
-    const { error } = await signOut();
-    if (!error) {
+    try {
+      console.log('🔐 Attempting to sign out...');
+      
+      // First try to sign out using the auth hook
+      const { error } = await signOut();
+      
+      if (error) {
+        console.error('❌ Sign out error:', error);
+        
+        // If the first method fails, try direct supabase sign out
+        try {
+          const { error: directError } = await supabase.auth.signOut();
+          if (directError) {
+            console.error('❌ Direct sign out also failed:', directError);
+          }
+        } catch (directError) {
+          console.error('❌ Direct sign out exception:', directError);
+        }
+      }
+      
+      // Clear all cached data using the new function
+      clearAllData();
+      
+      // Clear any local state and redirect
+      console.log('✅ Sign out successful, redirecting...');
       navigate("/auth");
       toast({
         title: "Signed Out",
         description: "You have been successfully signed out from Damon Music Academy.",
       });
+      
+    } catch (error) {
+      console.error('❌ Unexpected sign out error:', error);
+      
+      // Force clear everything and redirect
+      clearAllData();
+      
+      toast({
+        title: "Sign Out Error",
+        description: "An unexpected error occurred during sign out. Please try refreshing the page.",
+        variant: "destructive",
+      });
+      
+      // Force redirect even if sign out fails
+      navigate("/auth");
     }
   };
 
@@ -624,19 +704,6 @@ const AdminPanel = () => {
     return Music;
   };
 
-  const activeStudents = registrations.filter(reg => reg.status === 'approved');
-  const filteredRegistrations = registrations.filter(reg => {
-    const term = searchTerm.trim().toLowerCase();
-    return (
-      (reg.student_name || '').toLowerCase().includes(term) ||
-      (reg.instrument || '').toLowerCase().includes(term) ||
-      (reg.course_category || '').toLowerCase().includes(term) ||
-      (reg.location || '').toLowerCase().includes(term) ||
-      (reg.email || '').toLowerCase().includes(term) ||
-      (reg.production_type || '').toLowerCase().includes(term)
-    );
-  });
-
   const pendingCount = registrations.filter(reg => reg.status === 'pending').length;
   const unreadMessages = contactMessages.filter(msg => !msg.is_read).length;
 
@@ -740,6 +807,117 @@ const AdminPanel = () => {
     }
   };
 
+  // Fetch latest invoice for each active student
+  useEffect(() => {
+    const fetchStudentInvoices = async () => {
+      const ids = activeStudents.map(s => s.id);
+      if (ids.length === 0) return;
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('*')
+        .in('student_id', ids)
+        .order('period_end', { ascending: false });
+      if (!error && data) {
+        // Group by student_id, pick latest
+        const latest: Record<string, any> = {};
+        for (const inv of data) {
+          if (!latest[inv.student_id] || new Date(inv.period_end) > new Date(latest[inv.student_id].period_end)) {
+            latest[inv.student_id] = inv;
+          }
+        }
+        setStudentInvoices(latest);
+      }
+    };
+    fetchStudentInvoices();
+  }, [activeStudents]);
+
+  // Handler to view invoice details
+  const handleViewInvoice = (invoice: any) => {
+    setSelectedInvoice(invoice);
+    setShowInvoiceModal(true);
+  };
+
+  // Handler to mark invoice as paid
+  const handleMarkInvoicePaid = async (invoiceId: string) => {
+    await supabase.from('invoices').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', invoiceId);
+    setShowInvoiceModal(false);
+    // Refresh student invoices
+    const ids = activeStudents.map(s => s.id);
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*')
+      .in('student_id', ids)
+      .order('period_end', { ascending: false });
+    if (!error && data) {
+      const latest: Record<string, any> = {};
+      for (const inv of data) {
+        if (!latest[inv.student_id] || new Date(inv.period_end) > new Date(latest[inv.student_id].period_end)) {
+          latest[inv.student_id] = inv;
+        }
+      }
+      setStudentInvoices(latest);
+    }
+  };
+
+  // Handler: Resend Invoice
+  const handleResendInvoice = async (inv: any) => {
+    // Fetch student info
+    const { data: student, error } = await supabase.from('students').select('*').eq('id', inv.student_id).single();
+    if (error || !student) {
+      toast({ title: 'Error', description: 'Could not fetch student info.', variant: 'destructive' });
+      return;
+    }
+    const sent = await sendInvoiceEmail(inv, student, { isReminder: false });
+    if (sent) {
+      toast({ title: 'Invoice Resent', description: 'Invoice resent to student via email.' });
+    } else {
+      toast({ title: 'Email Error', description: 'Failed to send invoice email.', variant: 'destructive' });
+    }
+  };
+  // Handler: Send Reminder
+  const handleSendReminder = async (inv: any) => {
+    // Fetch student info
+    const { data: student, error } = await supabase.from('students').select('*').eq('id', inv.student_id).single();
+    if (error || !student) {
+      toast({ title: 'Error', description: 'Could not fetch student info.', variant: 'destructive' });
+      return;
+    }
+    const sent = await sendInvoiceEmail(inv, student, { isReminder: true });
+    if (sent) {
+      toast({ title: 'Reminder Sent', description: 'Payment reminder sent to student via email.' });
+    } else {
+      toast({ title: 'Email Error', description: 'Failed to send reminder email.', variant: 'destructive' });
+    }
+  };
+  // Handler: Excuse Period
+  const handleExcusePeriod = (inv: any) => {
+    setSelectedInvoice(inv);
+    setShowExcuseModal(true);
+  };
+  const submitExcuse = async () => {
+    if (!selectedInvoice) return;
+    await supabase.from('invoices').update({ status: 'excused', excuse_reason: excuseReason }).eq('id', selectedInvoice.id);
+    toast({ title: 'Period Excused', description: 'Student excused for this period.' });
+    setShowExcuseModal(false);
+    setExcuseReason('');
+  };
+  // Handler: Edit Invoice
+  const handleEditInvoice = (inv: any) => {
+    setEditInvoice({ ...inv });
+    setShowEditModal(true);
+  };
+  const submitEdit = async () => {
+    if (!editInvoice) return;
+    await supabase.from('invoices').update({
+      amount_due: editInvoice.amount_due,
+      due_date: editInvoice.due_date,
+      status: editInvoice.status
+    }).eq('id', editInvoice.id);
+    toast({ title: 'Invoice Updated', description: 'Invoice details updated.' });
+    setShowEditModal(false);
+    setEditInvoice(null);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5">
@@ -785,22 +963,36 @@ const AdminPanel = () => {
               )}
             </div>
           </div>
-          <Button
-            variant="outline"
-            onClick={handleSignOut}
-            className="flex items-center gap-2 bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign Out
-          </Button>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center">
+                <UserCog className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">{user?.email}</p>
+                <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
+              </div>
+            </div>
+            <div className="relative">
+              <Button
+                variant="outline"
+                onClick={() => handleSignOut()}
+                className="flex items-center gap-2 bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign Out
+              </Button>
+            </div>
+          </div>
         </div>
 
-        <div className="flex justify-center mb-8 overflow-x-auto">
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-2 shadow-xl border border-primary/10 flex gap-2">
+        <div className="flex justify-start mb-8 overflow-x-auto scrollbar-thin scrollbar-thumb-primary/40 scrollbar-track-transparent" style={{ WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory' }}>
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-2 shadow-xl border border-primary/10 flex gap-2 min-w-max" style={{ minWidth: 'fit-content' }}>
             <Button
               variant={activeTab === 'stats' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('stats')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
             >
               <Piano className="h-4 w-4 mr-2" />
               Overview
@@ -808,7 +1000,8 @@ const AdminPanel = () => {
             <Button
               variant={activeTab === 'students' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('students')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
             >
               <Users className="h-4 w-4 mr-2" />
               Students ({activeStudents.length})
@@ -816,7 +1009,8 @@ const AdminPanel = () => {
             <Button
               variant={activeTab === 'registrations' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('registrations')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
             >
               <Guitar className="h-4 w-4 mr-2" />
               Applications ({registrations.length})
@@ -824,7 +1018,8 @@ const AdminPanel = () => {
             <Button
               variant={activeTab === 'events' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('events')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
             >
               <Calendar className="h-4 w-4 mr-2" />
               Events
@@ -832,7 +1027,8 @@ const AdminPanel = () => {
             <Button
               variant={activeTab === 'messages' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('messages')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
             >
               <Mic className="h-4 w-4 mr-2" />
               Messages ({contactMessages.length})
@@ -840,7 +1036,8 @@ const AdminPanel = () => {
             <Button
               variant={activeTab === 'schedule' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('schedule')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
             >
               <Clock className="h-4 w-4 mr-2" />
               Schedule
@@ -849,7 +1046,8 @@ const AdminPanel = () => {
               <Button
                 variant={activeTab === 'admins' ? 'default' : 'ghost'}
                 onClick={() => setActiveTab('admins')}
-                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+                style={{ minWidth: 120 }}
               >
                 <Shield className="h-4 w-4 mr-2" />
                 Admins ({adminProfiles.length})
@@ -858,7 +1056,8 @@ const AdminPanel = () => {
             <Button
               variant={activeTab === 'teachers' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('teachers')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
             >
               <UserCog className="h-4 w-4 mr-2" />
               Teachers
@@ -866,7 +1065,8 @@ const AdminPanel = () => {
             <Button
               variant={activeTab === 'quotes' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('quotes')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
             >
               <Quote className="h-4 w-4 mr-2" />
               Quotes ({quotes.length})
@@ -874,10 +1074,20 @@ const AdminPanel = () => {
             <Button
               variant={activeTab === 'gallery' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('gallery')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap"
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
             >
               <Image className="h-4 w-4 mr-2" />
               Gallery
+            </Button>
+            <Button
+              variant={activeTab === 'finances' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('finances')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
+            >
+              <DollarSign className="h-4 w-4 mr-2" />
+              Finances
             </Button>
           </div>
         </div>
@@ -1065,15 +1275,40 @@ const AdminPanel = () => {
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center gap-4">
-                          <div className="p-3 bg-gradient-to-r from-primary/20 to-accent/20 rounded-full">
-                            <InstrumentIcon className="h-6 w-6 text-primary" />
-                          </div>
+                          {student.profile_photo_url ? (
+                            <img src={student.profile_photo_url} alt="Profile" className="w-12 h-12 rounded-full object-cover border-2 border-gray-200" />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+                              <UserCog className="w-6 h-6 text-gray-400" />
+                            </div>
+                          )}
                           <div>
                             <h4 className="text-xl font-bold text-primary">{student.student_name}</h4>
                             <p className="text-muted-foreground">Age: {student.age} • {student.instrument}</p>
+                            {student.date_of_birth && (
+                              <p className="text-xs text-gray-500">DOB: {new Date(student.date_of_birth).toLocaleDateString()}</p>
+                            )}
                           </div>
                         </div>
-                        <Badge className="bg-green-100 text-green-800">Active</Badge>
+                        <div className="flex items-center gap-2">
+                          {studentInvoices[student.id] ? (
+                            <>
+                              <Badge className={
+                                studentInvoices[student.id].status === 'paid' ? 'bg-green-100 text-green-800' :
+                                studentInvoices[student.id].status === 'overdue' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                              }>
+                                {studentInvoices[student.id].status.charAt(0).toUpperCase() + studentInvoices[student.id].status.slice(1)}
+                              </Badge>
+                              <span className="text-sm font-semibold text-primary ml-2">
+                                KES {studentInvoices[student.id].amount_due.toLocaleString()}
+                              </span>
+                              <Button size="sm" variant="outline" onClick={() => handleViewInvoice(studentInvoices[student.id])}>View Invoice</Button>
+                            </>
+                          ) : (
+                            <Badge className="bg-gray-100 text-gray-800">No Invoice</Badge>
+                          )}
+                        </div>
                       </div>
                       
                       <div className="grid md:grid-cols-2 gap-4 mb-4">
@@ -1085,6 +1320,18 @@ const AdminPanel = () => {
                           <Phone className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm">{student.phone}</span>
                         </div>
+                        {student.date_of_birth && (
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">DOB: {new Date(student.date_of_birth).toLocaleDateString()}</span>
+                          </div>
+                        )}
+                        {student.parent_name && (
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">Parent: {student.parent_name}</span>
+                          </div>
+                        )}
                       </div>
 
                       {student.goals && (
@@ -1216,6 +1463,24 @@ const AdminPanel = () => {
                                     <span className="font-medium text-gray-600">Location:</span>
                                     <span className="text-gray-800">{registration.location}</span>
                                   </div>
+                                  {registration.date_of_birth && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-600">Date of Birth:</span>
+                                      <span className="text-gray-800">{new Date(registration.date_of_birth).toLocaleDateString()}</span>
+                                    </div>
+                                  )}
+                                  {registration.parent_name && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-600">Parent Name:</span>
+                                      <span className="text-gray-800">{registration.parent_name}</span>
+                                    </div>
+                                  )}
+                                  {registration.parent_phone && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-600">Parent Phone:</span>
+                                      <span className="text-gray-800">{registration.parent_phone}</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
 
@@ -1879,6 +2144,142 @@ const AdminPanel = () => {
         <div style={{ display: activeTab === 'gallery' ? 'block' : 'none' }}>
           <AdminGalleryManager />
         </div>
+
+        {/* Invoice Modal */}
+        <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Invoice Breakdown</DialogTitle>
+            </DialogHeader>
+            {selectedInvoice ? (
+              <div className="space-y-4">
+                <div>Period: {selectedInvoice.period_start} - {selectedInvoice.period_end}</div>
+                <div>Status: {selectedInvoice.status}</div>
+                <div>Due: KES {selectedInvoice.amount_due.toLocaleString()}</div>
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th>Description</th>
+                      <th>Quantity</th>
+                      <th>Unit Price</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedInvoice.lessons_summary?.lineItems?.map((item: any, idx: number) => (
+                      <tr key={idx}>
+                        <td>{item.description}</td>
+                        <td>{item.quantity}</td>
+                        <td>KES {item.unitPrice.toLocaleString()}</td>
+                        <td>KES {item.amount.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="text-right font-bold">Total: KES {selectedInvoice.amount_due.toLocaleString()}</div>
+                {selectedInvoice && selectedInvoice.status !== 'paid' && (
+                  <Button variant="success" onClick={() => handleMarkInvoicePaid(selectedInvoice.id)}>
+                    Mark as Paid
+                  </Button>
+                )}
+              </div>
+            ) : <p>No breakdown available.</p>}
+          </DialogContent>
+        </Dialog>
+
+        {/* Finances Tab */}
+        <div style={{ display: activeTab === 'finances' ? 'block' : 'none' }}>
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Financial Management
+              </h3>
+            </div>
+            
+            <Tabs defaultValue="invoices" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="invoices">Invoices</TabsTrigger>
+                <TabsTrigger value="fees">Fees & Pricing</TabsTrigger>
+              </TabsList>
+              <TabsContent value="invoices">
+                <div className="space-y-6">
+                  <h4 className="text-xl font-semibold">Invoice Management</h4>
+                  <table className="min-w-full text-sm mb-6">
+                    <thead>
+                      <tr>
+                        <th>Student</th>
+                        <th>Period</th>
+                        <th>Amount Due</th>
+                        <th>Status</th>
+                        <th>Due Date</th>
+                        <th>PDF</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.values(studentInvoices).map(inv => (
+                        <tr key={inv.id}>
+                          <td>{inv.student_name || '-'}</td>
+                          <td>{inv.period_start} - {inv.period_end}</td>
+                          <td>KES {inv.amount_due?.toLocaleString()}</td>
+                          <td>{inv.status}</td>
+                          <td>{inv.due_date}</td>
+                          <td>{inv.pdf_url ? <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer">Download</a> : '-'}</td>
+                          <td className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleResendInvoice(inv)}>Resend</Button>
+                            <Button size="sm" variant="outline" onClick={() => handleSendReminder(inv)}>Remind</Button>
+                            <Button size="sm" variant="outline" onClick={() => handleExcusePeriod(inv)}>Excuse</Button>
+                            <Button size="sm" variant="outline" onClick={() => handleEditInvoice(inv)}>Edit</Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {/* Modals for Excuse, Edit, etc. */}
+                  {/* ...implement modals and handlers for each action... */}
+                </div>
+              </TabsContent>
+              <TabsContent value="fees">
+                <div className="space-y-6">
+                  <h4 className="text-xl font-semibold">Fees & Pricing Management</h4>
+                  <AdminFeesManager />
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
+        <Dialog open={showExcuseModal} onOpenChange={setShowExcuseModal}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Excuse Period</DialogTitle></DialogHeader>
+            <Textarea value={excuseReason} onChange={e => setExcuseReason(e.target.value)} placeholder="Reason for excusing this period..." />
+            <DialogFooter>
+              <Button onClick={submitExcuse}>Excuse</Button>
+              <Button variant="outline" onClick={() => setShowExcuseModal(false)}>Cancel</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Edit Invoice</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <Input type="number" value={editInvoice?.amount_due || ''} onChange={e => setEditInvoice({ ...editInvoice, amount_due: parseFloat(e.target.value) })} placeholder="Amount Due" />
+              <Input type="date" value={editInvoice?.due_date || ''} onChange={e => setEditInvoice({ ...editInvoice, due_date: e.target.value })} placeholder="Due Date" />
+              <Select value={editInvoice?.status || ''} onValueChange={status => setEditInvoice({ ...editInvoice, status })}>
+                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                  <SelectItem value="excused">Excused</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button onClick={submitEdit}>Save</Button>
+              <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </section>
   );

@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
+import { calculateStudentInvoice } from '../lib/invoiceUtils';
 
 interface TeacherProfile {
   id: string;
@@ -116,6 +117,10 @@ const TeacherDashboard = () => {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
   const [makeupCredits, setMakeupCredits] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [invoiceDetails, setInvoiceDetails] = useState<any>(null);
   const navigate = useNavigate();
 
   // Modal states
@@ -328,6 +333,15 @@ const TeacherDashboard = () => {
     // Accept both string and number
     const idx = typeof dayNum === 'string' ? parseInt(dayNum, 10) : dayNum;
     return days[(idx || 1) - 1] || "Monday";
+  };
+
+  const fetchInvoices = async () => {
+    // Fetch all invoices (for all students)
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*, students(student_name)')
+      .order('period_start', { ascending: false });
+    if (!error && data) setInvoices(data);
   };
 
   useEffect(() => {
@@ -736,6 +750,27 @@ const TeacherDashboard = () => {
     setEventModalOpen(true);
   };
 
+  const handleViewInvoice = (invoice: any) => {
+    setSelectedInvoice(invoice);
+    setInvoiceDetails(invoice.lessons_summary || null);
+    setShowInvoiceModal(true);
+  };
+
+  const handleGenerateInvoice = async (studentId: string, periodStart: string, periodEnd: string) => {
+    const result = await calculateStudentInvoice(studentId, periodStart, periodEnd);
+    // Store in Supabase
+    await supabase.from('invoices').insert({
+      student_id: studentId,
+      period_start: periodStart,
+      period_end: periodEnd,
+      lessons_summary: result,
+      amount_due: result.total,
+      status: 'pending',
+      due_date: periodEnd,
+    });
+    await fetchInvoices();
+  };
+
   if (loading || checking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5">
@@ -817,6 +852,10 @@ const TeacherDashboard = () => {
               <TabsTrigger value="calendar" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-gray-700 data-[state=active]:bg-gray-100 data-[state=active]:shadow-md transition-all">
                 <CalendarIcon className="w-5 h-5" />
                 <span>Calendar</span>
+              </TabsTrigger>
+              <TabsTrigger value="invoices" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-orange-700 data-[state=active]:bg-orange-100 data-[state=active]:shadow-md transition-all">
+                <FileText className="w-5 h-5" />
+                <span>Invoices</span>
               </TabsTrigger>
             </TabsList>
 
@@ -1457,6 +1496,85 @@ const TeacherDashboard = () => {
                 />
                 <EventDetailsModal open={eventModalOpen} onClose={() => setEventModalOpen(false)} event={selectedEvent} />
               </Card>
+            </TabsContent>
+
+            {/* Invoices Tab */}
+            <TabsContent value="invoices" className="mt-8">
+              <Card className="shadow-lg border-0 bg-white/95">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">All Student Invoices</CardTitle>
+                    <CardDescription>View and generate invoices for students</CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr>
+                          <th>Student</th>
+                          <th>Period</th>
+                          <th>Amount Due</th>
+                          <th>Status</th>
+                          <th>Due Date</th>
+                          <th>PDF</th>
+                          <th>Details</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invoices.map(inv => (
+                          <tr key={inv.id}>
+                            <td>{inv.students?.student_name || '-'}</td>
+                            <td>{inv.period_start} - {inv.period_end}</td>
+                            <td>KES {inv.amount_due.toLocaleString()}</td>
+                            <td>{inv.status}</td>
+                            <td>{inv.due_date}</td>
+                            <td>{inv.pdf_url ? <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer">Download</a> : '-'}</td>
+                            <td><Button size="sm" variant="outline" onClick={() => handleViewInvoice(inv)}>View</Button></td>
+                            <td>
+                              <Button size="sm" variant="outline" onClick={() => handleGenerateInvoice(inv.student_id, inv.period_start, inv.period_end)}>Regenerate</Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+              {/* Invoice details modal */}
+              <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Invoice Breakdown</DialogTitle>
+                  </DialogHeader>
+                  {invoiceDetails ? (
+                    <div className="space-y-4">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr>
+                            <th>Description</th>
+                            <th>Quantity</th>
+                            <th>Unit Price</th>
+                            <th>Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {invoiceDetails.lineItems.map((item, idx) => (
+                            <tr key={idx}>
+                              <td>{item.description}</td>
+                              <td>{item.quantity}</td>
+                              <td>KES {item.unitPrice.toLocaleString()}</td>
+                              <td>KES {item.amount.toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div className="text-right font-bold">Total: KES {invoiceDetails.total.toLocaleString()}</div>
+                    </div>
+                  ) : <p>No breakdown available.</p>}
+                </DialogContent>
+              </Dialog>
             </TabsContent>
           </Tabs>
         </div>

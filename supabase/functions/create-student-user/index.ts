@@ -163,6 +163,7 @@ serve(async (req) => {
               medical_details: registration.medical_details,
               goals: registration.goals,
               preferred_schedule: registration.preferred_schedule,
+              date_of_birth: registration.date_of_birth,
               status: 'active'
             });
 

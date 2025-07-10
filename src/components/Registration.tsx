@@ -193,6 +193,26 @@ const Registration = () => {
         }
         break;
       
+      case 'date_of_birth':
+        if (!value) {
+          return { isValid: false, error: 'Date of birth is required' };
+        }
+        const date = new Date(value);
+        const today = new Date();
+        if (isNaN(date.getTime())) {
+          return { isValid: false, error: 'Please enter a valid date of birth' };
+        }
+        if (date > today) {
+          return { isValid: false, error: 'Date of birth cannot be in the future' };
+        }
+        // Check if person is at least 3 years old
+        const age = today.getFullYear() - date.getFullYear();
+        const monthDiff = today.getMonth() - date.getMonth();
+        if (age < 3 || (age === 3 && monthDiff < 0)) {
+          return { isValid: false, error: 'Student must be at least 3 years old' };
+        }
+        break;
+      
       case 'course_category':
         if (!value || !['Music', 'Production', 'Art'].includes(value)) {
           return { isValid: false, error: 'Please select a valid course category' };
@@ -238,12 +258,23 @@ const Registration = () => {
     
     switch (step) {
       case 1:
-        ['student_name', 'age', 'email', 'phone', 'location'].forEach(field => {
+        ['student_name', 'age', 'email', 'phone', 'location', 'date_of_birth'].forEach(field => {
           const validation = validateField(field, formData[field as keyof typeof formData]);
           if (!validation.isValid) {
             errors.push(`${field}: ${validation.error}`);
           }
         });
+        
+        // Validate parent details for underage students (under 18)
+        const age = parseInt(formData.age);
+        if (age < 18) {
+          if (!formData.parent_name || formData.parent_name.trim().length < 2) {
+            errors.push('Parent/Guardian name is required for students under 18');
+          }
+          if (!formData.parent_phone || formData.parent_phone.trim().length < 9) {
+            errors.push('Parent/Guardian phone number is required for students under 18');
+          }
+        }
         
         // Validate medical details if medical condition is yes
         if (formData.medical_condition === 'yes') {
@@ -485,6 +516,21 @@ const Registration = () => {
         .update({ media_consent: mediaConsent })
         .eq('email', formData.email);
 
+      // Insert date_of_birth into profiles table
+      if (formData.date_of_birth) {
+        const { error: dateOfBirthError } = await supabase
+          .from('profiles')
+          .update({ date_of_birth: formData.date_of_birth })
+          .eq('email', formData.email);
+        
+        if (dateOfBirthError) {
+          console.error('❌ Error updating date_of_birth in profiles:', dateOfBirthError);
+          // Don't fail the registration if this fails
+        } else {
+          console.log('✅ Date of birth updated in profiles table');
+        }
+      }
+
       // Reset form after a delay
       setTimeout(() => {
         setFormData({
@@ -647,7 +693,7 @@ const Registration = () => {
       </div>
 
       <div className="space-y-4">
-        <Label htmlFor="date_of_birth" className="text-sm font-medium text-gray-700">Date of Birth</Label>
+        <Label htmlFor="date_of_birth" className="text-sm font-medium text-gray-700">Date of Birth <span className="text-red-500">*</span></Label>
         <Input
           id="date_of_birth"
           type="date"
@@ -694,27 +740,39 @@ const Registration = () => {
 
       {parseInt(formData.age) < 18 && (
         <>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
-            <h4 className="font-medium text-blue-800">Parent/Guardian Information</h4>
+          <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-bold">!</span>
+              </div>
+              <h4 className="font-semibold text-orange-800 text-lg">Parent/Guardian Information Required</h4>
+            </div>
+            <p className="text-orange-700 text-sm">Since you are under 18, we require parent/guardian contact information.</p>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="parent_name" className="text-sm font-medium text-gray-700">Parent/Guardian Name</Label>
+                <Label htmlFor="parent_name" className="text-sm font-medium text-gray-700">
+                  Parent/Guardian Name <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="parent_name"
                   value={formData.parent_name}
                   onChange={e => setFormData({ ...formData, parent_name: e.target.value })}
                   required
                   className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
+                  placeholder="Enter parent/guardian full name"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="parent_phone" className="text-sm font-medium text-gray-700">Parent/Guardian Phone</Label>
+                <Label htmlFor="parent_phone" className="text-sm font-medium text-gray-700">
+                  Parent/Guardian Phone <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="parent_phone"
                   value={formData.parent_phone}
                   onChange={e => setFormData({ ...formData, parent_phone: e.target.value })}
                   required
                   className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
+                  placeholder="Enter parent/guardian phone number"
                 />
               </div>
             </div>
@@ -1182,7 +1240,7 @@ const Registration = () => {
   const canProceed = () => {
     switch (currentStep) {
       case 1:
-        return formData.student_name && formData.age && formData.email && formData.phone && formData.location && 
+        return formData.student_name && formData.age && formData.email && formData.phone && formData.location && formData.date_of_birth && 
                formData.medical_condition && 
                (formData.medical_condition === "no" || (formData.medical_condition === "yes" && formData.medical_details.trim()));
       case 2:
