@@ -255,7 +255,6 @@ const AdminNewsManager = () => {
                   label="Article Image"
                   placeholder="Upload an image for this article"
                   maxSize={5}
-                  aspectRatio={16/9}
                 />
               </div>
 

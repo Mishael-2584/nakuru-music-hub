@@ -606,8 +606,9 @@ const AdminGalleryManager = () => {
               <ImageUpload
                 value={albumCoverImageUrl || ""}
                 onChange={(url) => setAlbumCoverImageUrl(url)}
-                aspectRatio={16/9}
                 className="w-full"
+                uploadPath="gallery/album_covers"
+                disableCrop={true}
               />
             </div>
             <div className="flex gap-4">
@@ -676,8 +677,9 @@ const AdminGalleryManager = () => {
               <ImageUpload
                 value={imageUrl || ""}
                 onChange={(url) => setImageUrl(url)}
-                aspectRatio={4/3}
                 className="w-full"
+                uploadPath="gallery/images"
+                disableCrop={true}
               />
             </div>
             <div>

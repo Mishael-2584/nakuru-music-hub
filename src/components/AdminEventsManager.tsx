@@ -327,7 +327,6 @@ const AdminEventsManager = () => {
                   label="Event Image"
                   placeholder="Upload an image for this event"
                   maxSize={5}
-                  aspectRatio={16/9}
                 />
               </div>
 

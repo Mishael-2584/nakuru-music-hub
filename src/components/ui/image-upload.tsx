@@ -17,6 +17,8 @@ interface ImageUploadProps {
   maxSize?: number;
   className?: string;
   aspectRatio?: number; // width/height ratio
+  uploadPath?: string; // Custom upload path (e.g., 'gallery/images/', 'events/')
+  disableCrop?: boolean; // Option to disable crop for gallery
 }
 
 const ImageUpload = ({
@@ -26,7 +28,9 @@ const ImageUpload = ({
   placeholder = "Upload an image",
   maxSize = 5,
   className = "",
-  aspectRatio = 16 / 9 // Default to 16:9 aspect ratio
+  aspectRatio = 16 / 9, // Default to 16:9 aspect ratio
+  uploadPath = "images", // Default to 'images' bucket
+  disableCrop = false // Default to enable crop
 }: ImageUploadProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(value || null);
@@ -72,7 +76,7 @@ const ImageUpload = ({
           if (error.message.includes("not found") || error.message.includes("does not exist")) {
             toast({
               title: "Storage Bucket Missing",
-              description: "The 'images' bucket doesn't exist. Please create it in your Supabase dashboard under Storage.",
+              description: `The 'images' bucket doesn't exist. Please create it in your Supabase dashboard under Storage.`,
               variant: "destructive",
             });
           } else {
@@ -110,7 +114,7 @@ const ImageUpload = ({
   }
 
   const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    if (aspectRatio) {
+    if (aspectRatio && !disableCrop) {
       const { width, height } = e.currentTarget;
       setCrop(centerAspectCrop(width, height, aspectRatio));
     }
@@ -157,14 +161,19 @@ const ImageUpload = ({
       return;
     }
 
-    // Create preview URL for editing
-    const previewUrl = URL.createObjectURL(file);
-    setOriginalImage(previewUrl);
-    setPreview(previewUrl);
-    setIsEditing(true);
-    setRotation(0);
-    setCrop(undefined);
-    setCompletedCrop(undefined);
+    if (disableCrop) {
+      // For gallery: upload directly without cropping
+      await handleUpload(file);
+    } else {
+      // For other uses: create preview for editing
+      const previewUrl = URL.createObjectURL(file);
+      setOriginalImage(previewUrl);
+      setPreview(previewUrl);
+      setIsEditing(true);
+      setRotation(0);
+      setCrop(undefined);
+      setCompletedCrop(undefined);
+    }
   };
 
   const getCroppedImg = (image: HTMLImageElement, crop: PixelCrop, rotation = 0): Promise<Blob> => {
@@ -288,7 +297,7 @@ const ImageUpload = ({
       }
 
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.jpg`;
-      const filePath = `images/${fileName}`;
+      const filePath = uploadPath === "images" ? fileName : `${uploadPath}/${fileName}`;
 
       console.log("Attempting upload of cropped image to:", filePath);
 
@@ -344,6 +353,72 @@ const ImageUpload = ({
           variant: "destructive",
         });
       }
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleUpload = async (file: File) => {
+    setIsUploading(true);
+
+    try {
+      // Check authentication before upload
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        toast({
+          title: "Authentication Required",
+          description: "You must be logged in to upload images.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}-${file.name}`;
+      const filePath = uploadPath === "images" ? fileName : `${uploadPath}/${fileName}`;
+
+      console.log("Attempting upload to:", filePath);
+
+      const { data, error } = await supabase.storage
+        .from("images")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false
+        });
+
+      if (error) {
+        console.error("Upload error details:", error);
+        toast({
+          title: "Upload failed",
+          description: `Error: ${error.message || "Unknown error occurred"}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log("Upload successful:", data);
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("images")
+        .getPublicUrl(filePath);
+
+      console.log("Public URL:", publicUrl);
+
+      onChange(publicUrl);
+      setPreview(publicUrl);
+
+      toast({
+        title: "Success",
+        description: "Image uploaded successfully",
+      });
+
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      toast({
+        title: "Error",
+        description: `An unexpected error occurred: ${error instanceof Error ? error.message : "Unknown error"}`,
+        variant: "destructive",
+      });
     } finally {
       setIsUploading(false);
     }
@@ -428,8 +503,8 @@ const ImageUpload = ({
         />
       </div>
 
-      {/* Image Editor */}
-      {isEditing && originalImage && (
+      {/* Image Editor - Only show if crop is enabled */}
+      {isEditing && originalImage && !disableCrop && (
         <div className="space-y-4 border rounded-lg p-4 bg-gray-50">
           <div className="flex items-center justify-between">
             <h4 className="font-medium">Edit Image</h4>
@@ -505,33 +580,35 @@ const ImageUpload = ({
             className="w-full max-w-xs h-auto rounded-lg border"
             onError={() => setPreview(null)}
           />
-          <div className="mt-2 flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                // Use the same CORS handling for editing existing images
-                setOriginalImage(preview);
-                setIsEditing(true);
-                setRotation(0);
-                setCrop(undefined);
-                setCompletedCrop(undefined);
-                
-                // Ensure the image loads with proper CORS settings
-                if (preview) {
-                  createImageWithCORS(preview).catch((error) => {
-                    console.warn('CORS warning for editing:', error);
-                    // Continue anyway - the image might still work
-                  });
-                }
-              }}
-              className="flex items-center gap-1"
-            >
-              <Crop className="h-3 w-3" />
-              Edit Image
-            </Button>
-          </div>
+          {!disableCrop && (
+            <div className="mt-2 flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  // Use the same CORS handling for editing existing images
+                  setOriginalImage(preview);
+                  setIsEditing(true);
+                  setRotation(0);
+                  setCrop(undefined);
+                  setCompletedCrop(undefined);
+                  
+                  // Ensure the image loads with proper CORS settings
+                  if (preview) {
+                    createImageWithCORS(preview).catch((error) => {
+                      console.warn('CORS warning for editing:', error);
+                      // Continue anyway - the image might still work
+                    });
+                  }
+                }}
+                className="flex items-center gap-1"
+              >
+                <Crop className="h-3 w-3" />
+                Edit Image
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
