@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CreditCard, DollarSign, TrendingUp, AlertCircle, CheckCircle, Clock, Plus, Eye, Edit } from 'lucide-react';
+import { Link } from "react-router-dom";
 
 interface Payment {
   id: string;
@@ -51,6 +52,8 @@ const PaymentManager: React.FC<PaymentManagerProps> = ({
     notes: '',
     student_id: ''
   });
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [mediaConsent, setMediaConsent] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -248,11 +251,40 @@ const PaymentManager: React.FC<PaymentManagerProps> = ({
                 />
               </div>
 
+              <div className="flex flex-col gap-4 mt-4">
+                <label className="flex items-start gap-2 text-sm font-medium text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={e => setAgreedToTerms(e.target.checked)}
+                    required
+                    className="mt-1 accent-primary"
+                  />
+                  <span>
+                    I have read and agree to the{' '}
+                    <Link to="/terms-of-service" className="text-primary underline" target="_blank">Terms of Service</Link>{' '}and{' '}
+                    <Link to="/cancellation-policy" className="text-primary underline" target="_blank">Cancellation Policy</Link>.
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={mediaConsent}
+                    onChange={e => setMediaConsent(e.target.checked)}
+                    className="mt-1 accent-primary"
+                  />
+                  <span>
+                    I grant Damon Music Academy permission to use photos/videos of me (or my child) for promotional purposes as described in the{' '}
+                    <Link to="/media-release-policy" className="text-primary underline" target="_blank">Media Release Policy</Link>.
+                  </span>
+                </label>
+              </div>
+
               <div className="flex justify-end space-x-2">
                 <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
                   Cancel
                 </Button>
-                <Button type="submit">
+                <Button type="submit" disabled={!agreedToTerms}>
                   {editingPayment ? 'Update Payment' : 'Add Payment'}
                 </Button>
               </div>

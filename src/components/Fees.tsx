@@ -228,6 +228,12 @@ const Fees = () => {
   return (
     <section className="py-16 bg-gray-50">
       <div className="container mx-auto px-4">
+        <div className="text-center mb-4">
+          <p className="text-sm text-gray-700">
+            All lessons and enrollments are subject to our{' '}
+            <Link to="/cancellation-policy" className="text-primary underline" target="_blank">Cancellation Policy</Link>.
+          </p>
+        </div>
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Damon Music Academy – Fee Structure</h2>
           <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">

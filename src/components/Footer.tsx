@@ -96,9 +96,11 @@ const Footer = () => {
               © 2025 Damon Music Academy. All rights reserved.
             </p>
             <div className="flex gap-6 text-sm">
-              <Link to="#" className="text-gray-400 hover:text-primary transition-colors">Privacy Policy</Link>
-              <Link to="#" className="text-gray-400 hover:text-primary transition-colors">Terms of Service</Link>
-              <Link to="#" className="text-gray-400 hover:text-primary transition-colors">Cookie Policy</Link>
+              <Link to="/privacy-policy" className="text-gray-400 hover:text-primary transition-colors">Privacy Policy</Link>
+              <Link to="/terms-of-service" className="text-gray-400 hover:text-primary transition-colors">Terms of Service</Link>
+              <Link to="/student-code-of-conduct" className="text-gray-400 hover:text-primary transition-colors">Student Code of Conduct</Link>
+              <Link to="/media-release-policy" className="text-gray-400 hover:text-primary transition-colors">Media Release Policy</Link>
+              <Link to="/cancellation-policy" className="text-gray-400 hover:text-primary transition-colors">Cancellation & Make-up Policy</Link>
             </div>
           </div>
         </div>

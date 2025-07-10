@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { sendConfirmationEmail } from "@/lib/emailService";
 import { Music, Users, Award, Star, ArrowRight, ArrowLeft, CheckCircle, MapPin, Phone, Mail, User, Calendar, Guitar, Mic, Palette, Video, Speaker } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Registration = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -40,6 +41,8 @@ const Registration = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const { toast } = useToast();
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [mediaConsent, setMediaConsent] = useState(false);
 
   const countryCodes = [
     { code: "+1", country: "United States", flag: "🇺🇸" },
@@ -453,6 +456,12 @@ const Registration = () => {
           });
         }
       }
+
+      // Save mediaConsent to student profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ media_consent: mediaConsent })
+        .eq('email', formData.email);
 
       // Reset form after a delay
       setTimeout(() => {
@@ -1005,6 +1014,35 @@ const Registration = () => {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="flex flex-col gap-4 mt-8">
+        <label className="flex items-start gap-2 text-sm font-medium text-gray-700">
+          <input
+            type="checkbox"
+            checked={agreedToTerms}
+            onChange={e => setAgreedToTerms(e.target.checked)}
+            required
+            className="mt-1 accent-primary"
+          />
+          <span>
+            I have read and agree to the{' '}
+            <Link to="/terms-of-service" className="text-primary underline" target="_blank">Terms of Service</Link>{' '}and{' '}
+            <Link to="/cancellation-policy" className="text-primary underline" target="_blank">Cancellation Policy</Link>.
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={mediaConsent}
+            onChange={e => setMediaConsent(e.target.checked)}
+            className="mt-1 accent-primary"
+          />
+          <span>
+            I grant Damon Music Academy permission to use photos/videos of me (or my child) for promotional purposes as described in the{' '}
+            <Link to="/media-release-policy" className="text-primary underline" target="_blank">Media Release Policy</Link>.
+          </span>
+        </label>
       </div>
 
       <div className="flex items-center space-x-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">

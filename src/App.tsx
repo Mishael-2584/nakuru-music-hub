@@ -27,6 +27,11 @@ import Shop from "./pages/Shop";
 import Team from "./pages/Team";
 import SignOut from "./pages/SignOut";
 import RoleTest from "./pages/RoleTest";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
+import StudentCodeOfConduct from "./pages/StudentCodeOfConduct";
+import MediaReleasePolicy from "./pages/MediaReleasePolicy";
+import CancellationPolicy from "./pages/CancellationPolicy";
 
 const queryClient = new QueryClient();
 
@@ -89,6 +94,11 @@ const App = () => (
             <Route path="/pending-teacher" element={<PendingTeacherPage />} />
             <Route path="/signout" element={<SignOut />} />
             <Route path="/roletest" element={<RoleTest />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/student-code-of-conduct" element={<StudentCodeOfConduct />} />
+            <Route path="/media-release-policy" element={<MediaReleasePolicy />} />
+            <Route path="/cancellation-policy" element={<CancellationPolicy />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
