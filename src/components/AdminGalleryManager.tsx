@@ -22,7 +22,9 @@ import {
   Upload,
   X,
   Eye,
-  EyeOff
+  EyeOff,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 
 interface Album {
@@ -85,6 +87,13 @@ const AdminGalleryManager = () => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [selectedAlbum, setSelectedAlbum] = useState<string>("all");
 
+  // Modal for full image view
+  const [modalImage, setModalImage] = useState<string | null>(null);
+  const [modalAlt, setModalAlt] = useState<string>("");
+  const [modalImageIndex, setModalImageIndex] = useState<number>(0);
+  const [modalImages, setModalImages] = useState<GalleryImage[]>([]);
+  const [modalAlbumName, setModalAlbumName] = useState<string>("");
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -92,6 +101,8 @@ const AdminGalleryManager = () => {
   const fetchData = async () => {
     try {
       setIsLoading(true);
+      
+      console.log('🖼️ Fetching gallery data...');
       
       // Fetch albums with image count
       const { data: albumsData, error: albumsError } = await supabase
@@ -110,6 +121,9 @@ const AdminGalleryManager = () => {
         image_count: album.gallery_images?.[0]?.count || 0
       })) || [];
 
+      console.log('🖼️ Albums fetched:', albumsWithCount.length);
+      console.log('🖼️ Sample album:', albumsWithCount[0]);
+      
       setAlbums(albumsWithCount);
 
       // Fetch all gallery images
@@ -119,6 +133,10 @@ const AdminGalleryManager = () => {
         .order('sort_order', { ascending: true });
 
       if (imagesError) throw imagesError;
+      
+      console.log('🖼️ Gallery images fetched:', imagesData?.length || 0);
+      console.log('🖼️ Sample image data:', imagesData?.[0]);
+      
       setGalleryImages(imagesData || []);
 
     } catch (error) {
@@ -138,7 +156,34 @@ const AdminGalleryManager = () => {
       let coverImagePath = editingAlbum?.cover_image_path || null;
       let coverImageFilename = editingAlbum?.cover_image_filename || null;
 
-      // Upload cover image if provided
+      console.log('🖼️ Admin - Album submission - albumCoverImageUrl:', albumCoverImageUrl);
+      console.log('🖼️ Admin - Album submission - coverImagePath (before):', coverImagePath);
+      console.log('🖼️ Admin - Album submission - coverImageFilename (before):', coverImageFilename);
+
+      // Handle cover image upload from ImageUpload component
+      if (albumCoverImageUrl) {
+        // Extract the file path from the public URL
+        // URL format: https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/gallery/album_covers/filename.jpg
+        try {
+          // Remove the base URL to get just the path
+          const baseUrl = 'https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/';
+          if (albumCoverImageUrl.startsWith(baseUrl)) {
+            coverImagePath = albumCoverImageUrl.substring(baseUrl.length);
+            // Decode URL-encoded characters
+            coverImagePath = decodeURIComponent(coverImagePath);
+            // Extract filename from the path
+            const pathParts = coverImagePath.split('/');
+            coverImageFilename = pathParts[pathParts.length - 1];
+          }
+        } catch (error) {
+          console.error('🖼️ Admin - Error parsing cover image URL:', error);
+        }
+      }
+
+      console.log('🖼️ Admin - Album submission - coverImagePath (after):', coverImagePath);
+      console.log('🖼️ Admin - Album submission - coverImageFilename (after):', coverImageFilename);
+
+      // Handle direct file upload (fallback)
       if (albumCoverImage) {
         const filename = `gallery/album_covers/${Date.now()}_${albumCoverImage.name}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -158,6 +203,8 @@ const AdminGalleryManager = () => {
         is_featured: albumForm.is_featured,
         sort_order: albumForm.sort_order
       };
+
+      console.log('🖼️ Admin - Album submission - final albumData:', albumData);
 
       if (editingAlbum) {
         // Update existing album
@@ -201,7 +248,27 @@ const AdminGalleryManager = () => {
       let imagePath = editingImage?.image_path || null;
       let imageFilename = editingImage?.image_filename || null;
 
-      // Upload image if provided
+      // Handle image upload from ImageUpload component
+      if (imageUrl) {
+        // Extract the file path from the public URL
+        // URL format: https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/gallery/images/filename.jpg
+        try {
+          // Remove the base URL to get just the path
+          const baseUrl = 'https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/';
+          if (imageUrl.startsWith(baseUrl)) {
+            imagePath = imageUrl.substring(baseUrl.length);
+            // Decode URL-encoded characters
+            imagePath = decodeURIComponent(imagePath);
+            // Extract filename from the path
+            const pathParts = imagePath.split('/');
+            imageFilename = pathParts[pathParts.length - 1];
+          }
+        } catch (error) {
+          console.error('🖼️ Admin - Error parsing image URL:', error);
+        }
+      }
+
+      // Handle direct file upload (fallback)
       if (imageFile) {
         const filename = `gallery/images/${Date.now()}_${imageFile.name}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -399,6 +466,53 @@ const AdminGalleryManager = () => {
     return album?.name || "Unknown Album";
   };
 
+  const openImageModal = (image: GalleryImage, images: GalleryImage[], startIndex: number = 0) => {
+    setModalImages(images);
+    setModalImageIndex(startIndex);
+    setModalImage(`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${image.image_path}`);
+    setModalAlt(image.alt_text || image.title || "Gallery image");
+    setModalAlbumName(getAlbumName(image.album_id));
+  };
+
+  const openAlbumCoverModal = (album: Album) => {
+    const albumImages = galleryImages.filter(img => img.album_id === album.id);
+    if (album.cover_image_path) {
+      setModalImages(albumImages);
+      setModalImageIndex(0);
+      setModalImage(`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${album.cover_image_path}`);
+      setModalAlt(album.name);
+      setModalAlbumName(album.name);
+    }
+  };
+
+  const nextImage = () => {
+    if (modalImageIndex < modalImages.length - 1) {
+      const nextIndex = modalImageIndex + 1;
+      const nextImage = modalImages[nextIndex];
+      setModalImageIndex(nextIndex);
+      setModalImage(`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${nextImage.image_path}`);
+      setModalAlt(nextImage.alt_text || nextImage.title || "Gallery image");
+    }
+  };
+
+  const previousImage = () => {
+    if (modalImageIndex > 0) {
+      const prevIndex = modalImageIndex - 1;
+      const prevImage = modalImages[prevIndex];
+      setModalImageIndex(prevIndex);
+      setModalImage(`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${prevImage.image_path}`);
+      setModalAlt(prevImage.alt_text || prevImage.title || "Gallery image");
+    }
+  };
+
+  const closeModal = () => {
+    setModalImage(null);
+    setModalAlt("");
+    setModalImageIndex(0);
+    setModalImages([]);
+    setModalAlbumName("");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -426,65 +540,77 @@ const AdminGalleryManager = () => {
             <div className="text-center py-8">Loading albums...</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {albums.map((album) => (
-                <Card key={album.id} className="relative">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <CardTitle className="text-lg">{album.name}</CardTitle>
-                      <div className="flex gap-1">
-                        {album.is_featured && (
-                          <Badge variant="secondary" className="text-xs">
-                            <Star className="w-3 h-3 mr-1" />
-                            Featured
+              {albums.map((album) => {
+                console.log('🖼️ Admin - Album:', album.name);
+                console.log('🖼️ Admin - Album cover_image_path:', album.cover_image_path);
+                
+                return (
+                  <Card key={album.id} className="relative">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <CardTitle className="text-lg">{album.name}</CardTitle>
+                        <div className="flex gap-1">
+                          {album.is_featured && (
+                            <Badge variant="secondary" className="text-xs">
+                              <Star className="w-3 h-3 mr-1" />
+                              Featured
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="text-xs">
+                            {album.image_count} images
                           </Badge>
-                        )}
-                        <Badge variant="outline" className="text-xs">
-                          {album.image_count} images
-                        </Badge>
+                        </div>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {album.cover_image_path ? (
-                      <div className="relative mb-3">
-                        <img
-                          src={`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${album.cover_image_path}`}
-                          alt={album.name}
-                          className="w-full h-32 object-cover rounded-md"
-                        />
+                    </CardHeader>
+                    <CardContent>
+                      {album.cover_image_path ? (
+                        <div className="relative mb-3">
+                          <img
+                            src={`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${album.cover_image_path}`}
+                            alt={album.name}
+                            className="w-full h-32 object-contain bg-gray-100 rounded-md"
+                            onError={(e) => {
+                              console.error('🖼️ Admin - Album cover image failed to load:', album.cover_image_path);
+                              console.error('🖼️ Admin - Full URL:', `https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${album.cover_image_path}`);
+                            }}
+                            onLoad={() => {
+                              console.log('🖼️ Admin - Album cover image loaded successfully:', album.cover_image_path);
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-full h-32 bg-muted rounded-md flex items-center justify-center mb-3">
+                          <Image className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                      )}
+                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                        {album.description || "No description"}
+                      </p>
+                      <div className="flex justify-between items-center">
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openAlbumDialog(album)}
+                          >
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => deleteAlbum(album.id, album.name)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          Order: {album.sort_order}
+                        </span>
                       </div>
-                    ) : (
-                      <div className="w-full h-32 bg-muted rounded-md flex items-center justify-center mb-3">
-                        <Image className="w-8 h-8 text-muted-foreground" />
-                      </div>
-                    )}
-                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                      {album.description || "No description"}
-                    </p>
-                    <div className="flex justify-between items-center">
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openAlbumDialog(album)}
-                        >
-                          <Edit className="w-3 h-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => deleteAlbum(album.id, album.name)}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        Order: {album.sort_order}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>
@@ -517,7 +643,15 @@ const AdminGalleryManager = () => {
                       <img
                         src={`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${image.image_path}`}
                         alt={image.alt_text || image.title || "Gallery image"}
-                        className="w-full h-48 object-cover rounded-t-lg"
+                        className="w-full h-48 object-contain bg-gray-100 rounded-t-lg cursor-pointer"
+                        onClick={() => openImageModal(image, filteredImages, filteredImages.findIndex(img => img.id === image.id))}
+                        onError={(e) => {
+                          console.error('🖼️ Image failed to load:', image.image_path);
+                          console.error('🖼️ Full URL:', `https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${image.image_path}`);
+                        }}
+                        onLoad={() => {
+                          console.log('🖼️ Image loaded successfully:', image.image_path);
+                        }}
                       />
                       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <div className="flex gap-1">
@@ -574,7 +708,7 @@ const AdminGalleryManager = () => {
 
       {/* Album Dialog */}
       <Dialog open={showAlbumDialog} onOpenChange={setShowAlbumDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingAlbum ? "Edit Album" : "Create New Album"}
@@ -611,7 +745,7 @@ const AdminGalleryManager = () => {
                 disableCrop={true}
               />
             </div>
-            <div className="flex gap-4">
+            <div className="flex gap-4 items-end">
               <div className="flex-1">
                 <label className="text-sm font-medium">Sort Order</label>
                 <Input
@@ -620,18 +754,19 @@ const AdminGalleryManager = () => {
                   onChange={(e) => setAlbumForm({ ...albumForm, sort_order: parseInt(e.target.value) || 0 })}
                 />
               </div>
-              <div className="flex items-center space-x-2 pt-6">
+              <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
                   id="featured"
                   checked={albumForm.is_featured}
                   onChange={(e) => setAlbumForm({ ...albumForm, is_featured: e.target.checked })}
+                  className="w-4 h-4"
                 />
                 <label htmlFor="featured" className="text-sm">Featured</label>
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={resetAlbumForm}>
               Cancel
             </Button>
@@ -644,7 +779,7 @@ const AdminGalleryManager = () => {
 
       {/* Image Dialog */}
       <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingImage ? "Edit Image" : "Upload New Image"}
@@ -707,7 +842,7 @@ const AdminGalleryManager = () => {
                 placeholder="Enter alt text for accessibility"
               />
             </div>
-            <div className="flex gap-4">
+            <div className="flex gap-4 items-end">
               <div className="flex-1">
                 <label className="text-sm font-medium">Sort Order</label>
                 <Input
@@ -716,18 +851,19 @@ const AdminGalleryManager = () => {
                   onChange={(e) => setImageForm({ ...imageForm, sort_order: parseInt(e.target.value) || 0 })}
                 />
               </div>
-              <div className="flex items-center space-x-2 pt-6">
+              <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
                   id="image-featured"
                   checked={imageForm.is_featured}
                   onChange={(e) => setImageForm({ ...imageForm, is_featured: e.target.checked })}
+                  className="w-4 h-4"
                 />
                 <label htmlFor="image-featured" className="text-sm">Featured</label>
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={resetImageForm}>
               Cancel
             </Button>
@@ -735,6 +871,33 @@ const AdminGalleryManager = () => {
               {editingImage ? "Update Image" : "Upload Image"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal for full image view */}
+      <Dialog open={!!modalImage} onOpenChange={closeModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col items-center justify-center">
+          <img
+            src={modalImage || ""}
+            alt={modalAlt}
+            className="max-w-full max-h-[80vh] object-contain rounded shadow-lg"
+            style={{ background: "#f3f4f6" }}
+          />
+          <div className="flex justify-between w-full px-4 mt-4">
+            <Button variant="outline" onClick={previousImage} className="p-2 rounded-full hover:bg-gray-200">
+              <ChevronLeft className="w-6 h-6 text-gray-600" />
+            </Button>
+            <span className="text-white text-lg font-medium">{modalAlbumName} - {modalImageIndex + 1} / {modalImages.length}</span>
+            <Button variant="outline" onClick={nextImage} className="p-2 rounded-full hover:bg-gray-200">
+              <ChevronRight className="w-6 h-6 text-gray-600" />
+            </Button>
+          </div>
+          <button
+            className="mt-4 px-4 py-2 bg-primary text-white rounded hover:bg-primary/80"
+            onClick={closeModal}
+          >
+            Close
+          </button>
         </DialogContent>
       </Dialog>
     </div>

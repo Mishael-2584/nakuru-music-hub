@@ -611,16 +611,38 @@ const AdminPanel = () => {
   };
 
   const deleteRegistration = async (id: string, studentName: string) => {
+    console.log('🗑️ Delete registration triggered for:', id, studentName);
+    
     // Show confirmation dialog
     if (!confirm(`Are you sure you want to delete the registration for ${studentName}? This action cannot be undone.`)) {
+      console.log('❌ Delete cancelled by user');
       return;
     }
 
     try {
-      const { error } = await supabase
+      // First, check if there are any students linked to this registration
+      console.log('🗑️ Checking for linked students...');
+      const { data: linkedStudents, error: studentError } = await supabase
+        .from('students')
+        .select('id, student_name')
+        .eq('registration_id', id);
+
+      if (studentError) {
+        console.error('Error checking linked students:', studentError);
+      } else {
+        console.log('🗑️ Linked students found:', linkedStudents?.length || 0);
+        if (linkedStudents && linkedStudents.length > 0) {
+          console.log('🗑️ Students to be unlinked:', linkedStudents);
+        }
+      }
+
+      console.log('🗑️ Attempting to delete registration from database...');
+      const { data, error } = await supabase
         .from('registrations')
         .delete()
         .eq('id', id);
+
+      console.log('🗑️ Delete response:', { data, error });
 
       if (error) {
         console.error("Error deleting registration:", error);
@@ -632,8 +654,14 @@ const AdminPanel = () => {
         return;
       }
 
+      console.log('✅ Registration deleted from database successfully');
+
       // Remove from local state
-      setRegistrations(prev => prev.filter(reg => reg.id !== id));
+      setRegistrations(prev => {
+        const filtered = prev.filter(reg => reg.id !== id);
+        console.log('🗑️ Updated local state, remaining registrations:', filtered.length);
+        return filtered;
+      });
 
       toast({
         title: "Registration Deleted",
@@ -963,26 +991,24 @@ const AdminPanel = () => {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center">
-                <UserCog className="w-4 h-4 text-white" />
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-primary/20">
+              <div className="w-6 h-6 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center">
+                <UserCog className="w-3 h-3 text-white" />
               </div>
-              <div>
+              <div className="text-right">
                 <p className="text-sm font-medium text-gray-900">{user?.email}</p>
                 <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
               </div>
             </div>
-            <div className="relative">
-              <Button
-                variant="outline"
-                onClick={() => handleSignOut()}
-                className="flex items-center gap-2 bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10"
-              >
-                <LogOut className="h-4 w-4" />
-                Sign Out
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              onClick={() => handleSignOut()}
+              className="flex items-center gap-2 bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign Out
+            </Button>
           </div>
         </div>
 

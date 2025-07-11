@@ -4,7 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Image, FolderOpen, Star, ChevronRight } from "lucide-react";
+import { Image, FolderOpen, Star, ChevronRight, ChevronLeft } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 interface Album {
   id: string;
@@ -39,6 +40,11 @@ const DynamicGallery = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAlbum, setSelectedAlbum] = useState<string | null>(null);
   const [featuredImages, setFeaturedImages] = useState<GalleryImage[]>([]);
+  const [modalImage, setModalImage] = useState<string | null>(null);
+  const [modalAlt, setModalAlt] = useState<string>("");
+  const [modalImageIndex, setModalImageIndex] = useState<number>(0);
+  const [modalImages, setModalImages] = useState<GalleryImage[]>([]);
+  const [modalAlbumName, setModalAlbumName] = useState<string>("");
 
   useEffect(() => {
     fetchGalleryData();
@@ -64,6 +70,9 @@ const DynamicGallery = () => {
         ...album,
         image_count: album.gallery_images?.[0]?.count || 0
       })) || [];
+
+      console.log('🖼️ Gallery - Albums fetched:', albumsWithCount);
+      console.log('🖼️ Gallery - Sample album:', albumsWithCount[0]);
 
       setAlbums(albumsWithCount);
 
@@ -94,6 +103,53 @@ const DynamicGallery = () => {
   const getAlbumName = (albumId: string) => {
     const album = albums.find(a => a.id === albumId);
     return album?.name || "Unknown Album";
+  };
+
+  const openImageModal = (image: GalleryImage, images: GalleryImage[], startIndex: number = 0) => {
+    setModalImages(images);
+    setModalImageIndex(startIndex);
+    setModalImage(`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${image.image_path}`);
+    setModalAlt(image.alt_text || image.title || "Gallery image");
+    setModalAlbumName(getAlbumName(image.album_id));
+  };
+
+  const openAlbumCoverModal = (album: Album) => {
+    const albumImages = getAlbumImages(album.id);
+    if (album.cover_image_path) {
+      setModalImages(albumImages);
+      setModalImageIndex(0);
+      setModalImage(`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${album.cover_image_path}`);
+      setModalAlt(album.name);
+      setModalAlbumName(album.name);
+    }
+  };
+
+  const nextImage = () => {
+    if (modalImageIndex < modalImages.length - 1) {
+      const nextIndex = modalImageIndex + 1;
+      const nextImage = modalImages[nextIndex];
+      setModalImageIndex(nextIndex);
+      setModalImage(`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${nextImage.image_path}`);
+      setModalAlt(nextImage.alt_text || nextImage.title || "Gallery image");
+    }
+  };
+
+  const previousImage = () => {
+    if (modalImageIndex > 0) {
+      const prevIndex = modalImageIndex - 1;
+      const prevImage = modalImages[prevIndex];
+      setModalImageIndex(prevIndex);
+      setModalImage(`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${prevImage.image_path}`);
+      setModalAlt(prevImage.alt_text || prevImage.title || "Gallery image");
+    }
+  };
+
+  const closeModal = () => {
+    setModalImage(null);
+    setModalAlt("");
+    setModalImageIndex(0);
+    setModalImages([]);
+    setModalAlbumName("");
   };
 
   if (isLoading) {
@@ -139,7 +195,10 @@ const DynamicGallery = () => {
                       <img
                         src={`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${image.image_path}`}
                         alt={image.alt_text || image.title || "Gallery image"}
-                        className="w-full h-64 sm:h-72 lg:h-80 object-cover transition-transform duration-500 group-hover:scale-110"
+                        className="w-full h-64 sm:h-72 lg:h-80 object-contain bg-gray-100 transition-transform duration-500 group-hover:scale-105 cursor-pointer"
+                        onClick={() => {
+                          openImageModal(image, getAlbumImages(image.album_id), getAlbumImages(image.album_id).findIndex(img => img.id === image.id));
+                        }}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
@@ -173,6 +232,11 @@ const DynamicGallery = () => {
                 const albumImages = getAlbumImages(album.id);
                 const coverImage = album.cover_image_path || (albumImages.length > 0 ? albumImages[0].image_path : null);
                 
+                console.log('🖼️ Gallery - Album:', album.name);
+                console.log('🖼️ Gallery - Album cover_image_path:', album.cover_image_path);
+                console.log('🖼️ Gallery - Album coverImage (final):', coverImage);
+                console.log('🖼️ Gallery - Album images count:', albumImages.length);
+                
                 return (
                   <Card 
                     key={album.id} 
@@ -185,7 +249,14 @@ const DynamicGallery = () => {
                           <img
                             src={`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${coverImage}`}
                             alt={album.name}
-                            className="w-full h-64 sm:h-72 lg:h-80 object-cover transition-transform duration-500 group-hover:scale-110"
+                            className="w-full h-64 sm:h-72 lg:h-80 object-contain bg-gray-100 transition-transform duration-500 group-hover:scale-105"
+                            onError={(e) => {
+                              console.error('🖼️ Gallery - Album cover image failed to load:', coverImage);
+                              console.error('🖼️ Gallery - Full URL:', `https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${coverImage}`);
+                            }}
+                            onLoad={() => {
+                              console.log('🖼️ Gallery - Album cover image loaded successfully:', coverImage);
+                            }}
                           />
                         ) : (
                           <div className="w-full h-64 sm:h-72 lg:h-80 bg-muted flex items-center justify-center">
@@ -246,7 +317,10 @@ const DynamicGallery = () => {
                           <img
                             src={`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${image.image_path}`}
                             alt={image.alt_text || image.title || "Gallery image"}
-                            className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-110"
+                            className="w-full h-64 sm:h-72 lg:h-80 object-contain bg-gray-100 transition-transform duration-500 group-hover:scale-105 cursor-pointer"
+                            onClick={() => {
+                              openImageModal(image, getAlbumImages(image.album_id), getAlbumImages(image.album_id).findIndex(img => img.id === image.id));
+                            }}
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                           <div className="absolute bottom-0 left-0 right-0 p-3 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
@@ -295,6 +369,33 @@ const DynamicGallery = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal for full image view */}
+      <Dialog open={!!modalImage} onOpenChange={closeModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col items-center justify-center">
+          <img
+            src={modalImage || ""}
+            alt={modalAlt}
+            className="max-w-full max-h-[80vh] object-contain rounded shadow-lg"
+            style={{ background: "#f3f4f6" }}
+          />
+          <div className="flex justify-between w-full px-4 mt-4">
+            <Button variant="outline" onClick={previousImage} className="p-2 rounded-full hover:bg-gray-200">
+              <ChevronLeft className="w-6 h-6 text-gray-600" />
+            </Button>
+            <span className="text-white text-lg font-medium">{modalAlbumName} - {modalImageIndex + 1} / {modalImages.length}</span>
+            <Button variant="outline" onClick={nextImage} className="p-2 rounded-full hover:bg-gray-200">
+              <ChevronRight className="w-6 h-6 text-gray-600" />
+            </Button>
+          </div>
+          <button
+            className="mt-4 px-4 py-2 bg-primary text-white rounded hover:bg-primary/80"
+            onClick={closeModal}
+          >
+            Close
+          </button>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 };
