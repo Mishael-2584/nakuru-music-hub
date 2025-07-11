@@ -1747,6 +1747,18 @@ const AdminPanel = () => {
                               <div className="text-sm mb-1">Experience: {teacher.experience}</div>
                               <div className="text-sm mb-1">Subjects: {teacher.subjects?.join(", ")}</div>
                               <div className="text-sm mb-1">Bio: {teacher.bio}</div>
+                              {teacher.cv_file_path && (
+                                <div className="text-sm mb-1">
+                                  <a
+                                    href={`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/teacher-cvs/${teacher.cv_file_path}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary underline font-medium"
+                                  >
+                                    Download CV
+                                  </a>
+                                </div>
+                              )}
                               <div className="text-xs text-gray-400">Applied: {new Date(teacher.created_at).toLocaleString()}</div>
                             </div>
                             <div className="flex flex-col gap-2 min-w-[180px]">
@@ -1794,6 +1806,18 @@ const AdminPanel = () => {
                               <div className="text-sm mb-1">Experience: {teacher.experience}</div>
                               <div className="text-sm mb-1">Subjects: {teacher.subjects?.join(", ")}</div>
                               <div className="text-sm mb-1">Bio: {teacher.bio}</div>
+                              {teacher.cv_file_path && (
+                                <div className="text-sm mb-1">
+                                  <a
+                                    href={`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/teacher-cvs/${teacher.cv_file_path}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary underline font-medium"
+                                  >
+                                    Download CV
+                                  </a>
+                                </div>
+                              )}
                               <div className="text-xs text-gray-400">Approved: {new Date(teacher.created_at).toLocaleString()}</div>
                             </div>
                           </div>

@@ -23,6 +23,7 @@ export default function TeacherSignup() {
     category: "Music",
     subjects: [],
   });
+  const [cvFile, setCvFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -49,7 +50,21 @@ export default function TeacherSignup() {
     e.preventDefault();
     setSubmitting(true);
     setError("");
+    if (!cvFile) {
+      setError("Please upload your CV (PDF, DOC, or DOCX).");
+      setSubmitting(false);
+      return;
+    }
     try {
+      // Upload CV to Supabase Storage
+      const fileExt = cvFile.name.split('.').pop();
+      const fileName = `${form.email.replace(/[^a-zA-Z0-9]/g, "_")}_${Date.now()}.${fileExt}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('teacher-cvs')
+        .upload(fileName, cvFile, { upsert: true, contentType: cvFile.type });
+      if (uploadError) throw uploadError;
+      const cvFilePath = uploadData?.path || fileName;
+      // Insert teacher application with CV file path
       const { data, error } = await supabase.from("pending_teachers").insert([
         {
           name: form.name,
@@ -61,6 +76,7 @@ export default function TeacherSignup() {
           category: form.category,
           subjects: form.subjects,
           status: "pending",
+          cv_file_path: cvFilePath,
         },
       ]);
       if (error) throw error;
@@ -145,6 +161,18 @@ export default function TeacherSignup() {
                   ))}
                 </div>
               </div>
+            </div>
+            {/* CV Upload */}
+            <div>
+              <label className="block font-medium mb-1">Upload CV <span className="text-red-500">*</span></label>
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                required
+                onChange={e => setCvFile(e.target.files?.[0] || null)}
+                className="block w-full border rounded p-2 bg-white"
+              />
+              <span className="text-xs text-muted-foreground">Accepted formats: PDF, DOC, DOCX</span>
             </div>
             {error && <div className="text-red-600 text-sm text-center">{error}</div>}
             <Button type="submit" disabled={submitting} className="w-full text-base font-semibold h-12 mt-2 shadow-lg">

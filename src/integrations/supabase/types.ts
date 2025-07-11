@@ -317,6 +317,58 @@ export interface Database {
           status?: string;
         };
       };
+      pending_teachers: {
+        Row: {
+          id: string;
+          created_at: string;
+          name: string;
+          email: string;
+          phone: string;
+          cv_file_path: string | null;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          name: string;
+          email: string;
+          phone?: string;
+          cv_file_path?: string | null;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          name?: string;
+          email?: string;
+          phone?: string;
+          cv_file_path?: string | null;
+        };
+      };
+      teachers: {
+        Row: {
+          id: string;
+          created_at: string;
+          name: string;
+          email: string;
+          phone: string;
+          cv_file_path: string | null;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          name: string;
+          email: string;
+          phone?: string;
+          cv_file_path?: string | null;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          name?: string;
+          email?: string;
+          phone?: string;
+          cv_file_path?: string | null;
+        };
+      };
     };
   };
 }

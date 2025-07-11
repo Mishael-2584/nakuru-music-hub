@@ -229,11 +229,13 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
             )}
           </form>
           
-          <div className="text-center">
-            <Button variant="link" onClick={() => setIsLogin(!isLogin)} className="text-sm text-muted-foreground">
-              {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
-            </Button>
-          </div>
+          {role !== 'teacher' && (
+            <div className="text-center">
+              <Button variant="link" onClick={() => setIsLogin(!isLogin)} className="text-sm text-muted-foreground">
+                {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
       {!isLogin && (
