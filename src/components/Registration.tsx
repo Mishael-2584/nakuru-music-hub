@@ -43,7 +43,6 @@ const Registration = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const { toast } = useToast();
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [mediaConsent, setMediaConsent] = useState(false);
 
   const countryCodes = [
     { code: "+1", country: "United States", flag: "🇺🇸" },
@@ -481,42 +480,7 @@ const Registration = () => {
         description: "Your registration was successful! We'll contact you within 24 hours.",
       });
 
-      // Send confirmation email with the complete registration data
-      if (data && data[0]) {
-        try {
-          console.log('📧 Sending confirmation email...');
-          const emailSent = await sendConfirmationEmail(data[0]);
-          
-          if (emailSent) {
-            console.log('✅ Confirmation email sent successfully');
-            toast({
-              title: "Email Sent",
-              description: "A confirmation receipt has been sent to your email address.",
-            });
-          } else {
-            console.warn('⚠️ Failed to send confirmation email');
-            toast({
-              title: "Registration Successful! 🎉",
-              description: "Your registration was successful! We'll contact you within 24 hours.",
-            });
-          }
-        } catch (emailError) {
-          console.error('❌ Email sending error:', emailError);
-          // Don't fail the registration if email fails
-          toast({
-            title: "Registration Successful! 🎉",
-            description: "Your registration was successful! We'll contact you within 24 hours.",
-          });
-        }
-      }
-
-      // Save mediaConsent to student profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ media_consent: mediaConsent })
-        .eq('email', formData.email);
-
-      // Insert date_of_birth into profiles table
+      // Save date_of_birth into profiles table
       if (formData.date_of_birth) {
         const { error: dateOfBirthError } = await supabase
           .from('profiles')
@@ -1124,18 +1088,6 @@ const Registration = () => {
             I have read and agree to the{' '}
             <Link to="/terms-of-service" className="text-primary underline" target="_blank">Terms of Service</Link>{' '}and{' '}
             <Link to="/cancellation-policy" className="text-primary underline" target="_blank">Cancellation Policy</Link>.
-          </span>
-        </label>
-        <label className="flex items-start gap-2 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            checked={mediaConsent}
-            onChange={e => setMediaConsent(e.target.checked)}
-            className="mt-1 accent-primary"
-          />
-          <span>
-            I grant Damon Music Academy permission to use photos/videos of me (or my child) for promotional purposes as described in the{' '}
-            <Link to="/media-release-policy" className="text-primary underline" target="_blank">Media Release Policy</Link>.
           </span>
         </label>
       </div>

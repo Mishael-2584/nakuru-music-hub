@@ -53,7 +53,6 @@ const PaymentManager: React.FC<PaymentManagerProps> = ({
     student_id: ''
   });
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [mediaConsent, setMediaConsent] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -264,18 +263,6 @@ const PaymentManager: React.FC<PaymentManagerProps> = ({
                     I have read and agree to the{' '}
                     <Link to="/terms-of-service" className="text-primary underline" target="_blank">Terms of Service</Link>{' '}and{' '}
                     <Link to="/cancellation-policy" className="text-primary underline" target="_blank">Cancellation Policy</Link>.
-                  </span>
-                </label>
-                <label className="flex items-start gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={mediaConsent}
-                    onChange={e => setMediaConsent(e.target.checked)}
-                    className="mt-1 accent-primary"
-                  />
-                  <span>
-                    I grant Damon Music Academy permission to use photos/videos of me (or my child) for promotional purposes as described in the{' '}
-                    <Link to="/media-release-policy" className="text-primary underline" target="_blank">Media Release Policy</Link>.
                   </span>
                 </label>
               </div>

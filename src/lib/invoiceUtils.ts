@@ -1,5 +1,6 @@
 import { supabase } from '../integrations/supabase/client';
 import { generateQuotePDF } from './pdfGenerator';
+import { Invoice } from '../integrations/supabase/types';
 
 export interface InvoiceLineItem {
   description: string;
@@ -123,4 +124,105 @@ export async function generateAndUploadInvoicePDF(invoice: any, student: any): P
   // Get public URL
   const { publicUrl } = supabase.storage.from('invoices').getPublicUrl(fileName).data;
   return publicUrl;
+}
+
+/**
+ * Generate an invoice for a given registration.
+ * @param registrationId - The registration UUID
+ * @returns The created Invoice object
+ */
+export async function generateInvoiceForRegistration(registrationId: string): Promise<Invoice | null> {
+  // Fetch registration, student, and fee info
+  const { data: registration, error: regError } = await supabase
+    .from('registrations')
+    .select('*')
+    .eq('id', registrationId)
+    .single();
+  if (regError || !registration) throw regError || new Error('Registration not found');
+
+  // Find the student for this registration
+  const { data: student, error: studentError } = await supabase
+    .from('students')
+    .select('*')
+    .eq('id', registration.student_id)
+    .single();
+  if (studentError || !student) throw studentError || new Error('Student not found');
+
+  // Find the matching fee
+  const { data: fee, error: feeError } = await supabase
+    .from('fees')
+    .select('*')
+    .eq('course_type', registration.course_category)
+    .eq('course_name', registration.instrument)
+    .eq('is_active', true)
+    .single();
+  if (feeError || !fee) throw feeError || new Error('Fee not found for registration');
+
+  // Determine billing period
+  const now = new Date();
+  let periodStart: Date, periodEnd: Date;
+  if (fee.payment_type === 'monthly') {
+    // Start: 1st of next month, End: last day of next month
+    periodStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    periodEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+  } else if (fee.payment_type === 'term') {
+    // Start: enrollment date, End: +3 months
+    periodStart = new Date(registration.created_at);
+    periodEnd = new Date(periodStart);
+    periodEnd.setMonth(periodEnd.getMonth() + 3);
+    periodEnd.setDate(periodEnd.getDate() - 1);
+  } else {
+    throw new Error('Unsupported payment type');
+  }
+
+  // Prepare invoice data
+  const invoiceData = {
+    student_id: student.id,
+    registration_id: registration.id,
+    fee_id: fee.id,
+    amount: fee.price,
+    period_start: periodStart.toISOString().slice(0, 10),
+    period_end: periodEnd.toISOString().slice(0, 10),
+    due_date: fee.payment_type === 'monthly'
+      ? new Date(now.getFullYear(), now.getMonth() + 1, 5).toISOString().slice(0, 10)
+      : periodEnd.toISOString().slice(0, 10),
+    status: 'pending',
+    is_auto_generated: true,
+    admin_override: false,
+    notes: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  // Insert invoice
+  const { data: invoice, error: invError } = await supabase
+    .from('invoices')
+    .insert([invoiceData])
+    .select('*')
+    .single();
+  if (invError) throw invError;
+  return invoice as Invoice;
+}
+
+/**
+ * Generate recurring invoices for all active registrations.
+ * Should be run as a scheduled job (e.g., monthly/termly).
+ */
+export async function generateRecurringInvoices(): Promise<void> {
+  // Fetch all active registrations
+  const { data: registrations, error } = await supabase
+    .from('registrations')
+    .select('*')
+    .eq('status', 'approved');
+  if (error) throw error;
+  if (!registrations) return;
+
+  for (const reg of registrations) {
+    try {
+      await generateInvoiceForRegistration(reg.id);
+    } catch (err) {
+      // Log or handle error for this registration
+      console.error(`Failed to generate invoice for registration ${reg.id}:`, err);
+    }
+  }
 } 

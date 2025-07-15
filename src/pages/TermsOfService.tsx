@@ -39,6 +39,16 @@ const TermsOfService = () => (
       <p className="mb-4">These Terms shall be governed by and construed in accordance with the laws of Kenya.</p>
       <h2 className="text-xl font-semibold mt-8 mb-2 text-primary">Contact Us</h2>
       <p>For any questions about these Terms, please contact us at <a href="mailto:admin@damonmusicacademy.co.ke" className="text-accent underline">admin@damonmusicacademy.co.ke</a>.</p>
+
+      {/* Media Release Consent Section */}
+      <div className="mt-12">
+        <h2 className="text-2xl font-bold mb-2">Media Release Consent</h2>
+        <p className="mb-2">
+          By enrolling at Damon Music Academy, you grant Damon Music Academy permission to use photos and videos of you (or your child) for promotional purposes as described in our{' '}
+          <a href="/media-release-policy" className="text-primary underline" target="_blank">Media Release Policy</a>.
+          If you have concerns or wish to opt out, please review the Media Release Policy for instructions.
+        </p>
+      </div>
     </div>
   </div>
 );

@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Link } from 'react-router-dom';
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
 import { calculateStudentInvoice, InvoiceCalculationResult } from '../lib/invoiceUtils';
+import { Invoice } from '../integrations/supabase/types';
 
 interface StudentProfile {
   id: string;
@@ -2412,6 +2413,7 @@ const StudentDashboard = () => {
               </Card>
             </TabsContent>
 
+            {/* Invoices Tab */}
             <TabsContent value="invoices" className="space-y-6">
               <Card>
                 <CardHeader>

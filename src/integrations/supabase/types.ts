@@ -372,3 +372,35 @@ export interface Database {
     };
   };
 }
+
+// Invoice type
+export type Invoice = {
+  id: string;
+  student_id: string;
+  registration_id: string | null;
+  fee_id: string | null;
+  amount: number;
+  period_start: string; // ISO date
+  period_end: string;   // ISO date
+  due_date: string;     // ISO date
+  status: 'pending' | 'paid' | 'overdue' | 'void';
+  is_auto_generated: boolean;
+  admin_override: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// Payment type
+export type Payment = {
+  id: string;
+  invoice_id: string;
+  mpesa_transaction_id: string | null;
+  amount: number;
+  status: 'pending' | 'completed' | 'failed' | 'refunded';
+  paid_at: string | null;
+  payer_phone: string | null;
+  raw_callback_data: any | null;
+  created_at: string;
+  updated_at: string;
+};
