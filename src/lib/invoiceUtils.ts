@@ -253,13 +253,32 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   
   console.log('Determined payment type:', paymentType, 'for course category:', courseCategory);
   
-  // First try to find exact match with learning mode and correct payment type
+  // Normalize learning mode for database matching
+  const normalizeLearningMode = (mode: string) => {
+    switch (mode.toLowerCase()) {
+      case 'online':
+        return 'Online (Global)';
+      case 'home':
+      case 'home (nakuru & environs)':
+        return 'Home (Nakuru & Environs)';
+      case 'in-person':
+      case 'at the academy':
+        return 'At the Academy';
+      default:
+        return mode;
+    }
+  };
+  
+  const normalizedLearningMode = normalizeLearningMode(learningMode);
+  console.log('Normalized learning mode:', normalizedLearningMode);
+  
+  // First try to find exact match with normalized learning mode and correct payment type
   const { data: exactFee, error: exactFeeError } = await supabase
     .from('fees')
     .select('*')
     .eq('course_type', courseCategory)
     .eq('course_name', instrument)
-    .eq('mode', learningMode)
+    .eq('mode', normalizedLearningMode)
     .eq('payment_type', paymentType)
     .eq('is_active', true)
     .maybeSingle();
@@ -270,12 +289,12 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   } else {
     console.log('No exact fee match found, trying fallback options');
     
-    // Fallback 1: Try to find by course_type and learning_mode with correct payment type
+    // Fallback 1: Try to find by course_type and normalized learning_mode with correct payment type
     const { data: modeFee, error: modeFeeError } = await supabase
       .from('fees')
       .select('*')
       .eq('course_type', courseCategory)
-      .eq('mode', learningMode)
+      .eq('mode', normalizedLearningMode)
       .eq('payment_type', paymentType)
       .eq('is_active', true)
       .maybeSingle();
@@ -313,12 +332,12 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
           }
         }
         
-        // Fallback 4: Try to find any fee for the learning mode with correct payment type
+        // Fallback 4: Try to find any fee for the normalized learning mode with correct payment type
         if (!fee) {
           const { data: modeAnyFee, error: modeAnyFeeError } = await supabase
             .from('fees')
             .select('*')
-            .eq('mode', learningMode)
+            .eq('mode', normalizedLearningMode)
             .eq('payment_type', paymentType)
             .eq('is_active', true)
             .maybeSingle();
@@ -454,14 +473,76 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   // Determine billing period
   const now = new Date();
   let periodStart: Date, periodEnd: Date;
+  
+  // Check if this is the first invoice for this student
+  const { data: existingInvoices, error: existingInvoicesError } = await supabase
+    .from('invoices')
+    .select('*')
+    .eq('student_id', student.id)
+    .order('created_at', { ascending: true });
+  
+  if (existingInvoicesError) {
+    console.error('Error checking existing invoices:', existingInvoicesError);
+    throw existingInvoicesError;
+  }
+  
+  const isFirstInvoice = !existingInvoices || existingInvoices.length === 0;
+  
+  console.log('📅 Billing period calculation:', {
+    isFirstInvoice,
+    existingInvoicesCount: existingInvoices?.length || 0,
+    currentDate: now.toISOString().slice(0, 10),
+    paymentType: fee.payment_type
+  });
+  
   if (fee.payment_type === 'monthly') {
-    periodStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    periodEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+    if (isFirstInvoice) {
+      // First invoice: Current month (regardless of start date) until 30th
+      periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+      console.log('📅 First monthly invoice period:', {
+        periodStart: periodStart.toISOString().slice(0, 10),
+        periodEnd: periodEnd.toISOString().slice(0, 10)
+      });
+    } else {
+      // Subsequent invoices: Next month periods (1st to last day)
+      const lastInvoice = existingInvoices[existingInvoices.length - 1];
+      const lastPeriodEnd = new Date(lastInvoice.period_end);
+      periodStart = new Date(lastPeriodEnd.getFullYear(), lastPeriodEnd.getMonth() + 1, 1);
+      periodEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0);
+      console.log('📅 Subsequent monthly invoice period:', {
+        lastPeriodEnd: lastPeriodEnd.toISOString().slice(0, 10),
+        periodStart: periodStart.toISOString().slice(0, 10),
+        periodEnd: periodEnd.toISOString().slice(0, 10)
+      });
+    }
   } else if (fee.payment_type === 'term') {
-    periodStart = new Date(registration.created_at);
-    periodEnd = new Date(periodStart);
-    periodEnd.setMonth(periodEnd.getMonth() + 3);
-    periodEnd.setDate(periodEnd.getDate() - 1);
+    if (isFirstInvoice) {
+      // First term: From registration date to 3 months later
+      periodStart = new Date(registration.created_at);
+      periodEnd = new Date(periodStart);
+      periodEnd.setMonth(periodEnd.getMonth() + 3);
+      periodEnd.setDate(periodEnd.getDate() - 1);
+      console.log('📅 First termly invoice period:', {
+        registrationDate: registration.created_at,
+        periodStart: periodStart.toISOString().slice(0, 10),
+        periodEnd: periodEnd.toISOString().slice(0, 10)
+      });
+    } else {
+      // Subsequent terms: 3-month periods after the last term
+      const lastInvoice = existingInvoices[existingInvoices.length - 1];
+      const lastPeriodEnd = new Date(lastInvoice.period_end);
+      periodStart = new Date(lastPeriodEnd);
+      periodStart.setDate(periodStart.getDate() + 1);
+      periodEnd = new Date(periodStart);
+      periodEnd.setMonth(periodEnd.getMonth() + 3);
+      periodEnd.setDate(periodEnd.getDate() - 1);
+      console.log('📅 Subsequent termly invoice period:', {
+        lastPeriodEnd: lastPeriodEnd.toISOString().slice(0, 10),
+        periodStart: periodStart.toISOString().slice(0, 10),
+        periodEnd: periodEnd.toISOString().slice(0, 10)
+      });
+    }
   } else {
     throw new Error('Unsupported payment type');
   }

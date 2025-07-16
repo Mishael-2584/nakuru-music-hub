@@ -1336,6 +1336,7 @@ const AdminPanel = () => {
               <DollarSign className="h-4 w-4 mr-2" />
               Finances
             </Button>
+
           </div>
         </div>
 
@@ -2452,6 +2453,8 @@ const AdminPanel = () => {
             </Tabs>
           </div>
         </div>
+
+
         <Dialog open={showExcuseModal} onOpenChange={setShowExcuseModal}>
           <DialogContent>
             <DialogHeader><DialogTitle>Excuse Period</DialogTitle></DialogHeader>
