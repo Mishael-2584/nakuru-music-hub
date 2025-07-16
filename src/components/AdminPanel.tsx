@@ -142,6 +142,11 @@ const AdminPanel = () => {
   const [editInvoice, setEditInvoice] = useState<any>(null);
   const [excuseReason, setExcuseReason] = useState('');
   const [activeStudents, setActiveStudents] = useState<Registration[]>([]);
+  const [expandedStudentIds, setExpandedStudentIds] = useState<Set<string>>(new Set());
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<any>(null);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   // Filter registrations based on search term
   const filteredRegistrations = useMemo(() => {
@@ -369,13 +374,27 @@ const AdminPanel = () => {
       // Fetch students data
       const { data: studentsData, error: studentsError } = await supabase
         .from('students')
-        .select('id, student_name, email, age, instrument, location, status, created_at, date_of_birth')
+        .select('*')
         .order('created_at', { ascending: false });
       if (!studentsError && studentsData) {
         setActiveStudents(studentsData.map(s => ({
           ...s,
-          profile_photo_url: null, // Students table doesn't have profile photos yet
-          date_of_birth: s.date_of_birth
+          receipt_number: s.receipt_number || '',
+          phone: s.phone || '',
+          country_code: s.country_code || '',
+          parent_name: s.parent_name || '',
+          parent_phone: s.parent_phone || '',
+          course_category: s.course_category || '',
+          production_type: s.production_type || '',
+          proficiency_level: s.proficiency_level || '',
+          learning_mode: s.learning_mode || '',
+          owns_instrument: s.owns_instrument ?? false,
+          medical_condition: s.medical_condition || '',
+          medical_details: s.medical_details || '',
+          goals: s.goals || '',
+          preferred_schedule: s.preferred_schedule || '',
+          date_of_birth: s.date_of_birth || '',
+          // Remove profile_photo_url
         })));
       }
 
@@ -946,6 +965,60 @@ const AdminPanel = () => {
     setEditInvoice(null);
   };
 
+  const toggleStudentExpand = (id: string) => {
+    setExpandedStudentIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+      return newSet;
+    });
+  };
+
+  const deleteStudent = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error("Error deleting student:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete student",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('✅ Student deleted from database successfully');
+
+      // Remove from local state
+      setActiveStudents(prev => prev.filter(s => s.id !== id));
+      toast({
+        title: "Student Deleted",
+        description: `Student has been deleted successfully.`,
+      });
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while deleting the student",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Replace verifyAdminPassword with secure Supabase Auth check
+  const verifyAdminPassword = async (password: string): Promise<boolean> => {
+    if (!user?.email) return false;
+    // Use Supabase Auth to re-authenticate
+    const { error } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password,
+    });
+    return !error;
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5">
@@ -1296,18 +1369,15 @@ const AdminPanel = () => {
                 student.instrument.toLowerCase().includes(searchTerm.toLowerCase())
               ).map((student) => {
                 const InstrumentIcon = getInstrumentIcon(student.instrument);
+                const isExpanded = expandedStudentIds.has(student.id);
                 return (
                   <Card key={student.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
                     <CardContent className="p-6">
-                      <div className="flex justify-between items-start mb-4">
+                      <div className="flex justify-between items-start mb-4 cursor-pointer" onClick={() => toggleStudentExpand(student.id)}>
                         <div className="flex items-center gap-4">
-                          {student.profile_photo_url ? (
-                            <img src={student.profile_photo_url} alt="Profile" className="w-12 h-12 rounded-full object-cover border-2 border-gray-200" />
-                          ) : (
-                            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
-                              <UserCog className="w-6 h-6 text-gray-400" />
-                            </div>
-                          )}
+                          <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+                            <UserCog className="w-6 h-6 text-gray-400" />
+                          </div>
                           <div>
                             <h4 className="text-xl font-bold text-primary">{student.student_name}</h4>
                             <p className="text-muted-foreground">Age: {student.age} • {student.instrument}</p>
@@ -1316,63 +1386,30 @@ const AdminPanel = () => {
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {studentInvoices[student.id] ? (
-                            <>
-                              <Badge className={
-                                studentInvoices[student.id].status === 'paid' ? 'bg-green-100 text-green-800' :
-                                studentInvoices[student.id].status === 'overdue' ? 'bg-red-100 text-red-800' :
-                                'bg-yellow-100 text-yellow-800'
-                              }>
-                                {studentInvoices[student.id].status.charAt(0).toUpperCase() + studentInvoices[student.id].status.slice(1)}
-                              </Badge>
-                              <span className="text-sm font-semibold text-primary ml-2">
-                                KES {studentInvoices[student.id].amount_due.toLocaleString()}
-                              </span>
-                              <Button size="sm" variant="outline" onClick={() => handleViewInvoice(studentInvoices[student.id])}>View Invoice</Button>
-                            </>
-                          ) : (
-                            <Badge className="bg-gray-100 text-gray-800">No Invoice</Badge>
-                          )}
-                        </div>
+                        <Button size="sm" variant="destructive" onClick={e => { e.stopPropagation(); setStudentToDelete(student); setShowDeleteModal(true); }}>Delete</Button>
                       </div>
-                      
-                      <div className="grid md:grid-cols-2 gap-4 mb-4">
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{student.email}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{student.phone}</span>
-                        </div>
-                        {student.date_of_birth && (
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">DOB: {new Date(student.date_of_birth).toLocaleDateString()}</span>
-                          </div>
-                        )}
-                        {student.parent_name && (
-                          <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">Parent: {student.parent_name}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {student.goals && (
-                        <div className="p-3 bg-primary/5 rounded-lg border border-primary/10">
-                          <p className="text-sm font-medium text-primary mb-1">Learning Goals:</p>
-                          <p className="text-sm text-muted-foreground">{student.goals}</p>
+                      {isExpanded && (
+                        <div className="space-y-2 mt-2">
+                          <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{student.email}</span></div>
+                          <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{student.phone}</span></div>
+                          {student.date_of_birth && (<div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground" /><span className="text-sm">DOB: {new Date(student.date_of_birth).toLocaleDateString()}</span></div>)}
+                          {student.parent_name && (<div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /><span className="text-sm">Parent: {student.parent_name}</span></div>)}
+                          {student.parent_phone && (<div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" /><span className="text-sm">Parent Phone: {student.parent_phone}</span></div>)}
+                          <div className="flex items-center gap-2"><span className="text-sm">Course Category: {student.course_category}</span></div>
+                          <div className="flex items-center gap-2"><span className="text-sm">Instrument: {student.instrument}</span></div>
+                          {student.production_type && (<div className="flex items-center gap-2"><span className="text-sm">Production Type: {student.production_type}</span></div>)}
+                          {student.proficiency_level && (<div className="flex items-center gap-2"><span className="text-sm">Proficiency: {student.proficiency_level}</span></div>)}
+                          {student.learning_mode && (<div className="flex items-center gap-2"><span className="text-sm">Learning Mode: {student.learning_mode}</span></div>)}
+                          {student.owns_instrument !== undefined && (<div className="flex items-center gap-2"><span className="text-sm">Owns Instrument: {student.owns_instrument ? 'Yes' : 'No'}</span></div>)}
+                          {student.location && (<div className="flex items-center gap-2"><span className="text-sm">Location: {student.location}</span></div>)}
+                          {student.medical_condition && (<div className="flex items-center gap-2"><span className="text-sm">Medical Condition: {student.medical_condition}</span></div>)}
+                          {student.medical_details && (<div className="flex items-center gap-2"><span className="text-sm">Medical Details: {student.medical_details}</span></div>)}
+                          {student.preferred_schedule && (<div className="flex items-center gap-2"><span className="text-sm">Preferred Schedule: {student.preferred_schedule}</span></div>)}
+                          {student.goals && (<div className="p-3 bg-primary/5 rounded-lg border border-primary/10"><p className="text-sm font-medium text-primary mb-1">Learning Goals:</p><p className="text-sm text-muted-foreground">{student.goals}</p></div>)}
+                          <div className="flex items-center gap-2"><span className="text-sm text-muted-foreground">Enrolled: {new Date(student.created_at).toLocaleDateString()}</span></div>
+                          <div className="flex items-center gap-2"><span className="text-sm font-medium text-primary">Experience: {student.experience}</span></div>
                         </div>
                       )}
-                      
-                      <div className="flex justify-between items-center mt-4">
-                        <span className="text-sm text-muted-foreground">
-                          Enrolled: {new Date(student.created_at).toLocaleDateString()}
-                        </span>
-                        <span className="text-sm font-medium text-primary">Experience: {student.experience}</span>
-                      </div>
                     </CardContent>
                   </Card>
                 );
@@ -2195,48 +2232,6 @@ const AdminPanel = () => {
           <AdminGalleryManager />
         </div>
 
-        {/* Invoice Modal */}
-        <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Invoice Breakdown</DialogTitle>
-            </DialogHeader>
-            {selectedInvoice ? (
-              <div className="space-y-4">
-                <div>Period: {selectedInvoice.period_start} - {selectedInvoice.period_end}</div>
-                <div>Status: {selectedInvoice.status}</div>
-                <div>Due: KES {selectedInvoice.amount_due.toLocaleString()}</div>
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr>
-                      <th>Description</th>
-                      <th>Quantity</th>
-                      <th>Unit Price</th>
-                      <th>Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedInvoice.lessons_summary?.lineItems?.map((item: any, idx: number) => (
-                      <tr key={idx}>
-                        <td>{item.description}</td>
-                        <td>{item.quantity}</td>
-                        <td>KES {item.unitPrice.toLocaleString()}</td>
-                        <td>KES {item.amount.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="text-right font-bold">Total: KES {selectedInvoice.amount_due.toLocaleString()}</div>
-                {selectedInvoice && selectedInvoice.status !== 'paid' && (
-                  <Button variant="success" onClick={() => handleMarkInvoicePaid(selectedInvoice.id)}>
-                    Mark as Paid
-                  </Button>
-                )}
-              </div>
-            ) : <p>No breakdown available.</p>}
-          </DialogContent>
-        </Dialog>
-
         {/* Finances Tab */}
         <div style={{ display: activeTab === 'finances' ? 'block' : 'none' }}>
           <div className="space-y-6">
@@ -2254,37 +2249,41 @@ const AdminPanel = () => {
               <TabsContent value="invoices">
                 <div className="space-y-6">
                   <h4 className="text-xl font-semibold">Invoice Management</h4>
-                  <table className="min-w-full text-sm mb-6">
-                    <thead>
-                      <tr>
-                        <th>Student</th>
-                        <th>Period</th>
-                        <th>Amount Due</th>
-                        <th>Status</th>
-                        <th>Due Date</th>
-                        <th>PDF</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.values(studentInvoices).map(inv => (
-                        <tr key={inv.id}>
-                          <td>{inv.student_name || '-'}</td>
-                          <td>{inv.period_start} - {inv.period_end}</td>
-                          <td>KES {inv.amount_due?.toLocaleString()}</td>
-                          <td>{inv.status}</td>
-                          <td>{inv.due_date}</td>
-                          <td>{inv.pdf_url ? <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer">Download</a> : '-'}</td>
-                          <td className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleResendInvoice(inv)}>Resend</Button>
-                            <Button size="sm" variant="outline" onClick={() => handleSendReminder(inv)}>Remind</Button>
-                            <Button size="sm" variant="outline" onClick={() => handleExcusePeriod(inv)}>Excuse</Button>
-                            <Button size="sm" variant="outline" onClick={() => handleEditInvoice(inv)}>Edit</Button>
-                          </td>
+                  {Object.keys(studentInvoices).length === 0 ? (
+                    <div className="text-center text-muted-foreground py-12 text-lg">No invoices found for the selected students or period.</div>
+                  ) : (
+                    <table className="min-w-full text-sm mb-6">
+                      <thead>
+                        <tr>
+                          <th>Student</th>
+                          <th>Period</th>
+                          <th>Amount Due</th>
+                          <th>Status</th>
+                          <th>Due Date</th>
+                          <th>PDF</th>
+                          <th>Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {Object.values(studentInvoices).map(inv => (
+                          <tr key={inv.id}>
+                            <td>{inv.student_name || '-'}</td>
+                            <td>{inv.period_start} - {inv.period_end}</td>
+                            <td>KES {inv.amount_due?.toLocaleString()}</td>
+                            <td>{inv.status}</td>
+                            <td>{inv.due_date}</td>
+                            <td>{inv.pdf_url ? <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer">Download</a> : '-'}</td>
+                            <td className="flex gap-2">
+                              <Button size="sm" variant="outline" onClick={() => handleResendInvoice(inv)}>Resend</Button>
+                              <Button size="sm" variant="outline" onClick={() => handleSendReminder(inv)}>Remind</Button>
+                              <Button size="sm" variant="outline" onClick={() => handleExcusePeriod(inv)}>Excuse</Button>
+                              <Button size="sm" variant="outline" onClick={() => handleEditInvoice(inv)}>Edit</Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                   {/* Modals for Excuse, Edit, etc. */}
                   {/* ...implement modals and handlers for each action... */}
                 </div>
@@ -2327,6 +2326,33 @@ const AdminPanel = () => {
             <DialogFooter>
               <Button onClick={submitEdit}>Save</Button>
               <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirm Student Deletion</DialogTitle>
+              <DialogDescription>Enter your password to confirm deletion of {studentToDelete?.student_name}.</DialogDescription>
+            </DialogHeader>
+            <Input type="password" placeholder="Admin Password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} />
+            {deleteError && <p className="text-red-500 text-sm mt-2">{deleteError}</p>}
+            <DialogFooter>
+              <Button variant="destructive" onClick={async () => {
+                setDeleteError('');
+                // Call a verify password endpoint or function (implement as needed)
+                const isValid = await verifyAdminPassword(adminPassword); // You need to implement this
+                if (!isValid) {
+                  setDeleteError('Incorrect password.');
+                  return;
+                }
+                // Proceed to delete student
+                await deleteStudent(studentToDelete.id);
+                setShowDeleteModal(false);
+                setAdminPassword('');
+                setStudentToDelete(null);
+              }}>Delete</Button>
+              <Button variant="outline" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

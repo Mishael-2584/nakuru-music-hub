@@ -1,6 +1,7 @@
 import { supabase } from '../integrations/supabase/client';
 import { generateQuotePDF } from './pdfGenerator';
 import { Invoice } from '../integrations/supabase/types';
+import { sendInvoiceEmail } from './emailService';
 
 export interface InvoiceLineItem {
   description: string;
@@ -131,7 +132,7 @@ export async function generateAndUploadInvoicePDF(invoice: any, student: any): P
  * @param registrationId - The registration UUID
  * @returns The created Invoice object
  */
-export async function generateInvoiceForRegistration(registrationId: string): Promise<Invoice | null> {
+export async function generateInvoiceForRegistration(registrationId: string): Promise<Invoice | null | { existing: Invoice }> {
   // Fetch registration, student, and fee info
   const { data: registration, error: regError } = await supabase
     .from('registrations')
@@ -162,11 +163,9 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   const now = new Date();
   let periodStart: Date, periodEnd: Date;
   if (fee.payment_type === 'monthly') {
-    // Start: 1st of next month, End: last day of next month
     periodStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     periodEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0);
   } else if (fee.payment_type === 'term') {
-    // Start: enrollment date, End: +3 months
     periodStart = new Date(registration.created_at);
     periodEnd = new Date(periodStart);
     periodEnd.setMonth(periodEnd.getMonth() + 3);
@@ -174,22 +173,84 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   } else {
     throw new Error('Unsupported payment type');
   }
+  const periodStartStr = periodStart.toISOString().slice(0, 10);
+  const periodEndStr = periodEnd.toISOString().slice(0, 10);
+
+  // Check for existing invoice for this student/registration/period
+  const { data: existingInvoice, error: existingError } = await supabase
+    .from('invoices')
+    .select('*')
+    .eq('student_id', student.id)
+    .eq('registration_id', registration.id)
+    .eq('period_start', periodStartStr)
+    .eq('period_end', periodEndStr)
+    .maybeSingle();
+  if (existingError) throw existingError;
+  if (existingInvoice) return { existing: existingInvoice }; // Already exists, return existing
+
+  // --- Makeup Credits Enforcement Logic ---
+  // 1. Find the previous invoice for this registration (by period_end < current period_start)
+  const { data: prevInvoice, error: prevInvError } = await supabase
+    .from('invoices')
+    .select('*')
+    .eq('student_id', student.id)
+    .eq('registration_id', registration.id)
+    .lt('period_end', periodStartStr)
+    .order('period_end', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (prevInvError) throw prevInvError;
+
+  let creditsApplied = 0;
+  let creditsValue = 0;
+  let makeupCreditIds: string[] = [];
+  let notes = null;
+  let invoiceAmount = fee.price;
+
+  // Only apply credits if previous invoice is paid (or if this is the first invoice)
+  let canApplyCredits = false;
+  if (!prevInvoice) {
+    canApplyCredits = true; // First invoice, allow credits (if you want to, or set to false to never apply on first)
+  } else if (prevInvoice.status === 'paid') {
+    canApplyCredits = true;
+  }
+
+  if (canApplyCredits) {
+    // Fetch unused, unexpired makeup credits for this student
+    const { data: credits, error: creditsError } = await supabase
+      .from('makeup_credits')
+      .select('*')
+      .eq('student_id', student.id)
+      .eq('is_used', false)
+      .gte('expires_at', periodStartStr);
+    if (creditsError) throw creditsError;
+    if (credits && credits.length > 0) {
+      // Each credit = 1 session, value = session price (fee.price / expected sessions per month/term)
+      const sessionsPerMonth = fee.sessions_per_week ? fee.sessions_per_week * 4 : 4; // fallback to 4
+      const sessionValue = Math.round((fee.price / sessionsPerMonth) * 100) / 100;
+      creditsApplied = credits.length;
+      creditsValue = Math.min(creditsApplied * sessionValue, invoiceAmount);
+      invoiceAmount = Math.max(0, invoiceAmount - creditsValue);
+      makeupCreditIds = credits.slice(0, Math.floor(creditsValue / sessionValue)).map(c => c.id);
+      notes = `Applied ${makeupCreditIds.length} makeup credit(s) worth KES ${creditsValue.toLocaleString()} to this invoice.`;
+    }
+  }
 
   // Prepare invoice data
   const invoiceData = {
     student_id: student.id,
     registration_id: registration.id,
     fee_id: fee.id,
-    amount: fee.price,
-    period_start: periodStart.toISOString().slice(0, 10),
-    period_end: periodEnd.toISOString().slice(0, 10),
+    amount: invoiceAmount,
+    period_start: periodStartStr,
+    period_end: periodEndStr,
     due_date: fee.payment_type === 'monthly'
-      ? new Date(now.getFullYear(), now.getMonth() + 1, 5).toISOString().slice(0, 10)
-      : periodEnd.toISOString().slice(0, 10),
+      ? new Date(periodStart.getFullYear(), periodStart.getMonth(), 10).toISOString().slice(0, 10)
+      : periodEndStr,
     status: 'pending',
     is_auto_generated: true,
     admin_override: false,
-    notes: null,
+    notes,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -201,6 +262,15 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     .select('*')
     .single();
   if (invError) throw invError;
+
+  // Mark applied credits as used and associate with this invoice
+  if (makeupCreditIds.length > 0 && invoice) {
+    await supabase
+      .from('makeup_credits')
+      .update({ is_used: true, used_at: new Date().toISOString() })
+      .in('id', makeupCreditIds);
+  }
+
   return invoice as Invoice;
 }
 
@@ -217,12 +287,44 @@ export async function generateRecurringInvoices(): Promise<void> {
   if (error) throw error;
   if (!registrations) return;
 
+  const summary = { created: 0, skipped: 0, reminders: 0, errors: 0 };
+
   for (const reg of registrations) {
     try {
-      await generateInvoiceForRegistration(reg.id);
+      const result = await generateInvoiceForRegistration(reg.id);
+      if (result && 'existing' in result) {
+        const invoice = result.existing;
+        // Fetch student for email
+        const { data: student, error: studentError } = await supabase
+          .from('students')
+          .select('*')
+          .eq('id', reg.student_id)
+          .single();
+        if (student && !studentError && invoice.status !== 'paid') {
+          await sendInvoiceEmail(invoice, student, { isReminder: true });
+          summary.reminders++;
+        } else {
+          summary.skipped++;
+        }
+      } else if (result) {
+        const invoice = result as Invoice;
+        // Fetch student for email
+        const { data: student, error: studentError } = await supabase
+          .from('students')
+          .select('*')
+          .eq('id', reg.student_id)
+          .single();
+        if (student && !studentError) {
+          await sendInvoiceEmail(invoice, student);
+        }
+        summary.created++;
+      } else {
+        summary.skipped++;
+      }
     } catch (err) {
-      // Log or handle error for this registration
-      console.error(`Failed to generate invoice for registration ${reg.id}:`, err);
+      console.error(`Failed to generate/send invoice for registration ${reg.id}:`, err);
+      summary.errors++;
     }
   }
+  console.log('Recurring invoice generation summary:', summary);
 } 
