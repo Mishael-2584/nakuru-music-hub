@@ -102,8 +102,6 @@ const AdminGalleryManager = () => {
     try {
       setIsLoading(true);
       
-      console.log('🖼️ Fetching gallery data...');
-      
       // Fetch albums with image count
       const { data: albumsData, error: albumsError } = await supabase
         .from('albums')
@@ -120,9 +118,6 @@ const AdminGalleryManager = () => {
         ...album,
         image_count: album.gallery_images?.[0]?.count || 0
       })) || [];
-
-      console.log('🖼️ Albums fetched:', albumsWithCount.length);
-      console.log('🖼️ Sample album:', albumsWithCount[0]);
       
       setAlbums(albumsWithCount);
 
@@ -133,9 +128,6 @@ const AdminGalleryManager = () => {
         .order('sort_order', { ascending: true });
 
       if (imagesError) throw imagesError;
-      
-      console.log('🖼️ Gallery images fetched:', imagesData?.length || 0);
-      console.log('🖼️ Sample image data:', imagesData?.[0]);
       
       setGalleryImages(imagesData || []);
 
@@ -155,10 +147,6 @@ const AdminGalleryManager = () => {
     try {
       let coverImagePath = editingAlbum?.cover_image_path || null;
       let coverImageFilename = editingAlbum?.cover_image_filename || null;
-
-      console.log('🖼️ Admin - Album submission - albumCoverImageUrl:', albumCoverImageUrl);
-      console.log('🖼️ Admin - Album submission - coverImagePath (before):', coverImagePath);
-      console.log('🖼️ Admin - Album submission - coverImageFilename (before):', coverImageFilename);
 
       // Handle cover image upload from ImageUpload component
       if (albumCoverImageUrl) {
@@ -180,9 +168,6 @@ const AdminGalleryManager = () => {
         }
       }
 
-      console.log('🖼️ Admin - Album submission - coverImagePath (after):', coverImagePath);
-      console.log('🖼️ Admin - Album submission - coverImageFilename (after):', coverImageFilename);
-
       // Handle direct file upload (fallback)
       if (albumCoverImage) {
         const filename = `gallery/album_covers/${Date.now()}_${albumCoverImage.name}`;
@@ -203,8 +188,6 @@ const AdminGalleryManager = () => {
         is_featured: albumForm.is_featured,
         sort_order: albumForm.sort_order
       };
-
-      console.log('🖼️ Admin - Album submission - final albumData:', albumData);
 
       if (editingAlbum) {
         // Update existing album
@@ -541,8 +524,6 @@ const AdminGalleryManager = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {albums.map((album) => {
-                console.log('🖼️ Admin - Album:', album.name);
-                console.log('🖼️ Admin - Album cover_image_path:', album.cover_image_path);
                 
                 return (
                   <Card key={album.id} className="relative">
@@ -571,10 +552,8 @@ const AdminGalleryManager = () => {
                             className="w-full h-32 object-contain bg-gray-100 rounded-md"
                             onError={(e) => {
                               console.error('🖼️ Admin - Album cover image failed to load:', album.cover_image_path);
-                              console.error('🖼️ Admin - Full URL:', `https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${album.cover_image_path}`);
                             }}
                             onLoad={() => {
-                              console.log('🖼️ Admin - Album cover image loaded successfully:', album.cover_image_path);
                             }}
                           />
                         </div>
@@ -647,10 +626,8 @@ const AdminGalleryManager = () => {
                         onClick={() => openImageModal(image, filteredImages, filteredImages.findIndex(img => img.id === image.id))}
                         onError={(e) => {
                           console.error('🖼️ Image failed to load:', image.image_path);
-                          console.error('🖼️ Full URL:', `https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/images/${image.image_path}`);
                         }}
                         onLoad={() => {
-                          console.log('🖼️ Image loaded successfully:', image.image_path);
                         }}
                       />
                       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">

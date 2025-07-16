@@ -17,6 +17,68 @@ export interface InvoiceCalculationResult {
   total: number;
 }
 
+// Real-time currency conversion using Exchange Rate API
+async function getExchangeRate(fromCurrency: string, toCurrency: string): Promise<number> {
+  try {
+    // Use Exchange Rate API (free tier)
+    const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${fromCurrency}`);
+    
+    if (!response.ok) {
+      console.warn(`Failed to fetch exchange rate from ${fromCurrency} to ${toCurrency}, using fallback rate`);
+      // Fallback rates (updated periodically)
+      const fallbackRates: { [key: string]: number } = {
+        'USD_KES': 150.5, // 1 USD = 150.5 KES (approximate)
+        'EUR_KES': 165.2, // 1 EUR = 165.2 KES (approximate)
+        'GBP_KES': 192.8, // 1 GBP = 192.8 KES (approximate)
+      };
+      
+      const rateKey = `${fromCurrency}_${toCurrency}`;
+      return fallbackRates[rateKey] || 150.5; // Default to USD_KES rate
+    }
+    
+    const data = await response.json();
+    const rate = data.rates[toCurrency];
+    
+    if (!rate) {
+      console.warn(`Exchange rate not found for ${fromCurrency} to ${toCurrency}, using fallback rate`);
+      return 150.5; // Default fallback
+    }
+    
+    console.log(`Real-time exchange rate: 1 ${fromCurrency} = ${rate} ${toCurrency}`);
+    return rate;
+  } catch (error) {
+    console.error('Error fetching exchange rate:', error);
+    console.warn('Using fallback exchange rate');
+    return 150.5; // Default fallback rate
+  }
+}
+
+// Cache exchange rates to avoid excessive API calls
+const exchangeRateCache: { [key: string]: { rate: number; timestamp: number } } = {};
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour cache
+
+async function getCachedExchangeRate(fromCurrency: string, toCurrency: string): Promise<number> {
+  const cacheKey = `${fromCurrency}_${toCurrency}`;
+  const now = Date.now();
+  
+  // Check if we have a cached rate that's still valid
+  if (exchangeRateCache[cacheKey] && (now - exchangeRateCache[cacheKey].timestamp) < CACHE_DURATION) {
+    console.log(`Using cached exchange rate: 1 ${fromCurrency} = ${exchangeRateCache[cacheKey].rate} ${toCurrency}`);
+    return exchangeRateCache[cacheKey].rate;
+  }
+  
+  // Fetch new rate
+  const rate = await getExchangeRate(fromCurrency, toCurrency);
+  
+  // Cache the new rate
+  exchangeRateCache[cacheKey] = {
+    rate,
+    timestamp: now
+  };
+  
+  return rate;
+}
+
 /**
  * Calculate invoice line items and totals for a student for a given period.
  * @param studentId - The student's UUID
@@ -127,12 +189,21 @@ export async function generateAndUploadInvoicePDF(invoice: any, student: any): P
   return publicUrl;
 }
 
+// Add defensive check utility function
+const isValidId = (id: any) => id && id !== 'undefined' && id !== undefined && id !== null;
+
 /**
  * Generate an invoice for a given registration.
  * @param registrationId - The registration UUID
  * @returns The created Invoice object
  */
 export async function generateInvoiceForRegistration(registrationId: string): Promise<Invoice | null | { existing: Invoice }> {
+  // Defensive check for registration ID
+  if (!isValidId(registrationId)) {
+    console.error('Invalid registration ID for invoice generation:', registrationId);
+    throw new Error('Invalid registration ID');
+  }
+
   // Fetch registration, student, and fee info
   const { data: registration, error: regError } = await supabase
     .from('registrations')
@@ -141,23 +212,244 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     .single();
   if (regError || !registration) throw regError || new Error('Registration not found');
 
-  // Find the student for this registration
+  // Find the student for this registration using registration_id
   const { data: student, error: studentError } = await supabase
     .from('students')
     .select('*')
-    .eq('id', registration.student_id)
+    .eq('registration_id', registrationId)
     .single();
-  if (studentError || !student) throw studentError || new Error('Student not found');
+  
+  if (studentError || !student) {
+    console.error('Student not found for registration:', registrationId);
+    throw new Error('Student not found for registration');
+  }
 
-  // Find the matching fee
-  const { data: fee, error: feeError } = await supabase
+  // Defensive check for student ID
+  if (!isValidId(student.id)) {
+    console.error('Student missing valid ID:', student);
+    throw new Error('Student missing valid ID');
+  }
+
+  // Find the matching fee with proper fallback logic based on student preferences
+  let fee = null;
+  let feeError = null;
+  
+  // Get student preferences from registration
+  const learningMode = registration.learning_mode || 'in-person';
+  const courseCategory = registration.course_category || 'Music';
+  const instrument = registration.instrument;
+  
+  console.log('Looking for fee with preferences:', {
+    courseCategory,
+    instrument,
+    learningMode
+  });
+  
+  // Determine payment type based on course category
+  let paymentType = 'monthly'; // Default
+  if (courseCategory === 'production' || courseCategory === 'photography') {
+    paymentType = 'term';
+  }
+  
+  console.log('Determined payment type:', paymentType, 'for course category:', courseCategory);
+  
+  // First try to find exact match with learning mode and correct payment type
+  const { data: exactFee, error: exactFeeError } = await supabase
     .from('fees')
     .select('*')
-    .eq('course_type', registration.course_category)
-    .eq('course_name', registration.instrument)
+    .eq('course_type', courseCategory)
+    .eq('course_name', instrument)
+    .eq('mode', learningMode)
+    .eq('payment_type', paymentType)
     .eq('is_active', true)
-    .single();
-  if (feeError || !fee) throw feeError || new Error('Fee not found for registration');
+    .maybeSingle();
+  
+  if (exactFee && !exactFeeError) {
+    fee = exactFee;
+    console.log('Found exact fee match with learning mode and payment type:', fee);
+  } else {
+    console.log('No exact fee match found, trying fallback options');
+    
+    // Fallback 1: Try to find by course_type and learning_mode with correct payment type
+    const { data: modeFee, error: modeFeeError } = await supabase
+      .from('fees')
+      .select('*')
+      .eq('course_type', courseCategory)
+      .eq('mode', learningMode)
+      .eq('payment_type', paymentType)
+      .eq('is_active', true)
+      .maybeSingle();
+    
+    if (modeFee && !modeFeeError) {
+      fee = modeFee;
+      console.log('Found fee by course_type and learning_mode with payment type:', fee);
+    } else {
+      // Fallback 2: Try to find by course_type only with correct payment type
+      const { data: typeFee, error: typeFeeError } = await supabase
+        .from('fees')
+        .select('*')
+        .eq('course_type', courseCategory)
+        .eq('payment_type', paymentType)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (typeFee && !typeFeeError) {
+        fee = typeFee;
+        console.log('Found fee by course_type only with payment type:', fee);
+      } else {
+        // Fallback 3: For termly courses, try to find any term fee for the course category
+        if (paymentType === 'term') {
+          const { data: termFee, error: termFeeError } = await supabase
+            .from('fees')
+            .select('*')
+            .eq('course_type', courseCategory)
+            .eq('payment_type', 'term')
+            .eq('is_active', true)
+            .maybeSingle();
+          
+          if (termFee && !termFeeError) {
+            fee = termFee;
+            console.log('Found term fee for course category:', fee);
+          }
+        }
+        
+        // Fallback 4: Try to find any fee for the learning mode with correct payment type
+        if (!fee) {
+          const { data: modeAnyFee, error: modeAnyFeeError } = await supabase
+            .from('fees')
+            .select('*')
+            .eq('mode', learningMode)
+            .eq('payment_type', paymentType)
+            .eq('is_active', true)
+            .maybeSingle();
+          
+          if (modeAnyFee && !modeAnyFeeError) {
+            fee = modeAnyFee;
+            console.log('Found fee for learning mode with payment type:', fee);
+          }
+        }
+        
+        // Fallback 5: Try to find any active fee with correct payment type
+        if (!fee) {
+          const { data: anyFee, error: anyFeeError } = await supabase
+            .from('fees')
+            .select('*')
+            .eq('payment_type', paymentType)
+            .eq('is_active', true)
+            .limit(1)
+            .maybeSingle();
+          
+          if (anyFee && !anyFeeError) {
+            fee = anyFee;
+            console.log('Found fallback fee with payment type:', fee);
+          }
+        }
+        
+        // Fallback 6: If still no fee found, fetch all active fees to get real rates
+        if (!fee) {
+          console.log('No fee found with fallbacks, fetching all active fees for real rates');
+          const { data: allFees, error: allFeesError } = await supabase
+            .from('fees')
+            .select('*')
+            .eq('is_active', true)
+            .order('price', { ascending: true });
+          
+          if (allFeesError) {
+            console.error('Error fetching all fees:', allFeesError);
+            throw allFeesError;
+          }
+          
+          if (allFees && allFees.length > 0) {
+            // Find the most appropriate fee based on course category and payment type
+            let bestMatch = null;
+            
+            // First try to find by course category
+            bestMatch = allFees.find(f => f.course_type === courseCategory);
+            
+            // If no match by course category, find by payment type
+            if (!bestMatch) {
+              bestMatch = allFees.find(f => f.payment_type === paymentType);
+            }
+            
+            // If still no match, use the first available fee
+            if (!bestMatch) {
+              bestMatch = allFees[0];
+            }
+            
+            fee = bestMatch;
+            console.log('Using real fee from database as fallback:', fee);
+          }
+        }
+        
+        // Fallback 7: Last resort - create a default fee structure based on real market rates
+        if (!fee) {
+          console.log('No fees found in database, creating default fee structure');
+          let defaultPrice = 5000; // Default in KES
+          let defaultCurrency = 'KSh';
+          
+          if (paymentType === 'term') {
+            // Termly courses (production, photography) - higher rates
+            if (courseCategory === 'production') {
+              defaultPrice = 45500; // KES 45,500 for production term
+            } else if (courseCategory === 'photography') {
+              defaultPrice = 45500; // KES 45,500 for photography term
+            } else {
+              defaultPrice = 40000; // KES 40,000 for other termly courses
+            }
+          } else if (learningMode === 'online') {
+            defaultPrice = 44; // $44 USD
+            defaultCurrency = '$';
+          } else if (learningMode === 'home') {
+            defaultPrice = 10000; // KES 10,000 for home lessons
+          } else {
+            defaultPrice = 4800; // KES 4,800 for academy lessons
+          }
+          
+          fee = {
+            id: 'default',
+            course_type: courseCategory,
+            course_name: instrument,
+            price: defaultPrice,
+            currency: defaultCurrency,
+            payment_type: paymentType,
+            mode: learningMode,
+            sessions_per_week: paymentType === 'term' ? 3 : 1,
+            is_active: true
+          };
+          console.log('Using default fee structure based on real market rates:', fee);
+        }
+      }
+    }
+  }
+  
+  if (!fee) {
+    console.error('No fee found and could not create default fee');
+    throw new Error('Fee not found for registration and no fallback available');
+  }
+  
+  // Convert foreign currency to KES using real-time exchange rates
+  console.log('💰 Currency conversion check:', {
+    feeCurrency: fee.currency,
+    feePrice: fee.price,
+    needsConversion: fee.currency && fee.currency !== 'KSh' && fee.price
+  });
+  
+  if (fee.currency && fee.currency !== 'KSh' && fee.price) {
+    try {
+      const exchangeRate = await getCachedExchangeRate(fee.currency, 'KES');
+      const originalPrice = fee.price;
+      fee.price = Math.round(fee.price * exchangeRate * 100) / 100; // Round to 2 decimal places
+      fee.currency = 'KSh';
+      console.log(`✅ Converted ${originalPrice} ${fee.currency} to KES: ${fee.price} KSh (rate: 1 ${fee.currency} = ${exchangeRate} KES)`);
+    } catch (error) {
+      console.error('❌ Error converting currency:', error);
+      // Fallback to default rate if conversion fails
+      const fallbackRate = fee.currency === '$' ? 150.5 : 150.5;
+      fee.price = Math.round(fee.price * fallbackRate * 100) / 100;
+      fee.currency = 'KSh';
+      console.log(`🔄 Used fallback rate for ${fee.currency}: ${fee.price} KSh`);
+    }
+  }
 
   // Determine billing period
   const now = new Date();
@@ -176,36 +468,61 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   const periodStartStr = periodStart.toISOString().slice(0, 10);
   const periodEndStr = periodEnd.toISOString().slice(0, 10);
 
-  // Check for existing invoice for this student/registration/period
+  // Check for existing invoice for this student/period (temporarily without registration_id)
   const { data: existingInvoice, error: existingError } = await supabase
     .from('invoices')
     .select('*')
     .eq('student_id', student.id)
-    .eq('registration_id', registration.id)
     .eq('period_start', periodStartStr)
     .eq('period_end', periodEndStr)
     .maybeSingle();
-  if (existingError) throw existingError;
-  if (existingInvoice) return { existing: existingInvoice }; // Already exists, return existing
+  
+  if (existingError) {
+    console.error('Error checking for existing invoice:', existingError);
+    throw existingError;
+  }
+  
+  if (existingInvoice) {
+    console.log('Existing invoice found:', existingInvoice);
+    return { existing: existingInvoice }; // Already exists, return existing
+  }
 
   // --- Makeup Credits Enforcement Logic ---
-  // 1. Find the previous invoice for this registration (by period_end < current period_start)
+  // 1. Find the previous invoice for this student (by period_end < current period_start)
   const { data: prevInvoice, error: prevInvError } = await supabase
     .from('invoices')
     .select('*')
     .eq('student_id', student.id)
-    .eq('registration_id', registration.id)
     .lt('period_end', periodStartStr)
     .order('period_end', { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (prevInvError) throw prevInvError;
+  
+  if (prevInvError) {
+    console.error('Error checking for previous invoice:', prevInvError);
+    throw prevInvError;
+  }
 
   let creditsApplied = 0;
   let creditsValue = 0;
   let makeupCreditIds: string[] = [];
   let notes = null;
+  console.log('🔍 Fee found for invoice generation:', {
+    feeId: fee.id,
+    feePrice: fee.price,
+    feeCurrency: fee.currency,
+    feePaymentType: fee.payment_type,
+    feeMode: fee.mode,
+    feeCourseType: fee.course_type,
+    feeCourseName: fee.course_name
+  });
+
   let invoiceAmount = fee.price;
+  
+  if (!fee.price || fee.price <= 0) {
+    console.error('❌ Fee has invalid price:', fee.price);
+    throw new Error(`Fee has invalid price: ${fee.price}`);
+  }
 
   // Only apply credits if previous invoice is paid (or if this is the first invoice)
   let canApplyCredits = false;
@@ -236,24 +553,29 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     }
   }
 
-  // Prepare invoice data
-  const invoiceData = {
+  // Prepare invoice data (using current schema with student_id only)
+  const invoiceData: any = {
     student_id: student.id,
-    registration_id: registration.id,
-    fee_id: fee.id,
-    amount: invoiceAmount,
+    amount_due: invoiceAmount, // Use 'amount_due' for invoices table
     period_start: periodStartStr,
     period_end: periodEndStr,
     due_date: fee.payment_type === 'monthly'
       ? new Date(periodStart.getFullYear(), periodStart.getMonth(), 10).toISOString().slice(0, 10)
       : periodEndStr,
     status: 'pending',
-    is_auto_generated: true,
-    admin_override: false,
-    notes,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
+  
+  // Add optional fields if they exist in the schema
+  if (fee.id) {
+    invoiceData.fee_id = fee.id;
+  }
+  invoiceData.is_auto_generated = true;
+  invoiceData.admin_override = false;
+  invoiceData.notes = notes;
+
+  console.log('Creating invoice with data:', invoiceData);
 
   // Insert invoice
   const { data: invoice, error: invError } = await supabase
@@ -261,7 +583,13 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     .insert([invoiceData])
     .select('*')
     .single();
-  if (invError) throw invError;
+  
+  if (invError) {
+    console.error('Error creating invoice:', invError);
+    throw invError;
+  }
+
+  console.log('Invoice created successfully:', invoice);
 
   // Mark applied credits as used and associate with this invoice
   if (makeupCreditIds.length > 0 && invoice) {
@@ -294,6 +622,12 @@ export async function generateRecurringInvoices(): Promise<void> {
       const result = await generateInvoiceForRegistration(reg.id);
       if (result && 'existing' in result) {
         const invoice = result.existing;
+        // Defensive check for student_id before fetching student
+        if (!isValidId(reg.student_id)) {
+          console.error('Registration missing valid student_id for email:', reg);
+          summary.errors++;
+          continue;
+        }
         // Fetch student for email
         const { data: student, error: studentError } = await supabase
           .from('students')
@@ -308,6 +642,12 @@ export async function generateRecurringInvoices(): Promise<void> {
         }
       } else if (result) {
         const invoice = result as Invoice;
+        // Defensive check for student_id before fetching student
+        if (!isValidId(reg.student_id)) {
+          console.error('Registration missing valid student_id for email:', reg);
+          summary.errors++;
+          continue;
+        }
         // Fetch student for email
         const { data: student, error: studentError } = await supabase
           .from('students')
@@ -327,4 +667,50 @@ export async function generateRecurringInvoices(): Promise<void> {
     }
   }
   console.log('Recurring invoice generation summary:', summary);
+} 
+
+/**
+ * Test function to check current exchange rates
+ * This can be used for debugging or to verify rates are working
+ */
+export async function testExchangeRates(): Promise<void> {
+  console.log('🧪 Testing Exchange Rates...');
+  
+  const currencies = ['USD', 'EUR', 'GBP'];
+  
+  for (const currency of currencies) {
+    try {
+      const rate = await getCachedExchangeRate(currency, 'KES');
+      console.log(`✅ ${currency} to KES: 1 ${currency} = ${rate} KES`);
+    } catch (error) {
+      console.error(`❌ Failed to get ${currency} to KES rate:`, error);
+    }
+  }
+  
+  // Test some sample conversions
+  const testAmounts = [
+    { amount: 44, currency: 'USD' },
+    { amount: 50, currency: 'EUR' },
+    { amount: 30, currency: 'GBP' }
+  ];
+  
+  for (const test of testAmounts) {
+    try {
+      const rate = await getCachedExchangeRate(test.currency, 'KES');
+      const converted = Math.round(test.amount * rate * 100) / 100;
+      console.log(`💰 ${test.amount} ${test.currency} = ${converted} KES`);
+    } catch (error) {
+      console.error(`❌ Failed to convert ${test.amount} ${test.currency}:`, error);
+    }
+  }
+}
+
+/**
+ * Get current exchange rate for a specific currency pair
+ * @param fromCurrency - Source currency (e.g., 'USD')
+ * @param toCurrency - Target currency (e.g., 'KES')
+ * @returns Current exchange rate
+ */
+export async function getCurrentExchangeRate(fromCurrency: string, toCurrency: string): Promise<number> {
+  return await getCachedExchangeRate(fromCurrency, toCurrency);
 } 

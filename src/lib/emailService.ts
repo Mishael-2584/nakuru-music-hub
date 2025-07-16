@@ -1028,8 +1028,11 @@ export const sendInvoiceEmail = async (
   options: { subject?: string; body?: string; isReminder?: boolean } = {}
 ): Promise<boolean> => {
   try {
-    // Generate PDF
-    const invoiceDetails = invoice.lessons_summary || invoice.invoice_details || [];
+    if (!invoice || !student || !student.email) {
+      console.error('❌ Missing required fields for invoice email', { invoice, student });
+      return false;
+    }
+    // Generate PDF with proper invoice details structure
     const pdfBlob = await generateQuotePDF(
       {
         name: student.student_name,
@@ -1042,17 +1045,29 @@ export const sendInvoiceEmail = async (
         budget_range: '',
         timeline: '',
         specific_requirements: '',
-        reference_materials_url: '',
-        status: '',
-        admin_notes: '',
-        quote_amount: invoice.amount_due,
-        quote_sent_at: '',
         preferred_contact_method: 'email',
         additional_notes: ''
       },
       invoice.amount_due,
       '',
-      invoiceDetails
+      {
+        lineItems: [
+          {
+            description: `Music Lessons - ${invoice.period_start ? `${new Date(invoice.period_start).toLocaleDateString()} to ${new Date(invoice.period_end).toLocaleDateString()}` : 'Current Period'}`,
+            quantity: 1,
+            unitPrice: invoice.amount_due,
+            amount: invoice.amount_due
+          }
+        ],
+        subtotal: invoice.amount_due,
+        tax: 0,
+        total: invoice.amount_due,
+        paymentTerms: 'Payment due within 7 days of invoice date',
+        validUntil: '30 days from invoice date',
+        serviceBreakdown: invoice.lessons_summary || 'Music lessons as scheduled',
+        equipmentBreakdown: 'All necessary equipment and materials provided',
+        additionalInfo: invoice.notes || 'Please contact us if you have any questions about this invoice.'
+      }
     );
     // Convert blob to base64 for email attachment
     const reader = new FileReader();
@@ -1071,14 +1086,12 @@ export const sendInvoiceEmail = async (
     const body = options.body || (options.isReminder
       ? `<p>Dear ${student.student_name},</p><p>This is a friendly reminder that your invoice for the current period is due. Please find the attached invoice PDF for details.</p><p>If you have already paid, please disregard this message.</p>`
       : `<p>Dear ${student.student_name},</p><p>Please find attached your invoice for the current period. If you have any questions, let us know.</p>`);
-    // Send email
+    // Send email using the same pattern as working emails
     const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
       body: {
         to: student.email,
         subject,
         html: `<!DOCTYPE html><html><body>${body}<br/><br/><p>Thank you for being part of Damon Music Academy!</p></body></html>`,
-        invoice,
-        student,
         attachments: [
           {
             filename: `invoice-${student.student_name.replace(/\s+/g, '_')}-${Date.now()}.pdf`,
@@ -1089,12 +1102,21 @@ export const sendInvoiceEmail = async (
       }
     });
     if (error) {
-      console.error('Error sending invoice email:', error);
+      console.error('❌ Invoice email sending error:', error);
       return false;
     }
-    return data && data.success;
+
+    if (data && data.success) {
+      console.log('✅ Invoice email sent successfully');
+      return true;
+    } else {
+      console.error('❌ Failed to send invoice email:', data?.message);
+      return false;
+    }
+    console.log('✅ Invoice email sent successfully', { invoice, student, options });
+    return true;
   } catch (error) {
-    console.error('Error in sendInvoiceEmail:', error);
+    console.error('❌ Error in sendInvoiceEmail:', error);
     return false;
   }
 };

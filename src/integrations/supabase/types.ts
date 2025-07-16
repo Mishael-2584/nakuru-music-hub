@@ -377,16 +377,15 @@ export interface Database {
 export type Invoice = {
   id: string;
   student_id: string;
-  registration_id: string | null;
-  fee_id: string | null;
+  fee_id?: string | null;
   amount: number;
   period_start: string; // ISO date
   period_end: string;   // ISO date
   due_date: string;     // ISO date
-  status: 'pending' | 'paid' | 'overdue' | 'void';
-  is_auto_generated: boolean;
-  admin_override: boolean;
-  notes: string | null;
+  status: 'pending' | 'paid' | 'overdue' | 'void' | 'cancelled';
+  is_auto_generated?: boolean;
+  admin_override?: boolean;
+  notes?: string | null;
   created_at: string;
   updated_at: string;
 };

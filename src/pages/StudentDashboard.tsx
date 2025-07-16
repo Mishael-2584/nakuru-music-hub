@@ -1182,14 +1182,30 @@ const StudentDashboard = () => {
   const upcomingBookings = myBookings.filter(booking => !isPastBooking(booking));
   const pastBookings = myBookings.filter(booking => isPastBooking(booking));
 
+  // Defensive check before fetching invoices
   const fetchInvoices = async (studentId: string) => {
+    if (!studentId || studentId === 'undefined' || studentId === undefined || studentId === null) {
+      console.error('Invalid or missing studentId for invoice query:', studentId);
+      toast({ title: 'Error', description: 'Invalid or missing student ID for invoice query.', variant: 'destructive' });
+      return;
+    }
     // Fetch invoices from Supabase
     const { data, error } = await supabase
       .from('invoices')
       .select('*')
       .eq('student_id', studentId)
       .order('period_start', { ascending: false });
-    if (!error && data) setInvoices(data);
+    if (error) {
+      console.error('Error fetching invoices:', error);
+      toast({ title: 'Error', description: 'Failed to fetch invoices.', variant: 'destructive' });
+      return;
+    }
+    if (!data || data.length === 0) {
+      console.warn('No invoices found for student:', studentId);
+      setInvoices([]);
+      return;
+    }
+    setInvoices(data);
   };
 
   // Handler to view invoice breakdown

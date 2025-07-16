@@ -147,6 +147,9 @@ const AdminPanel = () => {
   const [studentToDelete, setStudentToDelete] = useState<any>(null);
   const [adminPassword, setAdminPassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
+  // 1. Add state for tracking invoice sending/loading
+  const [sendingInvoiceIds, setSendingInvoiceIds] = useState<string[]>([]);
+  const [studentsNeedingInvoice, setStudentsNeedingInvoice] = useState<string[]>([]);
 
   // Filter registrations based on search term
   const filteredRegistrations = useMemo(() => {
@@ -460,7 +463,16 @@ const AdminPanel = () => {
     }
   };
 
+  // Defensive check for .eq('id', ...) and .eq('student_id', ...) queries
+  // Example for .eq('id', id):
+  const isValidId = (id: any) => id && id !== 'undefined' && id !== undefined && id !== null;
+
   const updateRegistrationStatus = async (id: string, status: string) => {
+    if (!isValidId(id)) {
+      console.error('Invalid or missing ID for updateRegistrationStatus:', id);
+      toast({ title: 'Error', description: 'Invalid or missing ID for update.', variant: 'destructive' });
+      return;
+    }
     try {
       const { error } = await supabase
         .from('registrations')
@@ -857,12 +869,17 @@ const AdminPanel = () => {
   // Fetch latest invoice for each active student
   useEffect(() => {
     const fetchStudentInvoices = async () => {
-      const ids = activeStudents.map(s => s.id);
-      if (ids.length === 0) return;
+      // Defensive check: filter out students with invalid IDs
+      const validStudentIds = activeStudents.filter(s => isValidId(s.id)).map(s => s.id);
+      if (validStudentIds.length === 0) {
+        console.log('No valid student IDs found for invoice fetching');
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('invoices')
         .select('*')
-        .in('student_id', ids)
+        .in('student_id', validStudentIds)
         .order('period_end', { ascending: false });
       if (!error && data) {
         // Group by student_id, pick latest
@@ -886,28 +903,45 @@ const AdminPanel = () => {
 
   // Handler to mark invoice as paid
   const handleMarkInvoicePaid = async (invoiceId: string) => {
+    // Defensive check for invoice ID
+    if (!isValidId(invoiceId)) {
+      console.error('Invalid invoice ID for mark paid:', invoiceId);
+      toast({ title: 'Error', description: 'Invalid invoice ID.', variant: 'destructive' });
+      return;
+    }
+    
     await supabase.from('invoices').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', invoiceId);
     setShowInvoiceModal(false);
-    // Refresh student invoices
-    const ids = activeStudents.map(s => s.id);
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('*')
-      .in('student_id', ids)
-      .order('period_end', { ascending: false });
-    if (!error && data) {
-      const latest: Record<string, any> = {};
-      for (const inv of data) {
-        if (!latest[inv.student_id] || new Date(inv.period_end) > new Date(latest[inv.student_id].period_end)) {
-          latest[inv.student_id] = inv;
+    
+    // Refresh student invoices with defensive check
+    const validStudentIds = activeStudents.filter(s => isValidId(s.id)).map(s => s.id);
+    if (validStudentIds.length > 0) {
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('*')
+        .in('student_id', validStudentIds)
+        .order('period_end', { ascending: false });
+      if (!error && data) {
+        const latest: Record<string, any> = {};
+        for (const inv of data) {
+          if (!latest[inv.student_id] || new Date(inv.period_end) > new Date(latest[inv.student_id].period_end)) {
+            latest[inv.student_id] = inv;
+          }
         }
+        setStudentInvoices(latest);
       }
-      setStudentInvoices(latest);
     }
   };
 
   // Handler: Resend Invoice
   const handleResendInvoice = async (inv: any) => {
+    // Defensive check for invoice and student_id
+    if (!inv || !isValidId(inv.student_id)) {
+      console.error('Invalid invoice or student_id for resend:', inv);
+      toast({ title: 'Error', description: 'Invalid invoice data for resend.', variant: 'destructive' });
+      return;
+    }
+    
     // Fetch student info
     const { data: student, error } = await supabase.from('students').select('*').eq('id', inv.student_id).single();
     if (error || !student) {
@@ -921,8 +955,16 @@ const AdminPanel = () => {
       toast({ title: 'Email Error', description: 'Failed to send invoice email.', variant: 'destructive' });
     }
   };
+
   // Handler: Send Reminder
   const handleSendReminder = async (inv: any) => {
+    // Defensive check for invoice and student_id
+    if (!inv || !isValidId(inv.student_id)) {
+      console.error('Invalid invoice or student_id for reminder:', inv);
+      toast({ title: 'Error', description: 'Invalid invoice data for reminder.', variant: 'destructive' });
+      return;
+    }
+    
     // Fetch student info
     const { data: student, error } = await supabase.from('students').select('*').eq('id', inv.student_id).single();
     if (error || !student) {
@@ -936,6 +978,7 @@ const AdminPanel = () => {
       toast({ title: 'Email Error', description: 'Failed to send reminder email.', variant: 'destructive' });
     }
   };
+
   // Handler: Excuse Period
   const handleExcusePeriod = (inv: any) => {
     setSelectedInvoice(inv);
@@ -1017,6 +1060,111 @@ const AdminPanel = () => {
       password,
     });
     return !error;
+  };
+
+  // 2. Helper to get current period (month)
+  const getCurrentPeriod = () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    return { start, end };
+  };
+
+  // 3. Compute students needing invoice for current period
+  useEffect(() => {
+    const { start, end } = getCurrentPeriod();
+    const needing = activeStudents.filter(student => {
+      const inv = Object.values(studentInvoices).find(
+        (inv: any) => inv.student_id === student.id && inv.period_start === start && inv.period_end === end
+      );
+      return !inv;
+    }).map(s => s.id);
+    setStudentsNeedingInvoice(needing);
+  }, [activeStudents, studentInvoices]);
+
+  // 4. Handler to send invoice for a student
+  const handleSendInvoice = async (student: any) => {
+    // Defensive check for student object and ID
+    if (!student || !isValidId(student.id)) {
+      console.error('Invalid student object or ID for invoice sending:', student);
+      toast({ title: 'Error', description: 'Invalid student data for invoice sending.', variant: 'destructive' });
+      return;
+    }
+
+    setSendingInvoiceIds(ids => [...ids, student.id]);
+    try {
+      console.log('Send Invoice: student object', student);
+      let regId = student.registration_id;
+      let reg = null;
+      
+      // Defensive check for registration_id
+      if (!regId || regId === 'undefined' || regId === undefined || regId === null) {
+        // Fallback: lookup registration by name/email
+        console.log('Send Invoice: registration_id missing, attempting lookup by name/email');
+        const { data, error } = await supabase
+          .from('registrations')
+          .select('*')
+          .eq('student_name', student.student_name)
+          .eq('email', student.email)
+          .eq('status', 'approved')
+          .single();
+        console.log('Send Invoice: registration lookup result', { data, error });
+        if (error || !data) {
+          toast({ title: 'Error', description: 'Could not find registration for student. ' + (error?.message || ''), variant: 'destructive' });
+          setSendingInvoiceIds(ids => ids.filter(id => id !== student.id));
+          return;
+        }
+        reg = data;
+        regId = data.id;
+      }
+      
+      // Final defensive check for registration ID
+      if (!regId || regId === 'undefined' || regId === undefined || regId === null) {
+        toast({ title: 'Error', description: 'Student is missing registration_id or it is invalid. Cannot send invoice.', variant: 'destructive' });
+        setSendingInvoiceIds(ids => ids.filter(id => id !== student.id));
+        return;
+      }
+      
+      // Generate invoice
+      const { generateInvoiceForRegistration } = await import('@/lib/invoiceUtils');
+      const result = await generateInvoiceForRegistration(regId);
+      if (result && !('existing' in result)) {
+        // Send email for the newly created invoice
+        const invoice = result as any;
+        const sent = await sendInvoiceEmail(invoice, student, { isReminder: false });
+        if (sent) {
+          toast({ title: 'Invoice Sent', description: `Invoice sent to ${student.student_name}` });
+        } else {
+          toast({ title: 'Invoice Created', description: `Invoice created but email failed to send.` });
+        }
+      } else {
+        toast({ title: 'Invoice Exists', description: `Invoice already exists for this period.` });
+      }
+      
+      // Refresh invoices with defensive check for student IDs
+      const validStudentIds = activeStudents.filter(s => isValidId(s.id)).map(s => s.id);
+      if (validStudentIds.length > 0) {
+        const { data, error } = await supabase
+          .from('invoices')
+          .select('*')
+          .in('student_id', validStudentIds)
+          .order('period_end', { ascending: false });
+        if (!error && data) {
+          const latest: Record<string, any> = {};
+          for (const inv of data) {
+            if (!latest[inv.student_id] || new Date(inv.period_end) > new Date(latest[inv.student_id].period_end)) {
+              latest[inv.student_id] = inv;
+            }
+          }
+          setStudentInvoices(latest);
+        }
+      }
+    } catch (err: any) {
+      console.error('Send Invoice error:', { student, err });
+      toast({ title: 'Error', description: (err.message || 'Failed to send invoice') + (err.stack ? '\n' + err.stack : ''), variant: 'destructive' });
+    } finally {
+      setSendingInvoiceIds(ids => ids.filter(id => id !== student.id));
+    }
   };
 
   if (isLoading) {
@@ -2189,12 +2337,11 @@ const AdminPanel = () => {
               <Button onClick={calculateInvoiceTotals}>Calculate Totals</Button>
               <Button onClick={async () => {
                 if (selectedQuote) {
-                  const pdfBlob = await generateQuotePDF(selectedQuote, Number(quoteAmount), adminNotes, invoiceDetails);
-                  const url = URL.createObjectURL(pdfBlob);
-                  setInvoicePDFUrl(url);
-                  
-                  // Send email with invoice PDF
                   try {
+                    const pdfBlob = await generateQuotePDF(selectedQuote, Number(quoteAmount), adminNotes, invoiceDetails);
+                    const url = URL.createObjectURL(pdfBlob);
+                    setInvoicePDFUrl(url);
+                    // Send email with invoice PDF
                     const emailSent = await sendQuoteEmail(selectedQuote, Number(quoteAmount), adminNotes, invoiceDetails);
                     if (emailSent) {
                       toast({
@@ -2203,19 +2350,23 @@ const AdminPanel = () => {
                       });
                     } else {
                       toast({
-                        title: "Invoice Generated",
-                        description: `Invoice generated but email could not be sent.`,
+                        title: "Email Error",
+                        description: "Invoice generated but email could not be sent.",
                         variant: "destructive",
                       });
                     }
-                  } catch (error) {
-                    console.error("Error sending invoice email:", error);
+                  } catch (err) {
+                    console.error("Error generating or sending invoice:", err);
                     toast({
-                      title: "Invoice Generated",
-                      description: `Invoice generated but email could not be sent.`,
+                      title: "Error",
+                      description: "Failed to generate or send invoice.",
                       variant: "destructive",
                     });
                   }
+                  setShowInvoiceDialog(false);
+                  setSelectedQuote(null);
+                  setQuoteAmount("");
+                  setAdminNotes("");
                 }
               }}>
                 Generate & Send Invoice
@@ -2248,44 +2399,48 @@ const AdminPanel = () => {
               </TabsList>
               <TabsContent value="invoices">
                 <div className="space-y-6">
-                  <h4 className="text-xl font-semibold">Invoice Management</h4>
-                  {Object.keys(studentInvoices).length === 0 ? (
-                    <div className="text-center text-muted-foreground py-12 text-lg">No invoices found for the selected students or period.</div>
-                  ) : (
-                    <table className="min-w-full text-sm mb-6">
-                      <thead>
-                        <tr>
-                          <th>Student</th>
-                          <th>Period</th>
-                          <th>Amount Due</th>
-                          <th>Status</th>
-                          <th>Due Date</th>
-                          <th>PDF</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.values(studentInvoices).map(inv => (
-                          <tr key={inv.id}>
-                            <td>{inv.student_name || '-'}</td>
-                            <td>{inv.period_start} - {inv.period_end}</td>
-                            <td>KES {inv.amount_due?.toLocaleString()}</td>
-                            <td>{inv.status}</td>
-                            <td>{inv.due_date}</td>
-                            <td>{inv.pdf_url ? <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer">Download</a> : '-'}</td>
-                            <td className="flex gap-2">
-                              <Button size="sm" variant="outline" onClick={() => handleResendInvoice(inv)}>Resend</Button>
-                              <Button size="sm" variant="outline" onClick={() => handleSendReminder(inv)}>Remind</Button>
-                              <Button size="sm" variant="outline" onClick={() => handleExcusePeriod(inv)}>Excuse</Button>
-                              <Button size="sm" variant="outline" onClick={() => handleEditInvoice(inv)}>Edit</Button>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xl font-semibold">Invoice Management</h4>
+                    {studentsNeedingInvoice.length > 0 && (
+                      <Badge className="bg-red-500 text-white">{studentsNeedingInvoice.length} need invoice</Badge>
+                    )}
+                  </div>
+                  <table className="min-w-full text-sm mb-6">
+                    <thead>
+                      <tr>
+                        <th>Student</th>
+                        <th>Course</th>
+                        <th>Status</th>
+                        <th>Due Date</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeStudents.map(student => {
+                        const { start, end } = getCurrentPeriod();
+                        const inv = Object.values(studentInvoices).find(
+                          (inv: any) => inv.student_id === student.id && inv.period_start === start && inv.period_end === end
+                        );
+                        return (
+                          <tr key={student.id}>
+                            <td>{student.student_name}</td>
+                            <td>{student.instrument || student.course_category}</td>
+                            <td>{inv ? inv.status : <span className="text-red-500">Not Sent</span>}</td>
+                            <td>{inv ? inv.due_date : '-'}</td>
+                            <td>
+                              {!inv ? (
+                                <Button size="sm" variant="default" disabled={sendingInvoiceIds.includes(student.id)} onClick={() => handleSendInvoice(student)}>
+                                  {sendingInvoiceIds.includes(student.id) ? 'Sending...' : 'Send Invoice'}
+                                </Button>
+                              ) : (
+                                <Button size="sm" variant="outline" onClick={() => handleViewInvoice(inv)}>View</Button>
+                              )}
                             </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                  {/* Modals for Excuse, Edit, etc. */}
-                  {/* ...implement modals and handlers for each action... */}
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </TabsContent>
               <TabsContent value="fees">
