@@ -178,8 +178,22 @@ export async function generateAndUploadInvoicePDF(invoice: any, student: any): P
     preferred_contact_method: 'email',
     additional_notes: ''
   };
-  // Generate PDF blob
-  const pdfBlob = await generateQuotePDF(quoteData, invoice.amount_due, '', invoiceDetails);
+
+  // Build invoiceMeta for the new PDF layout
+  const invoiceMeta = {
+    invoiceNumber: invoice.id || '',
+    periodStart: invoice.period_start || '',
+    periodEnd: invoice.period_end || '',
+    dueDate: invoice.due_date || '',
+    paymentStatus: invoice.status ? invoice.status.toUpperCase() : 'PENDING',
+    studentId: student.id || '',
+    registrationId: student.registration_id || '',
+    sessionsPerWeek: invoice.sessions_per_week || undefined,
+    notes: invoice.notes || '',
+  };
+
+  // Generate PDF blob with new layout
+  const pdfBlob = await generateQuotePDF(quoteData, invoice.amount_due, '', invoiceDetails, invoiceMeta);
   // Upload to Supabase Storage
   const fileName = `invoices/${student.id}_${invoice.period_start}_${invoice.period_end}.pdf`;
   const { data, error } = await supabase.storage.from('invoices').upload(fileName, pdfBlob, { upsert: true, contentType: 'application/pdf' });
