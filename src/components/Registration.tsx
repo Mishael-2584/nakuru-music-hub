@@ -37,6 +37,7 @@ const Registration = () => {
     medical_condition: "no",
     medical_details: "",
     date_of_birth: '',
+    sessions_per_week: 1,
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -248,6 +249,12 @@ const Registration = () => {
           return { isValid: false, error: 'Preferred Schedule is required' };
         }
         break;
+      case 'sessions_per_week':
+        const num = parseInt(value);
+        if (!num || num < 1 || num > 5) {
+          return { isValid: false, error: 'Number of classes per week must be between 1 and 5' };
+        }
+        break;
     }
     return { isValid: true, error: '' };
   };
@@ -313,6 +320,10 @@ const Registration = () => {
           if (!validation.isValid) {
             errors.push(validation.error);
           }
+        }
+        const sessionsValidation = validateField('sessions_per_week', formData.sessions_per_week);
+        if (!sessionsValidation.isValid) {
+          errors.push(sessionsValidation.error);
         }
         break;
     }
@@ -419,6 +430,7 @@ const Registration = () => {
         goals: formData.goals?.trim() || null,
         preferred_schedule: formData.preferred_schedule?.trim() || null,
         date_of_birth: formData.date_of_birth,
+        sessions_per_week: parseInt(formData.sessions_per_week) || 1,
         status: 'pending'
       };
 
@@ -519,6 +531,7 @@ const Registration = () => {
           medical_condition: "no",
           medical_details: "",
           date_of_birth: '',
+          sessions_per_week: 1,
         });
         setCurrentStep(1);
         setIsSubmitted(false);
@@ -996,6 +1009,23 @@ const Registration = () => {
           required
         />
       </div>
+
+      <div className="space-y-4">
+        <Label htmlFor="sessions_per_week" className="text-sm font-medium text-gray-700">Number of Classes per Week *</Label>
+        <Select
+          value={String(formData.sessions_per_week)}
+          onValueChange={value => setFormData({ ...formData, sessions_per_week: parseInt(value) })}
+        >
+          <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
+            <SelectValue placeholder="Select number of classes per week" />
+          </SelectTrigger>
+          <SelectContent>
+            {[1,2,3,4,5].map(num => (
+              <SelectItem key={num} value={String(num)}>{num}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 
@@ -1158,6 +1188,7 @@ const Registration = () => {
               medical_condition: "no",
               medical_details: "",
               date_of_birth: '',
+              sessions_per_week: 1,
             });
             setCurrentStep(1);
             setIsSubmitted(false);

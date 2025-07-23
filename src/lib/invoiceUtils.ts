@@ -496,26 +496,13 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   });
   
   if (fee.payment_type === 'monthly') {
-    if (isFirstInvoice) {
-      // First invoice: Current month (regardless of start date) until 30th
-      periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
-      console.log('📅 First monthly invoice period:', {
-        periodStart: periodStart.toISOString().slice(0, 10),
-        periodEnd: periodEnd.toISOString().slice(0, 10)
-      });
-    } else {
-      // Subsequent invoices: Next month periods (1st to last day)
-      const lastInvoice = existingInvoices[existingInvoices.length - 1];
-      const lastPeriodEnd = new Date(lastInvoice.period_end);
-      periodStart = new Date(lastPeriodEnd.getFullYear(), lastPeriodEnd.getMonth() + 1, 1);
-      periodEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0);
-      console.log('📅 Subsequent monthly invoice period:', {
-        lastPeriodEnd: lastPeriodEnd.toISOString().slice(0, 10),
-        periodStart: periodStart.toISOString().slice(0, 10),
-        periodEnd: periodEnd.toISOString().slice(0, 10)
-      });
-    }
+    // Always set period to current month (1st to last day)
+    periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+    console.log('📅 Monthly invoice period (always current month):', {
+      periodStart: periodStart.toISOString().slice(0, 10),
+      periodEnd: periodEnd.toISOString().slice(0, 10)
+    });
   } else if (fee.payment_type === 'term') {
     if (isFirstInvoice) {
       // First term: From registration date to 3 months later
@@ -598,7 +585,13 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     feeCourseName: fee.course_name
   });
 
+  // Get number of sessions per week from registration (default 1)
+  const sessionsPerWeek = registration.sessions_per_week ? parseInt(registration.sessions_per_week) : 1;
+
   let invoiceAmount = fee.price;
+  if (fee.payment_type === 'monthly') {
+    invoiceAmount = fee.price * sessionsPerWeek;
+  }
   
   if (!fee.price || fee.price <= 0) {
     console.error('❌ Fee has invalid price:', fee.price);
@@ -624,8 +617,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     if (creditsError) throw creditsError;
     if (credits && credits.length > 0) {
       // Each credit = 1 session, value = session price (fee.price / expected sessions per month/term)
-      const sessionsPerMonth = fee.sessions_per_week ? fee.sessions_per_week * 4 : 4; // fallback to 4
-      const sessionValue = Math.round((fee.price / sessionsPerMonth) * 100) / 100;
+      const sessionValue = Math.round((fee.price / sessionsPerWeek) * 100) / 100;
       creditsApplied = credits.length;
       creditsValue = Math.min(creditsApplied * sessionValue, invoiceAmount);
       invoiceAmount = Math.max(0, invoiceAmount - creditsValue);
@@ -640,12 +632,11 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     amount_due: invoiceAmount, // Use 'amount_due' for invoices table
     period_start: periodStartStr,
     period_end: periodEndStr,
-    due_date: fee.payment_type === 'monthly'
-      ? new Date(periodStart.getFullYear(), periodStart.getMonth(), 10).toISOString().slice(0, 10)
-      : periodEndStr,
+    due_date: new Date(now.getFullYear(), now.getMonth(), 10).toISOString().slice(0, 10),
     status: 'pending',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
+    sessions_per_week: sessionsPerWeek,
   };
   
   // Add optional fields if they exist in the schema

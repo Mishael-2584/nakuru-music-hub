@@ -45,6 +45,7 @@ interface Registration {
   status: string;
   created_at: string;
   date_of_birth?: string;
+  sessions_per_week?: number;
 }
 
 interface ContactMessage {
@@ -1557,6 +1558,9 @@ const AdminPanel = () => {
                           {student.goals && (<div className="p-3 bg-primary/5 rounded-lg border border-primary/10"><p className="text-sm font-medium text-primary mb-1">Learning Goals:</p><p className="text-sm text-muted-foreground">{student.goals}</p></div>)}
                           <div className="flex items-center gap-2"><span className="text-sm text-muted-foreground">Enrolled: {new Date(student.created_at).toLocaleDateString()}</span></div>
                           <div className="flex items-center gap-2"><span className="text-sm font-medium text-primary">Experience: {student.experience}</span></div>
+                          {student.sessions_per_week && (
+                            <div className="flex items-center gap-2"><span className="font-medium text-gray-600">Classes per Week:</span> <span className="text-gray-800">{student.sessions_per_week}</span></div>
+                          )}
                         </div>
                       )}
                     </CardContent>
@@ -1753,6 +1757,29 @@ const AdminPanel = () => {
                                       <span className="text-gray-800">{registration.preferred_schedule}</span>
                                     </div>
                                   )}
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-gray-600">Classes per Week:</span>
+                                    <Select
+                                      value={String(registration.sessions_per_week || 1)}
+                                      onValueChange={async (value) => {
+                                        // Update in Supabase and local state
+                                        const newVal = parseInt(value);
+                                        await supabase.from('registrations').update({ sessions_per_week: newVal }).eq('id', registration.id);
+                                        setRegistrations((prev) => prev.map((r) => r.id === registration.id ? { ...r, sessions_per_week: newVal } : r));
+                                        // Optionally show a toast
+                                        toast({ title: 'Updated', description: 'Classes per week updated.' });
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-8 w-24 border-gray-300">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {[1,2,3,4,5].map(num => (
+                                          <SelectItem key={num} value={String(num)}>{num}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
                                 </div>
                               </div>
 
