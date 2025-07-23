@@ -602,8 +602,24 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   // Get number of sessions per week from registration (default 1)
   const sessionsPerWeek = registration.sessions_per_week ? parseInt(registration.sessions_per_week) : 1;
 
-  let invoiceAmount = fee.price;
-  if (fee.payment_type === 'monthly') {
+  // Declare invoiceAmount
+  let invoiceAmount = 0;
+  // If the fee has a sessions_per_week column, use it for matching
+  if (fee && fee.sessions_per_week) {
+    // If the fee is for 1 session/week, multiply by sessionsPerWeek
+    if (fee.sessions_per_week === 1) {
+      invoiceAmount = fee.price * sessionsPerWeek;
+    } else {
+      // If the fee is for the same number of sessions as requested, use the fee as-is
+      if (fee.sessions_per_week === sessionsPerWeek) {
+        invoiceAmount = fee.price;
+      } else {
+        // If the fee is for a different number of sessions, scale proportionally
+        invoiceAmount = (fee.price / fee.sessions_per_week) * sessionsPerWeek;
+      }
+    }
+  } else {
+    // Fallback: if no sessions_per_week info, multiply as before
     invoiceAmount = fee.price * sessionsPerWeek;
   }
   

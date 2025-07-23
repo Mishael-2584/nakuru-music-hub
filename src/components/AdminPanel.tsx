@@ -151,6 +151,11 @@ const AdminPanel = () => {
   // 1. Add state for tracking invoice sending/loading
   const [sendingInvoiceIds, setSendingInvoiceIds] = useState<string[]>([]);
   const [studentsNeedingInvoice, setStudentsNeedingInvoice] = useState<string[]>([]);
+  // Add state for invoice history modal
+  const [showInvoiceHistoryModal, setShowInvoiceHistoryModal] = useState(false);
+  const [invoiceHistory, setInvoiceHistory] = useState<any[]>([]);
+  const [invoiceHistoryStudent, setInvoiceHistoryStudent] = useState<any>(null);
+  const [selectedHistoryInvoice, setSelectedHistoryInvoice] = useState<any>(null);
 
   // Filter registrations based on search term
   const filteredRegistrations = useMemo(() => {
@@ -1165,6 +1170,37 @@ const AdminPanel = () => {
       toast({ title: 'Error', description: (err.message || 'Failed to send invoice') + (err.stack ? '\n' + err.stack : ''), variant: 'destructive' });
     } finally {
       setSendingInvoiceIds(ids => ids.filter(id => id !== student.id));
+    }
+  };
+
+  // Function to fetch all invoices for a student
+  const fetchInvoiceHistory = async (studentId: string) => {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('period_start', { ascending: false });
+    if (!error && data) setInvoiceHistory(data);
+  };
+
+  // Handler to open invoice history modal
+  const handleOpenInvoiceHistory = async (student: any) => {
+    setInvoiceHistoryStudent(student);
+    await fetchInvoiceHistory(student.id);
+    setShowInvoiceHistoryModal(true);
+  };
+
+  // Handler to view invoice from history
+  const handleViewHistoryInvoice = (inv: any) => {
+    setSelectedHistoryInvoice(inv);
+  };
+
+  // Handler to download invoice PDF
+  const handleDownloadInvoicePDF = (inv: any) => {
+    if (inv && inv.pdf_url) {
+      window.open(inv.pdf_url, '_blank');
+    } else {
+      toast({ title: 'No PDF', description: 'No PDF available for this invoice.', variant: 'destructive' });
     }
   };
 
@@ -2451,20 +2487,38 @@ const AdminPanel = () => {
                         );
                         return (
                           <tr key={student.id}>
-                            <td>{student.student_name}</td>
+                            <td>
+                              <span
+                                className="text-blue-700 underline cursor-pointer"
+                                onClick={() => handleOpenInvoiceHistory(student)}
+                                title="View all invoices for this student"
+                              >
+                                {student.student_name}
+                              </span>
+                            </td>
                             <td>{student.instrument || student.course_category}</td>
                             <td>{inv ? inv.status : <span className="text-red-500">Not Sent</span>}</td>
                             <td>{inv ? inv.due_date : '-'}</td>
-                            <td>
+                            <td className="flex gap-2">
                               {!inv ? (
                                 <Button size="sm" variant="default" disabled={sendingInvoiceIds.includes(student.id)} onClick={() => handleSendInvoice(student)}>
                                   {sendingInvoiceIds.includes(student.id) ? 'Sending...' : 'Send Invoice'}
                                 </Button>
                               ) : (
-                                <Button size="sm" variant="outline" onClick={() => handleViewInvoice(inv)}>View</Button>
+                                <>
+                                  <Button size="sm" variant="outline" onClick={() => handleViewInvoice(inv)}>View</Button>
+                                  <Button size="sm" variant="ghost" onClick={() => handleOpenInvoiceHistory(student)}>
+                                    View All Invoices
+                                  </Button>
+                                  {inv.pdf_url && (
+                                    <Button size="sm" variant="outline" onClick={() => handleDownloadInvoicePDF(inv)}>
+                                      Download PDF
+                                    </Button>
+                                  )}
+                                </>
                               )}
-                          </td>
-                        </tr>
+                            </td>
+                          </tr>
                         );
                       })}
                     </tbody>
@@ -2539,6 +2593,62 @@ const AdminPanel = () => {
               }}>Delete</Button>
               <Button variant="outline" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={showInvoiceHistoryModal} onOpenChange={setShowInvoiceHistoryModal}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Invoice History for {invoiceHistoryStudent?.student_name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <table className="min-w-full text-sm mb-4">
+                <thead>
+                  <tr>
+                    <th>Period</th>
+                    <th>Status</th>
+                    <th>Amount</th>
+                    <th>Due Date</th>
+                    <th>PDF</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoiceHistory.map(inv => (
+                    <tr key={inv.id}>
+                      <td>{inv.period_start} - {inv.period_end}</td>
+                      <td>{inv.status}</td>
+                      <td>KES {inv.amount_due?.toLocaleString()}</td>
+                      <td>{inv.due_date}</td>
+                      <td>
+                        {inv.pdf_url ? (
+                          <Button size="sm" variant="outline" onClick={() => handleDownloadInvoicePDF(inv)}>Download PDF</Button>
+                        ) : (
+                          <span className="text-gray-400">No PDF</span>
+                        )}
+                      </td>
+                      <td>
+                        <Button size="sm" variant="ghost" onClick={() => handleViewHistoryInvoice(inv)}>View</Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {selectedHistoryInvoice && (
+                <div className="p-4 border rounded bg-gray-50">
+                  <h4 className="font-semibold mb-2">Invoice Details</h4>
+                  <div><b>Period:</b> {selectedHistoryInvoice.period_start} - {selectedHistoryInvoice.period_end}</div>
+                  <div><b>Status:</b> {selectedHistoryInvoice.status}</div>
+                  <div><b>Amount:</b> KES {selectedHistoryInvoice.amount_due?.toLocaleString()}</div>
+                  <div><b>Due Date:</b> {selectedHistoryInvoice.due_date}</div>
+                  <div><b>Notes:</b> {selectedHistoryInvoice.notes || '-'}</div>
+                  <div className="mt-2">
+                    {selectedHistoryInvoice.pdf_url && (
+                      <Button size="sm" variant="outline" onClick={() => handleDownloadInvoicePDF(selectedHistoryInvoice)}>Download PDF</Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </DialogContent>
         </Dialog>
       </div>
