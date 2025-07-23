@@ -286,12 +286,19 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   const normalizedLearningMode = normalizeLearningMode(learningMode);
   console.log('Normalized learning mode:', normalizedLearningMode);
   
+  let normalizedCourseCategory = (courseCategory || '').toLowerCase();
+  let normalizedInstrument = instrument;
+  if (normalizedCourseCategory === 'art') {
+    normalizedCourseCategory = 'art';
+    normalizedInstrument = 'Art Classes'; // canonical name for art in fees table
+  }
+  
   // First try to find exact match with normalized learning mode and correct payment type
   const { data: exactFee, error: exactFeeError } = await supabase
     .from('fees')
     .select('*')
-    .eq('course_type', courseCategory)
-    .eq('course_name', instrument)
+    .eq('course_type', normalizedCourseCategory)
+    .eq('course_name', normalizedInstrument)
     .eq('mode', normalizedLearningMode)
     .eq('payment_type', paymentType)
     .eq('is_active', true)
@@ -307,7 +314,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     const { data: modeFee, error: modeFeeError } = await supabase
       .from('fees')
       .select('*')
-      .eq('course_type', courseCategory)
+      .eq('course_type', normalizedCourseCategory)
       .eq('mode', normalizedLearningMode)
       .eq('payment_type', paymentType)
       .eq('is_active', true)
@@ -321,7 +328,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
       const { data: typeFee, error: typeFeeError } = await supabase
         .from('fees')
         .select('*')
-        .eq('course_type', courseCategory)
+        .eq('course_type', normalizedCourseCategory)
         .eq('payment_type', paymentType)
         .eq('is_active', true)
         .maybeSingle();
@@ -335,7 +342,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
           const { data: termFee, error: termFeeError } = await supabase
             .from('fees')
             .select('*')
-            .eq('course_type', courseCategory)
+            .eq('course_type', normalizedCourseCategory)
             .eq('payment_type', 'term')
             .eq('is_active', true)
             .maybeSingle();
@@ -397,7 +404,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
             let bestMatch = null;
             
             // First try to find by course category
-            bestMatch = allFees.find(f => f.course_type === courseCategory);
+            bestMatch = allFees.find(f => f.course_type === normalizedCourseCategory);
             
             // If no match by course category, find by payment type
             if (!bestMatch) {
@@ -422,9 +429,9 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
           
           if (paymentType === 'term') {
             // Termly courses (production, photography) - higher rates
-            if (courseCategory === 'production') {
+            if (normalizedCourseCategory === 'production') {
               defaultPrice = 45500; // KES 45,500 for production term
-            } else if (courseCategory === 'photography') {
+            } else if (normalizedCourseCategory === 'photography') {
               defaultPrice = 45500; // KES 45,500 for photography term
             } else {
               defaultPrice = 40000; // KES 40,000 for other termly courses
@@ -440,8 +447,8 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
           
           fee = {
             id: 'default',
-            course_type: courseCategory,
-            course_name: instrument,
+            course_type: normalizedCourseCategory,
+            course_name: normalizedInstrument,
             price: defaultPrice,
             currency: defaultCurrency,
             payment_type: paymentType,

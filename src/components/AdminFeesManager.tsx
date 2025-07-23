@@ -3,7 +3,8 @@ import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { useAuth } from '@/hooks/useAuth';
 
 const initialFee = {
   course_type: '',
@@ -27,6 +28,11 @@ const AdminFeesManager: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingFee, setEditingFee] = useState<any | null>(null);
   const [form, setForm] = useState<any>(initialFee);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [feeToDelete, setFeeToDelete] = useState<any | null>(null);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchFees();
@@ -46,8 +52,29 @@ const AdminFeesManager: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this fee?')) return;
-    await supabase.from('fees').delete().eq('id', id);
+    setFeeToDelete(fees.find(f => f.id === id));
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    setDeleteError('');
+    if (!user?.email) {
+      setDeleteError('No admin email found. Please re-login.');
+      return;
+    }
+    // Use Supabase Auth to verify password
+    const { error } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: adminPassword,
+    });
+    if (error) {
+      setDeleteError('Incorrect password.');
+      return;
+    }
+    await supabase.from('fees').delete().eq('id', feeToDelete.id);
+    setShowDeleteModal(false);
+    setAdminPassword('');
+    setFeeToDelete(null);
     fetchFees();
   };
 
@@ -138,6 +165,26 @@ const AdminFeesManager: React.FC = () => {
               <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Fee Deletion</DialogTitle>
+          </DialogHeader>
+          <div>Enter your admin password to confirm deletion of <b>{feeToDelete?.course_name}</b>.</div>
+          <input
+            type="password"
+            placeholder="Admin Password"
+            value={adminPassword}
+            onChange={e => setAdminPassword(e.target.value)}
+            className="w-full p-2 border rounded mt-2"
+          />
+          {deleteError && <div className="text-red-500 text-sm mt-2">{deleteError}</div>}
+          <DialogFooter>
+            <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+            <Button variant="outline" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </Card>

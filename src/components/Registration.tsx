@@ -409,6 +409,10 @@ const Registration = () => {
       console.log('✅ Connection test successful');
 
       // Prepare the complete data for submission
+      let instrumentValue = formData.instrument;
+      if (formData.course_category === 'Art') {
+        instrumentValue = 'Art Classes'; // canonical name for art in fees table
+      }
       const submissionData = {
         student_name: formData.student_name.trim(),
         age: parseInt(formData.age),
@@ -418,7 +422,7 @@ const Registration = () => {
         parent_name: formData.parent_name?.trim() || null,
         parent_phone: formData.parent_phone?.trim() || null,
         course_category: formData.course_category,
-        instrument: formData.instrument === "Other" ? formData.custom_instrument?.trim() : (formData.instrument?.trim() || "Not specified"),
+        instrument: instrumentValue === "Other" ? formData.custom_instrument?.trim() : (instrumentValue?.trim() || "Not specified"),
         production_type: formData.production_type?.trim() || null,
         experience: formData.proficiency_level || "beginner",
         proficiency_level: formData.proficiency_level || "beginner",
@@ -430,7 +434,7 @@ const Registration = () => {
         goals: formData.goals?.trim() || null,
         preferred_schedule: formData.preferred_schedule?.trim() || null,
         date_of_birth: formData.date_of_birth,
-        sessions_per_week: parseInt(formData.sessions_per_week) || 1,
+        sessions_per_week: parseInt(String(formData.sessions_per_week), 10) || 1,
         status: 'pending'
       };
 
@@ -1014,7 +1018,7 @@ const Registration = () => {
         <Label htmlFor="sessions_per_week" className="text-sm font-medium text-gray-700">Number of Classes per Week *</Label>
         <Select
           value={String(formData.sessions_per_week)}
-          onValueChange={value => setFormData({ ...formData, sessions_per_week: parseInt(value) })}
+          onValueChange={value => setFormData({ ...formData, sessions_per_week: parseInt(value, 10) })}
         >
           <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
             <SelectValue placeholder="Select number of classes per week" />

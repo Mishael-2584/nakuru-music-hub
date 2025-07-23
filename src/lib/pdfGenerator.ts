@@ -71,26 +71,36 @@ export const generateQuotePDF = async (
     day: 'numeric'
   });
 
+  // 1. Calculate due date as 7th of the next month if invoiceDetails is present
+  let invoiceOrQuoteDate = currentDate;
+  let dueDateStr = invoiceMeta?.dueDate;
+  if (invoiceDetails && invoiceMeta) {
+    // If periodEnd is e.g. 2025-08-31, due date is 7th of next month (2025-09-07)
+    const periodEnd = new Date(invoiceMeta.periodEnd);
+    const dueDate = new Date(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 7);
+    dueDateStr = dueDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  }
+
   pdfContainer.innerHTML = `
     <div style="max-width: 720px; margin: 0 auto; background-color: #ffffff; font-family: 'Arial', sans-serif;">
       <!-- Professional Header -->
-      <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 24px 24px 16px 24px; border-radius: 8px 8px 0 0; margin-bottom: 18px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+      <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 18px 18px 10px 18px; border-radius: 8px 8px 0 0; margin-bottom: 10px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
           <div style="display: flex; align-items: center;">
-            <img src="/damon-logo.png" alt="Damon Music Academy Logo" style="width: 48px; height: 48px; object-fit: contain; margin-right: 12px; background: white; border-radius: 8px; padding: 3px;" />
+            <img src="/damon-logo.png" alt="Damon Music Academy Logo" style="width: 40px; height: 40px; object-fit: contain; margin-right: 10px; background: white; border-radius: 8px; padding: 2px;" />
             <div>
-              <h1 style="margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 1px;">DAMON MUSIC ACADEMY</h1>
-              <p style="margin: 2px 0 0 0; font-size: 12px; opacity: 0.9;">Professional Music & Media Services</p>
+              <h1 style="margin: 0; font-size: 17px; font-weight: bold; letter-spacing: 1px;">DAMON MUSIC ACADEMY</h1>
+              <p style="margin: 2px 0 0 0; font-size: 10px; opacity: 0.9;">Professional Music & Media Services</p>
             </div>
           </div>
           <div style="text-align: right;">
-            <h2 style="margin: 0; font-size: 16px; font-weight: 600; letter-spacing: 1px;">${invoiceDetails ? 'INVOICE' : 'QUOTE'}</h2>
-            <p style="margin: 2px 0 0 0; font-size: 11px; opacity: 0.8;">Date: ${currentDate}</p>
-            ${invoiceMeta ? `<p style='margin:2px 0 0 0;font-size:11px;'>Invoice #: <b>${invoiceMeta.invoiceNumber}</b></p>` : ''}
-            ${invoiceMeta ? `<p style='margin:2px 0 0 0;font-size:11px;'>Status: <b>${invoiceMeta.paymentStatus}</b></p>` : ''}
+            <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 1px;">${invoiceDetails ? 'INVOICE' : 'QUOTE'}</h2>
+            <p style="margin: 2px 0 0 0; font-size: 10px; opacity: 0.8;">${invoiceDetails ? 'Invoice Date' : 'Quote Date'}: ${invoiceOrQuoteDate}</p>
+            ${invoiceMeta ? `<p style='margin:2px 0 0 0;font-size:10px;'>Invoice #: <b>${invoiceMeta.invoiceNumber}</b></p>` : ''}
+            ${invoiceMeta ? `<p style='margin:2px 0 0 0;font-size:10px;'>Status: <b>${invoiceMeta.paymentStatus}</b></p>` : ''}
           </div>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 11px; opacity: 0.9;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; font-size: 10px; opacity: 0.9;">
           <div><strong>Email:</strong> admin@damonmusicacademy.co.ke</div>
           <div><strong>Phone:</strong> +254 701 195 460</div>
           <div><strong>Location:</strong> Nakuru, Kenya</div>
@@ -99,67 +109,77 @@ export const generateQuotePDF = async (
 
       <!-- Invoice Summary -->
       ${invoiceMeta ? `
-      <div style="margin-bottom: 12px; background: #f8fafc; padding: 12px 18px; border-radius: 8px; border-left: 4px solid #2563eb; font-size: 13px; display: flex; flex-wrap: wrap; gap: 18px;">
+      <div style="margin-bottom: 8px; background: #f8fafc; padding: 8px 12px; border-radius: 8px; border-left: 4px solid #2563eb; font-size: 11px; display: flex; flex-wrap: wrap; gap: 12px;">
         <div><b>Student ID:</b> ${invoiceMeta.studentId}</div>
         ${invoiceMeta.registrationId ? `<div><b>Registration ID:</b> ${invoiceMeta.registrationId}</div>` : ''}
         <div><b>Period:</b> ${invoiceMeta.periodStart} to ${invoiceMeta.periodEnd}</div>
-        <div><b>Due Date:</b> ${invoiceMeta.dueDate}</div>
+        <div><b>Due Date:</b> ${dueDateStr || invoiceMeta.dueDate}</div>
         ${invoiceMeta.sessionsPerWeek ? `<div><b>Sessions/Week:</b> ${invoiceMeta.sessionsPerWeek}</div>` : ''}
       </div>
       ` : ''}
 
       <!-- Client Information -->
-      <div style="margin-bottom: 12px; background: #f8fafc; padding: 12px 18px; border-radius: 8px; border-left: 4px solid #2563eb; font-size: 13px;">
+      <div style="margin-bottom: 8px; background: #f8fafc; padding: 8px 12px; border-radius: 8px; border-left: 4px solid #2563eb; font-size: 11px;">
         <b>Client:</b> ${quoteData.name} &nbsp; | &nbsp; <b>Email:</b> ${quoteData.email} &nbsp; | &nbsp; <b>Phone:</b> ${quoteData.phone || '-'}
+      </div>
+
+      <!-- Payment Details -->
+      <div style="margin-bottom: 8px; background: #e0f2fe; padding: 8px 12px; border-radius: 8px; border-left: 4px solid #0ea5e9; font-size: 11px;">
+        <b>Payment Details:</b>
+        <ul style="margin: 0; padding-left: 16px;">
+          <li><b>Bank:</b> KCB Bank, Account: 113 747 2462, Name: Damon Music Academy</li>
+          <li><b>M-Pesa Paybill:</b> 522123, Account: Damon Music Academy</li>
+          <li><b>Contact:</b> 0701 195 460 for payment confirmation</li>
+        </ul>
       </div>
 
       <!-- Invoice Table (if invoiceDetails provided) -->
       ${invoiceDetails ? `
-      <div style="margin-bottom: 12px;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+      <div style="margin-bottom: 8px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
           <thead>
             <tr style="background: #1e40af; color: white;">
-              <th style="padding: 8px 4px; border: 1px solid #1e40af; text-align: left; font-weight: 600;">Description</th>
-              <th style="padding: 8px 4px; border: 1px solid #1e40af; text-align: right; font-weight: 600;">Quantity</th>
-              <th style="padding: 8px 4px; border: 1px solid #1e40af; text-align: right; font-weight: 600;">Unit Price</th>
-              <th style="padding: 8px 4px; border: 1px solid #1e40af; text-align: right; font-weight: 600;">Amount</th>
+              <th style="padding: 6px 2px; border: 1px solid #1e40af; text-align: left; font-weight: 600;">Description</th>
+              <th style="padding: 6px 2px; border: 1px solid #1e40af; text-align: right; font-weight: 600;">Quantity</th>
+              <th style="padding: 6px 2px; border: 1px solid #1e40af; text-align: right; font-weight: 600;">Unit Price</th>
+              <th style="padding: 6px 2px; border: 1px solid #1e40af; text-align: right; font-weight: 600;">Amount</th>
             </tr>
           </thead>
           <tbody>
             ${invoiceDetails.lineItems.map(item => `
               <tr style="border-bottom: 1px solid #e5e7eb;">
-                <td style="padding: 8px 4px; color: #374151;">${item.description}</td>
-                <td style="padding: 8px 4px; text-align: right; color: #374151;">${item.quantity}</td>
-                <td style="padding: 8px 4px; text-align: right; color: #374151;">KES ${item.unitPrice.toLocaleString()}</td>
-                <td style="padding: 8px 4px; text-align: right; color: #374151; font-weight: 600;">KES ${item.amount.toLocaleString()}</td>
+                <td style="padding: 6px 2px; color: #374151;">${item.description}</td>
+                <td style="padding: 6px 2px; text-align: right; color: #374151;">${item.quantity}</td>
+                <td style="padding: 6px 2px; text-align: right; color: #374151;">KES ${item.unitPrice.toLocaleString()}</td>
+                <td style="padding: 6px 2px; text-align: right; color: #374151; font-weight: 600;">KES ${item.amount.toLocaleString()}</td>
               </tr>
             `).join('')}
           </tbody>
         </table>
-        <div style="text-align: right; margin-top: 8px; padding: 8px; background: #f0f9ff; border-radius: 8px; border: 1px solid #2563eb; font-size: 13px;">
+        <div style="text-align: right; margin-top: 4px; padding: 4px; background: #f0f9ff; border-radius: 8px; border: 1px solid #2563eb; font-size: 11px;">
           <div style="margin-bottom: 2px;"><strong>Subtotal:</strong> KES ${invoiceDetails.subtotal.toLocaleString()}</div>
-          <div style="font-size: 15px; color: #1e40af; font-weight: bold;"><strong>TOTAL:</strong> KES ${invoiceDetails.total.toLocaleString()}</div>
+          <div style="font-size: 12px; color: #1e40af; font-weight: bold;"><strong>TOTAL:</strong> KES ${invoiceDetails.total.toLocaleString()}</div>
         </div>
       </div>
       ` : ''}
 
       <!-- Notes and Credits -->
       ${invoiceMeta && invoiceMeta.notes ? `
-        <div style="margin-bottom: 10px; background: #fef3c7; padding: 10px 16px; border-radius: 8px; border-left: 4px solid #f59e0b; font-size: 12px;">
+        <div style="margin-bottom: 6px; background: #fef3c7; padding: 6px 10px; border-radius: 8px; border-left: 4px solid #f59e0b; font-size: 10px;">
           <b>Notes:</b> ${invoiceMeta.notes}
         </div>
       ` : ''}
 
       ${adminNotes ? `
-        <div style="margin-bottom: 10px; background: #fef3c7; padding: 10px 16px; border-radius: 8px; border-left: 4px solid #f59e0b; font-size: 12px;">
+        <div style="margin-bottom: 6px; background: #fef3c7; padding: 6px 10px; border-radius: 8px; border-left: 4px solid #f59e0b; font-size: 10px;">
           <b>Admin Notes:</b> ${adminNotes}
         </div>
       ` : ''}
 
       <!-- Terms and Conditions -->
-      <div style="margin-bottom: 10px; background: #f8fafc; padding: 10px 16px; border-radius: 8px; border-left: 4px solid #2563eb; font-size: 11px;">
+      <div style="margin-bottom: 6px; background: #f8fafc; padding: 6px 10px; border-radius: 8px; border-left: 4px solid #2563eb; font-size: 9px;">
         <b>Terms & Conditions:</b>
-        <ul style="margin: 0; padding-left: 18px; line-height: 1.5;">
+        <ul style="margin: 0; padding-left: 14px; line-height: 1.5;">
           <li>${invoiceDetails ? invoiceDetails.paymentTerms : '50% deposit required to confirm booking'}</li>
           <li>This ${invoiceDetails ? 'invoice' : 'quote'} is valid for ${invoiceDetails ? invoiceDetails.validUntil : '30 days from the date of issue'}</li>
           <li>Final payment due before service delivery</li>
@@ -169,7 +189,7 @@ export const generateQuotePDF = async (
       </div>
 
       <!-- Footer -->
-      <div style="text-align: center; margin-top: 18px; padding: 10px; background: #1e40af; color: white; border-radius: 8px; font-size: 11px;">
+      <div style="text-align: center; margin-top: 10px; padding: 6px; background: #1e40af; color: white; border-radius: 8px; font-size: 9px;">
         <p style="margin: 2px 0;">Thank you for choosing Damon Music Academy</p>
         <p style="margin: 2px 0; opacity: 0.8;">© 2025 Damon Music Academy. All rights reserved.</p>
       </div>
