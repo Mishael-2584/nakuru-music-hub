@@ -917,19 +917,19 @@ const AdminPanel = () => {
     // Refresh student invoices with defensive check
     const validStudentIds = activeStudents.filter(s => isValidId(s.id)).map(s => s.id);
     if (validStudentIds.length > 0) {
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('*')
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*')
         .in('student_id', validStudentIds)
-        .order('period_end', { ascending: false });
-      if (!error && data) {
-        const latest: Record<string, any> = {};
-        for (const inv of data) {
-          if (!latest[inv.student_id] || new Date(inv.period_end) > new Date(latest[inv.student_id].period_end)) {
-            latest[inv.student_id] = inv;
-          }
+      .order('period_end', { ascending: false });
+    if (!error && data) {
+      const latest: Record<string, any> = {};
+      for (const inv of data) {
+        if (!latest[inv.student_id] || new Date(inv.period_end) > new Date(latest[inv.student_id].period_end)) {
+          latest[inv.student_id] = inv;
         }
-        setStudentInvoices(latest);
+      }
+      setStudentInvoices(latest);
       }
     }
   };
@@ -1525,9 +1525,9 @@ const AdminPanel = () => {
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4 cursor-pointer" onClick={() => toggleStudentExpand(student.id)}>
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
-                            <UserCog className="w-6 h-6 text-gray-400" />
-                          </div>
+                            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+                              <UserCog className="w-6 h-6 text-gray-400" />
+                            </div>
                           <div>
                             <h4 className="text-xl font-bold text-primary">{student.student_name}</h4>
                             <p className="text-muted-foreground">Age: {student.age} • {student.instrument}</p>
@@ -1537,7 +1537,7 @@ const AdminPanel = () => {
                           </div>
                         </div>
                         <Button size="sm" variant="destructive" onClick={e => { e.stopPropagation(); setStudentToDelete(student); setShowDeleteModal(true); }}>Delete</Button>
-                      </div>
+                        </div>
                       {isExpanded && (
                         <div className="space-y-2 mt-2">
                           <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{student.email}</span></div>
@@ -1561,8 +1561,8 @@ const AdminPanel = () => {
                           {student.sessions_per_week && (
                             <div className="flex items-center gap-2"><span className="font-medium text-gray-600">Classes per Week:</span> <span className="text-gray-800">{student.sessions_per_week}</span></div>
                           )}
-                        </div>
-                      )}
+                          </div>
+                        )}
                     </CardContent>
                   </Card>
                 );
@@ -2366,10 +2366,10 @@ const AdminPanel = () => {
               <Button onClick={async () => {
                 if (selectedQuote) {
                   try {
-                    const pdfBlob = await generateQuotePDF(selectedQuote, Number(quoteAmount), adminNotes, invoiceDetails);
-                    const url = URL.createObjectURL(pdfBlob);
-                    setInvoicePDFUrl(url);
-                    // Send email with invoice PDF
+                  const pdfBlob = await generateQuotePDF(selectedQuote, Number(quoteAmount), adminNotes, invoiceDetails);
+                  const url = URL.createObjectURL(pdfBlob);
+                  setInvoicePDFUrl(url);
+                  // Send email with invoice PDF
                     const emailSent = await sendQuoteEmail(selectedQuote, Number(quoteAmount), adminNotes, invoiceDetails);
                     if (emailSent) {
                       toast({
@@ -2428,7 +2428,7 @@ const AdminPanel = () => {
               <TabsContent value="invoices">
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xl font-semibold">Invoice Management</h4>
+                  <h4 className="text-xl font-semibold">Invoice Management</h4>
                     {studentsNeedingInvoice.length > 0 && (
                       <Badge className="bg-red-500 text-white">{studentsNeedingInvoice.length} need invoice</Badge>
                     )}
@@ -2463,8 +2463,8 @@ const AdminPanel = () => {
                               ) : (
                                 <Button size="sm" variant="outline" onClick={() => handleViewInvoice(inv)}>View</Button>
                               )}
-                            </td>
-                          </tr>
+                          </td>
+                        </tr>
                         );
                       })}
                     </tbody>

@@ -184,6 +184,19 @@ const EventDetailsModal = ({ open, onClose, event }) => {
           {event.notes && <div><b>Notes:</b> {event.notes}</div>}
           {event.meeting_link && <div><b>Meeting Link:</b> <a href={event.meeting_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Join Online</a></div>}
         </div>
+        {/* Lesson Materials Section */}
+        <div className="mt-4">
+          <h4 className="font-semibold mb-2">Lesson Materials</h4>
+          {event.materials_url && event.materials_url.length > 0 ? (
+            <ul className="list-disc pl-5 space-y-1">
+              {event.materials_url.map((url, idx) => (
+                <li key={idx}><a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Download Material {idx + 1}</a></li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-gray-500">No materials uploaded yet.</p>
+          )}
+        </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Close</Button>
         </DialogFooter>

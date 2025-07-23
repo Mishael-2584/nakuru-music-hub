@@ -506,10 +506,10 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   } else if (fee.payment_type === 'term') {
     if (isFirstInvoice) {
       // First term: From registration date to 3 months later
-      periodStart = new Date(registration.created_at);
-      periodEnd = new Date(periodStart);
-      periodEnd.setMonth(periodEnd.getMonth() + 3);
-      periodEnd.setDate(periodEnd.getDate() - 1);
+    periodStart = new Date(registration.created_at);
+    periodEnd = new Date(periodStart);
+    periodEnd.setMonth(periodEnd.getMonth() + 3);
+    periodEnd.setDate(periodEnd.getDate() - 1);
       console.log('📅 First termly invoice period:', {
         registrationDate: registration.created_at,
         periodStart: periodStart.toISOString().slice(0, 10),

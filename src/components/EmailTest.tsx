@@ -36,7 +36,7 @@ export default function EmailTest() {
           `
         }
       });
-
+      
       if (error) {
         console.error('❌ Email test failed:', error);
         setResult(`❌ Email test failed: ${error.message}`);
@@ -146,7 +146,7 @@ export default function EmailTest() {
               {isLoading ? 'Testing...' : 'Test Invoice Email'}
             </Button>
           </div>
-          
+
           {result && (
             <div className={`p-4 rounded-md ${
               result.includes('✅') 
@@ -156,7 +156,7 @@ export default function EmailTest() {
               <pre className="whitespace-pre-wrap text-sm">{result}</pre>
             </div>
           )}
-          
+
           <div className="text-sm text-gray-600 space-y-2">
             <p><strong>What this tests:</strong></p>
             <ul className="list-disc list-inside space-y-1">

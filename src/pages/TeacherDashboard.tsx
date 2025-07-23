@@ -53,6 +53,7 @@ interface Lesson {
   notes?: string;
   student_id: string;
   student_name?: string;
+  materials_url?: string[]; // Added for lesson materials
 }
 
 interface Message {
@@ -79,7 +80,39 @@ interface TimeSlot {
 }
 
 // Add EventDetailsModal component
-const EventDetailsModal = ({ open, onClose, event }) => {
+const EventDetailsModal = ({ open, onClose, event, isTeacher }) => {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [file, setFile] = useState(null);
+  const [materials, setMaterials] = useState(event.materials_url || []);
+
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  };
+
+  const handleUpload = async () => {
+    if (!file) return;
+    setUploading(true);
+    setUploadError("");
+    try {
+      const filePath = `lesson-materials/${event.id}/${file.name}`;
+      const { error: uploadError } = await supabase.storage.from('lesson-materials').upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      // Get public URL
+      const { data } = supabase.storage.from('lesson-materials').getPublicUrl(filePath);
+      const publicUrl = data.publicUrl;
+      // Update lesson's materials_url array
+      const newMaterials = [...(materials || []), publicUrl];
+      const { error: updateError } = await supabase.from('lessons').update({ materials_url: newMaterials }).eq('id', event.id);
+      if (updateError) throw updateError;
+      setMaterials(newMaterials);
+      setFile(null);
+    } catch (err) {
+      setUploadError(err.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
   if (!event) return null;
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -94,6 +127,28 @@ const EventDetailsModal = ({ open, onClose, event }) => {
           <div><b>Time:</b> {event.start && event.end ? `${event.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${event.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}</div>
           {event.student_name && <div><b>Student:</b> {event.student_name}</div>}
           {event.notes && <div><b>Notes:</b> {event.notes}</div>}
+        </div>
+        {/* Lesson Materials Section */}
+        <div className="mt-4">
+          <h4 className="font-semibold mb-2">Lesson Materials</h4>
+          {materials && materials.length > 0 ? (
+            <ul className="list-disc pl-5 space-y-1">
+              {materials.map((url, idx) => (
+                <li key={idx}><a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Download Material {idx + 1}</a></li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-gray-500">No materials uploaded yet.</p>
+          )}
+          {isTeacher && (
+            <div className="mt-3 space-y-2">
+              <input type="file" onChange={handleFileChange} />
+              <Button onClick={handleUpload} disabled={uploading || !file} variant="outline">
+                {uploading ? 'Uploading...' : 'Upload Material'}
+              </Button>
+              {uploadError && <p className="text-red-600 text-sm">{uploadError}</p>}
+            </div>
+          )}
         </div>
         <div className="flex justify-end mt-4">
           <Button variant="outline" onClick={onClose}>Close</Button>
@@ -732,6 +787,7 @@ const TeacherDashboard = () => {
     lesson_date: lesson.lesson_date,
     start_time: lesson.start_time,
     end_time: lesson.end_time,
+    materials_url: lesson.materials_url, // Add materials_url to event
     ...lesson,
   }));
 
@@ -1494,7 +1550,7 @@ const TeacherDashboard = () => {
                   onSelectEvent={handleSelectEvent}
                   defaultView="week"
                 />
-                <EventDetailsModal open={eventModalOpen} onClose={() => setEventModalOpen(false)} event={selectedEvent} />
+                <EventDetailsModal open={eventModalOpen} onClose={() => setEventModalOpen(false)} event={selectedEvent} isTeacher={isTeacher} />
               </Card>
             </TabsContent>
 
