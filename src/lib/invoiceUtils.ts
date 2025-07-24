@@ -520,22 +520,14 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     // Always set period to current month (1st to last day)
     periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
     periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
-    console.log('📅 Monthly invoice period (always current month):', {
-      periodStart: periodStart.toISOString().slice(0, 10),
-      periodEnd: periodEnd.toISOString().slice(0, 10)
-    });
+    // Due date should be 7th of the next month after periodEnd
   } else if (fee.payment_type === 'term') {
     if (isFirstInvoice) {
       // First term: From registration date to 3 months later
-    periodStart = new Date(registration.created_at);
-    periodEnd = new Date(periodStart);
-    periodEnd.setMonth(periodEnd.getMonth() + 3);
-    periodEnd.setDate(periodEnd.getDate() - 1);
-      console.log('📅 First termly invoice period:', {
-        registrationDate: registration.created_at,
-        periodStart: periodStart.toISOString().slice(0, 10),
-        periodEnd: periodEnd.toISOString().slice(0, 10)
-      });
+      periodStart = new Date(registration.created_at);
+      periodEnd = new Date(periodStart);
+      periodEnd.setMonth(periodEnd.getMonth() + 3);
+      periodEnd.setDate(periodEnd.getDate() - 1);
     } else {
       // Subsequent terms: 3-month periods after the last term
       const lastInvoice = existingInvoices[existingInvoices.length - 1];
@@ -545,17 +537,18 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
       periodEnd = new Date(periodStart);
       periodEnd.setMonth(periodEnd.getMonth() + 3);
       periodEnd.setDate(periodEnd.getDate() - 1);
-      console.log('📅 Subsequent termly invoice period:', {
-        lastPeriodEnd: lastPeriodEnd.toISOString().slice(0, 10),
-        periodStart: periodStart.toISOString().slice(0, 10),
-        periodEnd: periodEnd.toISOString().slice(0, 10)
-      });
     }
+    // Due date should be 7th of the next month after periodEnd
   } else {
     throw new Error('Unsupported payment type');
   }
   const periodStartStr = periodStart.toISOString().slice(0, 10);
   const periodEndStr = periodEnd.toISOString().slice(0, 10);
+
+  // Calculate due_date as 7th of the month after periodEnd
+  const dueDateObj = new Date(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 1);
+  dueDateObj.setDate(7); // Always set to 7th day of next month
+  const dueDateStr = dueDateObj.toISOString().slice(0, 10);
 
   // Check for existing invoice for this student/period (temporarily without registration_id)
   const { data: existingInvoice, error: existingError } = await supabase
@@ -669,7 +662,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     amount_due: invoiceAmount, // Use 'amount_due' for invoices table
     period_start: periodStartStr,
     period_end: periodEndStr,
-    due_date: new Date(now.getFullYear(), now.getMonth(), 10).toISOString().slice(0, 10),
+    due_date: dueDateStr,
     status: 'pending',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Fragment } from "react";
 
 interface AuthFormProps {
   onSuccess: () => void;
@@ -21,6 +22,8 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const [showForgot, setShowForgot] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,6 +136,38 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: window.location.origin + '/reset-password',
+      });
+      if (error) {
+        toast({
+          title: "Reset Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Reset Email Sent",
+          description: "Check your email for a password reset link.",
+        });
+        setShowForgot(false);
+        setResetEmail("");
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-sm">
       <Card className="shadow-lg border-gray-200 bg-white">
@@ -152,89 +187,120 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <form onSubmit={handleAuth} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="you@example.com"
-                className="h-11"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  placeholder="••••••••••"
-                  className="h-11 pr-10"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full text-muted-foreground"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </Button>
-              </div>
-            </div>
-
-            {!isLogin && (
+          {showForgot ? (
+            <form onSubmit={handleForgotPassword} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirm Password</Label>
-                <div className="relative">
+                <Label htmlFor="reset-email">Enter your email to reset password</Label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  value={resetEmail}
+                  onChange={e => setResetEmail(e.target.value)}
+                  required
+                  placeholder="you@example.com"
+                  className="h-11"
+                />
+              </div>
+              <Button type="submit" className="w-full h-11 text-base font-semibold" disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isLoading ? 'Please wait...' : 'Send Reset Link'}
+              </Button>
+              <Button variant="link" type="button" onClick={() => setShowForgot(false)} className="w-full text-sm">Back to Sign In</Button>
+            </form>
+          ) : (
+            <Fragment>
+              <form onSubmit={handleAuth} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
                   <Input
-                    id="confirm-password"
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
-                    placeholder="••••••••••"
-                    className="h-11 pr-10"
+                    placeholder="you@example.com"
+                    className="h-11"
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full text-muted-foreground"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      placeholder="••••••••••"
+                      className="h-11 pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full text-muted-foreground"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </Button>
+                  </div>
+                </div>
+
+                {!isLogin && (
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">Confirm Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="confirm-password"
+                        type={showConfirmPassword ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        placeholder="••••••••••"
+                        className="h-11 pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full text-muted-foreground"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                <Button type="submit" className="w-full h-11 text-base font-semibold" disabled={isLoading}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isLoading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
+                </Button>
+                {role === 'teacher' && isLogin && (
+                  <div className="text-center mt-2">
+                    <a href="/teacher-signup" className="text-primary hover:underline text-sm font-medium">
+                      Don't have an account? Sign up as a teacher
+                    </a>
+                  </div>
+                )}
+              </form>
+              
+              {role !== 'teacher' && (
+                <div className="text-center">
+                  <Button variant="link" onClick={() => setIsLogin(!isLogin)} className="text-sm text-muted-foreground">
+                    {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
                   </Button>
                 </div>
-              </div>
-            )}
-            
-            <Button type="submit" className="w-full h-11 text-base font-semibold" disabled={isLoading}>
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLoading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
-            </Button>
-            {role === 'teacher' && isLogin && (
-              <div className="text-center mt-2">
-                <a href="/teacher-signup" className="text-primary hover:underline text-sm font-medium">
-                  Don't have an account? Sign up as a teacher
-                </a>
-              </div>
-            )}
-          </form>
-          
-          {role !== 'teacher' && (
-            <div className="text-center">
-              <Button variant="link" onClick={() => setIsLogin(!isLogin)} className="text-sm text-muted-foreground">
-                {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
-              </Button>
-            </div>
+              )}
+              {isLogin && (
+                <div className="text-center mt-2">
+                  <Button variant="link" type="button" className="text-sm text-primary" onClick={() => setShowForgot(true)}>
+                    Forgot Password?
+                  </Button>
+                </div>
+              )}
+            </Fragment>
           )}
         </CardContent>
       </Card>
