@@ -141,7 +141,7 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
     setIsLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: window.location.origin + '/reset-password',
+        redirectTo: 'https://damonmusicacademy.co.ke/reset-password',
       });
       if (error) {
         toast({
@@ -159,8 +159,8 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
       }
     } catch (err) {
       toast({
-        title: "Error",
-        description: "An unexpected error occurred.",
+        title: "Reset Failed",
+        description: err.message,
         variant: "destructive",
       });
     } finally {

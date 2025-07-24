@@ -2402,10 +2402,34 @@ const AdminPanel = () => {
               <Button onClick={async () => {
                 if (selectedQuote) {
                   try {
-                  const pdfBlob = await generateQuotePDF(selectedQuote, Number(quoteAmount), adminNotes, invoiceDetails);
-                  const url = URL.createObjectURL(pdfBlob);
-                  setInvoicePDFUrl(url);
-                  // Send email with invoice PDF
+                    // Calculate periodStart from selectedQuote.created_at
+                    let periodStart = '';
+                    let periodEnd = '';
+                    if (selectedQuote?.created_at) {
+                      periodStart = selectedQuote.created_at.slice(0, 10);
+                      const startDate = new Date(periodStart);
+                      const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+                      periodEnd = endDate.toISOString().slice(0, 10);
+                    }
+                    // Calculate dueDate as 7th of the next month after periodEnd
+                    let dueDate = '';
+                    if (periodEnd) {
+                      const periodEndDate = new Date(periodEnd);
+                      const dueDateObj = new Date(Date.UTC(periodEndDate.getFullYear(), periodEndDate.getMonth() + 1, 7));
+                      dueDate = dueDateObj.toISOString().slice(0, 10);
+                    }
+                    const invoiceMeta = {
+                      invoiceNumber: selectedQuote.id || '',
+                      periodStart,
+                      periodEnd,
+                      dueDate,
+                      paymentStatus: 'PENDING',
+                      studentId: '',
+                    };
+                    const pdfBlob = await generateQuotePDF(selectedQuote, Number(quoteAmount), adminNotes, invoiceDetails, invoiceMeta);
+                    const url = URL.createObjectURL(pdfBlob);
+                    setInvoicePDFUrl(url);
+                    // Send email with invoice PDF
                     const emailSent = await sendQuoteEmail(selectedQuote, Number(quoteAmount), adminNotes, invoiceDetails);
                     if (emailSent) {
                       toast({

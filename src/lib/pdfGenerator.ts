@@ -55,6 +55,9 @@ export const generateQuotePDF = async (
   invoiceDetails?: InvoiceDetails,
   invoiceMeta?: InvoiceMeta
 ): Promise<Blob> => {
+  // Debug: log invoiceMeta and dueDate at PDF generation
+  console.log('PDF GENERATOR: invoiceMeta =', invoiceMeta);
+  console.log('PDF GENERATOR: invoiceMeta.dueDate =', invoiceMeta?.dueDate);
   // Create a temporary div to render the PDF content
   const pdfContainer = document.createElement('div');
   pdfContainer.style.width = '800px';
@@ -193,7 +196,7 @@ export const generateQuotePDF = async (
       </div>
     ` : ''}
     <div style="margin: 18px 32px 0 32px; font-size: 11px; color: #64748b;">
-      <div><b>Due Date:</b> ${dueDateStr || invoiceMeta?.dueDate || ''}</div>
+      <div><b>Due Date:</b> ${dueDateStr || '-'}</div>
       <div style="margin-top: 4px;">Thank you for choosing Damon Music Academy. For any queries, contact us at 0701 195 460.</div>
     </div>
   </div>

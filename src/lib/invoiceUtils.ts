@@ -179,6 +179,8 @@ export async function generateAndUploadInvoicePDF(invoice: any, student: any): P
     additional_notes: ''
   };
 
+  // Debug: log due date before passing to PDF
+  console.log('PDF Generation: invoice.due_date =', invoice.due_date);
   // Build invoiceMeta for the new PDF layout
   const invoiceMeta = {
     invoiceNumber: invoice.id || '',
@@ -191,6 +193,8 @@ export async function generateAndUploadInvoicePDF(invoice: any, student: any): P
     sessionsPerWeek: invoice.sessions_per_week || undefined,
     notes: invoice.notes || '',
   };
+  // Debug: log invoiceMeta before PDF generation
+  console.log('PDF Generation: invoiceMeta =', invoiceMeta);
 
   // Generate PDF blob with new layout
   const pdfBlob = await generateQuotePDF(quoteData, invoice.amount_due, '', invoiceDetails, invoiceMeta);
@@ -545,9 +549,8 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   const periodStartStr = periodStart.toISOString().slice(0, 10);
   const periodEndStr = periodEnd.toISOString().slice(0, 10);
 
-  // Calculate due_date as 7th of the month after periodEnd
-  const dueDateObj = new Date(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 1);
-  dueDateObj.setDate(7); // Always set to 7th day of next month
+  // Calculate due_date as 7th of the month after periodEnd (UTC to avoid timezone issues)
+  const dueDateObj = new Date(Date.UTC(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 7));
   const dueDateStr = dueDateObj.toISOString().slice(0, 10);
 
   // Check for existing invoice for this student/period (temporarily without registration_id)
