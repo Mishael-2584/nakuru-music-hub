@@ -52,6 +52,9 @@ const Header = () => {
     name: "Gallery",
     href: "/gallery"
   }, {
+    name: "FAQ",
+    href: "/faq"
+  }, {
     name: "Team",
     href: "/team"
   }, {
