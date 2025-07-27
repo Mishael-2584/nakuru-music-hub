@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
+import { sendInvoiceEmail, sendPaymentConfirmationEmail } from '@/lib/emailService';
 
 export default function EmailTest() {
   const [testEmail, setTestEmail] = useState('mishaelgebre@gmail.com');
@@ -91,8 +93,7 @@ export default function EmailTest() {
         registration_id: 'test-registration-id'
       };
 
-      const { sendInvoiceEmail } = await import('@/lib/emailService');
-      const sent = await sendInvoiceEmail(mockInvoice, mockStudent, { isReminder: false });
+      const sent = await sendInvoiceEmail(mockInvoice, mockStudent, { isReminder: false, isFirstInvoice: false });
       
       if (sent) {
         setResult('✅ Invoice email test successful!');
@@ -103,6 +104,179 @@ export default function EmailTest() {
     } catch (error) {
       console.error('❌ Invoice email test error:', error);
       setResult(`❌ Invoice email test error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const testPaymentConfirmationEmail = async () => {
+    try {
+      console.log('🧪 Testing payment confirmation email with login credentials...');
+      
+      // Create a mock registration for testing
+      const mockRegistration = {
+        id: 'test-registration-id',
+        receipt_number: 'TEST-001',
+        student_name: 'Test Student',
+        age: 25,
+        email: 'mishaelgebre@gmail.com',
+        phone: '123456789',
+        country_code: '+254',
+        parent_name: 'Test Parent',
+        parent_phone: '987654321',
+        course_category: 'Music',
+        instrument: 'Piano',
+        production_type: null,
+        experience: 'Beginner',
+        proficiency_level: 'Beginner',
+        learning_mode: 'Online',
+        owns_instrument: true,
+        location: 'Nakuru',
+        medical_condition: 'no',
+        medical_details: null,
+        goals: 'Learn piano for fun',
+        preferred_schedule: 'Weekends',
+        status: 'approved',
+        created_at: new Date().toISOString(),
+        date_of_birth: '2000-01-01',
+        sessions_per_week: 2
+      };
+
+      // Test with tempPassword
+      const emailSent = await sendPaymentConfirmationEmail(mockRegistration, 'testPass123!');
+      
+      if (emailSent) {
+        console.log('✅ Payment confirmation email test successful with login credentials');
+        toast({
+          title: "Test Successful",
+          description: "Payment confirmation email with login credentials sent successfully!",
+        });
+      } else {
+        console.log('❌ Payment confirmation email test failed');
+        toast({
+          title: "Test Failed",
+          description: "Payment confirmation email test failed.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('❌ Payment confirmation email test error:', error);
+      toast({
+        title: "Test Error",
+        description: "An error occurred during the payment confirmation email test.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const testPaymentConfirmationEmailWithoutCredentials = async () => {
+    try {
+      console.log('🧪 Testing payment confirmation email without login credentials...');
+      
+      // Create a mock registration for testing
+      const mockRegistration = {
+        id: 'test-registration-id',
+        receipt_number: 'TEST-002',
+        student_name: 'Test Student No Credentials',
+        age: 25,
+        email: 'mishaelgebre@gmail.com',
+        phone: '123456789',
+        country_code: '+254',
+        parent_name: 'Test Parent',
+        parent_phone: '987654321',
+        course_category: 'Music',
+        instrument: 'Piano',
+        production_type: null,
+        experience: 'Beginner',
+        proficiency_level: 'Beginner',
+        learning_mode: 'Online',
+        owns_instrument: true,
+        location: 'Nakuru',
+        medical_condition: 'no',
+        medical_details: null,
+        goals: 'Learn piano for fun',
+        preferred_schedule: 'Weekends',
+        status: 'approved',
+        created_at: new Date().toISOString(),
+        date_of_birth: '2000-01-01',
+        sessions_per_week: 2
+      };
+
+      // Test without tempPassword
+      const emailSent = await sendPaymentConfirmationEmail(mockRegistration, null);
+      
+      if (emailSent) {
+        console.log('✅ Payment confirmation email test successful without login credentials');
+        toast({
+          title: "Test Successful",
+          description: "Payment confirmation email without login credentials sent successfully!",
+        });
+      } else {
+        console.log('❌ Payment confirmation email test failed');
+        toast({
+          title: "Test Failed",
+          description: "Payment confirmation email test failed.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('❌ Payment confirmation email test error:', error);
+      toast({
+        title: "Test Error",
+        description: "An error occurred during the payment confirmation email test.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const testFullRegistrationEmail = async () => {
+    setIsLoading(true);
+    setResult('Testing full registration email...');
+    
+    try {
+      console.log('🧪 Testing full registration email...');
+      
+      // Create a mock registration for testing
+      const mockRegistration = {
+        id: 'test-registration-id',
+        receipt_number: 'TEST-003',
+        student_name: 'Test Student Full Email',
+        age: 25,
+        email: 'mishaelgebre@gmail.com',
+        phone: '123456789',
+        country_code: '+254',
+        parent_name: 'Test Parent',
+        parent_phone: '987654321',
+        course_category: 'Music',
+        instrument: 'Piano',
+        production_type: null,
+        experience: 'Beginner',
+        proficiency_level: 'Beginner',
+        learning_mode: 'Online',
+        owns_instrument: true,
+        location: 'Nakuru',
+        medical_condition: 'no',
+        medical_details: null,
+        goals: 'Learn piano for fun',
+        preferred_schedule: 'Weekends',
+        status: 'approved',
+        created_at: new Date().toISOString(),
+        date_of_birth: '2000-01-01',
+        sessions_per_week: 2
+      };
+
+      // For now, just test the payment confirmation email
+      const sent = await sendPaymentConfirmationEmail(mockRegistration, 'testPass123!');
+      
+      if (sent) {
+        setResult('✅ Full registration email test successful!');
+      } else {
+        setResult('❌ Full registration email test failed');
+      }
+      
+    } catch (error) {
+      console.error('❌ Full registration email test error:', error);
+      setResult(`❌ Full registration email test error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -129,21 +303,18 @@ export default function EmailTest() {
             />
           </div>
           
-          <div className="flex gap-2">
-            <Button 
-              onClick={testEmailService} 
-              disabled={isLoading}
-              variant="outline"
-            >
-              {isLoading ? 'Testing...' : 'Test Basic Email'}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <Button onClick={testInvoiceEmail} className="w-full">
+              Test Invoice Email
             </Button>
-            
-            <Button 
-              onClick={testInvoiceEmail} 
-              disabled={isLoading}
-              variant="outline"
-            >
-              {isLoading ? 'Testing...' : 'Test Invoice Email'}
+            <Button onClick={testPaymentConfirmationEmail} className="w-full">
+              Test Payment Confirmation Email (with credentials)
+            </Button>
+            <Button onClick={testPaymentConfirmationEmailWithoutCredentials} className="w-full">
+              Test Payment Confirmation Email (without credentials)
+            </Button>
+            <Button onClick={testFullRegistrationEmail} className="w-full">
+              Test Full Registration Email
             </Button>
           </div>
 

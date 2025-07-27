@@ -17,10 +17,11 @@ serve(async (req) => {
 
   try {
     console.log('🔧 Edge Function started');
-    const { email, student_name } = await req.json();
+    const { email, student_name, action } = await req.json();
     console.log('🔧 Received data:', {
       email,
-      student_name
+      student_name,
+      action
     });
 
     if (!email || !student_name) {
@@ -35,9 +36,6 @@ serve(async (req) => {
         }
       });
     }
-
-    const tempPassword = Math.random().toString(36).slice(-10) + 'A1!';
-    console.log('🔧 Generated temp password');
 
     // Check environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -64,6 +62,78 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     console.log('🔧 Supabase client created');
+
+    // If action is 'get_password', try to get existing user and generate new password
+    if (action === 'get_password') {
+      console.log('🔧 Getting password for existing user');
+      
+      // Check if user exists
+      const { data: existingUser, error: userError } = await supabase.auth.admin.listUsers();
+      
+      if (userError) {
+        console.log('❌ Error listing users:', userError.message);
+        return new Response(JSON.stringify({
+          error: 'Could not check existing users'
+        }), {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+
+      const user = existingUser.users.find(u => u.email === email);
+      
+      if (user) {
+        console.log('✅ Found existing user, generating new password');
+        const tempPassword = Math.random().toString(36).slice(-10) + 'A1!';
+        
+        // Update the user's password
+        const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
+          password: tempPassword
+        });
+
+        if (updateError) {
+          console.log('❌ Error updating password:', updateError.message);
+          return new Response(JSON.stringify({
+            error: 'Could not update password'
+          }), {
+            status: 500,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
+          });
+        }
+
+        console.log('✅ Password updated successfully');
+        return new Response(JSON.stringify({
+          tempPassword
+        }), {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      } else {
+        console.log('❌ User not found');
+        return new Response(JSON.stringify({
+          error: 'User not found'
+        }), {
+          status: 404,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+    }
+
+    // Original user creation logic
+    const tempPassword = Math.random().toString(36).slice(-10) + 'A1!';
+    console.log('🔧 Generated temp password');
 
     // Try to create the user
     const { data, error } = await supabase.auth.admin.createUser({

@@ -54,7 +54,7 @@ async function getExchangeRate(fromCurrency: string, toCurrency: string): Promis
 }
 
 // Cache exchange rates to avoid excessive API calls
-const exchangeRateCache: { [key: string]: { rate: number; timestamp: number } } = {};
+const exchangeRateCache: Map<string, { rate: number; timestamp: number }> = new Map();
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour cache
 
 async function getCachedExchangeRate(fromCurrency: string, toCurrency: string): Promise<number> {
@@ -62,19 +62,20 @@ async function getCachedExchangeRate(fromCurrency: string, toCurrency: string): 
   const now = Date.now();
   
   // Check if we have a cached rate that's still valid
-  if (exchangeRateCache[cacheKey] && (now - exchangeRateCache[cacheKey].timestamp) < CACHE_DURATION) {
-    console.log(`Using cached exchange rate: 1 ${fromCurrency} = ${exchangeRateCache[cacheKey].rate} ${toCurrency}`);
-    return exchangeRateCache[cacheKey].rate;
+  const cached = exchangeRateCache.get(cacheKey);
+  if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+    console.log(`Using cached exchange rate: 1 ${fromCurrency} = ${cached.rate} ${toCurrency}`);
+    return cached.rate;
   }
   
   // Fetch new rate
   const rate = await getExchangeRate(fromCurrency, toCurrency);
   
   // Cache the new rate
-  exchangeRateCache[cacheKey] = {
+  exchangeRateCache.set(cacheKey, {
     rate,
     timestamp: now
-  };
+  });
   
   return rate;
 }
@@ -154,9 +155,10 @@ export async function calculateStudentInvoice(studentId: string, periodStart: st
  * Generate a PDF for an invoice and upload to Supabase Storage. Returns the public URL.
  * @param invoice - The invoice object (with lessons_summary, student info, etc.)
  * @param student - The student object (for name/email)
+ * @param isFirstInvoice - Whether this is the first invoice for the student
  * @returns The public URL of the uploaded PDF
  */
-export async function generateAndUploadInvoicePDF(invoice: any, student: any): Promise<string> {
+export async function generateAndUploadInvoicePDF(invoice: any, student: any, isFirstInvoice: boolean = false): Promise<string> {
   // Prepare invoice details for PDF
   const invoiceDetails = invoice.lessons_summary;
   const quoteData = {
@@ -183,7 +185,7 @@ export async function generateAndUploadInvoicePDF(invoice: any, student: any): P
   console.log('PDF Generation: invoice.due_date =', invoice.due_date);
   // Build invoiceMeta for the new PDF layout
   const invoiceMeta = {
-    invoiceNumber: invoice.id || '',
+    invoiceNumber: isFirstInvoice ? 'first' : invoice.id || '',
     periodStart: invoice.period_start || '',
     periodEnd: invoice.period_end || '',
     dueDate: invoice.due_date || '',
@@ -487,8 +489,8 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
       console.log(`✅ Converted ${originalPrice} ${fee.currency} to KES: ${fee.price} KSh (rate: 1 ${fee.currency} = ${exchangeRate} KES)`);
     } catch (error) {
       console.error('❌ Error converting currency:', error);
-      // Fallback to default rate if conversion fails
-      const fallbackRate = fee.currency === '$' ? 150.5 : 150.5;
+      // Use 128 as fallback rate as requested
+      const fallbackRate = 128;
       fee.price = Math.round(fee.price * fallbackRate * 100) / 100;
       fee.currency = 'KSh';
       console.log(`🔄 Used fallback rate for ${fee.currency}: ${fee.price} KSh`);
@@ -659,10 +661,61 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     }
   }
 
+  // Calculate number of weeks in the invoice period (4 weeks for monthly billing)
+  const numWeeks = 4; // Monthly billing = 4 weeks
+  const quantity = sessionsPerWeek * numWeeks;
+  // Calculate unit price per session
+  const unitPrice = Math.round((invoiceAmount / quantity) * 100) / 100;
+
+  // Add application fee for first invoice only
+  const applicationFee = isFirstInvoice ? 800 : 0;
+  const totalAmount = invoiceAmount + applicationFee;
+
+  // Get the actual instrument/course name for display
+  const getCourseDisplayName = () => {
+    if (registration.course_category === 'Art') {
+      return 'Art Classes';
+    } else if (registration.course_category === 'Production') {
+      return registration.production_type || 'Production';
+    } else {
+      return registration.instrument || 'Music Lessons';
+    }
+  };
+
+  const courseDisplayName = getCourseDisplayName();
+
+  // Build invoiceDetails for PDF with detailed breakdown
+  const invoiceDetails = {
+    lineItems: [
+      {
+        description: `${courseDisplayName} - ${sessionsPerWeek} session${sessionsPerWeek > 1 ? 's' : ''} per week × ${numWeeks} weeks`,
+        quantity,
+        unitPrice,
+        amount: invoiceAmount,
+        lessonIds: [],
+      },
+      ...(isFirstInvoice ? [{
+        description: 'Application Fee (One-time, non-refundable enrollment fee)',
+        quantity: 1,
+        unitPrice: applicationFee,
+        amount: applicationFee,
+        lessonIds: [],
+      }] : [])
+    ],
+    subtotal: totalAmount,
+    tax: 0, // Remove tax as requested
+    total: totalAmount,
+    paymentTerms: 'Payment due within 7 days of invoice date',
+    validUntil: '',
+    serviceBreakdown: `${courseDisplayName} as scheduled`,
+    equipmentBreakdown: 'All necessary equipment and materials provided',
+    additionalInfo: notes || 'Please contact us if you have any questions about this invoice.'
+  };
+
   // Prepare invoice data (using current schema with student_id only)
   const invoiceData: any = {
     student_id: student.id,
-    amount_due: invoiceAmount, // Use 'amount_due' for invoices table
+    amount_due: totalAmount, // Use total amount including application fee
     period_start: periodStartStr,
     period_end: periodEndStr,
     due_date: dueDateStr,
@@ -670,6 +723,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     sessions_per_week: sessionsPerWeek,
+    lessons_summary: invoiceDetails, // Store the detailed breakdown
   };
   
   // Add optional fields if they exist in the schema
@@ -740,7 +794,7 @@ export async function generateRecurringInvoices(): Promise<void> {
           .eq('id', reg.student_id)
           .single();
         if (student && !studentError && invoice.status !== 'paid') {
-          await sendInvoiceEmail(invoice, student, { isReminder: true });
+          await sendInvoiceEmail(invoice, student, { isReminder: true, isFirstInvoice: false });
           summary.reminders++;
         } else {
           summary.skipped++;
@@ -760,7 +814,7 @@ export async function generateRecurringInvoices(): Promise<void> {
           .eq('id', reg.student_id)
           .single();
         if (student && !studentError) {
-          await sendInvoiceEmail(invoice, student);
+          await sendInvoiceEmail(invoice, student, { isFirstInvoice: false });
         }
         summary.created++;
       } else {

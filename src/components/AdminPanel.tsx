@@ -12,13 +12,14 @@ import AdminEventsManager from "@/components/AdminEventsManager";
 import AdminNewsManager from "@/components/AdminNewsManager";
 import AdminGalleryManager from "@/components/AdminGalleryManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { sendAcceptedEmail, sendDeclinedEmail, sendTeacherAcceptedEmail, sendTeacherDeclinedEmail, sendTeacherRequestInfoEmail, sendQuoteEmail, sendInvoiceEmail } from "@/lib/emailService";
+import { sendAcceptedEmail, sendDeclinedEmail, sendTeacherAcceptedEmail, sendTeacherDeclinedEmail, sendTeacherRequestInfoEmail, sendQuoteEmail, sendInvoiceEmail, sendApplicationConfirmationEmail, sendPaymentConfirmationEmail } from "@/lib/emailService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { generateQuotePDF } from "@/lib/pdfGenerator";
 import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
+import { generateInvoiceForRegistration } from "@/lib/invoiceUtils";
 
 interface Registration {
   id: string;
@@ -506,7 +507,7 @@ const AdminPanel = () => {
         description: `Registration has been ${status}`,
       });
 
-      // If approved, send acceptance email with login credentials
+      // If approved, send acceptance email with invoice
       if (status === 'approved') {
         // First, create Supabase Auth user for the student
         let tempPassword = null;
@@ -556,6 +557,50 @@ const AdminPanel = () => {
           toast({
             title: "Warning",
             description: "Student approved but user creation failed. Please contact support.",
+            variant: "destructive",
+          });
+        }
+
+        // Generate invoice for the student
+        try {
+          console.log('💰 Generating invoice for approved student...');
+          const invoiceResult = await generateInvoiceForRegistration(id);
+          
+          if (invoiceResult && !('existing' in invoiceResult)) {
+            // Fetch student data for email
+            const { data: studentData, error: studentError } = await supabase
+              .from('students')
+              .select('*')
+              .eq('registration_id', id)
+              .single();
+            
+            if (studentData && !studentError) {
+              // Send invoice email (this is the first invoice)
+              const invoiceEmailSent = await sendInvoiceEmail(invoiceResult, studentData, { isFirstInvoice: true });
+              if (invoiceEmailSent) {
+                toast({
+                  title: "Invoice Sent",
+                  description: "Invoice has been sent to the student with payment instructions.",
+                });
+              } else {
+                toast({
+                  title: "Invoice Email Failed",
+                  description: "Could not send invoice email to student.",
+                  variant: "destructive",
+                });
+              }
+            }
+          } else if (invoiceResult && 'existing' in invoiceResult) {
+            toast({
+              title: "Invoice Already Exists",
+              description: "An invoice already exists for this student.",
+            });
+          }
+        } catch (invoiceError) {
+          console.error('Error generating invoice:', invoiceError);
+          toast({
+            title: "Invoice Generation Failed",
+            description: "Could not generate invoice for the student.",
             variant: "destructive",
           });
         }
@@ -909,33 +954,104 @@ const AdminPanel = () => {
 
   // Handler to mark invoice as paid
   const handleMarkInvoicePaid = async (invoiceId: string) => {
-    // Defensive check for invoice ID
-    if (!isValidId(invoiceId)) {
-      console.error('Invalid invoice ID for mark paid:', invoiceId);
-      toast({ title: 'Error', description: 'Invalid invoice ID.', variant: 'destructive' });
-      return;
-    }
-    
-    await supabase.from('invoices').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', invoiceId);
-    setShowInvoiceModal(false);
-    
-    // Refresh student invoices with defensive check
-    const validStudentIds = activeStudents.filter(s => isValidId(s.id)).map(s => s.id);
-    if (validStudentIds.length > 0) {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('*')
-        .in('student_id', validStudentIds)
-      .order('period_end', { ascending: false });
-    if (!error && data) {
-      const latest: Record<string, any> = {};
-      for (const inv of data) {
-        if (!latest[inv.student_id] || new Date(inv.period_end) > new Date(latest[inv.student_id].period_end)) {
-          latest[inv.student_id] = inv;
+    try {
+      const { error } = await supabase
+        .from('invoices')
+        .update({ 
+          status: 'paid', 
+          paid_date: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', invoiceId);
+
+      if (error) {
+        console.error('Error marking invoice as paid:', error);
+        toast({
+          title: "Error",
+          description: "Failed to mark invoice as paid",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Fetch invoice and student data for email
+      const { data: invoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .select('*, students(*)')
+        .eq('id', invoiceId)
+        .single();
+
+      if (invoiceError || !invoice) {
+        console.error('Error fetching invoice for payment confirmation:', invoiceError);
+        toast({
+          title: "Warning",
+          description: "Invoice marked as paid but could not send confirmation email.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Fetch registration data for email
+      const { data: registration, error: regError } = await supabase
+        .from('registrations')
+        .select('*')
+        .eq('id', invoice.students?.registration_id)
+        .single();
+
+      if (registration && !regError) {
+        // Get the student's user data to retrieve tempPassword
+        let tempPassword = null;
+        try {
+          // Call the Edge Function to get or regenerate the student's tempPassword
+          const { data: userData, error: userError } = await supabase.functions.invoke('create-student-user', {
+            body: {
+              email: registration.email,
+              student_name: registration.student_name,
+              action: 'get_password' // This will retrieve existing password or generate new one
+            }
+          });
+
+          if (!userError && userData && userData.tempPassword) {
+            console.log('✅ Retrieved student tempPassword for payment confirmation');
+            tempPassword = userData.tempPassword;
+          } else {
+            console.log('⚠️ Could not retrieve tempPassword, proceeding without login credentials');
+          }
+        } catch (passwordError) {
+          console.error('Error retrieving tempPassword:', passwordError);
+          // Continue without tempPassword - the email will be sent without login credentials
         }
+
+        // Send payment confirmation email with tempPassword
+        const emailSent = await sendPaymentConfirmationEmail(registration, tempPassword);
+        if (emailSent) {
+          toast({
+            title: "Payment Confirmed",
+            description: "Invoice marked as paid and confirmation email sent to student.",
+          });
+        } else {
+          toast({
+            title: "Payment Confirmed",
+            description: "Invoice marked as paid but could not send confirmation email.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "Payment Confirmed",
+          description: "Invoice marked as paid.",
+        });
       }
-      setStudentInvoices(latest);
-      }
+
+      // Refresh invoice data
+      fetchData();
+    } catch (error) {
+      console.error('Error in handleMarkInvoicePaid:', error);
+      toast({
+        title: "Error",
+        description: "An error occurred while processing payment",
+        variant: "destructive",
+      });
     }
   };
 
@@ -954,7 +1070,7 @@ const AdminPanel = () => {
       toast({ title: 'Error', description: 'Could not fetch student info.', variant: 'destructive' });
       return;
     }
-    const sent = await sendInvoiceEmail(inv, student, { isReminder: false });
+    const sent = await sendInvoiceEmail(inv, student, { isReminder: false, isFirstInvoice: false });
     if (sent) {
       toast({ title: 'Invoice Resent', description: 'Invoice resent to student via email.' });
     } else {
@@ -977,7 +1093,7 @@ const AdminPanel = () => {
       toast({ title: 'Error', description: 'Could not fetch student info.', variant: 'destructive' });
       return;
     }
-    const sent = await sendInvoiceEmail(inv, student, { isReminder: true });
+    const sent = await sendInvoiceEmail(inv, student, { isReminder: true, isFirstInvoice: false });
     if (sent) {
       toast({ title: 'Reminder Sent', description: 'Payment reminder sent to student via email.' });
     } else {
@@ -1137,7 +1253,7 @@ const AdminPanel = () => {
       if (result && !('existing' in result)) {
         // Send email for the newly created invoice
         const invoice = result as any;
-        const sent = await sendInvoiceEmail(invoice, student, { isReminder: false });
+        const sent = await sendInvoiceEmail(invoice, student, { isReminder: false, isFirstInvoice: false });
         if (sent) {
           toast({ title: 'Invoice Sent', description: `Invoice sent to ${student.student_name}` });
         } else {
@@ -2194,62 +2310,69 @@ const AdminPanel = () => {
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={() => {
+              <Button onClick={async () => {
                 if (selectedQuote) {
-                  supabase
-                    .from('quotes')
-                    .update({
-                      status: selectedQuote.status,
-                      quote_amount: quoteAmount ? parseFloat(quoteAmount) : null,
-                      admin_notes: adminNotes,
-                      updated_at: new Date().toISOString(),
-                    })
-                    .eq('id', selectedQuote.id)
-                    .select()
-                    .single()
-                    .then(async (res) => {
-                      if (res.data) {
-                        setQuotes(prev => prev.map(q => q.id === selectedQuote.id ? res.data : q));
-                        toast({
-                          title: "Quote Updated",
-                          description: `Quote status updated to ${selectedQuote.status}.`,
-                        });
-                        
-                        // Send email if quote amount is provided
-                        if (quoteAmount && parseFloat(quoteAmount) > 0) {
-                          try {
-                            const emailSent = await sendQuoteEmail(res.data, parseFloat(quoteAmount), adminNotes);
-                            if (emailSent) {
-                              toast({
-                                title: "Quote Email Sent",
-                                description: "Quote has been sent to the customer via email.",
-                              });
-                            } else {
-                              toast({
-                                title: "Email Error",
-                                description: "Quote updated but email could not be sent.",
-                                variant: "destructive",
-                              });
-                            }
-                          } catch (error) {
-                            console.error("Error sending quote email:", error);
+                  try {
+                    const { data: updatedQuote, error: updateError } = await supabase
+                      .from('quotes')
+                      .update({
+                        status: selectedQuote.status,
+                        quote_amount: quoteAmount ? parseFloat(quoteAmount) : null,
+                        admin_notes: adminNotes,
+                        updated_at: new Date().toISOString(),
+                      })
+                      .eq('id', selectedQuote.id)
+                      .select()
+                      .single();
+
+                    if (updateError) {
+                      console.error("Error updating quote:", updateError);
+                      toast({
+                        title: "Error",
+                        description: "Failed to update quote status.",
+                        variant: "destructive",
+                      });
+                    } else if (updatedQuote) {
+                      setQuotes(prev => prev.map(q => q.id === selectedQuote.id ? updatedQuote : q));
+                      toast({
+                        title: "Quote Updated",
+                        description: `Quote status updated to ${selectedQuote.status}.`,
+                      });
+                      
+                      // Send email if quote amount is provided
+                      if (quoteAmount && parseFloat(quoteAmount) > 0) {
+                        try {
+                          const emailSent = await sendQuoteEmail(updatedQuote, parseFloat(quoteAmount), adminNotes);
+                          if (emailSent) {
+                            toast({
+                              title: "Quote Email Sent",
+                              description: "Quote has been sent to the customer via email.",
+                            });
+                          } else {
                             toast({
                               title: "Email Error",
                               description: "Quote updated but email could not be sent.",
                               variant: "destructive",
                             });
                           }
+                        } catch (error) {
+                          console.error("Error sending quote email:", error);
+                          toast({
+                            title: "Email Error",
+                            description: "Quote updated but email could not be sent.",
+                            variant: "destructive",
+                          });
                         }
                       }
-                    })
-                    .catch(err => {
-                      console.error("Error updating quote:", err);
-                      toast({
-                        title: "Error",
-                        description: "Failed to update quote status.",
-                        variant: "destructive",
-                      });
+                    }
+                  } catch (err) {
+                    console.error("Error updating quote:", err);
+                    toast({
+                      title: "Error",
+                      description: "Failed to update quote status.",
+                      variant: "destructive",
                     });
+                  }
                   setShowQuoteDialog(false);
                   setSelectedQuote(null);
                   setQuoteAmount("");
@@ -2539,6 +2662,16 @@ const AdminPanel = () => {
                                       Download PDF
                                     </Button>
                                   )}
+                                  {inv.status !== 'paid' && (
+                                    <Button 
+                                      size="sm" 
+                                      variant="default" 
+                                      className="bg-green-600 hover:bg-green-700 text-white"
+                                      onClick={() => handleMarkInvoicePaid(inv.id)}
+                                    >
+                                      Mark as Paid
+                                    </Button>
+                                  )}
                                 </>
                               )}
                             </td>
@@ -2634,6 +2767,7 @@ const AdminPanel = () => {
                     <th>Due Date</th>
                     <th>PDF</th>
                     <th>Details</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2653,6 +2787,18 @@ const AdminPanel = () => {
                       <td>
                         <Button size="sm" variant="ghost" onClick={() => handleViewHistoryInvoice(inv)}>View</Button>
                       </td>
+                      <td>
+                        {inv.status !== 'paid' && (
+                          <Button 
+                            size="sm" 
+                            variant="default" 
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => handleMarkInvoicePaid(inv.id)}
+                          >
+                            Mark as Paid
+                          </Button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -2668,6 +2814,16 @@ const AdminPanel = () => {
                   <div className="mt-2">
                     {selectedHistoryInvoice.pdf_url && (
                       <Button size="sm" variant="outline" onClick={() => handleDownloadInvoicePDF(selectedHistoryInvoice)}>Download PDF</Button>
+                    )}
+                    {selectedHistoryInvoice.status !== 'paid' && (
+                      <Button 
+                        size="sm" 
+                        variant="default" 
+                        className="bg-green-600 hover:bg-green-700 text-white ml-2"
+                        onClick={() => handleMarkInvoicePaid(selectedHistoryInvoice.id)}
+                      >
+                        Mark as Paid
+                      </Button>
                     )}
                   </div>
                 </div>

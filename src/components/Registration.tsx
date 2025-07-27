@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { sendConfirmationEmail } from "@/lib/emailService";
+import { sendApplicationConfirmationEmail } from '@/lib/emailService';
 import { Music, Users, Award, Star, ArrowRight, ArrowLeft, CheckCircle, MapPin, Phone, Mail, User, Calendar, Guitar, Mic, Palette, Video, Speaker } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -491,9 +491,21 @@ const Registration = () => {
 
       setIsSubmitted(true);
       
+      // Send application confirmation email
+      try {
+        const emailSent = await sendApplicationConfirmationEmail(data[0]);
+        if (emailSent) {
+          console.log('✅ Application confirmation email sent successfully');
+        } else {
+          console.error('❌ Failed to send application confirmation email');
+        }
+      } catch (emailError) {
+        console.error('❌ Error sending application confirmation email:', emailError);
+      }
+      
       toast({
         title: "Registration Successful! 🎉",
-        description: "Your registration was successful! We'll contact you within 24 hours.",
+        description: "Your application has been received! We'll contact you within 2 business days.",
       });
 
       // Save date_of_birth into profiles table

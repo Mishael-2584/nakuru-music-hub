@@ -550,6 +550,7 @@ export const sendAcceptedEmail = async (registration: RegistrationData, tempPass
           .status-badge { background: #28a745; color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
           .next-steps { background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #28a745; }
           .login-credentials { background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #2196f3; }
+          .payment-notice { background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #ffc107; }
           .contact-info { background: #e3f2fd; padding: 20px; border-radius: 8px; margin-top: 25px; border-left: 4px solid #2196f3; }
           .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
           .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef; color: #6c757d; font-size: 14px; }
@@ -560,13 +561,13 @@ export const sendAcceptedEmail = async (registration: RegistrationData, tempPass
         <div class="header">
           <img src="{{LOGO_URL}}" alt="Damon Music Academy Logo" style="height: 70px; margin-bottom: 20px;">
           <h1>🎉 Congratulations, ${registration.student_name}!</h1>
-          <h2>Your Enrollment is Confirmed</h2>
-          <p>Welcome to Damon Music Academy! Your application has been <strong>approved</strong> and you are now officially enrolled.</p>
+          <h2>Your Application is Successful!</h2>
+          <p>Welcome to Damon Music Academy! Your application has been <strong>approved</strong> and you are now ready to begin your creative journey.</p>
         </div>
         <div class="content">
           <div class="receipt-header">
             <div class="receipt-number">Receipt #: ${registration.receipt_number}</div>
-            <div>Registration Date: ${formatDate(registration.created_at)}</div>
+            <div>Application Date: ${formatDate(registration.created_at)}</div>
             <div class="status-badge">APPROVED</div>
           </div>
           <div class="section">
@@ -596,27 +597,26 @@ export const sendAcceptedEmail = async (registration: RegistrationData, tempPass
           </div>
           ${registration.parent_name ? `<div class="section"><div class="section-title">👨‍👩‍👧‍👦 Parent/Guardian Information</div><div class="info-grid"><div class="info-item"><span class="info-label">Name:</span><span class="info-value">${registration.parent_name}</span></div>${registration.parent_phone ? `<div class="info-item"><span class="info-label">Phone:</span><span class="info-value">${registration.parent_phone}</span></div>` : ''}</div></div>` : ''}
           ${registration.medical_condition === 'yes' ? `<div class="section"><div class="section-title">🏥 Medical Information</div><div class="info-item"><span class="info-label">Medical Conditions:</span><span class="info-value">Yes</span></div><div class="info-item"><span class="info-label">Details:</span><span class="info-value">${registration.medical_details}</span></div></div>` : ''}
-          ${registration.goals ? `<div class="section"><div class="section-title">🎯 Learning Goals</div><p>${registration.goals}</p></div>` : ''}
-          ${tempPassword ? `
-          <div class="login-credentials">
-            <h3>🔐 Your Student Portal Login Credentials</h3>
-            <p><strong>Important:</strong> You can now access your personalized student portal with the following credentials:</p>
-            <div class="info-grid">
-              <div class="info-item"><span class="info-label">Login URL:</span><span class="info-value"><a href="${siteUrl}/auth" style="color: #2196f3; text-decoration: none;">${siteUrl}/auth</a></span></div>
-              <div class="info-item"><span class="info-label">Email:</span><span class="info-value">${registration.email}</span></div>
-              <div class="info-item"><span class="info-label">Temporary Password:</span><span class="info-value"><strong>${tempPassword}</strong></span></div>
-            </div>
+          
+          <div class="payment-notice">
+            <h3>💰 Payment Required to Secure Your Spot</h3>
+            <p><strong>Important:</strong> We have sent you an invoice that includes:</p>
+            <ul>
+              <li><strong>One-time enrollment fee:</strong> 800 KSh (non-refundable)</li>
+              <li><strong>First month's tuition:</strong> Based on your selected course and sessions</li>
+              <li><strong>Total due:</strong> Enrollment fee + Tuition</li>
+            </ul>
             <p style="margin-top: 15px; font-size: 14px; color: #666;">
-              <strong>Security Note:</strong> Please change your password on your first login for security purposes.
+              <strong>Next Step:</strong> Please check your email for the invoice and complete payment to finalize your enrollment and secure your spot in our program.
             </p>
           </div>
-          ` : ''}
+          
           <div class="next-steps">
             <h3>✅ Next Steps</h3>
             <ul>
-              <li>Your enrollment is now <strong>confirmed</strong>. We will contact you soon with your class schedule and further instructions.</li>
-              ${tempPassword ? '<li><strong>Access your student portal</strong> using the credentials provided above to view your lessons, materials, and progress.</li>' : ''}
-              <li>If you have any questions, feel free to reply to this email or contact us using the information below.</li>
+              <li><strong>Complete payment</strong> using the invoice we sent you to secure your enrollment.</li>
+              <li>Once payment is confirmed, you will receive a final enrollment confirmation email with your student portal login credentials.</li>
+              <li>If you have any questions about payment or enrollment, feel free to reply to this email or contact us using the information below.</li>
               <li>We look forward to seeing you at Damon Music Academy!</li>
             </ul>
           </div>
@@ -631,7 +631,7 @@ export const sendAcceptedEmail = async (registration: RegistrationData, tempPass
           </div>
           <div class="footer">
             <p>Welcome to the Damon Music Academy family!</p>
-            <p>We are excited to help you achieve your musical dreams.</p>
+            <p>We are excited to help you achieve your creative dreams.</p>
             <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
           </div>
         </div>
@@ -1025,13 +1025,47 @@ export const sendQuoteEmail = async (quoteData: any, quoteAmount: number, adminN
 export const sendInvoiceEmail = async (
   invoice: any,
   student: any,
-  options: { subject?: string; body?: string; isReminder?: boolean } = {}
+  options: { subject?: string; body?: string; isReminder?: boolean; isFirstInvoice?: boolean } = {}
 ): Promise<boolean> => {
   try {
     if (!invoice || !student || !student.email) {
       console.error('❌ Missing required fields for invoice email', { invoice, student });
       return false;
     }
+    
+    // Build invoiceMeta for PDF generation
+    const invoiceMeta = {
+      invoiceNumber: options.isFirstInvoice ? 'first' : invoice.id || '',
+      periodStart: invoice.period_start || '',
+      periodEnd: invoice.period_end || '',
+      dueDate: invoice.due_date || '',
+      paymentStatus: invoice.status ? invoice.status.toUpperCase() : 'PENDING',
+      studentId: student.id || '',
+      registrationId: student.registration_id || '',
+      sessionsPerWeek: invoice.sessions_per_week || undefined,
+      notes: invoice.notes || '',
+    };
+    
+    // Use the invoice details from the invoice object if available, otherwise create a basic structure
+    const invoiceDetails = invoice.lessons_summary || {
+      lineItems: [
+        {
+          description: `Music Lessons - ${invoice.period_start ? `${new Date(invoice.period_start).toLocaleDateString()} to ${new Date(invoice.period_end).toLocaleDateString()}` : 'Current Period'}`,
+          quantity: 1,
+          unitPrice: invoice.amount_due,
+          amount: invoice.amount_due
+        }
+      ],
+      subtotal: invoice.amount_due,
+      tax: 0,
+      total: invoice.amount_due,
+      paymentTerms: 'Payment due within 7 days of invoice date',
+      validUntil: '30 days from invoice date',
+      serviceBreakdown: 'Music lessons as scheduled',
+      equipmentBreakdown: 'All necessary equipment and materials provided',
+      additionalInfo: invoice.notes || 'Please contact us if you have any questions about this invoice.'
+    };
+    
     // Generate PDF with proper invoice details structure
     const pdfBlob = await generateQuotePDF(
       {
@@ -1050,24 +1084,8 @@ export const sendInvoiceEmail = async (
       },
       invoice.amount_due,
       '',
-      {
-        lineItems: [
-          {
-            description: `Music Lessons - ${invoice.period_start ? `${new Date(invoice.period_start).toLocaleDateString()} to ${new Date(invoice.period_end).toLocaleDateString()}` : 'Current Period'}`,
-            quantity: 1,
-            unitPrice: invoice.amount_due,
-            amount: invoice.amount_due
-          }
-        ],
-        subtotal: invoice.amount_due,
-        tax: 0,
-        total: invoice.amount_due,
-        paymentTerms: 'Payment due within 7 days of invoice date',
-        validUntil: '30 days from invoice date',
-        serviceBreakdown: invoice.lessons_summary || 'Music lessons as scheduled',
-        equipmentBreakdown: 'All necessary equipment and materials provided',
-        additionalInfo: invoice.notes || 'Please contact us if you have any questions about this invoice.'
-      }
+      invoiceDetails,
+      invoiceMeta
     );
     // Convert blob to base64 for email attachment
     const reader = new FileReader();
@@ -1117,6 +1135,534 @@ export const sendInvoiceEmail = async (
     return true;
   } catch (error) {
     console.error('❌ Error in sendInvoiceEmail:', error);
+    return false;
+  }
+};
+
+export const sendApplicationConfirmationEmail = async (registration: RegistrationData): Promise<boolean> => {
+  try {
+    console.log('📧 Sending application confirmation email to:', registration.email);
+
+    // Validate required fields
+    if (!registration.id || !registration.receipt_number || !registration.student_name || !registration.email || !registration.created_at) {
+      console.error('❌ Missing required fields for application confirmation email');
+      return false;
+    }
+
+    const formatDate = (dateString: string) => {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    };
+
+    const siteUrl = 'https://damonmusicacademy.co.ke';
+    const logoUrl = `${siteUrl}/damon-logo.png`;
+
+    // Create HTML email content for application confirmation
+    const emailHTML = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Application Received - Damon Music Academy</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+          }
+          .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-radius: 10px 10px 0 0;
+          }
+          .content {
+            background: white;
+            padding: 30px;
+            border-radius: 0 0 10px 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          }
+          .receipt-header {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border-left: 4px solid #667eea;
+          }
+          .receipt-number {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+          }
+          .section {
+            margin-bottom: 25px;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+          }
+          .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 5px;
+          }
+          .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+          }
+          .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f1f3f4;
+          }
+          .info-label {
+            font-weight: 600;
+            color: #6c757d;
+          }
+          .info-value {
+            color: #495057;
+          }
+          .status-badge {
+            background: #ffc107;
+            color: #212529;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+          }
+          .next-steps {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+            border-left: 4px solid #ffc107;
+          }
+          .application-fee {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+            border-left: 4px solid #2196f3;
+          }
+          .contact-info {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 25px;
+            border-left: 4px solid #2196f3;
+          }
+          .contact-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+          }
+          .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+          }
+          @media (max-width: 600px) {
+            .info-grid, .contact-grid {
+              grid-template-columns: 1fr;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <img src="{{LOGO_URL}}" alt="Damon Music Academy Logo" style="height: 70px; margin-bottom: 20px;">
+          <h1>🎵 Damon Music Academy</h1>
+          <h2>Application Received</h2>
+          <p>Thank you for your interest in joining our creative community!</p>
+        </div>
+        
+        <div class="content">
+          <div class="receipt-header">
+            <div class="receipt-number">Receipt #: ${registration.receipt_number}</div>
+            <div>Application Date: ${formatDate(registration.created_at)}</div>
+            <div class="status-badge">UNDER REVIEW</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">👤 Student Information</div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">Full Name:</span>
+                <span class="info-value">${registration.student_name}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Age:</span>
+                <span class="info-value">${registration.age} years</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Email:</span>
+                <span class="info-value">${registration.email}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Phone:</span>
+                <span class="info-value">${registration.country_code} ${registration.phone}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Location:</span>
+                <span class="info-value">${registration.location}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">🎓 Course Details</div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">Course Category:</span>
+                <span class="info-value">${registration.course_category}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Subject/Instrument:</span>
+                <span class="info-value">${(() => {
+                  if (registration.course_category === 'Music') return registration.instrument;
+                  if (registration.course_category === 'Production') return registration.production_type;
+                  return 'Art Course';
+                })()}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Proficiency Level:</span>
+                <span class="info-value">${registration.proficiency_level}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Learning Mode:</span>
+                <span class="info-value">${registration.learning_mode}</span>
+              </div>
+              ${registration.course_category === 'Music' ? `
+              <div class="info-item">
+                <span class="info-label">Owns Instrument:</span>
+                <span class="info-value">${registration.owns_instrument ? 'Yes' : 'No'}</span>
+              </div>
+              ` : ''}
+              ${registration.preferred_schedule ? `
+              <div class="info-item">
+                <span class="info-label">Preferred Schedule:</span>
+                <span class="info-value">${registration.preferred_schedule}</span>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+
+          ${registration.parent_name ? `
+          <div class="section">
+            <div class="section-title">👨‍👩‍👧‍👦 Parent/Guardian Information</div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">Name:</span>
+                <span class="info-value">${registration.parent_name}</span>
+              </div>
+              ${registration.parent_phone ? `
+              <div class="info-item">
+                <span class="info-label">Phone:</span>
+                <span class="info-value">${registration.parent_phone}</span>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+          ` : ''}
+
+          ${registration.medical_condition === 'yes' ? `
+          <div class="section">
+            <div class="section-title">🏥 Medical Information</div>
+            <div class="info-item">
+              <span class="info-label">Medical Conditions:</span>
+              <span class="info-value">Yes</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Details:</span>
+              <span class="info-value">${registration.medical_details}</span>
+            </div>
+          </div>
+          ` : ''}
+
+          ${registration.goals ? `
+          <div class="section">
+            <div class="section-title">🎯 Learning Goals</div>
+            <p>${registration.goals}</p>
+          </div>
+          ` : ''}
+
+          <div class="application-fee">
+            <h3>💰 Application Fee Information</h3>
+            <p><strong>Important:</strong> If your application is accepted, you will receive an invoice that includes:</p>
+            <ul>
+              <li><strong>One-time enrollment fee:</strong> 800 KSh (non-refundable)</li>
+              <li><strong>First month's tuition:</strong> Based on your selected course and sessions</li>
+              <li><strong>Total due:</strong> Enrollment fee + Tuition</li>
+            </ul>
+            <p style="margin-top: 15px; font-size: 14px; color: #666;">
+              <strong>Note:</strong> Payment of this invoice will finalize your enrollment and secure your spot in our program.
+            </p>
+          </div>
+
+          <div class="next-steps">
+            <h3>📋 What's Next?</h3>
+            <ul>
+              <li>We'll review your application and contact you within <strong>2 business days</strong> with an update.</li>
+              <li>Please keep this receipt number (<strong>${registration.receipt_number}</strong>) for your records.</li>
+              <li>You can track your application status using your email address.</li>
+              <li>If you have any questions, feel free to contact us using the information below.</li>
+              <li>In the meantime, explore more about our diverse offerings on our website, or check our <a href="${siteUrl}/faq" style="color: #2196f3;">FAQs</a>.</li>
+            </ul>
+          </div>
+
+          <div class="contact-info">
+            <h3>📞 Need Help? Contact Us</h3>
+            <div class="contact-grid">
+              <div class="info-item">
+                <span class="info-label">📱 Phone:</span>
+                <span class="info-value">+254 701 195 460 / +254 713 490 535</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">📧 Email:</span>
+                <span class="info-value">info@damonmusicacademy.com</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">📍 Address:</span>
+                <span class="info-value">Nakuru, Kenya</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">🕒 Hours:</span>
+                <span class="info-value">Sun: 8am-6pm, Mon-Fri: 7am-6pm (Academy)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="footer">
+            <p>Thank you for choosing Damon Music Academy!</p>
+            <p>We look forward to connecting with you soon!</p>
+            <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Call the Supabase Edge Function to send the email
+    const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
+      body: {
+        to: registration.email,
+        subject: `Application Received - ${registration.receipt_number} | Damon Music Academy`,
+        html: emailHTML,
+        registration: registration
+      }
+    });
+
+    if (error) {
+      console.error('❌ Application confirmation email sending error:', error);
+      return false;
+    }
+
+    if (data && data.success) {
+      console.log('✅ Application confirmation email sent successfully');
+      return true;
+    } else {
+      console.error('❌ Failed to send application confirmation email:', data?.message);
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Application confirmation email error:', error);
+    return false;
+  }
+};
+
+export const sendPaymentConfirmationEmail = async (registration: RegistrationData, tempPassword?: string | null): Promise<boolean> => {
+  try {
+    console.log('📧 Sending payment confirmation email to:', registration.email);
+
+    if (!registration.id || !registration.receipt_number || !registration.student_name || !registration.email || !registration.created_at) {
+      console.error('❌ Missing required fields for payment confirmation email');
+      return false;
+    }
+
+    const formatDate = (dateString: string) => {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    };
+
+    const siteUrl = 'https://damonmusicacademy.co.ke';
+    const logoUrl = `${siteUrl}/damon-logo.png`;
+
+    // Create HTML email content for payment confirmation
+    const emailHTML = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Payment Received - Enrollment Confirmed | Damon Music Academy</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; }
+          .header { background: linear-gradient(135deg, #28a745 0%, #00c6ff 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { background: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+          .receipt-header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #28a745; }
+          .receipt-number { font-size: 18px; font-weight: bold; color: #28a745; }
+          .section { margin-bottom: 25px; padding: 20px; border: 1px solid #e9ecef; border-radius: 8px; }
+          .section-title { font-size: 18px; font-weight: bold; color: #495057; margin-bottom: 15px; border-bottom: 2px solid #28a745; padding-bottom: 5px; }
+          .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+          .info-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f3f4; }
+          .info-label { font-weight: 600; color: #6c757d; }
+          .info-value { color: #495057; }
+          .status-badge { background: #28a745; color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+          .next-steps { background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #28a745; }
+          .login-credentials { background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #2196f3; }
+          .payment-confirmed { background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #17a2b8; }
+          .contact-info { background: #e3f2fd; padding: 20px; border-radius: 8px; margin-top: 25px; border-left: 4px solid #2196f3; }
+          .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+          .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef; color: #6c757d; font-size: 14px; }
+          @media (max-width: 600px) { .info-grid, .contact-grid { grid-template-columns: 1fr; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <img src="{{LOGO_URL}}" alt="Damon Music Academy Logo" style="height: 70px; margin-bottom: 20px;">
+          <h1>🎉 Payment Received!</h1>
+          <h2>You're Officially Enrolled at Damon Music Academy</h2>
+          <p>Welcome to the Damon Music Academy family! Your payment has been confirmed and your enrollment is now complete.</p>
+        </div>
+        <div class="content">
+          <div class="receipt-header">
+            <div class="receipt-number">Receipt #: ${registration.receipt_number}</div>
+            <div>Enrollment Date: ${formatDate(registration.created_at)}</div>
+            <div class="status-badge">ENROLLED</div>
+          </div>
+          <div class="section">
+            <div class="section-title">👤 Student Information</div>
+            <div class="info-grid">
+              <div class="info-item"><span class="info-label">Full Name:</span><span class="info-value">${registration.student_name}</span></div>
+              <div class="info-item"><span class="info-label">Age:</span><span class="info-value">${registration.age} years</span></div>
+              <div class="info-item"><span class="info-label">Email:</span><span class="info-value">${registration.email}</span></div>
+              <div class="info-item"><span class="info-label">Phone:</span><span class="info-value">${registration.country_code} ${registration.phone}</span></div>
+              <div class="info-item"><span class="info-label">Location:</span><span class="info-value">${registration.location}</span></div>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-title">🎓 Course Details</div>
+            <div class="info-grid">
+              <div class="info-item"><span class="info-label">Course Category:</span><span class="info-value">${registration.course_category}</span></div>
+              <div class="info-item"><span class="info-label">Subject/Instrument:</span><span class="info-value">${(() => {
+                if (registration.course_category === 'Music') return registration.instrument;
+                if (registration.course_category === 'Production') return registration.production_type;
+                return 'Art Course';
+              })()}</span></div>
+              <div class="info-item"><span class="info-label">Proficiency Level:</span><span class="info-value">${registration.proficiency_level}</span></div>
+              <div class="info-item"><span class="info-label">Learning Mode:</span><span class="info-value">${registration.learning_mode}</span></div>
+              ${registration.course_category === 'Music' ? `<div class="info-item"><span class="info-label">Owns Instrument:</span><span class="info-value">${registration.owns_instrument ? 'Yes' : 'No'}</span></div>` : ''}
+              ${registration.preferred_schedule ? `<div class="info-item"><span class="info-label">Preferred Schedule:</span><span class="info-value">${registration.preferred_schedule}</span></div>` : ''}
+            </div>
+          </div>
+          ${registration.parent_name ? `<div class="section"><div class="section-title">👨‍👩‍👧‍👦 Parent/Guardian Information</div><div class="info-grid"><div class="info-item"><span class="info-label">Name:</span><span class="info-value">${registration.parent_name}</span></div>${registration.parent_phone ? `<div class="info-item"><span class="info-label">Phone:</span><span class="info-value">${registration.parent_phone}</span></div>` : ''}</div></div>` : ''}
+          ${registration.medical_condition === 'yes' ? `<div class="section"><div class="section-title">🏥 Medical Information</div><div class="info-item"><span class="info-label">Medical Conditions:</span><span class="info-value">Yes</span></div><div class="info-item"><span class="info-label">Details:</span><span class="info-value">${registration.medical_details}</span></div></div>` : ''}
+          
+          <div class="payment-confirmed">
+            <h3>✅ Payment Confirmed</h3>
+            <p><strong>Great news!</strong> Your payment has been successfully processed and your enrollment is now complete.</p>
+            <ul>
+              <li><strong>Enrollment fee:</strong> ✅ Paid</li>
+              <li><strong>First month's tuition:</strong> ✅ Paid</li>
+              <li><strong>Status:</strong> ✅ Officially Enrolled</li>
+            </ul>
+            <p style="margin-top: 15px; font-size: 14px; color: #666;">
+              <strong>What's next:</strong> We will contact you within 24-48 hours with your personalized class schedule and further instructions.
+            </p>
+          </div>
+          
+          ${tempPassword ? `
+          <div class="login-credentials">
+            <h3>🔐 Your Student Portal Login Credentials</h3>
+            <p><strong>Important:</strong> You can now access your personalized student portal with the following credentials:</p>
+            <div class="info-grid">
+              <div class="info-item"><span class="info-label">Login URL:</span><span class="info-value"><a href="${siteUrl}/auth" style="color: #2196f3; text-decoration: none;">${siteUrl}/auth</a></span></div>
+              <div class="info-item"><span class="info-label">Email:</span><span class="info-value">${registration.email}</span></div>
+              <div class="info-item"><span class="info-label">Temporary Password:</span><span class="info-value"><strong>${tempPassword}</strong></span></div>
+            </div>
+            <p style="margin-top: 15px; font-size: 14px; color: #666;">
+              <strong>Security Note:</strong> Please change your password on your first login for security purposes.
+            </p>
+          </div>
+          ` : ''}
+          
+          <div class="next-steps">
+            <h3>🎯 What's Next?</h3>
+            <ul>
+              <li><strong>Class Schedule:</strong> We will contact you within 24-48 hours with your personalized class schedule.</li>
+              <li><strong>First Lesson:</strong> Your first lesson will be scheduled based on your preferred schedule and instructor availability.</li>
+              <li><strong>Welcome Kit:</strong> You will receive information about any required materials or equipment for your course.</li>
+              ${tempPassword ? '<li><strong>Student Portal:</strong> Access your student portal using the credentials provided above to view your lessons, materials, and progress.</li>' : ''}
+              <li><strong>Questions:</strong> If you have any questions, feel free to contact us using the information below.</li>
+            </ul>
+          </div>
+          <div class="contact-info">
+            <h3>📞 Need Help? Contact Us</h3>
+            <div class="contact-grid">
+              <div class="info-item"><span class="info-label">📱 Phone:</span><span class="info-value">+254 701 195 460 / +254 713 490 535</span></div>
+              <div class="info-item"><span class="info-label">📧 Email:</span><span class="info-value">info@damonmusicacademy.com</span></div>
+              <div class="info-item"><span class="info-label">📍 Address:</span><span class="info-value">Nakuru, Kenya</span></div>
+              <div class="info-item"><span class="info-label">🕒 Hours:</span><span class="info-value">Sun: 8am-6pm, Mon-Fri: 7am-6pm (Academy)</span></div>
+            </div>
+          </div>
+          <div class="footer">
+            <p>Welcome to the Damon Music Academy family!</p>
+            <p>We are excited to help you achieve your creative dreams.</p>
+            <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
+      body: {
+        to: registration.email,
+        subject: `Payment Received - Enrollment Confirmed | Damon Music Academy`,
+        html: emailHTML,
+        registration: registration
+      }
+    });
+
+    if (error) {
+      console.error('❌ Payment confirmation email sending error:', error);
+      return false;
+    }
+
+    if (data && data.success) {
+      console.log('✅ Payment confirmation email sent successfully');
+      return true;
+    } else {
+      console.error('❌ Failed to send payment confirmation email:', data?.message);
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Payment confirmation email error:', error);
     return false;
   }
 };

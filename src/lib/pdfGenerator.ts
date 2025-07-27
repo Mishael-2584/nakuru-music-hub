@@ -92,10 +92,14 @@ export const generateQuotePDF = async (
 
   // Determine course/instrument for specificity
   let courseOrInstrument = '';
-  if (invoiceMeta && invoiceMeta.registrationId) {
-    courseOrInstrument = invoiceMeta.registrationId;
-  } else if (invoiceDetails && invoiceDetails.lineItems && invoiceDetails.lineItems.length > 0) {
-    courseOrInstrument = invoiceDetails.lineItems[0].description;
+  if (invoiceDetails && invoiceDetails.lineItems && invoiceDetails.lineItems.length > 0) {
+    // Extract course name from the first line item description
+    const firstItem = invoiceDetails.lineItems[0];
+    if (firstItem.description.includes(' - ')) {
+      courseOrInstrument = firstItem.description.split(' - ')[0];
+    } else {
+      courseOrInstrument = firstItem.description;
+    }
   } else if (quoteData && quoteData.service_category) {
     courseOrInstrument = quoteData.service_category;
   }
@@ -166,8 +170,14 @@ export const generateQuotePDF = async (
       <div style="display: flex; justify-content: flex-end;">
         <table style="font-size: 13px;">
           <tbody>
-            <tr><td style="padding: 2px 8px; color: #64748b;">Subtotal:</td><td style="padding: 2px 8px; text-align: right; color: #1e293b;">KES ${invoiceDetails?.subtotal.toLocaleString()}</td></tr>
-            <tr><td style="padding: 2px 8px; color: #64748b; font-weight: bold;">Total:</td><td style="padding: 2px 8px; text-align: right; color: #1e40af; font-weight: bold;">KES ${invoiceDetails?.total.toLocaleString()}</td></tr>
+            <tr>
+              <td style="padding: 8px 4px; text-align: right; font-weight: 600; color: #1e293b;">Subtotal:</td>
+              <td style="padding: 8px 4px; text-align: right; font-weight: 600; color: #1e293b;">KES ${invoiceDetails?.subtotal.toLocaleString()}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 4px; text-align: right; font-weight: 700; color: #1e40af; font-size: 15px;">Total:</td>
+              <td style="padding: 8px 4px; text-align: right; font-weight: 700; color: #1e40af; font-size: 15px;">KES ${invoiceDetails?.total.toLocaleString()}</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -193,6 +203,11 @@ export const generateQuotePDF = async (
     ${adminNotes ? `
       <div style="margin: 18px 32px 0 32px; background: #fef3c7; padding: 10px 16px; border-radius: 8px; border-left: 4px solid #f59e0b; font-size: 12px;">
         <b>Admin Notes:</b> ${adminNotes}
+      </div>
+    ` : ''}
+    ${invoiceMeta && invoiceMeta.invoiceNumber && invoiceMeta.invoiceNumber !== 'first' ? `
+      <div style="margin: 18px 32px 0 32px; background: #fef2f2; padding: 10px 16px; border-radius: 8px; border-left: 4px solid #ef4444; font-size: 12px; color: #dc2626;">
+        <b>⚠️ Automated Invoice:</b> This is an automated invoice kindly ignore if already paid.
       </div>
     ` : ''}
     <div style="margin: 18px 32px 0 32px; font-size: 11px; color: #64748b;">
