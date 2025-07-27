@@ -103,7 +103,7 @@ const FAQ = () => (
             ))}
           </Accordion>
           <div className="mt-10 text-center text-gray-600 text-sm">
-            Didn\'t find your answer? Email <a href="mailto:info@damonmusicacademy.co.ke" className="text-blue-600 underline">info@damonmusicacademy.co.ke</a> or call <a href="tel:+254701195460" className="text-blue-600 underline">+254 701 195 460</a>.
+            Didn't find your answer? Email <a href="mailto:info@damonmusicacademy.co.ke" className="text-blue-600 underline">info@damonmusicacademy.co.ke</a> or call <a href="tel:+254701195460" className="text-blue-600 underline">+254 701 195 460</a>.
           </div>
         </CardContent>
       </Card>
