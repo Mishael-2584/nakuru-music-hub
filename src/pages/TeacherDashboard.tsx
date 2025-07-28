@@ -249,18 +249,9 @@ const TeacherDashboard = () => {
     }
 
     // Prepare payload
-    const dayMap = {
-      'Monday': 1,
-      'Tuesday': 2,
-      'Wednesday': 3,
-      'Thursday': 4,
-      'Friday': 5,
-      'Saturday': 6,
-      'Sunday': 7
-    };
     const payload = {
       teacher_id: profile?.id,
-      day_of_week: dayMap[newTimeSlot.day_of_week] || 1,
+      day_of_week: newTimeSlot.day_of_week, // Keep as text: 'Monday', 'Tuesday', etc.
       start_time: newTimeSlot.start_time,
       end_time: newTimeSlot.end_time,
       is_available: true,
@@ -382,10 +373,16 @@ const TeacherDashboard = () => {
     description: ''
   });
 
-  // Helper to map day_of_week integer to day name
+  // Helper to map day_of_week to day name (handles both text and number formats)
   const getDayName = (dayNum: number | string) => {
     const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-    // Accept both string and number
+    
+    // If it's already a day name, return it
+    if (typeof dayNum === 'string' && days.includes(dayNum)) {
+      return dayNum;
+    }
+    
+    // If it's a number, convert to day name
     const idx = typeof dayNum === 'string' ? parseInt(dayNum, 10) : dayNum;
     return days[(idx || 1) - 1] || "Monday";
   };

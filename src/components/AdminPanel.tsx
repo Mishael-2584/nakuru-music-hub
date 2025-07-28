@@ -843,37 +843,63 @@ const AdminPanel = () => {
   const approveTeacher = async (teacher) => {
     setTeacherLoading(true);
     try {
-      // Explicitly map all required fields for teachers table
+      // First, create a Supabase Auth user for the teacher using Edge Function
+      console.log('🔧 Creating Supabase Auth user for teacher...');
+      const { data: userData, error: userError } = await supabase.functions.invoke('create-teacher-user', {
+        body: {
+          email: teacher.email,
+          name: teacher.name,
+          password: teacher.password // Pass the teacher's initially created password
+        }
+      });
+
+      if (userError) {
+        console.error('Error creating teacher user:', userError);
+        toast({
+          title: "Error",
+          description: "Failed to create teacher account. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('✅ Teacher Auth user created successfully');
+
+      // Now create the teacher record with the user_id
       const teacherData = {
         id: teacher.id,
         name: teacher.name,
-        teacher_name: teacher.name,
         email: teacher.email,
         phone: teacher.phone,
-        password: teacher.password,
+        password: teacher.password, // Store hashed/encrypted in production
         bio: teacher.bio,
         experience: teacher.experience,
         category: teacher.category,
-        instruments: teacher.subjects,
         subjects: teacher.subjects,
-        status: "active", // must be one of: 'active', 'inactive', 'on_leave'
-        approval_status: "approved", // must be one of: 'pending', 'approved', 'rejected'
+        status: "approved",
+        user_id: userData.userId, // Set the user_id to link to auth.users
         created_at: teacher.created_at || new Date().toISOString(),
       };
+
       const { data, error } = await supabase.from("teachers").insert([teacherData]);
       if (error) throw error;
+
       // Remove from pending_teachers
       await supabase.from("pending_teachers").delete().eq("id", teacher.id);
-      // Send acceptance email
-      const emailSent = await sendTeacherAcceptedEmail(teacher);
+
+      // Send acceptance email with login credentials (using the original password)
+      const emailSent = await sendTeacherAcceptedEmail(teacher, teacher.password); // Pass original password
       if (!emailSent) {
         toast({ title: "Email Failed", description: "Could not send approval email to teacher.", variant: "destructive" });
       }
+
       toast({ title: "Teacher Approved", description: `${teacher.name} has been approved and notified.` });
+      
       // Refresh lists
       setPendingTeachers((prev) => prev.filter((t) => t.id !== teacher.id));
       setApprovedTeachers((prev) => [{ ...teacher, status: "approved" }, ...prev]);
     } catch (err) {
+      console.error('Error approving teacher:', err);
       toast({ title: "Error", description: err.message || "Failed to approve teacher.", variant: "destructive" });
     } finally {
       setTeacherLoading(false);

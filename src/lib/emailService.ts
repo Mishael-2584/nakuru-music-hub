@@ -768,9 +768,23 @@ export const sendDeclinedEmail = async (registration: RegistrationData): Promise
   }
 };
 
-export const sendTeacherAcceptedEmail = async (teacher) => {
+export const sendTeacherAcceptedEmail = async (teacher, tempPassword?: string) => {
   const siteUrl = 'https://damonmusicacademy.co.ke';
   const logoUrl = `${siteUrl}/damon-logo.png`;
+  
+  // Create login credentials section
+  const loginCredentialsSection = tempPassword ? `
+    <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #2196f3;">
+      <h3 style="color: #1976d2; margin-top: 0;">🔐 Your Login Credentials</h3>
+      <p><strong>Login URL:</strong> <a href="https://damonmusicacademy.co.ke/auth" style="color: #1976d2;">https://damonmusicacademy.co.ke/auth</a></p>
+      <p><strong>Email:</strong> ${teacher.email}</p>
+      <p><strong>Password:</strong> ${tempPassword}</p>
+      <p style="font-size: 14px; color: #666; margin-top: 15px;">
+        <strong>Important:</strong> This is the password you created during signup. You can change it after your first login for security.
+      </p>
+    </div>
+  ` : '';
+
   const emailHTML = `
     <!DOCTYPE html>
     <html lang="en">
@@ -778,7 +792,14 @@ export const sendTeacherAcceptedEmail = async (teacher) => {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Teacher Application Approved - Damon Music Academy</title>
-      <style>body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;background-color:#f8f9fa;}.header{background:linear-gradient(135deg,#28a745 0%,#00c6ff 100%);color:white;padding:30px;text-align:center;border-radius:10px 10px 0 0;}.content{background:white;padding:30px;border-radius:0 0 10px 10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);}.footer{text-align:center;margin-top:30px;padding-top:20px;border-top:1px solid #e9ecef;color:#6c757d;font-size:14px;}</style>
+      <style>
+        body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;background-color:#f8f9fa;}
+        .header{background:linear-gradient(135deg,#28a745 0%,#00c6ff 100%);color:white;padding:30px;text-align:center;border-radius:10px 10px 0 0;}
+        .content{background:white;padding:30px;border-radius:0 0 10px 10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);}
+        .next-steps{background:linear-gradient(135deg,#d4edda 0%,#c3e6cb 100%);padding:20px;border-radius:8px;margin:25px 0;border-left:4px solid #28a745;}
+        .contact-info{background:#e3f2fd;padding:20px;border-radius:8px;margin-top:25px;border-left:4px solid #2196f3;}
+        .footer{text-align:center;margin-top:30px;padding-top:20px;border-top:1px solid #e9ecef;color:#6c757d;font-size:14px;}
+      </style>
     </head>
     <body>
       <div class="header">
@@ -789,19 +810,36 @@ export const sendTeacherAcceptedEmail = async (teacher) => {
       <div class="content">
         <p>Dear ${teacher.name},</p>
         <p>We are pleased to inform you that your application to become a teacher at Damon Music Academy has been <strong>approved</strong>!</p>
-        <p>You can now log in to your teacher portal and start managing your schedule, students, and resources.</p>
-        <ul>
-          <li><strong>Email:</strong> ${teacher.email}</li>
-        </ul>
-        <p>If you have any questions, please contact us at <a href="mailto:info@damonmusicacademy.com">info@damonmusicacademy.com</a>.</p>
+        
+        ${loginCredentialsSection}
+        
+        <div class="next-steps">
+          <h3>✅ Next Steps</h3>
+          <ul>
+            <li><strong>Log in to your teacher portal</strong> using the credentials above</li>
+            <li><strong>Set up your availability</strong> by adding your time slots</li>
+            <li><strong>Update your profile</strong> with your teaching preferences</li>
+            <li><strong>Start managing your students</strong> and lesson schedules</li>
+          </ul>
+        </div>
+        
+        <div class="contact-info">
+          <h3>📞 Need Help? Contact Us</h3>
+          <p><strong>Phone:</strong> +254 701 195 460 / +254 713 490 535</p>
+          <p><strong>Email:</strong> <a href="mailto:info@damonmusicacademy.com">info@damonmusicacademy.com</a></p>
+          <p><strong>Address:</strong> Nakuru, Kenya</p>
+        </div>
+        
         <div class="footer">
           <p>Welcome to the Damon Music Academy team!</p>
+          <p>We look forward to working with you to inspire the next generation of musicians and artists.</p>
           <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
         </div>
       </div>
     </body>
     </html>
   `;
+  
   const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
     body: {
       to: teacher.email,
