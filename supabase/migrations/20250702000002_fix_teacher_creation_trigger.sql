@@ -1,17 +1,7 @@
--- Migration: Update profiles table to support teacher roles
--- This migration allows the profiles table to store teacher roles
+-- Migration: Fix teacher creation trigger to handle pending_teachers
+-- This migration fixes the handle_new_user function to properly handle teacher creation
 
--- First, drop the existing constraint
-ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
-
--- Add the new constraint that includes teacher role
-ALTER TABLE public.profiles ADD CONSTRAINT profiles_role_check 
-CHECK (role IN ('admin', 'super_admin', 'teacher', 'student'));
-
--- Add an index for role-based queries
-CREATE INDEX IF NOT EXISTS idx_profiles_role ON public.profiles(role);
-
--- Update the handle_new_user function to support different roles
+-- Update the handle_new_user function to support pending teachers
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql

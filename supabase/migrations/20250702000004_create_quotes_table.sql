@@ -1,4 +1,4 @@
--- Create quotes table
+-- Create quotes table (only if it doesn't exist)
 CREATE TABLE IF NOT EXISTS quotes (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -32,28 +32,39 @@ CREATE TABLE IF NOT EXISTS quotes (
     additional_notes TEXT
 );
 
--- Create indexes for better performance
+-- Create indexes for better performance (only if they don't exist)
 CREATE INDEX IF NOT EXISTS idx_quotes_email ON quotes(email);
 CREATE INDEX IF NOT EXISTS idx_quotes_status ON quotes(status);
 CREATE INDEX IF NOT EXISTS idx_quotes_created_at ON quotes(created_at);
 
--- Enable RLS
+-- Enable RLS (only if not already enabled)
 ALTER TABLE quotes ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies
--- Allow public to insert quotes
-CREATE POLICY "Allow public to insert quotes" ON quotes
-    FOR INSERT WITH CHECK (true);
+-- Create policies only if they don't exist
+DO $$
+BEGIN
+    -- Allow public to insert quotes
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'quotes' 
+        AND policyname = 'Allow public to insert quotes'
+    ) THEN
+        CREATE POLICY "Allow public to insert quotes" ON quotes
+            FOR INSERT WITH CHECK (true);
+    END IF;
 
--- Allow authenticated users to view their own quotes (if we add user_id later)
--- CREATE POLICY "Allow users to view own quotes" ON quotes
---     FOR SELECT USING (auth.uid() = user_id);
+    -- Allow admins to view all quotes
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'quotes' 
+        AND policyname = 'Allow admins to view all quotes'
+    ) THEN
+        CREATE POLICY "Allow admins to view all quotes" ON quotes
+            FOR ALL USING (auth.role() = 'authenticated');
+    END IF;
+END $$;
 
--- Allow admins to view all quotes (we'll handle this in the admin panel)
-CREATE POLICY "Allow admins to view all quotes" ON quotes
-    FOR ALL USING (auth.role() = 'authenticated');
-
--- Create function to update updated_at
+-- Create function to update updated_at (only if it doesn't exist)
 CREATE OR REPLACE FUNCTION update_quotes_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -62,7 +73,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger for updated_at
+-- Create trigger for updated_at (only if it doesn't exist)
+DROP TRIGGER IF EXISTS update_quotes_updated_at ON quotes;
 CREATE TRIGGER update_quotes_updated_at
     BEFORE UPDATE ON quotes
     FOR EACH ROW

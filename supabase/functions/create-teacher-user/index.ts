@@ -21,6 +21,7 @@ serve(async (req) => {
     console.log('🔧 Received data:', {
       email,
       name,
+      password: password ? '***PROVIDED***' : '***MISSING***',
       action
     });
 
@@ -28,6 +29,19 @@ serve(async (req) => {
       console.log('❌ Missing required fields');
       return new Response(JSON.stringify({
         error: 'Missing email or name'
+      }), {
+        status: 400,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+
+    if (!password) {
+      console.log('❌ Missing password');
+      return new Response(JSON.stringify({
+        error: 'Missing password'
       }), {
         status: 400,
         headers: {
@@ -60,8 +74,9 @@ serve(async (req) => {
       });
     }
 
+    console.log('🔧 Creating Supabase client...');
     const supabase = createClient(supabaseUrl, serviceRoleKey);
-    console.log('🔧 Supabase client created');
+    console.log('🔧 Supabase client created successfully');
 
     // If action is 'get_password', try to get existing user and generate new password
     if (action === 'get_password') {
@@ -132,7 +147,90 @@ serve(async (req) => {
     }
 
     // Create new teacher user
-    console.log('🔧 Creating new teacher user');
+    console.log('🔧 Creating new teacher user with password');
+    console.log('🔧 User creation parameters:', {
+      email,
+      passwordLength: password?.length || 0,
+      name,
+      userMetadata: { name, role: 'teacher' }
+    });
+
+    // First check if user already exists
+    const { data: existingUsers, error: listError } = await supabase.auth.admin.listUsers();
+    
+    if (listError) {
+      console.log('❌ Error listing users:', listError.message);
+      return new Response(JSON.stringify({
+        error: 'Could not check existing users'
+      }), {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+
+    const existingUser = existingUsers.users.find(u => u.email === email);
+    
+    if (existingUser) {
+      console.log('✅ Found existing user, updating metadata and password');
+      
+      // Update the existing user's metadata and password
+      const { error: updateError } = await supabase.auth.admin.updateUserById(existingUser.id, {
+        password: password,
+        user_metadata: {
+          name,
+          role: 'teacher'
+        }
+      });
+
+      if (updateError) {
+        console.log('❌ Error updating existing user:', updateError.message);
+        return new Response(JSON.stringify({
+          error: updateError.message
+        }), {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+
+      console.log('✅ Existing user updated successfully');
+      
+      // Ensure teacher profile exists in profiles table
+      console.log('🔧 Ensuring teacher profile exists for existing user...');
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: existingUser.id,
+          email: existingUser.email,
+          role: 'teacher'
+        }, {
+          onConflict: 'id'
+        });
+      
+      if (profileError) {
+        console.log('⚠️ Warning: Could not ensure teacher profile:', profileError.message);
+      } else {
+        console.log('✅ Teacher profile ensured for existing user');
+      }
+      
+      return new Response(JSON.stringify({
+        userId: existingUser.id,
+        tempPassword: undefined
+      }), {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+
+    // Create new user if it doesn't exist
     const { data: userData, error: createError } = await supabase.auth.admin.createUser({
       email,
       password: password, // Use the password provided by the teacher during signup
@@ -145,6 +243,7 @@ serve(async (req) => {
 
     if (createError) {
       console.log('❌ Error creating teacher user:', createError.message);
+      console.log('❌ Error details:', createError);
       return new Response(JSON.stringify({
         error: createError.message
       }), {
@@ -157,6 +256,29 @@ serve(async (req) => {
     }
 
     console.log('✅ Teacher user created successfully');
+    console.log('✅ User data:', {
+      userId: userData.user.id,
+      userEmail: userData.user.email
+    });
+    
+    // Ensure teacher profile exists in profiles table
+    console.log('🔧 Ensuring teacher profile exists...');
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert({
+        id: userData.user.id,
+        email: userData.user.email,
+        role: 'teacher'
+      }, {
+        onConflict: 'id'
+      });
+    
+    if (profileError) {
+      console.log('⚠️ Warning: Could not ensure teacher profile:', profileError.message);
+    } else {
+      console.log('✅ Teacher profile ensured');
+    }
+    
     return new Response(JSON.stringify({
       userId: userData.user.id,
       tempPassword: undefined // Explicitly undefined as per user request
@@ -170,8 +292,10 @@ serve(async (req) => {
 
   } catch (error) {
     console.log('❌ Unexpected error:', error);
+    console.log('❌ Error stack:', error.stack);
     return new Response(JSON.stringify({
-      error: 'Internal server error'
+      error: 'Internal server error',
+      details: error.message
     }), {
       status: 500,
       headers: {

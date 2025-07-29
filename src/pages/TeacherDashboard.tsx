@@ -1,20 +1,23 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Users, MessageSquare, BookOpen, Clock, Bell, UserCircle, BadgeCheck, LogOut, Plus, Edit, Trash2, Eye, Download, Upload, CheckCircle, XCircle, Clock as ClockIcon, Calendar as CalendarIcon, FileText } from "lucide-react";
+import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
-import { calculateStudentInvoice } from '../lib/invoiceUtils';
+import { calculateStudentInvoice, InvoiceCalculationResult } from '../lib/invoiceUtils';
+import { Invoice } from '../integrations/supabase/types';
+import VideoConferenceModal from '../components/VideoConferenceModal';
+import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking } from '../lib/videoConferencing';
 
 interface TeacherProfile {
   id: string;
@@ -206,6 +209,10 @@ const TeacherDashboard = () => {
   const [selectedCredit, setSelectedCredit] = useState<any>(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  // Add video conferencing state
+  const [showVideoConferenceModal, setShowVideoConferenceModal] = useState(false);
+  const [selectedMeetingRoom, setSelectedMeetingRoom] = useState<MeetingRoom | null>(null);
+  const [meetingRooms, setMeetingRooms] = useState<MeetingRoom[]>([]);
   // Filter state
   const [calendarStudent, setCalendarStudent] = useState('all');
   const [calendarLessonType, setCalendarLessonType] = useState('all');
@@ -214,6 +221,16 @@ const TeacherDashboard = () => {
   // Time slot management functions
   const handleAddTimeSlot = async () => {
     if (!user) return;
+
+    // Check if teacher profile is properly set up
+    if (!profile || !profile.id || profile.id === 'not-found') {
+      toast({
+        title: "Account Error",
+        description: "Your teacher account is not properly set up. Please contact the administrator.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     // Validation: required fields
     if (!newTimeSlot.day_of_week || !newTimeSlot.start_time || !newTimeSlot.end_time) {
@@ -414,38 +431,53 @@ const TeacherDashboard = () => {
         if (profile && !profileError) {
           console.log('[TeacherDashboard] User role from profiles:', profile.role);
           if (profile.role === 'teacher') {
-            // Fetch teacher profile by email
+            // First try to fetch teacher profile by user_id (Auth UID)
+            console.log('[TeacherDashboard] Looking for teacher by user_id:', user.id);
             const { data: teacherProfile, error: teacherError } = await supabase
               .from('teachers')
               .select('*')
-              .eq('email', user.email)
+              .eq('user_id', user.id)
               .single();
-            console.log('[TeacherDashboard] teacherProfile:', teacherProfile, 'teacherError:', teacherError);
+            console.log('[TeacherDashboard] teacherProfile by user_id:', teacherProfile, 'teacherError:', teacherError);
+            
             if (teacherProfile && !teacherError && (teacherProfile.status === 'approved' || teacherProfile.status === 'active')) {
+              console.log('[TeacherDashboard] ✅ Found approved teacher by user_id');
               setIsTeacher(true);
               setIsApproved(true);
               setProfile(teacherProfile);
               fetchTeacherData(teacherProfile.id);
               return;
-            } else {
-              // If not found in teachers table, treat as teacher anyway (profile is source of truth)
+            }
+            
+            // If not found by user_id, try by email as fallback
+            console.log('[TeacherDashboard] Not found by user_id, trying by email:', user.email);
+            const { data: teacherProfileByEmail, error: teacherErrorByEmail } = await supabase
+              .from('teachers')
+              .select('*')
+              .eq('email', user.email)
+              .single();
+            console.log('[TeacherDashboard] teacherProfile by email:', teacherProfileByEmail, 'teacherErrorByEmail:', teacherErrorByEmail);
+            
+            if (teacherProfileByEmail && !teacherErrorByEmail && (teacherProfileByEmail.status === 'approved' || teacherProfileByEmail.status === 'active')) {
+              console.log('[TeacherDashboard] ✅ Found approved teacher by email');
               setIsTeacher(true);
               setIsApproved(true);
-              setProfile({
-                id: 'not-found',
-                email: user.email,
-                name: user.user_metadata?.name || user.email,
-                phone: '',
-                bio: '',
-                experience: '',
-                category: '',
-                subjects: [],
-                status: 'approved',
-                created_at: '',
-                notFound: true
-              });
+              setProfile(teacherProfileByEmail);
+              fetchTeacherData(teacherProfileByEmail.id);
               return;
             }
+            
+            // If teacher role is set but not found in teachers table, this is an error
+            console.error('[TeacherDashboard] ❌ Teacher role found but no teacher record exists for user_id:', user.id, 'or email:', user.email);
+            console.error('[TeacherDashboard] ❌ This should not happen - teacher record exists in database but not found by query');
+            toast({
+              title: "Account Error",
+              description: "Your teacher account is not properly set up. Please contact the administrator.",
+              variant: "destructive",
+            });
+            // Redirect to student dashboard as fallback
+            navigate('/student', { replace: true });
+            return;
           } else if (profile.role === 'admin') {
             navigate('/admin', { replace: true });
             return;
@@ -458,17 +490,40 @@ const TeacherDashboard = () => {
         }
 
         // 2. Only check teachers table if no profile role found
-        console.log('[TeacherDashboard] Checking teachers table...');
+        console.log('[TeacherDashboard] No profile found or error:', profileError);
+        console.log('[TeacherDashboard] Checking teachers table as fallback...');
+        // First try by user_id
         const { data: teacherProfile, error: teacherError } = await supabase
           .from('teachers')
           .select('*')
-          .eq('email', user.email)
+          .eq('user_id', user.id)
           .single();
+        console.log('[TeacherDashboard] teacherProfile by user_id (fallback):', teacherProfile, 'teacherError:', teacherError);
+        
         if (teacherProfile && !teacherError && (teacherProfile.status === 'approved' || teacherProfile.status === 'active')) {
+          console.log('[TeacherDashboard] ✅ Found approved teacher by user_id (fallback)');
           setIsTeacher(true);
           setIsApproved(true);
           setProfile(teacherProfile);
           fetchTeacherData(teacherProfile.id);
+          return;
+        }
+        
+        // If not found by user_id, try by email
+        console.log('[TeacherDashboard] Not found by user_id (fallback), trying by email:', user.email);
+        const { data: teacherProfileByEmail, error: teacherErrorByEmail } = await supabase
+          .from('teachers')
+          .select('*')
+          .eq('email', user.email)
+          .single();
+        console.log('[TeacherDashboard] teacherProfile by email (fallback):', teacherProfileByEmail, 'teacherErrorByEmail:', teacherErrorByEmail);
+        
+        if (teacherProfileByEmail && !teacherErrorByEmail && (teacherProfileByEmail.status === 'approved' || teacherProfileByEmail.status === 'active')) {
+          console.log('[TeacherDashboard] ✅ Found approved teacher by email (fallback)');
+          setIsTeacher(true);
+          setIsApproved(true);
+          setProfile(teacherProfileByEmail);
+          fetchTeacherData(teacherProfileByEmail.id);
           return;
         }
 
@@ -544,68 +599,45 @@ const TeacherDashboard = () => {
       if (!messagesError && messagesData) {
         setMessages(messagesData.map(message => ({
           ...message,
-          recipient_name: message.students?.student_name
+          student_name: message.students?.student_name
         })));
       }
 
-      // Fetch real time slots from database
+      // Fetch time slots
       const { data: timeSlotsData, error: timeSlotsError } = await supabase
         .from('time_slots')
         .select('*')
         .eq('teacher_id', teacherId)
-        .order('day_of_week', { ascending: true })
-        .order('start_time', { ascending: true });
+        .order('day_of_week', { ascending: true });
 
       if (!timeSlotsError && timeSlotsData) {
         setTimeSlots(timeSlotsData);
-      } else {
-        console.log('No time slots found, using default slots');
-        // Set default time slots if none exist
-        setTimeSlots([
-          { id: '1', teacher_id: user?.id, day_of_week: 'Monday', start_time: '09:00', end_time: '10:00', is_available: true, slot_type: 'regular', max_students: 1, description: 'Morning slot' },
-          { id: '2', teacher_id: user?.id, day_of_week: 'Monday', start_time: '10:00', end_time: '11:00', is_available: true, slot_type: 'regular', max_students: 1, description: 'Late morning slot' },
-          { id: '3', teacher_id: user?.id, day_of_week: 'Tuesday', start_time: '14:00', end_time: '15:00', is_available: true, slot_type: 'regular', max_students: 1, description: 'Afternoon slot' },
-          { id: '4', teacher_id: user?.id, day_of_week: 'Wednesday', start_time: '16:00', end_time: '17:00', is_available: false, slot_type: 'regular', max_students: 1, description: 'Evening slot' },
-        ]);
       }
 
-      // Fetch materials
-      const { data: materialsData, error: materialsError } = await supabase
-        .from('lesson_materials')
-        .select('*')
-        .eq('uploaded_by', user?.id)
-        .order('created_at', { ascending: false });
-
-      if (!materialsError && materialsData) {
-        setMaterials(materialsData);
-      } else {
-        // Set default materials if none exist
-        setMaterials([
-          { id: '1', title: 'Piano Fundamentals Guide', description: 'Basic hand positioning and technique', file_url: '/materials/piano-fundamentals.pdf' },
-          { id: '2', title: 'Music Theory Basics', description: 'Introduction to reading music', file_url: '/materials/music-theory.pdf' },
-          { id: '3', title: 'Practice Schedule Template', description: 'Weekly practice planning sheet', file_url: '/materials/practice-schedule.pdf' },
-        ]);
-      }
-
-      // In fetchTeacherData, fetch make-up credits for this teacher
-      const { data: creditsData, error: creditsError } = await supabase
-        .from('makeup_credits')
-        .select('*, students(student_name, email)')
-        .eq('teacher_id', teacherId)
-        .eq('is_used', false)
-        .gt('expires_at', new Date().toISOString());
-      if (!creditsError && creditsData) {
-        setMakeupCredits(creditsData);
-      }
+      // Fetch meeting rooms
+      await fetchMeetingRooms();
 
     } catch (error) {
       console.error('Error fetching teacher data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load teacher data",
-        variant: "destructive",
-      });
     }
+  };
+
+  // Fetch user's meeting rooms
+  const fetchMeetingRooms = async () => {
+    if (!profile) return;
+
+    try {
+      const rooms = await getUserMeetingRooms(profile.id, 'teacher');
+      setMeetingRooms(rooms);
+    } catch (error) {
+      console.error('Error fetching meeting rooms:', error);
+    }
+  };
+
+  // Handle opening video conference
+  const handleOpenVideoConference = (meetingRoom: MeetingRoom) => {
+    setSelectedMeetingRoom(meetingRoom);
+    setShowVideoConferenceModal(true);
   };
 
   const handleSignOut = async () => {
@@ -854,7 +886,7 @@ const TeacherDashboard = () => {
           <div className="flex items-center justify-center gap-2 mb-2">
             <span className="text-lg font-semibold text-white drop-shadow">Welcome, {profile?.name || 'Teacher'}</span>
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-semibold ml-2 shadow">
-              <UserCircle className="h-4 w-4 mr-1" /> Teacher
+              <User className="h-4 w-4 mr-1" /> Teacher
             </span>
           </div>
           <p className="text-white/90 text-base sm:text-lg mb-4">Empowering music education and managing your teaching journey</p>
@@ -899,7 +931,7 @@ const TeacherDashboard = () => {
                 <span>Availability</span>
               </TabsTrigger>
               <TabsTrigger value="makeup-credits" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all">
-                <BadgeCheck className="w-5 h-5" />
+                <Badge className="w-5 h-5" />
                 <span>Make-up Credits</span>
               </TabsTrigger>
               <TabsTrigger value="calendar" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-gray-700 data-[state=active]:bg-gray-100 data-[state=active]:shadow-md transition-all">
@@ -909,6 +941,10 @@ const TeacherDashboard = () => {
               <TabsTrigger value="invoices" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-orange-700 data-[state=active]:bg-orange-100 data-[state=active]:shadow-md transition-all">
                 <FileText className="w-5 h-5" />
                 <span>Invoices</span>
+              </TabsTrigger>
+              <TabsTrigger value="video-conferencing" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:shadow-md transition-all">
+                <Video className="w-5 h-5" />
+                <span>Video Calls</span>
               </TabsTrigger>
             </TabsList>
 
@@ -1145,7 +1181,7 @@ const TeacherDashboard = () => {
                       students.map(student => (
                         <div key={student.id} className="flex items-center justify-between p-4 border rounded-lg">
                           <div className="flex items-center space-x-4">
-                            <UserCircle className="w-10 h-10 text-blue-600" />
+                            <User className="w-10 h-10 text-blue-600" />
                             <div>
                               <h4 className="font-semibold">{student.student_name}</h4>
                               <p className="text-sm text-gray-600">{student.email}</p>
@@ -1425,7 +1461,7 @@ const TeacherDashboard = () => {
                       timeSlots.map(slot => (
                         <div key={slot.id} className="flex items-center justify-between p-4 border rounded-lg">
                           <div className="flex items-center space-x-4">
-                            <ClockIcon className="w-5 h-5 text-blue-600" />
+                            <Clock className="w-5 h-5 text-blue-600" />
                             <div>
                               <h4 className="font-semibold">{getDayName(slot.day_of_week)}</h4>
                               <p className="text-sm text-gray-600">{slot.start_time} - {slot.end_time}</p>
@@ -1629,6 +1665,45 @@ const TeacherDashboard = () => {
                 </DialogContent>
               </Dialog>
             </TabsContent>
+
+            {/* Video Conferencing Tab */}
+            <TabsContent value="video-conferencing" className="mt-8">
+              <Card className="shadow-lg border-0 bg-white/95">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Video Conferencing</CardTitle>
+                    <CardDescription>Manage your video conference rooms and bookings.</CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <p className="text-gray-700">
+                      You currently have {meetingRooms.length} video conference room(s) available.
+                      Click on a room to manage its bookings or create a new one.
+                    </p>
+                    {meetingRooms.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {meetingRooms.map(room => (
+                          <Card key={room.id} className="hover:shadow-md transition-shadow cursor-pointer">
+                            <CardContent className="p-4">
+                              <h4 className="font-semibold">{room.name}</h4>
+                              <p className="text-sm text-gray-600">Capacity: {room.max_participants}</p>
+                              <p className="text-sm text-gray-600">Current Bookings: {room.current_bookings.length}</p>
+                              <p className="text-sm text-gray-600">Status: {room.is_available ? 'Available' : 'Occupied'}</p>
+                              <Button variant="outline" size="sm" onClick={() => handleOpenVideoConference(room)}>
+                                Manage Bookings
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 text-center py-8">No video conference rooms available.</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
         </div>
       </main>
@@ -1679,6 +1754,25 @@ const TeacherDashboard = () => {
           </DialogContent>
         </Dialog>
       )}
+      {/* Video Conference Modal */}
+      {showVideoConferenceModal && selectedMeetingRoom && (
+        <VideoConferenceModal
+          meetingRoom={selectedMeetingRoom}
+          onClose={() => setShowVideoConferenceModal(false)}
+          onBookingCreated={() => {
+            toast({ title: 'Success', description: 'Meeting room booked!' });
+            fetchMeetingRooms(); // Refresh meeting rooms to update availability
+          }}
+        />
+      )}
+      {/* Video Conference Modal */}
+      <VideoConferenceModal
+        open={showVideoConferenceModal}
+        onClose={() => setShowVideoConferenceModal(false)}
+        meetingRoom={selectedMeetingRoom}
+        userName={profile?.name || 'Teacher'}
+        userRole="teacher"
+      />
     </div>
   );
 };

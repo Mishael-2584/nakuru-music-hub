@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera } from 'lucide-react';
+import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import PasswordChangePrompt from '../components/PasswordChangePrompt';
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +18,8 @@ import { Link } from 'react-router-dom';
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
 import { calculateStudentInvoice, InvoiceCalculationResult } from '../lib/invoiceUtils';
 import { Invoice } from '../integrations/supabase/types';
+import VideoConferenceModal from '../components/VideoConferenceModal';
+import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking } from '../lib/videoConferencing';
 
 interface StudentProfile {
   id: string;
@@ -152,6 +154,7 @@ interface Booking {
   day_of_week?: string;
   mode?: string;
   meeting_link?: string;
+  meeting_room?: MeetingRoom; // Add meeting room to booking interface
 }
 
 interface Teacher {
@@ -261,6 +264,11 @@ const StudentDashboard = () => {
   // Add state for booking details modal
   const [showBookingDetailsModal, setShowBookingDetailsModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+
+  // Add video conferencing state
+  const [showVideoConferenceModal, setShowVideoConferenceModal] = useState(false);
+  const [selectedMeetingRoom, setSelectedMeetingRoom] = useState<MeetingRoom | null>(null);
+  const [meetingRooms, setMeetingRooms] = useState<MeetingRoom[]>([]);
 
   const [editMode, setEditMode] = useState(false);
   const [editProfile, setEditProfile] = useState({ phone: '', proficiency_level: '', experience: '', location: '', learning_mode: '' });
@@ -478,6 +486,9 @@ const StudentDashboard = () => {
       
       // Fetch teachers
       await fetchTeachers();
+      
+      // Fetch meeting rooms
+      await fetchMeetingRooms();
       
       // Fetch invoices
       await fetchInvoices(student.id);
@@ -759,16 +770,65 @@ const StudentDashboard = () => {
         .order('booking_date', { ascending: true });
 
       if (!error && data) {
-        const bookingsWithTeacherInfo = data.map(booking => ({
-          ...booking,
-          teacher_name: booking.time_slots?.teachers?.name || 'Unknown Teacher',
-          day_of_week: booking.time_slots?.day_of_week || ''
-        }));
-        setMyBookings(bookingsWithTeacherInfo);
+        // Fetch meeting rooms for each booking
+        const bookingsWithMeetingRooms = await Promise.all(
+          data.map(async (booking) => {
+            try {
+              const meetingRoom = await getMeetingRoomByBooking(booking.id);
+              return {
+                ...booking,
+                teacher_name: booking.time_slots?.teachers?.name || 'Unknown Teacher',
+                day_of_week: booking.time_slots?.day_of_week || '',
+                meeting_room: meetingRoom
+              };
+            } catch (error) {
+              console.error('Error fetching meeting room for booking:', booking.id, error);
+              return {
+                ...booking,
+                teacher_name: booking.time_slots?.teachers?.name || 'Unknown Teacher',
+                day_of_week: booking.time_slots?.day_of_week || '',
+                meeting_room: null
+              };
+            }
+          })
+        );
+        setMyBookings(bookingsWithMeetingRooms);
       }
     } catch (error) {
       console.error('Error fetching bookings:', error);
     }
+  };
+
+  // Fetch user's meeting rooms
+  const fetchMeetingRooms = async () => {
+    if (!studentProfile) return;
+
+    try {
+      const rooms = await getUserMeetingRooms(studentProfile.id, 'student');
+      setMeetingRooms(rooms);
+    } catch (error) {
+      console.error('Error fetching meeting rooms:', error);
+    }
+  };
+
+  // Handle opening video conference
+  const handleOpenVideoConference = (booking: Booking) => {
+    if (booking.meeting_room) {
+      setSelectedMeetingRoom(booking.meeting_room);
+      setShowVideoConferenceModal(true);
+    } else {
+      toast({
+        title: "No Meeting Room",
+        description: "This booking doesn't have a video conference room.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle opening video conference from meeting rooms list
+  const handleOpenMeetingRoom = (meetingRoom: MeetingRoom) => {
+    setSelectedMeetingRoom(meetingRoom);
+    setShowVideoConferenceModal(true);
   };
 
   // Handle booking a time slot
@@ -777,8 +837,9 @@ const StudentDashboard = () => {
 
     try {
       const isOnline = studentProfile.learning_mode === 'online';
-      const meetingLink = isOnline ? `https://meet.jit.si/damon-music-${Math.random().toString(36).substring(2, 8)}` : null;
-      const { data, error } = await supabase
+      
+      // Create booking
+      const { data: booking, error } = await supabase
         .from('bookings')
         .insert({
           time_slot_id: selectedTimeSlot.id,
@@ -790,14 +851,39 @@ const StudentDashboard = () => {
           status: 'confirmed',
           lesson_type: newBooking.lesson_type,
           notes: newBooking.notes,
-          mode: studentProfile.learning_mode,
-          meeting_link: meetingLink
+          mode: studentProfile.learning_mode
         })
         .select()
         .single();
 
       if (error) {
         throw error;
+      }
+
+      // Create meeting room for online lessons
+      if (isOnline && booking) {
+        try {
+          const { createMeetingRoom } = await import('../lib/videoConferencing');
+          
+          // Get teacher name for meeting room
+          const teacher = teachers.find(t => t.id === selectedTimeSlot.teacher_id);
+          const teacherName = teacher?.name || 'Teacher';
+          
+          await createMeetingRoom(
+            booking.id,
+            selectedTimeSlot.teacher_id,
+            studentProfile.id,
+            teacherName,
+            studentProfile.student_name,
+            newBooking.lesson_type,
+            `${newBooking.booking_date}T${selectedTimeSlot.start_time}`,
+            `${newBooking.booking_date}T${selectedTimeSlot.end_time}`,
+            newBooking.notes
+          );
+        } catch (meetingError) {
+          console.error('Error creating meeting room:', meetingError);
+          // Don't fail the booking if meeting room creation fails
+        }
       }
 
       // Update available time slots
@@ -817,7 +903,9 @@ const StudentDashboard = () => {
 
       toast({
         title: "Success",
-        description: "Lesson booked successfully!",
+        description: isOnline 
+          ? "Lesson booked successfully! A video conference room has been created." 
+          : "Lesson booked successfully!",
       });
     } catch (error) {
       console.error('Error booking time slot:', error);
@@ -1556,6 +1644,10 @@ const StudentDashboard = () => {
                 <FileText className="w-4 h-4" />
                 <span className="hidden sm:inline">Invoices</span>
               </TabsTrigger>
+              <TabsTrigger value="video-conferencing" className="flex items-center space-x-2">
+                <Video className="w-4 h-4" />
+                <span className="hidden sm:inline">Video Conferencing</span>
+              </TabsTrigger>
             </TabsList>
 
             {/* Dashboard Tab */}
@@ -1799,6 +1891,20 @@ const StudentDashboard = () => {
                               {booking.status === 'confirmed' && isWithin24Hours(booking) && (
                                 <span className="text-xs text-gray-400">Cannot cancel within 24 hours</span>
                               )}
+                              
+                              {/* Video Conference Button for Online Lessons */}
+                              {booking.mode === 'online' && booking.meeting_room && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleOpenVideoConference(booking)}
+                                  className="flex items-center gap-1"
+                                >
+                                  <Video className="w-4 h-4" />
+                                  Join Meeting
+                                </Button>
+                              )}
+                              
                               <Button variant="outline" size="sm" onClick={() => { setSelectedBooking(booking); setShowBookingDetailsModal(true); }}>
                                 View Details
                               </Button>
@@ -2521,9 +2627,80 @@ const StudentDashboard = () => {
                 </DialogContent>
               </Dialog>
             </TabsContent>
+
+            {/* Video Conferencing Tab */}
+            <TabsContent value="video-conferencing" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Video className="w-5 h-5" />
+                    Video Conferencing
+                  </CardTitle>
+                  <CardDescription>Join your online lessons and practice sessions</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {meetingRooms.length > 0 ? (
+                      meetingRooms.map(room => (
+                        <div key={room.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold">{room.roomName}</h4>
+                            <Badge className={getStatusColor(room.status)}>{room.status}</Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
+                            <div>
+                              <span className="font-medium">Type:</span> {room.lessonType}
+                            </div>
+                            <div>
+                              <span className="font-medium">Date:</span> {formatDate(room.startTime)}
+                            </div>
+                            <div>
+                              <span className="font-medium">Time:</span> {formatTime(room.startTime)} - {formatTime(room.endTime)}
+                            </div>
+                            <div>
+                              <span className="font-medium">Duration:</span> {getMeetingDuration(room.startTime, room.endTime)} min
+                            </div>
+                          </div>
+                          {room.notes && (
+                            <p className="text-sm text-gray-600 mb-3">{room.notes}</p>
+                          )}
+                          <div className="flex space-x-2">
+                            <Button 
+                              onClick={() => handleOpenMeetingRoom(room)}
+                              className="flex items-center gap-1"
+                            >
+                              <Video className="w-4 h-4" />
+                              Join Meeting
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => window.open(room.meetingUrl, '_blank')}
+                            >
+                              Open in New Tab
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-gray-500 text-center py-8">No video conference rooms found</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
         </div>
       </main>
+
+      {/* Video Conference Modal */}
+      <VideoConferenceModal
+        open={showVideoConferenceModal}
+        onClose={() => setShowVideoConferenceModal(false)}
+        meetingRoom={selectedMeetingRoom}
+        userName={studentProfile?.student_name || 'Student'}
+        userRole="student"
+      />
     </div>
   );
 };

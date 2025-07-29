@@ -821,17 +821,37 @@ const AdminPanel = () => {
     const fetchTeachers = async () => {
       setTeacherLoading(true);
       try {
+        console.log('🔍 Fetching pending teachers...');
         const { data: pending, error: pendingError } = await supabase
           .from("pending_teachers")
           .select("*")
           .order("created_at", { ascending: false });
-        if (!pendingError) setPendingTeachers(pending || []);
+        
+        console.log('📊 Pending teachers result:', { data: pending, error: pendingError });
+        
+        if (!pendingError) {
+          setPendingTeachers(pending || []);
+          console.log('✅ Set pending teachers:', pending?.length || 0);
+        } else {
+          console.error('❌ Error fetching pending teachers:', pendingError);
+        }
+        
+        console.log('🔍 Fetching approved teachers...');
         const { data: approved, error: approvedError } = await supabase
           .from("teachers")
           .select("*")
           .order("created_at", { ascending: false });
-        if (!approvedError) setApprovedTeachers(approved || []);
+        
+        console.log('📊 Approved teachers result:', { data: approved, error: approvedError });
+        
+        if (!approvedError) {
+          setApprovedTeachers(approved || []);
+          console.log('✅ Set approved teachers:', approved?.length || 0);
+        } else {
+          console.error('❌ Error fetching approved teachers:', approvedError);
+        }
       } catch (err) {
+        console.error('❌ Exception in fetchTeachers:', err);
         toast({ title: "Error", description: "Failed to load teachers.", variant: "destructive" });
       } finally {
         setTeacherLoading(false);
@@ -845,6 +865,14 @@ const AdminPanel = () => {
     try {
       // First, create a Supabase Auth user for the teacher using Edge Function
       console.log('🔧 Creating Supabase Auth user for teacher...');
+      console.log('🔧 Teacher data being sent:', {
+        email: teacher.email,
+        name: teacher.name,
+        password: teacher.password ? '***PROVIDED***' : '***MISSING***',
+        hasPassword: !!teacher.password,
+        teacherKeys: Object.keys(teacher)
+      });
+      
       const { data: userData, error: userError } = await supabase.functions.invoke('create-teacher-user', {
         body: {
           email: teacher.email,

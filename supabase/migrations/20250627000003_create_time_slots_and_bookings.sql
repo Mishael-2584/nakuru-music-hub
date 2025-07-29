@@ -1,28 +1,42 @@
 -- Migration: Create time slots and booking system
 -- This migration sets up the complete time slot and booking infrastructure
 
--- 1. Create time slots table
-CREATE TABLE IF NOT EXISTS public.time_slots (
-  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  teacher_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  day_of_week TEXT NOT NULL CHECK (day_of_week IN ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')),
-  start_time TIME NOT NULL,
-  end_time TIME NOT NULL,
-  is_available BOOLEAN DEFAULT true,
-  slot_type TEXT DEFAULT 'regular' CHECK (slot_type IN ('regular', 'makeup', 'exam_prep', 'performance')),
-  max_students INTEGER DEFAULT 1,
-  description TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  UNIQUE(teacher_id, day_of_week, start_time, end_time)
-);
+-- 1. Create time slots table (only if it doesn't exist or has wrong structure)
+DO $$
+BEGIN
+  -- Check if time_slots table exists and has the correct structure
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'time_slots' 
+    AND column_name = 'teacher_id'
+  ) THEN
+    -- Drop existing table if it has wrong structure
+    DROP TABLE IF EXISTS public.time_slots CASCADE;
+    
+    -- Create time slots table with correct structure
+    CREATE TABLE public.time_slots (
+      id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+      teacher_id UUID REFERENCES public.teachers(id) ON DELETE CASCADE,
+      day_of_week TEXT NOT NULL CHECK (day_of_week IN ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')),
+      start_time TIME NOT NULL,
+      end_time TIME NOT NULL,
+      is_available BOOLEAN DEFAULT true,
+      slot_type TEXT DEFAULT 'regular' CHECK (slot_type IN ('regular', 'makeup', 'exam_prep', 'performance')),
+      max_students INTEGER DEFAULT 1,
+      description TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+      UNIQUE(teacher_id, day_of_week, start_time, end_time)
+    );
+  END IF;
+END $$;
 
 -- 2. Create bookings table
 CREATE TABLE IF NOT EXISTS public.bookings (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   time_slot_id UUID REFERENCES public.time_slots(id) ON DELETE CASCADE,
   student_id UUID REFERENCES public.students(id) ON DELETE CASCADE,
-  teacher_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  teacher_id UUID REFERENCES public.teachers(id) ON DELETE CASCADE,
   booking_date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
@@ -36,7 +50,7 @@ CREATE TABLE IF NOT EXISTS public.bookings (
 -- 3. Create teacher availability table (for weekly schedules)
 CREATE TABLE IF NOT EXISTS public.teacher_availability (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  teacher_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  teacher_id UUID REFERENCES public.teachers(id) ON DELETE CASCADE,
   day_of_week TEXT NOT NULL CHECK (day_of_week IN ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')),
   is_available BOOLEAN DEFAULT true,
   start_time TIME,
@@ -49,7 +63,7 @@ CREATE TABLE IF NOT EXISTS public.teacher_availability (
 -- 4. Create recurring lessons table
 CREATE TABLE IF NOT EXISTS public.recurring_lessons (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  teacher_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  teacher_id UUID REFERENCES public.teachers(id) ON DELETE CASCADE,
   student_id UUID REFERENCES public.students(id) ON DELETE CASCADE,
   time_slot_id UUID REFERENCES public.time_slots(id) ON DELETE CASCADE,
   day_of_week TEXT NOT NULL,
@@ -69,16 +83,40 @@ ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.teacher_availability ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.recurring_lessons ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies for time_slots
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Teachers can manage their own time slots" ON public.time_slots;
+DROP POLICY IF EXISTS "Students can view available time slots" ON public.time_slots;
+DROP POLICY IF EXISTS "Teachers can view bookings for their slots" ON public.bookings;
+DROP POLICY IF EXISTS "Students can view their own bookings" ON public.bookings;
+DROP POLICY IF EXISTS "Students can create bookings" ON public.bookings;
+DROP POLICY IF EXISTS "Students can update their own bookings" ON public.bookings;
+DROP POLICY IF EXISTS "Teachers can manage their own availability" ON public.teacher_availability;
+
+-- Create RLS policies for time_slots (using email matching since user_id doesn't exist yet)
 CREATE POLICY "Teachers can manage their own time slots" ON public.time_slots
-  FOR ALL USING (auth.uid() = teacher_id);
+  FOR ALL USING (
+    teacher_id IN (
+      SELECT id FROM public.teachers 
+      WHERE email = (SELECT email FROM auth.users WHERE id = auth.uid())
+    )
+  );
 
 CREATE POLICY "Students can view available time slots" ON public.time_slots
   FOR SELECT USING (is_available = true);
 
+CREATE POLICY "Admins can manage all time slots" ON public.time_slots
+  FOR ALL USING (
+    auth.uid() IN (SELECT id FROM public.profiles WHERE role IN ('admin', 'super_admin'))
+  );
+
 -- Create RLS policies for bookings
 CREATE POLICY "Teachers can view bookings for their slots" ON public.bookings
-  FOR SELECT USING (auth.uid() = teacher_id);
+  FOR SELECT USING (
+    teacher_id IN (
+      SELECT id FROM public.teachers 
+      WHERE email = (SELECT email FROM auth.users WHERE id = auth.uid())
+    )
+  );
 
 CREATE POLICY "Students can view their own bookings" ON public.bookings
   FOR SELECT USING (
@@ -97,18 +135,11 @@ CREATE POLICY "Students can update their own bookings" ON public.bookings
 
 -- Create RLS policies for teacher_availability
 CREATE POLICY "Teachers can manage their own availability" ON public.teacher_availability
-  FOR ALL USING (auth.uid() = teacher_id);
-
-CREATE POLICY "Students can view teacher availability" ON public.teacher_availability
-  FOR SELECT USING (is_available = true);
-
--- Create RLS policies for recurring_lessons
-CREATE POLICY "Teachers can manage their recurring lessons" ON public.recurring_lessons
-  FOR ALL USING (auth.uid() = teacher_id);
-
-CREATE POLICY "Students can view their recurring lessons" ON public.recurring_lessons
-  FOR SELECT USING (
-    student_id IN (SELECT id FROM public.students WHERE user_id = auth.uid())
+  FOR ALL USING (
+    teacher_id IN (
+      SELECT id FROM public.teachers 
+      WHERE email = (SELECT email FROM auth.users WHERE id = auth.uid())
+    )
   );
 
 -- Create indexes for better performance
@@ -122,25 +153,30 @@ CREATE INDEX IF NOT EXISTS idx_teacher_availability_teacher_id ON public.teacher
 CREATE INDEX IF NOT EXISTS idx_recurring_lessons_teacher_id ON public.recurring_lessons(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_recurring_lessons_student_id ON public.recurring_lessons(student_id);
 
--- Create function to update time slot availability when booked
+-- Create function to update time slot availability when bookings change
 CREATE OR REPLACE FUNCTION update_time_slot_availability()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Update the time slot availability based on current bookings
+  -- Update time slot availability based on bookings
   UPDATE public.time_slots 
   SET is_available = (
     SELECT COUNT(*) < max_students 
     FROM public.bookings 
-    WHERE time_slot_id = NEW.time_slot_id 
-    AND status IN ('confirmed', 'pending')
+    WHERE time_slot_id = time_slots.id 
+    AND status != 'cancelled'
   )
-  WHERE id = NEW.time_slot_id;
+  WHERE id IN (
+    SELECT DISTINCT time_slot_id 
+    FROM public.bookings 
+    WHERE status != 'cancelled'
+  );
   
-  RETURN NEW;
+  RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger to update availability when bookings change
+-- Create trigger to update time slot availability
+DROP TRIGGER IF EXISTS trigger_update_time_slot_availability ON public.bookings;
 CREATE TRIGGER trigger_update_time_slot_availability
   AFTER INSERT OR UPDATE OR DELETE ON public.bookings
   FOR EACH ROW
@@ -150,45 +186,68 @@ CREATE TRIGGER trigger_update_time_slot_availability
 CREATE OR REPLACE FUNCTION generate_recurring_lessons()
 RETURNS TRIGGER AS $$
 DECLARE
-  loop_date DATE := NEW.start_date;
+  start_date_var DATE;
+  end_date DATE;
   lesson_date DATE;
+  day_num INTEGER;
 BEGIN
-  WHILE loop_date <= COALESCE(NEW.end_date, (loop_date::timestamp + INTERVAL '1 year')::date) LOOP
-    -- Find the next occurrence of the day_of_week
-    lesson_date := loop_date + (CASE 
-      WHEN NEW.day_of_week = 'Monday' THEN 0
-      WHEN NEW.day_of_week = 'Tuesday' THEN 1
-      WHEN NEW.day_of_week = 'Wednesday' THEN 2
-      WHEN NEW.day_of_week = 'Thursday' THEN 3
-      WHEN NEW.day_of_week = 'Friday' THEN 4
-      WHEN NEW.day_of_week = 'Saturday' THEN 5
-      WHEN NEW.day_of_week = 'Sunday' THEN 6
-    END)::INTEGER;
-    
-    -- Insert the lesson
-    INSERT INTO public.lessons (
-      student_id, teacher_id, title, lesson_date, 
-      start_time, end_time, lesson_type, status
-    ) VALUES (
-      NEW.student_id, NEW.teacher_id, 'Recurring Lesson', lesson_date,
-      NEW.start_time, NEW.end_time, 'regular', 'scheduled'
-    );
-    
-    -- Move to next week/month based on frequency
-    IF NEW.frequency = 'weekly' THEN
-      loop_date := (loop_date::timestamp + INTERVAL '7 days')::date;
-    ELSIF NEW.frequency = 'biweekly' THEN
-      loop_date := (loop_date::timestamp + INTERVAL '14 days')::date;
-    ELSIF NEW.frequency = 'monthly' THEN
-      loop_date := (loop_date::timestamp + INTERVAL '1 month')::date;
+  -- Set start date to today if not specified
+  start_date_var := COALESCE(NEW.start_date, CURRENT_DATE);
+  end_date := COALESCE(NEW.end_date, start_date_var + INTERVAL '3 months');
+  
+  -- Convert day_of_week to number
+  day_num := CASE NEW.day_of_week 
+    WHEN 'Monday' THEN 1
+    WHEN 'Tuesday' THEN 2
+    WHEN 'Wednesday' THEN 3
+    WHEN 'Thursday' THEN 4
+    WHEN 'Friday' THEN 5
+    WHEN 'Saturday' THEN 6
+    WHEN 'Sunday' THEN 0
+  END;
+  
+  -- Generate lessons based on frequency
+  lesson_date := start_date_var;
+  
+  WHILE lesson_date <= end_date LOOP
+    -- Check if this day matches the recurring pattern
+    IF EXTRACT(DOW FROM lesson_date) = day_num THEN
+      -- Create booking for this lesson
+      INSERT INTO public.bookings (
+        time_slot_id,
+        student_id,
+        teacher_id,
+        booking_date,
+        start_time,
+        end_time,
+        status,
+        lesson_type
+      ) VALUES (
+        NEW.time_slot_id,
+        NEW.student_id,
+        NEW.teacher_id,
+        lesson_date,
+        NEW.start_time,
+        NEW.end_time,
+        'confirmed',
+        'regular'
+      );
     END IF;
+    
+    -- Move to next week/biweek/month based on frequency
+    CASE NEW.frequency
+      WHEN 'weekly' THEN lesson_date := lesson_date + INTERVAL '1 week';
+      WHEN 'biweekly' THEN lesson_date := lesson_date + INTERVAL '2 weeks';
+      WHEN 'monthly' THEN lesson_date := lesson_date + INTERVAL '1 month';
+    END CASE;
   END LOOP;
   
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger to generate lessons when recurring lesson is created
+-- Create trigger to generate recurring lessons
+DROP TRIGGER IF EXISTS trigger_generate_recurring_lessons ON public.recurring_lessons;
 CREATE TRIGGER trigger_generate_recurring_lessons
   AFTER INSERT ON public.recurring_lessons
   FOR EACH ROW

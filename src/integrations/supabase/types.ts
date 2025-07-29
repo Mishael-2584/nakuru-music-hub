@@ -324,6 +324,12 @@ export interface Database {
           name: string;
           email: string;
           phone: string;
+          password: string;
+          bio: string | null;
+          experience: string | null;
+          category: string;
+          subjects: string[];
+          status: string;
           cv_file_path: string | null;
         };
         Insert: {
@@ -331,7 +337,13 @@ export interface Database {
           created_at?: string;
           name: string;
           email: string;
-          phone?: string;
+          phone: string;
+          password: string;
+          bio?: string | null;
+          experience?: string | null;
+          category: string;
+          subjects: string[];
+          status?: string;
           cv_file_path?: string | null;
         };
         Update: {
@@ -340,6 +352,12 @@ export interface Database {
           name?: string;
           email?: string;
           phone?: string;
+          password?: string;
+          bio?: string | null;
+          experience?: string | null;
+          category?: string;
+          subjects?: string[];
+          status?: string;
           cv_file_path?: string | null;
         };
       };
@@ -350,6 +368,13 @@ export interface Database {
           name: string;
           email: string;
           phone: string;
+          password: string;
+          bio: string | null;
+          experience: string | null;
+          category: string;
+          subjects: string[];
+          status: string;
+          user_id: string | null;
           cv_file_path: string | null;
         };
         Insert: {
@@ -357,7 +382,14 @@ export interface Database {
           created_at?: string;
           name: string;
           email: string;
-          phone?: string;
+          phone: string;
+          password: string;
+          bio?: string | null;
+          experience?: string | null;
+          category: string;
+          subjects: string[];
+          status?: string;
+          user_id?: string | null;
           cv_file_path?: string | null;
         };
         Update: {
@@ -366,6 +398,13 @@ export interface Database {
           name?: string;
           email?: string;
           phone?: string;
+          password?: string;
+          bio?: string | null;
+          experience?: string | null;
+          category?: string;
+          subjects?: string[];
+          status?: string;
+          user_id?: string | null;
           cv_file_path?: string | null;
         };
       };
