@@ -218,6 +218,11 @@ const TeacherDashboard = () => {
   const [calendarLessonType, setCalendarLessonType] = useState('all');
   const [calendarStatus, setCalendarStatus] = useState('all');
 
+  // Add bookings state
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [upcomingBookings, setUpcomingBookings] = useState<any[]>([]);
+  const [pastBookings, setPastBookings] = useState<any[]>([]);
+
   // Time slot management functions
   const handleAddTimeSlot = async () => {
     if (!user) return;
@@ -614,8 +619,14 @@ const TeacherDashboard = () => {
         setTimeSlots(timeSlotsData);
       }
 
-      // Fetch meeting rooms
+      // Fetch user's meeting rooms
       await fetchMeetingRooms();
+
+      // Fetch teacher's bookings
+      await fetchTeacherBookings();
+
+      // Test teacher access to bookings
+      await testTeacherBookingsAccess();
 
     } catch (error) {
       console.error('Error fetching teacher data:', error);
@@ -631,6 +642,118 @@ const TeacherDashboard = () => {
       setMeetingRooms(rooms);
     } catch (error) {
       console.error('Error fetching meeting rooms:', error);
+    }
+  };
+
+  // Test teacher access to bookings
+  const testTeacherBookingsAccess = async () => {
+    if (!profile) return;
+    
+    try {
+      console.log('[TeacherDashboard] Testing teacher access to bookings...');
+      
+      // Test 1: Direct query without joins
+      const { data: directBookings, error: directError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('teacher_id', profile.id)
+        .limit(5);
+      
+      console.log('[TeacherDashboard] Direct bookings query:', directBookings, 'Error:', directError);
+      
+      // Test 2: Check if teacher exists in teachers table
+      const { data: teacherCheck, error: teacherError } = await supabase
+        .from('teachers')
+        .select('*')
+        .eq('id', profile.id);
+      
+      console.log('[TeacherDashboard] Teacher check:', teacherCheck, 'Error:', teacherError);
+      
+      // Test 3: Check auth user info
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('[TeacherDashboard] Auth user:', user);
+      
+    } catch (error) {
+      console.error('[TeacherDashboard] Error testing bookings access:', error);
+    }
+  };
+
+  // Fetch teacher's bookings
+  const fetchTeacherBookings = async () => {
+    if (!profile) return;
+
+    try {
+      console.log('[TeacherDashboard] Fetching bookings for teacher:', profile.id, profile.name, profile.email);
+      
+      // First, let's check what bookings exist for this teacher
+      const { data: allBookings, error: allBookingsError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('teacher_id', profile.id);
+      
+      console.log('[TeacherDashboard] All bookings for teacher:', allBookings, 'Error:', allBookingsError);
+      
+      // Now try the full query with joins
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          students!inner(
+            student_name,
+            email,
+            phone,
+            instrument,
+            learning_mode
+          ),
+          time_slots(
+            day_of_week
+          )
+        `)
+        .eq('teacher_id', profile.id)
+        .order('booking_date', { ascending: true });
+
+      console.log('[TeacherDashboard] Bookings with joins:', data, 'Error:', error);
+
+      if (!error && data) {
+        const bookingsWithStudentInfo = data.map(booking => ({
+          ...booking,
+          student_name: booking.students?.student_name || 'Unknown Student',
+          student_email: booking.students?.email || '',
+          student_phone: booking.students?.phone || '',
+          student_instrument: booking.students?.instrument || '',
+          student_learning_mode: booking.students?.learning_mode || '',
+          day_of_week: booking.time_slots?.day_of_week || ''
+        }));
+        
+        setBookings(bookingsWithStudentInfo);
+        
+        // Separate upcoming and past bookings
+        const now = new Date();
+        const upcoming = bookingsWithStudentInfo.filter(booking => {
+          const bookingDate = new Date(`${booking.booking_date}T${booking.start_time}`);
+          return bookingDate > now;
+        });
+        const past = bookingsWithStudentInfo.filter(booking => {
+          const bookingDate = new Date(`${booking.booking_date}T${booking.start_time}`);
+          return bookingDate <= now;
+        });
+        
+        setUpcomingBookings(upcoming);
+        setPastBookings(past);
+        
+        console.log('[TeacherDashboard] Processed bookings:', {
+          total: bookingsWithStudentInfo.length,
+          upcoming: upcoming.length,
+          past: past.length
+        });
+      } else {
+        console.error('[TeacherDashboard] Error fetching bookings:', error);
+        setBookings([]);
+        setUpcomingBookings([]);
+        setPastBookings([]);
+      }
+    } catch (error) {
+      console.error('Error fetching teacher bookings:', error);
     }
   };
 
@@ -803,22 +926,44 @@ const TeacherDashboard = () => {
     });
   };
 
-  // Map lessons to calendar events
-  const calendarEvents: LessonEvent[] = lessons.map(lesson => ({
-    id: lesson.id,
-    title: lesson.title || 'Lesson',
-    start: new Date(`${lesson.lesson_date}T${lesson.start_time}`),
-    end: new Date(`${lesson.lesson_date}T${lesson.end_time}`),
-    status: lesson.status,
-    lesson_type: lesson.lesson_type,
-    student_name: lesson.student_name,
-    notes: lesson.notes,
-    lesson_date: lesson.lesson_date,
-    start_time: lesson.start_time,
-    end_time: lesson.end_time,
-    materials_url: lesson.materials_url, // Add materials_url to event
-    ...lesson,
-  }));
+  // Convert lessons and bookings to calendar events
+  const lessonEventKeys = lessons.map(l => `${l.lesson_date}_${l.start_time}_${l.end_time}`);
+  const calendarEvents: LessonEvent[] = [
+    ...lessons.map(lesson => ({
+      id: lesson.id,
+      title: lesson.title || 'Lesson',
+      start: new Date(`${lesson.lesson_date}T${lesson.start_time}`),
+      end: new Date(`${lesson.lesson_date}T${lesson.end_time}`),
+      status: lesson.status,
+      lesson_type: lesson.lesson_type,
+      student_name: lesson.student_name,
+      notes: lesson.notes,
+      lesson_date: lesson.lesson_date,
+      start_time: lesson.start_time,
+      end_time: lesson.end_time,
+      materials_url: lesson.materials_url || [],
+      ...lesson,
+    })),
+    ...bookings.filter(booking => {
+      // Only show if no lesson exists for this slot/date/time
+      const key = `${booking.booking_date}_${booking.start_time}_${booking.end_time}`;
+      return !lessonEventKeys.includes(key) && booking.status !== 'cancelled';
+    }).map(booking => ({
+      id: booking.id,
+      title: booking.status === 'pending' ? 'Pending Booking' : (booking.lesson_type === 'makeup' ? 'Make-up Booking' : `${booking.student_name} - ${booking.lesson_type || 'Lesson'}`),
+      start: new Date(`${booking.booking_date}T${booking.start_time}`),
+      end: new Date(`${booking.booking_date}T${booking.end_time}`),
+      status: booking.status,
+      lesson_type: booking.lesson_type || 'lesson',
+      student_name: booking.student_name,
+      notes: booking.notes,
+      lesson_date: booking.booking_date,
+      start_time: booking.start_time,
+      end_time: booking.end_time,
+      materials_url: booking.materials_url || [],
+      ...booking,
+    })),
+  ];
 
   // Filtered events for the calendar
   const filteredCalendarEvents = useMemo(() => {
@@ -941,6 +1086,10 @@ const TeacherDashboard = () => {
               <TabsTrigger value="invoices" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-orange-700 data-[state=active]:bg-orange-100 data-[state=active]:shadow-md transition-all">
                 <FileText className="w-5 h-5" />
                 <span>Invoices</span>
+              </TabsTrigger>
+              <TabsTrigger value="bookings" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
+                <Calendar className="w-5 h-5" />
+                <span>Bookings</span>
               </TabsTrigger>
               <TabsTrigger value="video-conferencing" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:shadow-md transition-all">
                 <Video className="w-5 h-5" />
@@ -1543,7 +1692,10 @@ const TeacherDashboard = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Students</SelectItem>
-                        {[...new Set(lessons.map(l => l.student_name).filter(Boolean))].map(name => (
+                        {[...new Set([
+                          ...lessons.map(l => l.student_name).filter(Boolean),
+                          ...bookings.map(b => b.student_name).filter(Boolean)
+                        ])].map(name => (
                           <SelectItem key={name} value={name}>{name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -1557,7 +1709,10 @@ const TeacherDashboard = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Types</SelectItem>
-                        {[...new Set(lessons.map(l => l.lesson_type).filter(Boolean))].map(type => (
+                        {[...new Set([
+                          ...lessons.map(l => l.lesson_type).filter(Boolean),
+                          ...bookings.map(b => b.lesson_type).filter(Boolean)
+                        ])].map(type => (
                           <SelectItem key={type} value={type}>{type}</SelectItem>
                         ))}
                       </SelectContent>
@@ -1571,7 +1726,10 @@ const TeacherDashboard = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Statuses</SelectItem>
-                        {[...new Set(lessons.map(l => l.status).filter(Boolean))].map(status => (
+                        {[...new Set([
+                          ...lessons.map(l => l.status).filter(Boolean),
+                          ...bookings.map(b => b.status).filter(Boolean)
+                        ])].map(status => (
                           <SelectItem key={status} value={status}>{status}</SelectItem>
                         ))}
                       </SelectContent>
@@ -1666,6 +1824,77 @@ const TeacherDashboard = () => {
               </Dialog>
             </TabsContent>
 
+            {/* Bookings Tab */}
+            <TabsContent value="bookings" className="mt-8">
+              <Card className="shadow-lg border-0 bg-white/95">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Upcoming and Past Bookings</CardTitle>
+                    <CardDescription>Manage your bookings and see upcoming and past lessons.</CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <p className="text-gray-700">
+                      You currently have {bookings.length} booking(s) scheduled.
+                      Click on a booking to view details or manage it.
+                    </p>
+                    {bookings.length > 0 ? (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold text-green-700">Upcoming Bookings ({upcomingBookings.length})</h3>
+                        {upcomingBookings.map(booking => (
+                          <div key={booking.id} className="p-4 border border-green-200 rounded-lg bg-green-50">
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-lg">{booking.student_name}</h4>
+                                <p className="text-sm text-gray-600">Instrument: {booking.student_instrument}</p>
+                                <p className="text-sm text-gray-600">Learning Mode: {booking.student_learning_mode}</p>
+                                <p className="text-sm text-gray-600">Date: {formatDate(booking.booking_date)}</p>
+                                <p className="text-sm text-gray-600">Time: {formatTime(booking.start_time)} - {formatTime(booking.end_time)}</p>
+                                <p className="text-sm text-gray-600">Day: {booking.day_of_week}</p>
+                                <p className="text-sm text-gray-600">Status: <span className={`px-2 py-1 rounded text-xs ${getStatusColor(booking.status)}`}>{booking.status}</span></p>
+                                <p className="text-sm text-gray-600">Type: {booking.lesson_type}</p>
+                                {booking.notes && <p className="text-sm text-gray-600">Notes: {booking.notes}</p>}
+                              </div>
+                              <div className="flex flex-col space-y-2">
+                                <Button size="sm" variant="outline" onClick={() => handleViewInvoice(booking)}>View Invoice</Button>
+                                <Button size="sm" variant="outline" onClick={() => handleGenerateInvoice(booking.student_id, booking.period_start, booking.period_end)}>Generate Invoice</Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        <h3 className="text-lg font-semibold text-gray-700 mt-6">Past Bookings ({pastBookings.length})</h3>
+                        {pastBookings.map(booking => (
+                          <div key={booking.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-lg">{booking.student_name}</h4>
+                                <p className="text-sm text-gray-600">Instrument: {booking.student_instrument}</p>
+                                <p className="text-sm text-gray-600">Learning Mode: {booking.student_learning_mode}</p>
+                                <p className="text-sm text-gray-600">Date: {formatDate(booking.booking_date)}</p>
+                                <p className="text-sm text-gray-600">Time: {formatTime(booking.start_time)} - {formatTime(booking.end_time)}</p>
+                                <p className="text-sm text-gray-600">Day: {booking.day_of_week}</p>
+                                <p className="text-sm text-gray-600">Status: <span className={`px-2 py-1 rounded text-xs ${getStatusColor(booking.status)}`}>{booking.status}</span></p>
+                                <p className="text-sm text-gray-600">Type: {booking.lesson_type}</p>
+                                {booking.notes && <p className="text-sm text-gray-600">Notes: {booking.notes}</p>}
+                              </div>
+                              <div className="flex flex-col space-y-2">
+                                <Button size="sm" variant="outline" onClick={() => handleViewInvoice(booking)}>View Invoice</Button>
+                                <Button size="sm" variant="outline" onClick={() => handleGenerateInvoice(booking.student_id, booking.period_start, booking.period_end)}>Generate Invoice</Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 text-center py-8">No bookings scheduled yet.</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             {/* Video Conferencing Tab */}
             <TabsContent value="video-conferencing" className="mt-8">
               <Card className="shadow-lg border-0 bg-white/95">
@@ -1686,12 +1915,13 @@ const TeacherDashboard = () => {
                         {meetingRooms.map(room => (
                           <Card key={room.id} className="hover:shadow-md transition-shadow cursor-pointer">
                             <CardContent className="p-4">
-                              <h4 className="font-semibold">{room.name}</h4>
-                              <p className="text-sm text-gray-600">Capacity: {room.max_participants}</p>
-                              <p className="text-sm text-gray-600">Current Bookings: {room.current_bookings.length}</p>
-                              <p className="text-sm text-gray-600">Status: {room.is_available ? 'Available' : 'Occupied'}</p>
+                              <h4 className="font-semibold">{room.roomName}</h4>
+                              <p className="text-sm text-gray-600">Lesson Type: {room.lessonType}</p>
+                              <p className="text-sm text-gray-600">Date: {formatDate(room.startTime)}</p>
+                              <p className="text-sm text-gray-600">Time: {formatTime(room.startTime)} - {formatTime(room.endTime)}</p>
+                              <p className="text-sm text-gray-600">Status: {room.status}</p>
                               <Button variant="outline" size="sm" onClick={() => handleOpenVideoConference(room)}>
-                                Manage Bookings
+                                Join Meeting
                               </Button>
                             </CardContent>
                           </Card>

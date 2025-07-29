@@ -207,6 +207,17 @@ export const isMeetingActive = (startTime: string, endTime: string): boolean => 
   return now >= fifteenMinutesBefore && now <= end;
 };
 
+// Check if meeting link should be available (24 hours before start time)
+export const isMeetingLinkAvailable = (startTime: string): boolean => {
+  const now = new Date();
+  const start = new Date(startTime);
+  
+  // Meeting link is available 24 hours before the meeting starts
+  const twentyFourHoursBefore = new Date(start.getTime() - 24 * 60 * 60 * 1000);
+  
+  return now >= twentyFourHoursBefore;
+};
+
 // Get meeting status based on time
 export const getMeetingStatus = (startTime: string, endTime: string): MeetingRoom['status'] => {
   const now = new Date();

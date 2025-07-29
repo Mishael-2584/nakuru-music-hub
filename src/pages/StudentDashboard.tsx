@@ -19,7 +19,7 @@ import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
 import { calculateStudentInvoice, InvoiceCalculationResult } from '../lib/invoiceUtils';
 import { Invoice } from '../integrations/supabase/types';
 import VideoConferenceModal from '../components/VideoConferenceModal';
-import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking } from '../lib/videoConferencing';
+import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getMeetingDuration } from '../lib/videoConferencing';
 
 interface StudentProfile {
   id: string;
@@ -64,6 +64,7 @@ interface Lesson {
   materials_url?: string[];
   attendance_status: string;
   teacher_id?: string;
+  meeting_link?: string;
 }
 
 interface PracticeLog {
@@ -298,6 +299,20 @@ const StudentDashboard = () => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
+  // Add recurring booking state
+  const [recurringBooking, setRecurringBooking] = useState({
+    start_date: '',
+    end_date: '',
+    frequency: 'weekly',
+    notes: ''
+  });
+
+  // Add makeup booking state
+  const [makeupBooking, setMakeupBooking] = useState({
+    booking_date: '',
+    notes: ''
+  });
 
   useEffect(() => {
     if (user) {
@@ -831,12 +846,64 @@ const StudentDashboard = () => {
     setShowVideoConferenceModal(true);
   };
 
+  // Get next available date for a given day of the week
+  const getNextAvailableDate = (dayOfWeek: string): string => {
+    const today = new Date();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const targetDayIndex = dayNames.indexOf(dayOfWeek);
+    
+    if (targetDayIndex === -1) return 'Invalid day';
+    
+    const currentDayIndex = today.getDay();
+    let daysToAdd = targetDayIndex - currentDayIndex;
+    
+    // If the target day is today or has passed this week, get next week's date
+    if (daysToAdd <= 0) {
+      daysToAdd += 7;
+    }
+    
+    const nextDate = new Date(today);
+    nextDate.setDate(today.getDate() + daysToAdd);
+    
+    return nextDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  // Get next available date as ISO string for booking
+  const getNextAvailableDateISO = (dayOfWeek: string): string => {
+    const today = new Date();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const targetDayIndex = dayNames.indexOf(dayOfWeek);
+    
+    if (targetDayIndex === -1) return '';
+    
+    const currentDayIndex = today.getDay();
+    let daysToAdd = targetDayIndex - currentDayIndex;
+    
+    // If the target day is today or has passed this week, get next week's date
+    if (daysToAdd <= 0) {
+      daysToAdd += 7;
+    }
+    
+    const nextDate = new Date(today);
+    nextDate.setDate(today.getDate() + daysToAdd);
+    
+    return nextDate.toISOString().split('T')[0];
+  };
+
   // Handle booking a time slot
   const handleBookTimeSlot = async () => {
     if (!selectedTimeSlot || !studentProfile) return;
 
     try {
       const isOnline = studentProfile.learning_mode === 'online';
+      
+      // Automatically calculate the next available date for the selected day
+      const bookingDate = getNextAvailableDateISO(selectedTimeSlot.day_of_week);
       
       // Create booking
       const { data: booking, error } = await supabase
@@ -845,7 +912,7 @@ const StudentDashboard = () => {
           time_slot_id: selectedTimeSlot.id,
           student_id: studentProfile.id,
           teacher_id: selectedTimeSlot.teacher_id,
-          booking_date: newBooking.booking_date,
+          booking_date: bookingDate,
           start_time: selectedTimeSlot.start_time,
           end_time: selectedTimeSlot.end_time,
           status: 'confirmed',
@@ -876,8 +943,8 @@ const StudentDashboard = () => {
             teacherName,
             studentProfile.student_name,
             newBooking.lesson_type,
-            `${newBooking.booking_date}T${selectedTimeSlot.start_time}`,
-            `${newBooking.booking_date}T${selectedTimeSlot.end_time}`,
+            `${bookingDate}T${selectedTimeSlot.start_time}`,
+            `${bookingDate}T${selectedTimeSlot.end_time}`,
             newBooking.notes
           );
         } catch (meetingError) {
@@ -1009,9 +1076,60 @@ const StudentDashboard = () => {
     setNewBooking({
       booking_date: '',
       lesson_type: 'regular',
-      notes: ''
+      notes: '',
+      frequency: 'weekly',
+      end_date: ''
     });
     setShowRecurringBookingModal(true);
+  };
+
+  // Get recurring end date based on frequency
+  const getRecurringEndDate = (dayOfWeek: string, frequency: string): string => {
+    const startDate = new Date(getNextAvailableDateISO(dayOfWeek));
+    const endDate = new Date(startDate);
+    
+    switch (frequency) {
+      case 'weekly':
+        endDate.setDate(startDate.getDate() + 28); // 4 weeks
+        break;
+      case 'biweekly':
+        endDate.setDate(startDate.getDate() + 56); // 8 weeks
+        break;
+      case 'monthly':
+        endDate.setMonth(startDate.getMonth() + 3); // 3 months
+        break;
+      default:
+        endDate.setDate(startDate.getDate() + 28); // Default to 4 weeks
+    }
+    
+    return endDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  // Get recurring end date as ISO string
+  const getRecurringEndDateISO = (dayOfWeek: string, frequency: string): string => {
+    const startDate = new Date(getNextAvailableDateISO(dayOfWeek));
+    const endDate = new Date(startDate);
+    
+    switch (frequency) {
+      case 'weekly':
+        endDate.setDate(startDate.getDate() + 28); // 4 weeks
+        break;
+      case 'biweekly':
+        endDate.setDate(startDate.getDate() + 56); // 8 weeks
+        break;
+      case 'monthly':
+        endDate.setMonth(startDate.getMonth() + 3); // 3 months
+        break;
+      default:
+        endDate.setDate(startDate.getDate() + 28); // Default to 4 weeks
+    }
+    
+    return endDate.toISOString().split('T')[0];
   };
 
   // Handle recurring booking submission
@@ -1019,6 +1137,10 @@ const StudentDashboard = () => {
     if (!selectedTimeSlot || !studentProfile) return;
     
     try {
+      // Automatically calculate start and end dates
+      const startDate = getNextAvailableDateISO(selectedTimeSlot.day_of_week);
+      const endDate = getRecurringEndDateISO(selectedTimeSlot.day_of_week, recurringBooking.frequency);
+      
       // Create recurring booking pattern
       const { data, error } = await supabase
         .from('recurring_booking_patterns')
@@ -1029,11 +1151,11 @@ const StudentDashboard = () => {
           day_of_week: selectedTimeSlot.day_of_week,
           start_time: selectedTimeSlot.start_time,
           end_time: selectedTimeSlot.end_time,
-          frequency: newBooking.frequency || 'weekly',
-          start_date: newBooking.booking_date,
-          end_date: newBooking.end_date,
+          frequency: recurringBooking.frequency,
+          start_date: startDate,
+          end_date: endDate,
           lesson_type: newBooking.lesson_type,
-          notes: newBooking.notes
+          notes: recurringBooking.notes
         })
         .select()
         .single();
@@ -1053,6 +1175,12 @@ const StudentDashboard = () => {
         notes: '',
         frequency: 'weekly',
         end_date: ''
+      });
+      setRecurringBooking({
+        start_date: '',
+        end_date: '',
+        frequency: 'weekly',
+        notes: ''
       });
 
       toast({
@@ -1564,6 +1692,56 @@ const StudentDashboard = () => {
   (window as any).testLearningModeUpdate = testLearningModeUpdate;
   (window as any).testMultipleUpdateMethods = testMultipleUpdateMethods;
   (window as any).testWithRLSDisabled = testWithRLSDisabled;
+
+  // Add function to handle makeup lesson booking
+  const handleBookMakeupLesson = async () => {
+    if (!selectedMakeupCredit || !studentProfile) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert({
+          student_id: studentProfile.id,
+          teacher_id: selectedMakeupCredit.teacher_id,
+          booking_date: makeupBooking.booking_date,
+          start_time: selectedMakeupCredit.start_time,
+          end_time: selectedMakeupCredit.end_time,
+          status: 'confirmed',
+          lesson_type: 'makeup',
+          notes: makeupBooking.notes,
+          mode: studentProfile.learning_mode
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      // Mark makeup credit as used
+      await supabase
+        .from('makeup_credits')
+        .update({ is_used: true })
+        .eq('id', selectedMakeupCredit.id);
+
+      await fetchMyBookings();
+      setShowMakeupBookingModal(false);
+      setSelectedMakeupCredit(null);
+      setMakeupBooking({ booking_date: '', notes: '' });
+
+      toast({
+        title: "Success",
+        description: "Make-up lesson booked successfully!",
+      });
+    } catch (error) {
+      console.error('Error booking makeup lesson:', error);
+      toast({
+        title: "Error",
+        description: "Failed to book make-up lesson",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100">
@@ -2701,6 +2879,179 @@ const StudentDashboard = () => {
         userName={studentProfile?.student_name || 'Student'}
         userRole="student"
       />
+
+      {/* Booking Modal */}
+      <Dialog open={showBookingModal} onOpenChange={setShowBookingModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Book Time Slot</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {selectedTimeSlot && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <h4 className="font-semibold mb-2">Selected Time Slot</h4>
+                <div className="text-sm text-gray-600">
+                  <p><strong>Teacher:</strong> {selectedTimeSlot.teacher_name}</p>
+                  <p><strong>Day:</strong> {selectedTimeSlot.day_of_week}</p>
+                  <p><strong>Time:</strong> {formatTime(selectedTimeSlot.start_time)} - {formatTime(selectedTimeSlot.end_time)}</p>
+                  <p><strong>Type:</strong> {selectedTimeSlot.slot_type}</p>
+                  <p><strong>Next Available:</strong> {getNextAvailableDate(selectedTimeSlot.day_of_week)}</p>
+                </div>
+              </div>
+            )}
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="lesson_type" className="text-right">Lesson Type</Label>
+              <Select value={newBooking.lesson_type} onValueChange={(value) => setNewBooking({...newBooking, lesson_type: value})}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select lesson type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="regular">Regular Lesson</SelectItem>
+                  <SelectItem value="practice">Practice Session</SelectItem>
+                  <SelectItem value="consultation">Consultation</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="notes" className="text-right">Notes</Label>
+              <Textarea
+                id="notes"
+                value={newBooking.notes}
+                onChange={(e) => setNewBooking({...newBooking, notes: e.target.value})}
+                placeholder="Any special requests or notes..."
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBookingModal(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleBookTimeSlot}
+              disabled={!selectedTimeSlot}
+            >
+              Book Lesson
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Recurring Booking Modal */}
+      <Dialog open={showRecurringBookingModal} onOpenChange={setShowRecurringBookingModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Book Recurring Lessons</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {selectedTimeSlot && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <h4 className="font-semibold mb-2">Selected Time Slot</h4>
+                <div className="text-sm text-gray-600">
+                  <p><strong>Teacher:</strong> {selectedTimeSlot.teacher_name}</p>
+                  <p><strong>Day:</strong> {selectedTimeSlot.day_of_week}</p>
+                  <p><strong>Time:</strong> {formatTime(selectedTimeSlot.start_time)} - {formatTime(selectedTimeSlot.end_time)}</p>
+                  <p><strong>Start Date:</strong> {getNextAvailableDate(selectedTimeSlot.day_of_week)}</p>
+                  <p><strong>End Date:</strong> {getRecurringEndDate(selectedTimeSlot.day_of_week, recurringBooking.frequency)}</p>
+                </div>
+              </div>
+            )}
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="recurring_frequency" className="text-right">Frequency</Label>
+              <Select value={recurringBooking.frequency} onValueChange={(value) => setRecurringBooking({...recurringBooking, frequency: value})}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select frequency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="biweekly">Bi-weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="recurring_notes" className="text-right">Notes</Label>
+              <Textarea
+                id="recurring_notes"
+                value={recurringBooking.notes}
+                onChange={(e) => setRecurringBooking({...recurringBooking, notes: e.target.value})}
+                placeholder="Any special requests or notes..."
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRecurringBookingModal(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmitRecurringBooking}
+              disabled={!selectedTimeSlot}
+            >
+              Book Recurring Lessons
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Make-up Credit Booking Modal */}
+      <Dialog open={showMakeupBookingModal} onOpenChange={setShowMakeupBookingModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Book Make-up Lesson</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {selectedMakeupCredit && (
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                <h4 className="font-semibold mb-2">Make-up Credit Details</h4>
+                <div className="text-sm text-gray-600">
+                  <p><strong>Student:</strong> {selectedMakeupCredit.student_name}</p>
+                  <p><strong>Expires:</strong> {formatDate(selectedMakeupCredit.expires_at)}</p>
+                  <p><strong>Reason:</strong> {selectedMakeupCredit.reason}</p>
+                </div>
+              </div>
+            )}
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="makeup_date" className="text-right">Date</Label>
+              <Input
+                id="makeup_date"
+                type="date"
+                value={makeupBooking.booking_date}
+                onChange={(e) => setMakeupBooking({...makeupBooking, booking_date: e.target.value})}
+                className="col-span-3"
+                min={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="makeup_notes" className="text-right">Notes</Label>
+              <Textarea
+                id="makeup_notes"
+                value={makeupBooking.notes}
+                onChange={(e) => setMakeupBooking({...makeupBooking, notes: e.target.value})}
+                placeholder="Any special requests or notes..."
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMakeupBookingModal(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleBookMakeupLesson}
+              disabled={!makeupBooking.booking_date || !selectedMakeupCredit}
+            >
+              Book Make-up Lesson
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

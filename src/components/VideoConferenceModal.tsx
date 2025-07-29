@@ -29,7 +29,8 @@ import {
   isMeetingActive, 
   formatMeetingTime, 
   getMeetingDuration,
-  getMeetingStatus
+  getMeetingStatus,
+  isMeetingLinkAvailable
 } from '../lib/videoConferencing';
 
 interface VideoConferenceModalProps {
@@ -51,13 +52,16 @@ const VideoConferenceModal: React.FC<VideoConferenceModalProps> = ({
   const [isActive, setIsActive] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [meetingStatus, setMeetingStatus] = useState<'scheduled' | 'active' | 'completed' | 'cancelled'>('scheduled');
+  const [isLinkAvailable, setIsLinkAvailable] = useState(false);
 
   useEffect(() => {
     if (meetingRoom) {
       const active = isMeetingActive(meetingRoom.startTime, meetingRoom.endTime);
       const status = getMeetingStatus(meetingRoom.startTime, meetingRoom.endTime);
+      const linkAvailable = isMeetingLinkAvailable(meetingRoom.startTime);
       setIsActive(active);
       setMeetingStatus(status);
+      setIsLinkAvailable(linkAvailable);
     }
   }, [meetingRoom]);
 
@@ -135,7 +139,7 @@ const VideoConferenceModal: React.FC<VideoConferenceModalProps> = ({
   }
 
   const duration = getMeetingDuration(meetingRoom.startTime, meetingRoom.endTime);
-  const canJoin = isActive || meetingStatus === 'scheduled';
+  const canJoin = (isActive || meetingStatus === 'scheduled') && isLinkAvailable;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -243,6 +247,25 @@ const VideoConferenceModal: React.FC<VideoConferenceModalProps> = ({
                 </Button>
               </div>
 
+              {/* Meeting Link Availability Information */}
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-semibold text-blue-800 mb-2">Meeting Link Availability</h4>
+                <div className="text-sm text-blue-700 space-y-1">
+                  {isLinkAvailable ? (
+                    <p>✅ Meeting link is now available (24 hours before start time)</p>
+                  ) : (
+                    <p>⏰ Meeting link will be available 24 hours before the lesson starts</p>
+                  )}
+                  {isActive ? (
+                    <p>🎥 Meeting is currently active (15 minutes before start time)</p>
+                  ) : meetingStatus === 'scheduled' ? (
+                    <p>📅 Meeting is scheduled and will be active 15 minutes before start time</p>
+                  ) : meetingStatus === 'completed' ? (
+                    <p>✅ Meeting has ended</p>
+                  ) : null}
+                </div>
+              </div>
+
               {!canJoin && (
                 <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-sm text-yellow-800">
@@ -250,6 +273,8 @@ const VideoConferenceModal: React.FC<VideoConferenceModalProps> = ({
                       ? 'This meeting has ended.' 
                       : meetingStatus === 'cancelled'
                       ? 'This meeting has been cancelled.'
+                      : !isLinkAvailable
+                      ? 'Meeting link will be available 24 hours before the lesson starts.'
                       : 'Meeting will be available 15 minutes before start time.'
                     }
                   </p>
