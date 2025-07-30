@@ -30,6 +30,7 @@ interface TeacherProfile {
   subjects: string[];
   status: string;
   created_at: string;
+  user_id?: string; // Add user_id field
   notFound?: boolean;
 }
 
@@ -87,14 +88,19 @@ const EventDetailsModal = ({ open, onClose, event, isTeacher }) => {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [file, setFile] = useState(null);
-  const [materials, setMaterials] = useState(event.materials_url || []);
+  const [materials, setMaterials] = useState(event?.materials_url || []);
+
+  // Don't render if no event is provided
+  if (!event) {
+    return null;
+  }
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file || !event) return;
     setUploading(true);
     setUploadError("");
     try {
@@ -116,7 +122,7 @@ const EventDetailsModal = ({ open, onClose, event, isTeacher }) => {
       setUploading(false);
     }
   };
-  if (!event) return null;
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
@@ -420,213 +426,116 @@ const TeacherDashboard = () => {
 
   useEffect(() => {
     const checkUserRole = async () => {
+      console.log('[TeacherDashboard] checkUserRole called');
+      
       if (!user) {
-        setChecking(false);
+        console.log('[TeacherDashboard] No user, skipping checkUserRole');
         return;
       }
-      setChecking(true);
-      try {
-        // 1. Check profiles table for role
-        console.log('[TeacherDashboard] Checking profiles table for user:', user.id);
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-        if (profile && !profileError) {
-          console.log('[TeacherDashboard] User role from profiles:', profile.role);
-          if (profile.role === 'teacher') {
-            // First try to fetch teacher profile by user_id (Auth UID)
-            console.log('[TeacherDashboard] Looking for teacher by user_id:', user.id);
-            const { data: teacherProfile, error: teacherError } = await supabase
-              .from('teachers')
-              .select('*')
-              .eq('user_id', user.id)
-              .single();
-            console.log('[TeacherDashboard] teacherProfile by user_id:', teacherProfile, 'teacherError:', teacherError);
-            
-            if (teacherProfile && !teacherError && (teacherProfile.status === 'approved' || teacherProfile.status === 'active')) {
-              console.log('[TeacherDashboard] ✅ Found approved teacher by user_id');
-              setIsTeacher(true);
-              setIsApproved(true);
-              setProfile(teacherProfile);
-              fetchTeacherData(teacherProfile.id);
-              return;
-            }
-            
-            // If not found by user_id, try by email as fallback
-            console.log('[TeacherDashboard] Not found by user_id, trying by email:', user.email);
-            const { data: teacherProfileByEmail, error: teacherErrorByEmail } = await supabase
-              .from('teachers')
-              .select('*')
-              .eq('email', user.email)
-              .single();
-            console.log('[TeacherDashboard] teacherProfile by email:', teacherProfileByEmail, 'teacherErrorByEmail:', teacherErrorByEmail);
-            
-            if (teacherProfileByEmail && !teacherErrorByEmail && (teacherProfileByEmail.status === 'approved' || teacherProfileByEmail.status === 'active')) {
-              console.log('[TeacherDashboard] ✅ Found approved teacher by email');
-              setIsTeacher(true);
-              setIsApproved(true);
-              setProfile(teacherProfileByEmail);
-              fetchTeacherData(teacherProfileByEmail.id);
-              return;
-            }
-            
-            // If teacher role is set but not found in teachers table, this is an error
-            console.error('[TeacherDashboard] ❌ Teacher role found but no teacher record exists for user_id:', user.id, 'or email:', user.email);
-            console.error('[TeacherDashboard] ❌ This should not happen - teacher record exists in database but not found by query');
-            toast({
-              title: "Account Error",
-              description: "Your teacher account is not properly set up. Please contact the administrator.",
-              variant: "destructive",
-            });
-            // Redirect to student dashboard as fallback
-            navigate('/student', { replace: true });
-            return;
-          } else if (profile.role === 'admin') {
-            navigate('/admin', { replace: true });
-            return;
-          } else if (profile.role === 'student') {
-            navigate('/student', { replace: true });
-            return;
-          }
-        } else {
-          console.log('[TeacherDashboard] No profile found or error:', profileError);
-        }
 
-        // 2. Only check teachers table if no profile role found
-        console.log('[TeacherDashboard] No profile found or error:', profileError);
-        console.log('[TeacherDashboard] Checking teachers table as fallback...');
-        // First try by user_id
-        const { data: teacherProfile, error: teacherError } = await supabase
+      try {
+        console.log('[TeacherDashboard] Checking user role for:', user.email);
+        
+        // First try to find teacher by user_id (Auth UID)
+        let { data: teacherProfile, error: teacherError } = await supabase
           .from('teachers')
           .select('*')
           .eq('user_id', user.id)
           .single();
-        console.log('[TeacherDashboard] teacherProfile by user_id (fallback):', teacherProfile, 'teacherError:', teacherError);
-        
-        if (teacherProfile && !teacherError && (teacherProfile.status === 'approved' || teacherProfile.status === 'active')) {
-          console.log('[TeacherDashboard] ✅ Found approved teacher by user_id (fallback)');
-          setIsTeacher(true);
-          setIsApproved(true);
-          setProfile(teacherProfile);
-          fetchTeacherData(teacherProfile.id);
-          return;
-        }
-        
-        // If not found by user_id, try by email
-        console.log('[TeacherDashboard] Not found by user_id (fallback), trying by email:', user.email);
-        const { data: teacherProfileByEmail, error: teacherErrorByEmail } = await supabase
-          .from('teachers')
-          .select('*')
-          .eq('email', user.email)
-          .single();
-        console.log('[TeacherDashboard] teacherProfile by email (fallback):', teacherProfileByEmail, 'teacherErrorByEmail:', teacherErrorByEmail);
-        
-        if (teacherProfileByEmail && !teacherErrorByEmail && (teacherProfileByEmail.status === 'approved' || teacherProfileByEmail.status === 'active')) {
-          console.log('[TeacherDashboard] ✅ Found approved teacher by email (fallback)');
-          setIsTeacher(true);
-          setIsApproved(true);
-          setProfile(teacherProfileByEmail);
-          fetchTeacherData(teacherProfileByEmail.id);
-          return;
-        }
 
-        // 3. Only check pending_teachers if not found in teachers table
-        try {
-          const { data: pendingTeacher, error: pendingTeacherError } = await supabase
-            .from('pending_teachers')
-            .select('id')
+        console.log('[TeacherDashboard] Teacher lookup by user_id:', {
+          found: !!teacherProfile,
+          profile: teacherProfile,
+          error: teacherError
+        });
+
+        // If not found by user_id, try by email
+        if (!teacherProfile && user.email) {
+          const { data: teacherByEmail, error: emailError } = await supabase
+            .from('teachers')
+            .select('*')
             .eq('email', user.email)
             .single();
-          if (pendingTeacher && !pendingTeacherError) {
-            setIsTeacher(false);
-            setIsApproved(false);
-            navigate('/pending-teacher', { replace: true });
-            return;
-          }
-        } catch (err) {
-          console.warn('[TeacherDashboard] Skipping pending_teachers check due to error:', err);
+
+          console.log('[TeacherDashboard] Teacher lookup by email:', {
+            found: !!teacherByEmail,
+            profile: teacherByEmail,
+            error: emailError
+          });
+
+          teacherProfile = teacherByEmail;
+          teacherError = emailError;
         }
 
-        // 4. If not admin or teacher, redirect to student dashboard
-        navigate('/student', { replace: true });
+        if (teacherProfile) {
+          console.log('[TeacherDashboard] Teacher profile found:', teacherProfile);
+          setProfile(teacherProfile);
+          setIsTeacher(true);
+          setIsApproved(teacherProfile.status === 'approved');
+        } else {
+          console.log('[TeacherDashboard] No teacher profile found');
+          setIsTeacher(false);
+          setIsApproved(false);
+        }
       } catch (error) {
-        console.error('[TeacherDashboard] Error checking user role:', error);
-        // If there's an error, redirect to student dashboard as fallback
-        navigate('/student', { replace: true });
+        console.error('[TeacherDashboard] Error in checkUserRole:', error);
+        setIsTeacher(false);
+        setIsApproved(false);
       } finally {
         setChecking(false);
       }
     };
     checkUserRole();
-  }, [user, navigate]);
+  }, [user]);
+
+  // Fetch teacher data when profile is set
+  useEffect(() => {
+    if (profile && isTeacher && isApproved) {
+      console.log('[TeacherDashboard] Profile set, fetching teacher data for:', profile.id);
+      fetchTeacherData(profile.id);
+    }
+  }, [profile, isTeacher, isApproved]);
 
   const fetchTeacherData = async (teacherId: string) => {
+    console.log('[TeacherDashboard] fetchTeacherData called with teacherId:', teacherId);
+    
     try {
-      // Fetch students assigned to this teacher
-      const { data: studentsData, error: studentsError } = await supabase
-        .from('students')
-        .select('*')
-        .eq('status', 'active');
-
-      if (!studentsError && studentsData) {
-        setStudents(studentsData);
-      }
-
-      // Fetch lessons for this teacher
-      const { data: lessonsData, error: lessonsError } = await supabase
-        .from('lessons')
-        .select(`
-          *,
-          students!inner(student_name)
-        `)
-        .eq('teacher_id', teacherId)
-        .order('lesson_date', { ascending: true });
-
-      if (!lessonsError && lessonsData) {
-        setLessons(lessonsData.map(lesson => ({
-          ...lesson,
-          student_name: lesson.students?.student_name
-        })));
-      }
-
-      // Fetch messages
-      const { data: messagesData, error: messagesError } = await supabase
-        .from('portal_messages')
-        .select(`
-          *,
-          students!inner(student_name)
-        `)
-        .eq('recipient_id', user?.id)
-        .order('created_at', { ascending: false });
-
-      if (!messagesError && messagesData) {
-        setMessages(messagesData.map(message => ({
-          ...message,
-          student_name: message.students?.student_name
-        })));
-      }
-
-      // Fetch time slots
+      // Fetch teacher's time slots
       const { data: timeSlotsData, error: timeSlotsError } = await supabase
         .from('time_slots')
         .select('*')
         .eq('teacher_id', teacherId)
         .order('day_of_week', { ascending: true });
 
-      if (!timeSlotsError && timeSlotsData) {
-        setTimeSlots(timeSlotsData);
+      if (timeSlotsError) {
+        console.error('Error fetching time slots:', timeSlotsError);
+      } else {
+        setTimeSlots(timeSlotsData || []);
+        console.log('[TeacherDashboard] Time slots loaded:', timeSlotsData?.length || 0);
       }
+
+      // Fetch teacher's lessons
+      const { data: lessonsData, error: lessonsError } = await supabase
+        .from('lessons')
+        .select('*')
+        .eq('teacher_id', teacherId)
+        .order('lesson_date', { ascending: false });
+
+      if (lessonsError) {
+        console.error('Error fetching lessons:', lessonsError);
+      } else {
+        setLessons(lessonsData || []);
+        console.log('[TeacherDashboard] Lessons loaded:', lessonsData?.length || 0);
+      }
+
+      // Fetch invoices
+      await fetchInvoices();
 
       // Fetch user's meeting rooms
       await fetchMeetingRooms();
 
       // Fetch teacher's bookings
       await fetchTeacherBookings();
-
-      // Test teacher access to bookings
-      await testTeacherBookingsAccess();
 
     } catch (error) {
       console.error('Error fetching teacher data:', error);
@@ -645,109 +554,244 @@ const TeacherDashboard = () => {
     }
   };
 
-  // Test teacher access to bookings
-  const testTeacherBookingsAccess = async () => {
-    if (!profile) return;
+
+
+  // Fetch teacher's bookings with complete information
+  const fetchTeacherBookings = async () => {
+    console.log('[TeacherDashboard] fetchTeacherBookings called');
     
+    if (!profile) {
+      console.log('[TeacherDashboard] No profile, skipping fetchTeacherBookings');
+      return;
+    }
+
     try {
-      console.log('[TeacherDashboard] Testing teacher access to bookings...');
+      console.log('[TeacherDashboard] Fetching bookings for teacher:', {
+        profileId: profile.id,
+        profileName: profile.name,
+        profileEmail: profile.email,
+        profileUserId: profile.user_id
+      });
       
-      // Test 1: Direct query without joins
-      const { data: directBookings, error: directError } = await supabase
+      // Fetch all bookings for this teacher with all necessary fields
+      const { data: allBookings, error: allBookingsError } = await supabase
         .from('bookings')
-        .select('*')
+        .select(`
+          id,
+          time_slot_id,
+          student_id,
+          teacher_id,
+          booking_date,
+          start_time,
+          end_time,
+          status,
+          lesson_type,
+          notes,
+          created_at,
+          updated_at
+        `)
         .eq('teacher_id', profile.id)
-        .limit(5);
+        .order('booking_date', { ascending: true });
       
-      console.log('[TeacherDashboard] Direct bookings query:', directBookings, 'Error:', directError);
+      console.log('[TeacherDashboard] All bookings for teacher:', {
+        bookings: allBookings,
+        error: allBookingsError,
+        count: allBookings?.length || 0
+      });
       
-      // Test 2: Check if teacher exists in teachers table
+      // Check if teacher exists in teachers table
       const { data: teacherCheck, error: teacherError } = await supabase
         .from('teachers')
         .select('*')
         .eq('id', profile.id);
       
-      console.log('[TeacherDashboard] Teacher check:', teacherCheck, 'Error:', teacherError);
+      console.log('[TeacherDashboard] Teacher check:', {
+        teacher: teacherCheck,
+        error: teacherError,
+        found: teacherCheck?.length > 0
+      });
       
-      // Test 3: Check auth user info
+      // Check auth user info
       const { data: { user } } = await supabase.auth.getUser();
       console.log('[TeacherDashboard] Auth user:', user);
       
-    } catch (error) {
-      console.error('[TeacherDashboard] Error testing bookings access:', error);
-    }
-  };
-
-  // Fetch teacher's bookings
-  const fetchTeacherBookings = async () => {
-    if (!profile) return;
-
-    try {
-      console.log('[TeacherDashboard] Fetching bookings for teacher:', profile.id, profile.name, profile.email);
-      
-      // First, let's check what bookings exist for this teacher
-      const { data: allBookings, error: allBookingsError } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('teacher_id', profile.id);
-      
-      console.log('[TeacherDashboard] All bookings for teacher:', allBookings, 'Error:', allBookingsError);
-      
-      // Now try the full query with joins
-      const { data, error } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          students!inner(
+      // Fetch student information separately
+      if (allBookings && allBookings.length > 0) {
+        const studentIds = [...new Set(allBookings.map(booking => booking.student_id))];
+        console.log('[TeacherDashboard] Fetching student info for IDs:', studentIds);
+        
+        // Try multiple approaches to get student data
+        console.log('[TeacherDashboard] Student IDs to fetch:', studentIds);
+        
+        // Approach 1: Direct query
+        const { data: studentsData, error: studentsError } = await supabase
+          .from('students')
+          .select(`
+            id,
             student_name,
             email,
             phone,
             instrument,
-            learning_mode
-          ),
-          time_slots(
-            day_of_week
-          )
-        `)
-        .eq('teacher_id', profile.id)
-        .order('booking_date', { ascending: true });
-
-      console.log('[TeacherDashboard] Bookings with joins:', data, 'Error:', error);
-
-      if (!error && data) {
-        const bookingsWithStudentInfo = data.map(booking => ({
-          ...booking,
-          student_name: booking.students?.student_name || 'Unknown Student',
-          student_email: booking.students?.email || '',
-          student_phone: booking.students?.phone || '',
-          student_instrument: booking.students?.instrument || '',
-          student_learning_mode: booking.students?.learning_mode || '',
-          day_of_week: booking.time_slots?.day_of_week || ''
-        }));
+            learning_mode,
+            age,
+            proficiency_level,
+            status
+          `)
+          .in('id', studentIds);
         
-        setBookings(bookingsWithStudentInfo);
+        console.log('[TeacherDashboard] Direct query result:', {
+          students: studentsData,
+          error: studentsError,
+          count: studentsData?.length || 0
+        });
+        
+        // Approach 2: If direct query fails, try individual queries
+        let finalStudentsData = studentsData;
+        if (!studentsData || studentsData.length === 0) {
+          console.log('[TeacherDashboard] Direct query failed, trying individual queries...');
+          
+          const individualStudents = [];
+          for (const studentId of studentIds) {
+            console.log('[TeacherDashboard] Fetching individual student:', studentId);
+            const { data: singleStudent, error: singleError } = await supabase
+              .from('students')
+              .select('*')
+              .eq('id', studentId)
+              .single();
+            
+            console.log('[TeacherDashboard] Individual student result:', {
+              student: singleStudent,
+              error: singleError,
+              studentId: studentId
+            });
+            
+            if (singleStudent) {
+              individualStudents.push(singleStudent);
+            }
+          }
+          
+          finalStudentsData = individualStudents;
+          console.log('[TeacherDashboard] Individual students collected:', finalStudentsData);
+          
+          // Approach 3: If still no data, create a fallback student object
+          if (finalStudentsData.length === 0) {
+            console.log('[TeacherDashboard] No student data found, creating fallback...');
+            finalStudentsData = studentIds.map(studentId => ({
+              id: studentId,
+              student_name: `Student ${studentId.slice(0, 8)}`,
+              email: 'student@example.com',
+              phone: '',
+              instrument: 'Unknown',
+              learning_mode: 'in-person',
+              age: 0,
+              proficiency_level: 'beginner',
+              status: 'active'
+            }));
+            console.log('[TeacherDashboard] Created fallback students:', finalStudentsData);
+          }
+        }
+        
+        // Fetch time slot information for each booking
+        const timeSlotIds = [...new Set(allBookings.map(booking => booking.time_slot_id).filter(Boolean))];
+        console.log('[TeacherDashboard] Fetching time slot info for IDs:', timeSlotIds);
+        
+        const { data: timeSlotsData, error: timeSlotsError } = await supabase
+          .from('time_slots')
+          .select(`
+            id,
+            teacher_id,
+            day_of_week,
+            start_time,
+            end_time,
+            is_available,
+            slot_type,
+            max_students,
+            description
+          `)
+          .in('id', timeSlotIds);
+        
+        console.log('[TeacherDashboard] Time slots data:', {
+          timeSlots: timeSlotsData,
+          error: timeSlotsError
+        });
+        
+        // Create maps for easy lookup
+        const studentsMap = {};
+        if (finalStudentsData) {
+          finalStudentsData.forEach(student => {
+            studentsMap[student.id] = student;
+          });
+        }
+        
+        const timeSlotsMap = {};
+        if (timeSlotsData) {
+          timeSlotsData.forEach(slot => {
+            timeSlotsMap[slot.id] = slot;
+          });
+        }
+        
+                  // Process bookings with all information
+          const bookingsWithFullInfo = allBookings.map(booking => {
+            const student = studentsMap[booking.student_id];
+            const timeSlot = timeSlotsMap[booking.time_slot_id];
+            
+            console.log('[TeacherDashboard] Processing booking:', {
+              bookingId: booking.id,
+              studentId: booking.student_id,
+              student: student,
+              timeSlotId: booking.time_slot_id,
+              timeSlot: timeSlot
+            });
+            
+            return {
+            ...booking,
+            // Student information
+            student_name: student?.student_name || 'Unknown Student',
+            student_email: student?.email || '',
+            student_phone: student?.phone || '',
+            student_instrument: student?.instrument || '',
+            student_learning_mode: student?.learning_mode || '',
+            student_age: student?.age || '',
+            student_proficiency: student?.proficiency_level || '',
+            student_status: student?.status || '',
+            // Time slot information
+            day_of_week: timeSlot?.day_of_week || '',
+            slot_type: timeSlot?.slot_type || '',
+            max_students: timeSlot?.max_students || 1,
+            slot_description: timeSlot?.description || '',
+            slot_is_available: timeSlot?.is_available || false,
+            // Booking information
+            booking_status: booking.status,
+            booking_lesson_type: booking.lesson_type,
+            booking_notes: booking.notes,
+            // Formatted dates and times
+            formatted_date: new Date(booking.booking_date).toLocaleDateString(),
+            formatted_start_time: booking.start_time,
+            formatted_end_time: booking.end_time,
+            // Calculate if booking is upcoming or past
+            is_upcoming: new Date(`${booking.booking_date}T${booking.start_time}`) > new Date(),
+            is_past: new Date(`${booking.booking_date}T${booking.start_time}`) <= new Date()
+          };
+        });
+        
+        console.log('[TeacherDashboard] Processed bookings with full info:', bookingsWithFullInfo);
+        
+        setBookings(bookingsWithFullInfo);
         
         // Separate upcoming and past bookings
-        const now = new Date();
-        const upcoming = bookingsWithStudentInfo.filter(booking => {
-          const bookingDate = new Date(`${booking.booking_date}T${booking.start_time}`);
-          return bookingDate > now;
-        });
-        const past = bookingsWithStudentInfo.filter(booking => {
-          const bookingDate = new Date(`${booking.booking_date}T${booking.start_time}`);
-          return bookingDate <= now;
-        });
+        const upcoming = bookingsWithFullInfo.filter(booking => booking.is_upcoming);
+        const past = bookingsWithFullInfo.filter(booking => booking.is_past);
         
         setUpcomingBookings(upcoming);
         setPastBookings(past);
         
         console.log('[TeacherDashboard] Processed bookings:', {
-          total: bookingsWithStudentInfo.length,
+          total: bookingsWithFullInfo.length,
           upcoming: upcoming.length,
           past: past.length
         });
       } else {
-        console.error('[TeacherDashboard] Error fetching bookings:', error);
+        console.log('[TeacherDashboard] No bookings found, setting empty arrays');
         setBookings([]);
         setUpcomingBookings([]);
         setPastBookings([]);
@@ -762,6 +806,69 @@ const TeacherDashboard = () => {
     setSelectedMeetingRoom(meetingRoom);
     setShowVideoConferenceModal(true);
   };
+
+  // Create meeting room for existing booking if it doesn't have one
+                  const createMeetingRoomForExistingBooking = async (booking: any) => {
+                  try {
+                    // Check if meeting room already exists for this booking
+                    const { getMeetingRoomByBooking } = await import('../lib/videoConferencing');
+                    const existingMeetingRoom = await getMeetingRoomByBooking(booking.id);
+                    
+                    if (existingMeetingRoom) {
+                      toast({
+                        title: "Meeting Room Already Exists",
+                        description: "A video conference room already exists for this booking.",
+                      });
+                      return existingMeetingRoom;
+                    }
+                    
+                    console.log('[TeacherDashboard] Creating meeting room for existing booking:', booking);
+                    
+                    const { createMeetingRoom } = await import('../lib/videoConferencing');
+                    
+                    // Get student and teacher names
+                    const studentName = booking.student_name || 'Student';
+                    const teacherName = profile?.name || 'Teacher';
+                    
+                    const meetingRoom = await createMeetingRoom(
+                      booking.id,
+                      booking.teacher_id,
+                      booking.student_id,
+                      teacherName,
+                      studentName,
+                      booking.booking_lesson_type || booking.lesson_type || 'regular',
+                      `${booking.booking_date}T${booking.start_time}`,
+                      `${booking.booking_date}T${booking.end_time}`,
+                      booking.booking_notes || booking.notes
+                    );
+                    
+                    console.log('[TeacherDashboard] Meeting room created for existing booking:', meetingRoom);
+                    
+                    // Update booking with meeting link
+                    await supabase
+                      .from('bookings')
+                      .update({ 
+                        meeting_link: meetingRoom.meetingUrl,
+                        mode: 'online'
+                      })
+                      .eq('id', booking.id);
+                      
+                    toast({
+                      title: "Meeting Room Created",
+                      description: `Meeting room created successfully for ${studentName} on ${new Date(booking.booking_date).toLocaleDateString()}`,
+                    });
+                      
+                    return meetingRoom;
+                  } catch (error) {
+                    console.error('[TeacherDashboard] Error creating meeting room for existing booking:', error);
+                    toast({
+                      title: "Error Creating Meeting Room",
+                      description: error instanceof Error ? error.message : "Failed to create meeting room. Please try again.",
+                      variant: "destructive",
+                    });
+                    return null;
+                  }
+                };
 
   const handleSignOut = async () => {
     await signOut();
@@ -928,42 +1035,67 @@ const TeacherDashboard = () => {
 
   // Convert lessons and bookings to calendar events
   const lessonEventKeys = lessons.map(l => `${l.lesson_date}_${l.start_time}_${l.end_time}`);
+  
+
+  
   const calendarEvents: LessonEvent[] = [
-    ...lessons.map(lesson => ({
-      id: lesson.id,
-      title: lesson.title || 'Lesson',
-      start: new Date(`${lesson.lesson_date}T${lesson.start_time}`),
-      end: new Date(`${lesson.lesson_date}T${lesson.end_time}`),
-      status: lesson.status,
-      lesson_type: lesson.lesson_type,
-      student_name: lesson.student_name,
-      notes: lesson.notes,
-      lesson_date: lesson.lesson_date,
-      start_time: lesson.start_time,
-      end_time: lesson.end_time,
-      materials_url: lesson.materials_url || [],
-      ...lesson,
-    })),
+    ...lessons.map(lesson => {
+      const event = {
+        id: lesson.id,
+        title: lesson.title || 'Lesson',
+        start: new Date(`${lesson.lesson_date}T${lesson.start_time}`),
+        end: new Date(`${lesson.lesson_date}T${lesson.end_time}`),
+        status: lesson.status,
+        lesson_type: lesson.lesson_type,
+        student_name: lesson.student_name,
+        notes: lesson.notes,
+        lesson_date: lesson.lesson_date,
+        start_time: lesson.start_time,
+        end_time: lesson.end_time,
+        materials_url: lesson.materials_url || [],
+        ...lesson,
+      };
+              return event;
+      }),
     ...bookings.filter(booking => {
       // Only show if no lesson exists for this slot/date/time
       const key = `${booking.booking_date}_${booking.start_time}_${booking.end_time}`;
-      return !lessonEventKeys.includes(key) && booking.status !== 'cancelled';
-    }).map(booking => ({
-      id: booking.id,
-      title: booking.status === 'pending' ? 'Pending Booking' : (booking.lesson_type === 'makeup' ? 'Make-up Booking' : `${booking.student_name} - ${booking.lesson_type || 'Lesson'}`),
-      start: new Date(`${booking.booking_date}T${booking.start_time}`),
-      end: new Date(`${booking.booking_date}T${booking.end_time}`),
-      status: booking.status,
-      lesson_type: booking.lesson_type || 'lesson',
-      student_name: booking.student_name,
-      notes: booking.notes,
-      lesson_date: booking.booking_date,
-      start_time: booking.start_time,
-      end_time: booking.end_time,
-      materials_url: booking.materials_url || [],
-      ...booking,
-    })),
+              const shouldInclude = !lessonEventKeys.includes(key) && booking.booking_status !== 'cancelled';
+        return shouldInclude;
+    }).map(booking => {
+      const event = {
+        id: booking.id,
+        title: booking.booking_status === 'pending' ? 'Pending Booking' : 
+               (booking.booking_lesson_type === 'makeup' ? 'Make-up Booking' : 
+               `${booking.student_name} - ${booking.student_instrument} (${booking.booking_lesson_type || 'Regular'})`),
+        start: new Date(`${booking.booking_date}T${booking.start_time}`),
+        end: new Date(`${booking.booking_date}T${booking.end_time}`),
+        status: booking.booking_status || booking.status,
+        lesson_type: booking.booking_lesson_type || booking.lesson_type || 'lesson',
+        student_name: booking.student_name,
+        student_instrument: booking.student_instrument,
+        student_learning_mode: booking.student_learning_mode,
+        student_age: booking.student_age,
+        student_proficiency: booking.student_proficiency,
+        day_of_week: booking.day_of_week,
+        slot_type: booking.slot_type,
+        notes: booking.booking_notes || booking.notes,
+        lesson_date: booking.booking_date,
+        start_time: booking.start_time,
+        end_time: booking.end_time,
+        formatted_date: booking.formatted_date,
+        formatted_start_time: booking.formatted_start_time,
+        formatted_end_time: booking.formatted_end_time,
+        is_upcoming: booking.is_upcoming,
+        is_past: booking.is_past,
+        materials_url: booking.materials_url || [],
+        ...booking,
+              };
+        return event;
+      }),
   ];
+  
+
 
   // Filtered events for the calendar
   const filteredCalendarEvents = useMemo(() => {
@@ -999,6 +1131,126 @@ const TeacherDashboard = () => {
       due_date: periodEnd,
     });
     await fetchInvoices();
+  };
+
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [selectedBookingForReschedule, setSelectedBookingForReschedule] = useState<any>(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTimeSlot, setRescheduleTimeSlot] = useState<any>(null);
+  const [availableTimeSlotsForReschedule, setAvailableTimeSlotsForReschedule] = useState<TimeSlot[]>([]);
+
+  // Handle reschedule booking
+  const handleRescheduleBooking = async () => {
+    if (!selectedBookingForReschedule || !rescheduleTimeSlot || !rescheduleDate) {
+      toast({
+        title: "Error",
+        description: "Please select a new date and time slot for rescheduling.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Update the booking with new date and time slot
+      const { error: updateError } = await supabase
+        .from('bookings')
+        .update({
+          booking_date: rescheduleDate,
+          start_time: rescheduleTimeSlot.start_time,
+          end_time: rescheduleTimeSlot.end_time,
+          time_slot_id: rescheduleTimeSlot.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedBookingForReschedule.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Update meeting room if it exists
+      if (selectedBookingForReschedule.meeting_room) {
+        const { updateMeetingRoomStatus } = await import('../lib/videoConferencing');
+        await updateMeetingRoomStatus(selectedBookingForReschedule.meeting_room.id, 'cancelled');
+        
+        // Create new meeting room for the rescheduled booking
+        const { createMeetingRoom } = await import('../lib/videoConferencing');
+        const teacherName = profile?.name || 'Teacher';
+        
+        const newMeetingRoom = await createMeetingRoom(
+          selectedBookingForReschedule.id,
+          selectedBookingForReschedule.teacher_id,
+          selectedBookingForReschedule.student_id,
+          teacherName,
+          selectedBookingForReschedule.student_name,
+          selectedBookingForReschedule.booking_lesson_type || selectedBookingForReschedule.lesson_type || 'regular',
+          `${rescheduleDate}T${rescheduleTimeSlot.start_time}`,
+          `${rescheduleDate}T${rescheduleTimeSlot.end_time}`,
+          `Rescheduled from ${selectedBookingForReschedule.booking_date}`
+        );
+
+        // Update booking with new meeting link
+        await supabase
+          .from('bookings')
+          .update({ 
+            meeting_link: newMeetingRoom.meetingUrl,
+            mode: 'online'
+          })
+          .eq('id', selectedBookingForReschedule.id);
+      }
+
+      toast({
+        title: "Booking Rescheduled",
+        description: `Booking has been successfully rescheduled to ${new Date(rescheduleDate).toLocaleDateString()} at ${rescheduleTimeSlot.start_time}`,
+      });
+
+      // Refresh data
+      await fetchTeacherBookings();
+      await fetchAvailableTimeSlotsForReschedule();
+
+      // Close modal and reset state
+      setShowRescheduleModal(false);
+      setSelectedBookingForReschedule(null);
+      setRescheduleDate('');
+      setRescheduleTimeSlot(null);
+
+    } catch (error) {
+      console.error('Error rescheduling booking:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reschedule booking. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Fetch available time slots for rescheduling
+  const fetchAvailableTimeSlotsForReschedule = async () => {
+    if (!profile) return;
+
+    try {
+      const { data: timeSlots, error } = await supabase
+        .from('time_slots')
+        .select('*')
+        .eq('teacher_id', profile.id)
+        .eq('is_available', true)
+        .order('day_of_week', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching time slots for reschedule:', error);
+        return;
+      }
+
+      setAvailableTimeSlotsForReschedule(timeSlots || []);
+    } catch (error) {
+      console.error('Error fetching time slots for reschedule:', error);
+    }
+  };
+
+  // Open reschedule modal
+  const openRescheduleModal = (booking: any) => {
+    setSelectedBookingForReschedule(booking);
+    setShowRescheduleModal(true);
+    fetchAvailableTimeSlotsForReschedule();
   };
 
   if (loading || checking) {
@@ -1682,6 +1934,9 @@ const TeacherDashboard = () => {
             <TabsContent value="calendar" className="mt-8">
               <Card className="p-6 bg-white shadow-lg rounded-lg">
                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><CalendarIcon className="w-5 h-5" /> My Teaching Calendar</h2>
+                
+
+                
                 {/* Filters */}
                 <div className="flex flex-wrap gap-4 mb-6">
                   <div>
@@ -1736,12 +1991,38 @@ const TeacherDashboard = () => {
                     </Select>
                   </div>
                 </div>
-                <LessonCalendar
-                  events={filteredCalendarEvents}
-                  onSelectEvent={handleSelectEvent}
-                  defaultView="week"
-                />
-                <EventDetailsModal open={eventModalOpen} onClose={() => setEventModalOpen(false)} event={selectedEvent} isTeacher={isTeacher} />
+                
+                {/* Calendar */}
+                <div className="border rounded-lg p-4">
+                  {filteredCalendarEvents.length > 0 ? (
+                    <LessonCalendar
+                      events={filteredCalendarEvents}
+                      onSelectEvent={handleSelectEvent}
+                      defaultView="week"
+                    />
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No events to display in calendar.</p>
+                      <p className="text-sm mt-2">This could be because:</p>
+                      <ul className="text-sm mt-1 text-left max-w-md mx-auto">
+                        <li>• No lessons or bookings have been created yet</li>
+                        <li>• Current filters are hiding all events</li>
+                        <li>• Data is still loading</li>
+                      </ul>
+                      <div className="mt-4 p-3 bg-yellow-100 rounded">
+                        <p className="text-sm"><strong>Debug Info:</strong></p>
+                        <p className="text-xs">Lessons: {lessons.length}</p>
+                        <p className="text-xs">Bookings: {bookings.length}</p>
+                        <p className="text-xs">Calendar Events: {calendarEvents.length}</p>
+                        <p className="text-xs">Filtered Events: {filteredCalendarEvents.length}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {selectedEvent && (
+                  <EventDetailsModal open={eventModalOpen} onClose={() => setEventModalOpen(false)} event={selectedEvent} isTeacher={isTeacher} />
+                )}
               </Card>
             </TabsContent>
 
@@ -1859,6 +2140,24 @@ const TeacherDashboard = () => {
                               <div className="flex flex-col space-y-2">
                                 <Button size="sm" variant="outline" onClick={() => handleViewInvoice(booking)}>View Invoice</Button>
                                 <Button size="sm" variant="outline" onClick={() => handleGenerateInvoice(booking.student_id, booking.period_start, booking.period_end)}>Generate Invoice</Button>
+                                {!booking.meeting_link && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => createMeetingRoomForExistingBooking(booking)}
+                                  >
+                                    Create Meeting Room
+                                  </Button>
+                                )}
+                                {booking.meeting_link && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => window.open(booking.meeting_link, '_blank')}
+                                  >
+                                    Join Meeting
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1882,6 +2181,24 @@ const TeacherDashboard = () => {
                               <div className="flex flex-col space-y-2">
                                 <Button size="sm" variant="outline" onClick={() => handleViewInvoice(booking)}>View Invoice</Button>
                                 <Button size="sm" variant="outline" onClick={() => handleGenerateInvoice(booking.student_id, booking.period_start, booking.period_end)}>Generate Invoice</Button>
+                                {!booking.meeting_link && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => createMeetingRoomForExistingBooking(booking)}
+                                  >
+                                    Create Meeting Room
+                                  </Button>
+                                )}
+                                {booking.meeting_link && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => window.open(booking.meeting_link, '_blank')}
+                                  >
+                                    Join Meeting
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1985,17 +2302,6 @@ const TeacherDashboard = () => {
         </Dialog>
       )}
       {/* Video Conference Modal */}
-      {showVideoConferenceModal && selectedMeetingRoom && (
-        <VideoConferenceModal
-          meetingRoom={selectedMeetingRoom}
-          onClose={() => setShowVideoConferenceModal(false)}
-          onBookingCreated={() => {
-            toast({ title: 'Success', description: 'Meeting room booked!' });
-            fetchMeetingRooms(); // Refresh meeting rooms to update availability
-          }}
-        />
-      )}
-      {/* Video Conference Modal */}
       <VideoConferenceModal
         open={showVideoConferenceModal}
         onClose={() => setShowVideoConferenceModal(false)}
@@ -2003,6 +2309,33 @@ const TeacherDashboard = () => {
         userName={profile?.name || 'Teacher'}
         userRole="teacher"
       />
+      {/* Reschedule Modal */}
+      <Dialog open={showRescheduleModal} onOpenChange={setShowRescheduleModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Reschedule Booking</DialogTitle>
+          </DialogHeader>
+          <div className="mb-4">Select a new date and time slot for the booking:</div>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {availableTimeSlotsForReschedule.map(slot => (
+              <div key={slot.id} className="flex items-center justify-between p-2 border rounded">
+                <div>
+                  <div className="font-semibold">{profile?.name}</div>
+                  <div className="text-xs text-gray-600">{slot.day_of_week}, {slot.start_time} - {slot.end_time}</div>
+                </div>
+                <Button size="sm" onClick={async () => {
+                  setRescheduleTimeSlot(slot);
+                  setRescheduleDate(new Date().toISOString().split('T')[0]);
+                  handleRescheduleBooking();
+                }}>Select</Button>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end mt-4">
+            <Button variant="outline" onClick={() => setShowRescheduleModal(false)}>Cancel</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

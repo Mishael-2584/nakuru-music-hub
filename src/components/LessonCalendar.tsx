@@ -61,6 +61,17 @@ export const LessonCalendar: React.FC<LessonCalendarProps> = ({
   selectable = false,
   defaultView = 'week',
 }) => {
+  // Validate events
+  const validEvents = events.filter(event => {
+    if (!event.start || !event.end) {
+      return false;
+    }
+    if (!(event.start instanceof Date) || !(event.end instanceof Date)) {
+      return false;
+    }
+    return true;
+  });
+
   // Custom event style by status
   const eventPropGetter = (event: LessonEvent) => {
     const color = statusColors[event.status || 'scheduled'] || '#64748b';
@@ -76,11 +87,26 @@ export const LessonCalendar: React.FC<LessonCalendarProps> = ({
     };
   };
 
+  // Test with sample data if no valid events
+  const testEvents: LessonEvent[] = [
+    {
+      id: 'test-1',
+      title: 'Test Lesson',
+      start: new Date(),
+      end: new Date(Date.now() + 60 * 60 * 1000), // 1 hour later
+      status: 'scheduled',
+      lesson_type: 'lesson',
+      student_name: 'Test Student'
+    }
+  ];
+
+  const eventsToShow = validEvents.length > 0 ? validEvents : testEvents;
+
   return (
     <div style={{ minHeight: 500 }}>
       <Calendar
         localizer={localizer}
-        events={events}
+        events={eventsToShow}
         startAccessor="start"
         endAccessor="end"
         style={{ height: 600 }}

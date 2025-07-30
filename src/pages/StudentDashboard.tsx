@@ -241,6 +241,7 @@ const StudentDashboard = () => {
     end_date: ''
   });
   const [makeupCredits, setMakeupCredits] = useState<any[]>([]);
+  const [bookingStatus, setBookingStatus] = useState<any>(null);
   
   // Practice log modal state
   const [showPracticeModal, setShowPracticeModal] = useState(false);
@@ -323,6 +324,7 @@ const StudentDashboard = () => {
   useEffect(() => {
     if (studentProfile) {
       fetchMyBookings();
+      fetchBookingStatus();
     }
   }, [studentProfile]);
 
@@ -826,6 +828,27 @@ const StudentDashboard = () => {
     }
   };
 
+  // Fetch booking status for session limits
+  const fetchBookingStatus = async () => {
+    if (!studentProfile) return;
+
+    try {
+      const { data, error } = await supabase
+        .rpc('get_student_booking_status', { student_id_param: studentProfile.id });
+
+      if (error) {
+        console.error('Error fetching booking status:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        setBookingStatus(data[0]);
+      }
+    } catch (error) {
+      console.error('Error fetching booking status:', error);
+    }
+  };
+
   // Handle opening video conference
   const handleOpenVideoConference = (booking: Booking) => {
     if (booking.meeting_room) {
@@ -882,15 +905,29 @@ const StudentDashboard = () => {
     if (targetDayIndex === -1) return '';
     
     const currentDayIndex = today.getDay();
+    const currentTime = today.getHours() * 60 + today.getMinutes(); // Current time in minutes
     let daysToAdd = targetDayIndex - currentDayIndex;
     
-    // If the target day is today or has passed this week, get next week's date
-    if (daysToAdd <= 0) {
+    // If it's the same day, check if the time slot has already passed
+    if (daysToAdd === 0 && selectedTimeSlot) {
+      const slotTime = selectedTimeSlot.start_time;
+      const [slotHour, slotMinute] = slotTime.split(':').map(Number);
+      const slotTimeInMinutes = slotHour * 60 + slotMinute;
+      
+      if (currentTime >= slotTimeInMinutes) {
+        // Slot has passed today, book for next week
+        daysToAdd = 7;
+      }
+      // If slot hasn't passed, daysToAdd remains 0 (same day)
+    } else if (daysToAdd <= 0) {
+      // Target day has passed this week, get next week's date
       daysToAdd += 7;
     }
     
     const nextDate = new Date(today);
     nextDate.setDate(today.getDate() + daysToAdd);
+    
+    
     
     return nextDate.toISOString().split('T')[0];
   };
@@ -900,6 +937,40 @@ const StudentDashboard = () => {
     if (!selectedTimeSlot || !studentProfile) return;
 
     try {
+      // Check session limits before booking
+      const { data: bookingStatus, error: statusError } = await supabase
+        .rpc('get_student_booking_status', { student_id_param: studentProfile.id });
+
+      if (statusError) {
+        console.error('Error checking booking status:', statusError);
+        toast({
+          title: "Error",
+          description: "Failed to check booking limits. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!bookingStatus || bookingStatus.length === 0) {
+        toast({
+          title: "Error",
+          description: "Unable to verify booking limits. Please contact support.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const status = bookingStatus[0];
+      
+      if (!status.can_book_more) {
+        toast({
+          title: "Booking Limit Reached",
+          description: `You have already booked ${status.current_week_bookings} out of ${status.sessions_per_week} sessions this week. Please wait until next week or contact your teacher to reschedule.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
       const isOnline = studentProfile.learning_mode === 'online';
       
       // Automatically calculate the next available date for the selected day
@@ -930,13 +1001,27 @@ const StudentDashboard = () => {
       // Create meeting room for online lessons
       if (isOnline && booking) {
         try {
+          // Check if meeting room already exists for this booking
+          const { getMeetingRoomByBooking } = await import('../lib/videoConferencing');
+          const existingMeetingRoom = await getMeetingRoomByBooking(booking.id);
+          
+          if (existingMeetingRoom) {
+            toast({
+              title: "Meeting Room Already Exists",
+              description: "A video conference room already exists for this lesson.",
+            });
+            return;
+          }
+          
+
+          
           const { createMeetingRoom } = await import('../lib/videoConferencing');
           
           // Get teacher name for meeting room
           const teacher = teachers.find(t => t.id === selectedTimeSlot.teacher_id);
           const teacherName = teacher?.name || 'Teacher';
           
-          await createMeetingRoom(
+          const meetingRoom = await createMeetingRoom(
             booking.id,
             selectedTimeSlot.teacher_id,
             studentProfile.id,
@@ -947,8 +1032,30 @@ const StudentDashboard = () => {
             `${bookingDate}T${selectedTimeSlot.end_time}`,
             newBooking.notes
           );
+          
+
+          
+          // Update booking with meeting link
+          await supabase
+            .from('bookings')
+            .update({ 
+              meeting_link: meetingRoom.meetingUrl,
+              mode: 'online'
+            })
+            .eq('id', booking.id);
+            
+          toast({
+            title: "Meeting Room Created",
+            description: "Video conference room created successfully for your online lesson.",
+          });
+            
         } catch (meetingError) {
           console.error('Error creating meeting room:', meetingError);
+          toast({
+            title: "Meeting Room Creation Failed",
+            description: "Lesson booked successfully, but video conference room creation failed. Please contact support.",
+            variant: "destructive",
+          });
           // Don't fail the booking if meeting room creation fails
         }
       }
@@ -1936,6 +2043,34 @@ const StudentDashboard = () => {
                     <CardDescription>Book lessons with our teachers</CardDescription>
                   </CardHeader>
                   <CardContent>
+                    {/* Session Limit Display */}
+                    {bookingStatus && (
+                      <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <h4 className="font-semibold text-blue-800 mb-2">Your Session Limits</h4>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="font-medium">Sessions per week:</span> {bookingStatus.sessions_per_week}
+                          </div>
+                          <div>
+                            <span className="font-medium">Booked this week:</span> {bookingStatus.current_week_bookings}
+                          </div>
+                          <div>
+                            <span className="font-medium">Remaining sessions:</span> {bookingStatus.remaining_sessions}
+                          </div>
+                          <div>
+                            <span className="font-medium">Can book more:</span> 
+                            <span className={`ml-1 ${bookingStatus.can_book_more ? 'text-green-600' : 'text-red-600'}`}>
+                              {bookingStatus.can_book_more ? 'Yes' : 'No'}
+                            </span>
+                          </div>
+                        </div>
+                        {!bookingStatus.can_book_more && (
+                          <p className="text-sm text-red-600 mt-2">
+                            You have reached your weekly session limit. Please contact your teacher to reschedule or wait until next week.
+                          </p>
+                        )}
+                      </div>
+                    )}
                     <div className="mb-4">
                       <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
                         <SelectTrigger>
@@ -1991,10 +2126,11 @@ const StudentDashboard = () => {
                                 });
                                 setShowBookingModal(true);
                               }}
-                              disabled={slot.current_bookings >= slot.max_students}
+                              disabled={slot.current_bookings >= slot.max_students || (bookingStatus && !bookingStatus.can_book_more)}
                               className="w-full"
                             >
-                              {slot.current_bookings >= slot.max_students ? 'Full' : 'Book This Slot'}
+                              {slot.current_bookings >= slot.max_students ? 'Full' : 
+                               (bookingStatus && !bookingStatus.can_book_more) ? 'Limit Reached' : 'Book This Slot'}
                             </Button>
                             
                             {/* Add recurring booking option for instruments */}
@@ -2002,9 +2138,10 @@ const StudentDashboard = () => {
                               <Button 
                                 variant="outline"
                                 onClick={() => handleBookRecurringSlot(slot)}
+                                disabled={bookingStatus && !bookingStatus.can_book_more}
                                 className="w-full mt-2"
                               >
-                                Book Recurring
+                                {bookingStatus && !bookingStatus.can_book_more ? 'Limit Reached' : 'Book Recurring'}
                               </Button>
                             )}
                           </div>

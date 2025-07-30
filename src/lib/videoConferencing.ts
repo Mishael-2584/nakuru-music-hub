@@ -108,6 +108,24 @@ export const createMeetingRoom = async (
 ): Promise<MeetingRoom> => {
   const { supabase } = await import('../integrations/supabase/client');
   
+  // Map booking lesson types to meeting room lesson types
+  const mapLessonType = (type: string): 'lesson' | 'practice' | 'consultation' => {
+    switch (type.toLowerCase()) {
+      case 'regular':
+      case 'lesson':
+        return 'lesson';
+      case 'practice':
+        return 'practice';
+      case 'consultation':
+      case 'makeup':
+        return 'consultation';
+      default:
+        return 'lesson'; // Default to lesson
+    }
+  };
+  
+  const mappedLessonType = mapLessonType(lessonType);
+  
   const roomName = generateMeetingRoomName(teacherName, studentName, lessonType, startTime);
   const meetingUrl = generateJitsiMeetUrl(roomName);
   
@@ -117,16 +135,34 @@ export const createMeetingRoom = async (
     teacherId,
     studentId,
     bookingId,
-    lessonType: lessonType as 'lesson' | 'practice' | 'consultation',
+    lessonType: mappedLessonType,
     startTime,
     endTime,
     status: 'scheduled',
     notes,
   };
 
+
+
+  // Map camelCase to snake_case for database
+  const dbMeetingRoom = {
+    room_name: meetingRoom.roomName,
+    meeting_url: meetingRoom.meetingUrl,
+    teacher_id: meetingRoom.teacherId,
+    student_id: meetingRoom.studentId,
+    booking_id: meetingRoom.bookingId,
+    lesson_type: meetingRoom.lessonType,
+    start_time: meetingRoom.startTime,
+    end_time: meetingRoom.endTime,
+    status: meetingRoom.status,
+    notes: meetingRoom.notes,
+  };
+
+
+
   const { data, error } = await supabase
     .from('meeting_rooms')
-    .insert(meetingRoom)
+    .insert(dbMeetingRoom)
     .select()
     .single();
 
@@ -151,7 +187,27 @@ export const getMeetingRoomByBooking = async (bookingId: string): Promise<Meetin
     throw new Error(`Failed to get meeting room: ${error.message}`);
   }
 
-  return data;
+  // Map snake_case to camelCase for interface
+  if (data) {
+    return {
+      id: data.id,
+      roomName: data.room_name,
+      meetingUrl: data.meeting_url,
+      teacherId: data.teacher_id,
+      studentId: data.student_id,
+      bookingId: data.booking_id,
+      lessonType: data.lesson_type,
+      startTime: data.start_time,
+      endTime: data.end_time,
+      status: data.status,
+      notes: data.notes,
+      recordingUrl: data.recording_url,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  }
+
+  return null;
 };
 
 // Get all meeting rooms for a user (teacher or student)
@@ -168,7 +224,23 @@ export const getUserMeetingRooms = async (userId: string, userRole: 'teacher' | 
     throw new Error(`Failed to get meeting rooms: ${error.message}`);
   }
 
-  return data || [];
+  // Map snake_case to camelCase for interface
+  return (data || []).map(room => ({
+    id: room.id,
+    roomName: room.room_name,
+    meetingUrl: room.meeting_url,
+    teacherId: room.teacher_id,
+    studentId: room.student_id,
+    bookingId: room.booking_id,
+    lessonType: room.lesson_type,
+    startTime: room.start_time,
+    endTime: room.end_time,
+    status: room.status,
+    notes: room.notes,
+    recordingUrl: room.recording_url,
+    createdAt: room.created_at,
+    updatedAt: room.updated_at,
+  }));
 };
 
 // Update meeting room status

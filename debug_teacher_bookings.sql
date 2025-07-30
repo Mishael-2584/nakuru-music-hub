@@ -58,3 +58,37 @@ SELECT
 FROM public.bookings b
 LEFT JOIN public.teachers t ON b.teacher_id = t.id
 WHERE t.id IS NULL OR t.user_id IS NULL;
+
+-- 6. Check time_slots and their availability
+SELECT 
+  ts.id,
+  ts.teacher_id,
+  ts.day_of_week,
+  ts.start_time,
+  ts.end_time,
+  ts.is_available,
+  t.name as teacher_name,
+  t.email as teacher_email
+FROM public.time_slots ts
+LEFT JOIN public.teachers t ON ts.teacher_id = t.id
+ORDER BY t.name, ts.day_of_week, ts.start_time;
+
+-- 7. Check if booked slots are properly marked as unavailable
+SELECT 
+  ts.id as slot_id,
+  ts.teacher_id,
+  ts.day_of_week,
+  ts.start_time,
+  ts.end_time,
+  ts.is_available,
+  b.id as booking_id,
+  b.booking_date,
+  b.status as booking_status,
+  s.student_name
+FROM public.time_slots ts
+LEFT JOIN public.bookings b ON ts.teacher_id = b.teacher_id 
+  AND ts.day_of_week = TO_CHAR(b.booking_date::date, 'Day')
+  AND ts.start_time = b.start_time
+LEFT JOIN public.students s ON b.student_id = s.id
+WHERE ts.is_available = true
+ORDER BY ts.teacher_id, ts.day_of_week, ts.start_time;
