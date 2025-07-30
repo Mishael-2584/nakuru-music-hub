@@ -143,12 +143,32 @@ const Registration = () => {
   const handleNext = () => {
     if (currentStep < 4) {
       setCurrentStep(currentStep + 1);
+      // Scroll to the top of the form after state update
+      setTimeout(() => {
+        const formElement = document.getElementById('registration');
+        if (formElement) {
+          formElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }
+      }, 100); // Small delay to ensure state has updated
     }
   };
 
   const handlePrev = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
+      // Scroll to the top of the form after state update
+      setTimeout(() => {
+        const formElement = document.getElementById('registration');
+        if (formElement) {
+          formElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }
+      }, 100); // Small delay to ensure state has updated
     }
   };
 
