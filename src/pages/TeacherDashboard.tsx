@@ -1270,39 +1270,119 @@ const TeacherDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100">
-      {/* Hero/Header Section */}
-      <section className="py-12 bg-gradient-to-r from-blue-700 via-purple-600 to-indigo-700 shadow-lg">
+      {/* Hero/Header Section - Mobile responsive */}
+      <section className="py-8 sm:py-12 bg-gradient-to-r from-blue-700 via-purple-600 to-indigo-700 shadow-lg">
         <div className="container mx-auto px-4 flex flex-col items-center justify-center text-center">
-          <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-20 w-20 mb-4 rounded-full shadow-lg border-4 border-white/80 bg-white/80 object-contain" />
-          <h1 className="text-4xl sm:text-5xl font-extrabold mb-2 bg-gradient-to-r from-white via-blue-200 to-purple-200 bg-clip-text text-transparent drop-shadow-lg">
+          <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-16 sm:h-20 w-16 sm:w-20 mb-4 rounded-full shadow-lg border-4 border-white/80 bg-white/80 object-contain" />
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold mb-2 bg-gradient-to-r from-white via-blue-200 to-purple-200 bg-clip-text text-transparent drop-shadow-lg">
             Damon Music Academy
           </h1>
-          <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
             Teacher Panel
           </h2>
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="text-lg font-semibold text-white drop-shadow">Welcome, {profile?.name || 'Teacher'}</span>
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-semibold ml-2 shadow">
-              <User className="h-4 w-4 mr-1" /> Teacher
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mb-2">
+            <span className="text-base sm:text-lg font-semibold text-white drop-shadow">Welcome, {profile?.name || 'Teacher'}</span>
+            <span className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs sm:text-sm font-semibold shadow">
+              <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Teacher
             </span>
           </div>
-          <p className="text-white/90 text-base sm:text-lg mb-4">Empowering music education and managing your teaching journey</p>
-          <div className="flex justify-end w-full max-w-4xl mx-auto mt-2">
-            <Button variant="outline" size="sm" className="bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10 mr-2">
-              <Bell className="w-4 h-4 mr-2 text-blue-700" />
-              Notifications
+          <p className="text-white/90 text-sm sm:text-base lg:text-lg mb-4 px-4">Empowering music education and managing your teaching journey</p>
+          <div className="flex flex-col sm:flex-row justify-center w-full max-w-4xl mx-auto mt-2 gap-2">
+            <Button variant="outline" size="sm" className="bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10 text-xs sm:text-sm">
+              <Bell className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-blue-700" />
+              <span className="hidden sm:inline">Notifications</span>
+              <span className="sm:hidden">Notifications</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleSignOut} className="bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10">
-              <LogOut className="w-4 h-4 mr-2 text-blue-700" />
-              Sign Out
+            <Button variant="outline" size="sm" onClick={handleSignOut} className="bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10 text-xs sm:text-sm">
+              <LogOut className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-blue-700" />
+              <span className="hidden sm:inline">Sign Out</span>
+              <span className="sm:hidden">Logout</span>
             </Button>
           </div>
         </div>
       </section>
-      <main className="w-full max-w-6xl px-2 sm:px-4 lg:px-8 py-8 mx-auto">
-        <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-4 sm:p-8 shadow-xl border border-primary/10">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="flex flex-wrap w-full bg-white/80 shadow-sm rounded-lg overflow-x-auto gap-1 justify-center">
+      <main className="w-full max-w-6xl px-2 sm:px-4 lg:px-8 py-4 sm:py-8 mx-auto">
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-3 sm:p-4 lg:p-8 shadow-xl border border-primary/10">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+            {/* Mobile dropdown for tabs */}
+            <div className="lg:hidden">
+              <Select value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
+                <SelectTrigger className="w-full bg-white/80 shadow-sm rounded-lg border border-primary/20">
+                  <SelectValue placeholder="Select section" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dashboard">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4" />
+                      <span>Dashboard</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="schedule">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      <span>Schedule</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="students">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      <span>Students</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="messages">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4" />
+                      <span>Messages</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="resources">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4" />
+                      <span>Resources</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="availability">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      <span>Availability</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="makeup-credits">
+                    <div className="flex items-center gap-2">
+                      <Badge className="w-4 h-4" />
+                      <span>Make-up Credits</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="calendar">
+                    <div className="flex items-center gap-2">
+                      <CalendarIcon className="w-4 h-4" />
+                      <span>Calendar</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="invoices">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      <span>Invoices</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="bookings">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      <span>Bookings</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="video-conferencing">
+                    <div className="flex items-center gap-2">
+                      <Video className="w-4 h-4" />
+                      <span>Video Calls</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Desktop horizontal tabs */}
+            <TabsList className="hidden lg:flex flex-wrap w-full bg-white/80 shadow-sm rounded-lg overflow-x-auto gap-1 justify-center p-1">
               <TabsTrigger value="dashboard" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-md transition-all">
                 <Bell className="w-5 h-5" />
                 <span>Dashboard</span>
@@ -1349,220 +1429,160 @@ const TeacherDashboard = () => {
               </TabsTrigger>
             </TabsList>
 
-            {/* Dashboard Tab */}
-            <TabsContent value="dashboard" className="mt-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            {/* Dashboard Tab - Mobile responsive */}
+            <TabsContent value="dashboard" className="mt-6 sm:mt-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
                 <Card className="shadow-lg border-0 bg-white/95">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Students</CardTitle>
-                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-xs sm:text-sm font-medium">Total Students</CardTitle>
+                    <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{students.length}</div>
+                    <div className="text-xl sm:text-2xl font-bold">{students.length}</div>
                     <p className="text-xs text-muted-foreground">Active students</p>
                   </CardContent>
                 </Card>
                 <Card className="shadow-lg border-0 bg-white/95">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Upcoming Lessons</CardTitle>
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-xs sm:text-sm font-medium">Upcoming Lessons</CardTitle>
+                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{lessons.filter(l => l.status === 'scheduled').length}</div>
+                    <div className="text-xl sm:text-2xl font-bold">{lessons.filter(l => l.status === 'scheduled').length}</div>
                     <p className="text-xs text-muted-foreground">This week</p>
                   </CardContent>
                 </Card>
                 <Card className="shadow-lg border-0 bg-white/95">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Unread Messages</CardTitle>
-                    <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-xs sm:text-sm font-medium">Unread Messages</CardTitle>
+                    <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{messages.filter(m => !m.is_read).length}</div>
+                    <div className="text-xl sm:text-2xl font-bold">{messages.filter(m => !m.is_read).length}</div>
                     <p className="text-xs text-muted-foreground">New messages</p>
                   </CardContent>
                 </Card>
                 <Card className="shadow-lg border-0 bg-white/95">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Available Slots</CardTitle>
-                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-xs sm:text-sm font-medium">Available Slots</CardTitle>
+                    <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{timeSlots.filter(s => s.is_available).length}</div>
+                    <div className="text-xl sm:text-2xl font-bold">{timeSlots.filter(s => s.is_available).length}</div>
                     <p className="text-xs text-muted-foreground">This week</p>
                   </CardContent>
                 </Card>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 <Card className="shadow-lg border-0 bg-white/95">
                   <CardHeader>
-                    <CardTitle>Next Lesson</CardTitle>
-                    <CardDescription>Your upcoming lesson details</CardDescription>
+                    <CardTitle className="text-base sm:text-lg">Next Lesson</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Your upcoming lesson details</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {lessons.filter(l => l.status === 'scheduled').length > 0 ? (
                       <div className="space-y-4">
                         {lessons.filter(l => l.status === 'scheduled').slice(0, 1).map(lesson => (
-                          <div key={lesson.id} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                          <div key={lesson.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-blue-50 rounded-lg gap-2">
                             <div>
-                              <h4 className="font-semibold">{lesson.title}</h4>
-                              <p className="text-sm text-gray-600">{formatDate(lesson.lesson_date)} at {formatTime(lesson.start_time)}</p>
-                              <p className="text-sm text-gray-600">Student: {lesson.student_name}</p>
+                              <h4 className="font-semibold text-sm sm:text-base">{lesson.title}</h4>
+                              <p className="text-xs sm:text-sm text-gray-600">{formatDate(lesson.lesson_date)} at {formatTime(lesson.start_time)}</p>
+                              <p className="text-xs sm:text-sm text-gray-600">Student: {lesson.student_name}</p>
                             </div>
                             <Badge className={getStatusColor(lesson.status)}>{lesson.status}</Badge>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-gray-500">No upcoming lessons scheduled</p>
+                      <p className="text-gray-500 text-sm">No upcoming lessons scheduled</p>
                     )}
                   </CardContent>
                 </Card>
 
                 <Card className="shadow-lg border-0 bg-white/95">
                   <CardHeader>
-                    <CardTitle>Recent Messages</CardTitle>
-                    <CardDescription>Latest communications</CardDescription>
+                    <CardTitle className="text-base sm:text-lg">Recent Messages</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Latest communications</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {messages.length > 0 ? (
                       <div className="space-y-4">
                         {messages.slice(0, 3).map(message => (
                           <div key={message.id} className={`p-3 rounded-lg ${!message.is_read ? 'bg-blue-50 border-blue-200' : 'bg-gray-50'}`}>
-                            <h4 className="font-semibold">{message.subject}</h4>
-                            <p className="text-sm text-gray-600">{message.message.substring(0, 50)}...</p>
+                            <h4 className="font-semibold text-sm sm:text-base">{message.subject}</h4>
+                            <p className="text-xs sm:text-sm text-gray-600">{message.message.substring(0, 50)}...</p>
                             <p className="text-xs text-gray-500">{formatDate(message.created_at)}</p>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-gray-500">No recent messages</p>
+                      <p className="text-gray-500 text-sm">No recent messages</p>
                     )}
                   </CardContent>
                 </Card>
               </div>
             </TabsContent>
 
-            {/* Schedule Tab */}
-            <TabsContent value="schedule" className="mt-8">
+            {/* Schedule Tab - Mobile responsive */}
+            <TabsContent value="schedule" className="mt-6 sm:mt-8">
               <Card className="shadow-lg border-0 bg-white/95">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle className="text-xl font-bold">Teaching Schedule</CardTitle>
-                    <CardDescription>Manage your available time slots and view bookings.</CardDescription>
+                    <CardTitle className="text-base sm:text-lg">Time Slot Management</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Manage your available teaching slots</CardDescription>
                   </div>
-                  <Dialog open={showLessonModal} onOpenChange={setShowLessonModal}>
-                    <DialogTrigger asChild>
-                      <Button>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Schedule Lesson
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      <DialogHeader>
-                        <DialogTitle>Schedule New Lesson</DialogTitle>
-                      </DialogHeader>
-                      <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="title" className="text-right">Title</Label>
-                          <Input
-                            id="title"
-                            value={newLesson.title}
-                            onChange={(e) => setNewLesson({...newLesson, title: e.target.value})}
-                            className="col-span-3"
-                          />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="student" className="text-right">Student</Label>
-                          <Select value={newLesson.student_id} onValueChange={(value) => setNewLesson({...newLesson, student_id: value})}>
-                            <SelectTrigger className="col-span-3">
-                              <SelectValue placeholder="Select student" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {students.map(student => (
-                                <SelectItem key={student.id} value={student.id}>
-                                  {student.student_name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="date" className="text-right">Date</Label>
-                          <Input
-                            id="date"
-                            type="date"
-                            value={newLesson.lesson_date}
-                            onChange={(e) => setNewLesson({...newLesson, lesson_date: e.target.value})}
-                            className="col-span-3"
-                          />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="start_time" className="text-right">Start Time</Label>
-                          <Input
-                            id="start_time"
-                            type="time"
-                            value={newLesson.start_time}
-                            onChange={(e) => setNewLesson({...newLesson, start_time: e.target.value})}
-                            className="col-span-3"
-                          />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="end_time" className="text-right">End Time</Label>
-                          <Input
-                            id="end_time"
-                            type="time"
-                            value={newLesson.end_time}
-                            onChange={(e) => setNewLesson({...newLesson, end_time: e.target.value})}
-                            className="col-span-3"
-                          />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="notes" className="text-right">Notes</Label>
-                          <Textarea
-                            id="notes"
-                            value={newLesson.notes}
-                            onChange={(e) => setNewLesson({...newLesson, notes: e.target.value})}
-                            className="col-span-3"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex justify-end space-x-2">
-                        <Button variant="outline" onClick={() => setShowLessonModal(false)}>
-                          Cancel
-                        </Button>
-                        <Button onClick={handleAddLesson}>
-                          Schedule Lesson
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                  <Button onClick={() => setShowLessonModal(true)} className="text-xs sm:text-sm">
+                    <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Add Time Slot</span>
+                    <span className="sm:hidden">Add Slot</span>
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {lessons.length > 0 ? (
-                      lessons.map(lesson => (
-                        <div key={lesson.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center space-x-4">
-                            <CalendarIcon className="w-5 h-5 text-blue-600" />
-                            <div>
-                              <h4 className="font-semibold">{lesson.title}</h4>
-                              <p className="text-sm text-gray-600">{formatDate(lesson.lesson_date)} at {formatTime(lesson.start_time)}</p>
-                              <p className="text-sm text-gray-600">Student: {lesson.student_name}</p>
-                              <p className="text-sm text-gray-600">Duration: {lesson.start_time} - {lesson.end_time}</p>
+                    {timeSlots.length > 0 ? (
+                      timeSlots.map((slot) => (
+                        <div key={slot.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-gray-50 rounded-lg gap-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-blue-600" />
+                              <span className="font-semibold text-sm sm:text-base">{getDayName(slot.day_of_week)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs sm:text-sm text-gray-600">{slot.start_time} - {slot.end_time}</span>
+                              <Badge variant={slot.is_available ? "default" : "secondary"} className="text-xs">
+                                {slot.is_available ? "Available" : "Booked"}
+                              </Badge>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <Badge className={getStatusColor(lesson.status)}>{lesson.status}</Badge>
-                            <Button variant="outline" size="sm">
-                              <Edit className="w-4 h-4" />
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUpdateTimeSlot(slot.id, { is_available: !slot.is_available })}
+                              className="text-xs"
+                            >
+                              <Edit className="w-3 h-3 mr-1" />
+                              <span className="hidden sm:inline">Edit</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteTimeSlot(slot.id)}
+                              className="text-xs"
+                            >
+                              <Trash2 className="w-3 h-3 mr-1" />
+                              <span className="hidden sm:inline">Delete</span>
                             </Button>
                           </div>
                         </div>
                       ))
                     ) : (
-                      <p className="text-gray-500 text-center py-8">No lessons scheduled</p>
+                      <div className="text-center py-8">
+                        <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-500 text-sm">No time slots configured yet</p>
+                        <p className="text-xs text-gray-400 mt-1">Add your first time slot to start receiving bookings</p>
+                      </div>
                     )}
                   </div>
                 </CardContent>

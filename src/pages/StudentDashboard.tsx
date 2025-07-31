@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video } from 'lucide-react';
+import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video, AlertTriangle } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import PasswordChangePrompt from '../components/PasswordChangePrompt';
 import { useNavigate } from 'react-router-dom';
@@ -136,6 +136,7 @@ interface AvailableTimeSlot {
   max_students: number;
   description?: string;
   current_bookings: number;
+  has_conflict?: boolean;
 }
 
 interface Booking {
@@ -694,20 +695,46 @@ const StudentDashboard = () => {
     }
   };
 
-  // Fetch available time slots with teacher information
+  // Check if a time slot conflicts with existing bookings
+  const checkBookingConflict = async (timeSlot: AvailableTimeSlot) => {
+    if (!studentProfile) return false;
+    
+    try {
+      const bookingDate = getNextAvailableDateISO(timeSlot.day_of_week);
+      
+      const { data: conflictingBookings, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('student_id', studentProfile.id)
+        .eq('booking_date', bookingDate)
+        .eq('status', 'confirmed')
+        .or(`start_time.lt.${timeSlot.end_time},end_time.gt.${timeSlot.start_time}`);
+
+      if (error) {
+        console.error('Error checking booking conflicts:', error);
+        return false;
+      }
+
+      return conflictingBookings && conflictingBookings.length > 0;
+    } catch (error) {
+      console.error('Error checking booking conflicts:', error);
+      return false;
+    }
+  };
+
+  // Fetch available time slots with conflict checking
   const fetchAvailableTimeSlots = async () => {
+    if (!studentProfile) return;
+
     try {
       const { data, error } = await supabase
         .from('time_slots')
         .select(`
           *,
           teachers!inner(
+            id,
             name,
-            email,
-            bio,
-            experience,
-            category,
-            subjects
+            email
           )
         `)
         .eq('is_available', true)
@@ -719,36 +746,24 @@ const StudentDashboard = () => {
         return;
       }
 
-      // Transform data to include teacher information and booking count
-      const slotsWithTeacherInfo = await Promise.all(
-        data.map(async (slot) => {
-          // Get current booking count for this slot
-          const { count: bookingCount } = await supabase
-            .from('bookings')
-            .select('*', { count: 'exact', head: true })
-            .eq('time_slot_id', slot.id)
-            .eq('status', 'confirmed');
+      if (data) {
+        // Check for conflicts for each time slot
+        const timeSlotsWithConflicts = await Promise.all(
+          data.map(async (slot) => {
+            const hasConflict = await checkBookingConflict(slot);
+            return {
+              ...slot,
+              teacher_name: slot.teachers?.name || 'Unknown Teacher',
+              teacher_email: slot.teachers?.email || '',
+              has_conflict: hasConflict
+            };
+          })
+        );
 
-          return {
-            id: slot.id,
-            teacher_id: slot.teacher_id,
-            teacher_name: slot.teachers?.name || 'Unknown Teacher',
-            teacher_email: slot.teachers?.email || '',
-            day_of_week: slot.day_of_week,
-            start_time: slot.start_time,
-            end_time: slot.end_time,
-            is_available: slot.is_available,
-            slot_type: slot.slot_type,
-            max_students: slot.max_students,
-            description: slot.description,
-            current_bookings: bookingCount || 0
-          };
-        })
-      );
-
-      setAvailableTimeSlots(slotsWithTeacherInfo);
+        setAvailableTimeSlots(timeSlotsWithConflicts);
+      }
     } catch (error) {
-      console.error('Error fetching available time slots:', error);
+      console.error('Error fetching time slots:', error);
     }
   };
 
@@ -975,6 +990,63 @@ const StudentDashboard = () => {
       
       // Automatically calculate the next available date for the selected day
       const bookingDate = getNextAvailableDateISO(selectedTimeSlot.day_of_week);
+      
+      // Check for overlapping bookings at the same time
+      const { data: overlappingBookings, error: overlapError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('student_id', studentProfile.id)
+        .eq('booking_date', bookingDate)
+        .eq('start_time', selectedTimeSlot.start_time)
+        .eq('end_time', selectedTimeSlot.end_time)
+        .eq('status', 'confirmed');
+
+      if (overlapError) {
+        console.error('Error checking for overlapping bookings:', overlapError);
+        toast({
+          title: "Error",
+          description: "Failed to check for existing bookings. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (overlappingBookings && overlappingBookings.length > 0) {
+        toast({
+          title: "Double Booking Detected",
+          description: "You already have a lesson booked at this time. Please choose a different time slot or cancel your existing booking first.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Additional check for any overlapping time ranges on the same date
+      const { data: timeOverlapBookings, error: timeOverlapError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('student_id', studentProfile.id)
+        .eq('booking_date', bookingDate)
+        .eq('status', 'confirmed')
+        .or(`start_time.lt.${selectedTimeSlot.end_time},end_time.gt.${selectedTimeSlot.start_time}`);
+
+      if (timeOverlapError) {
+        console.error('Error checking for time overlaps:', timeOverlapError);
+        toast({
+          title: "Error",
+          description: "Failed to check for time conflicts. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (timeOverlapBookings && timeOverlapBookings.length > 0) {
+        toast({
+          title: "Time Conflict",
+          description: "You have another lesson scheduled during this time period. Please choose a different time slot.",
+          variant: "destructive",
+        });
+        return;
+      }
       
       // Create booking
       const { data: booking, error } = await supabase
@@ -1247,6 +1319,67 @@ const StudentDashboard = () => {
       // Automatically calculate start and end dates
       const startDate = getNextAvailableDateISO(selectedTimeSlot.day_of_week);
       const endDate = getRecurringEndDateISO(selectedTimeSlot.day_of_week, recurringBooking.frequency);
+      
+      // Check for overlapping bookings in the recurring period
+      const { data: overlappingRecurringBookings, error: overlapError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('student_id', studentProfile.id)
+        .eq('day_of_week', selectedTimeSlot.day_of_week)
+        .eq('start_time', selectedTimeSlot.start_time)
+        .eq('end_time', selectedTimeSlot.end_time)
+        .gte('booking_date', startDate)
+        .lte('booking_date', endDate)
+        .eq('status', 'confirmed');
+
+      if (overlapError) {
+        console.error('Error checking for overlapping recurring bookings:', overlapError);
+        toast({
+          title: "Error",
+          description: "Failed to check for existing bookings. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (overlappingRecurringBookings && overlappingRecurringBookings.length > 0) {
+        toast({
+          title: "Double Booking Detected",
+          description: "You already have lessons booked during this recurring period. Please choose a different time slot or cancel your existing bookings first.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Additional check for any overlapping time ranges in the recurring period
+      const { data: timeOverlapRecurringBookings, error: timeOverlapError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('student_id', studentProfile.id)
+        .eq('day_of_week', selectedTimeSlot.day_of_week)
+        .gte('booking_date', startDate)
+        .lte('booking_date', endDate)
+        .eq('status', 'confirmed')
+        .or(`start_time.lt.${selectedTimeSlot.end_time},end_time.gt.${selectedTimeSlot.start_time}`);
+
+      if (timeOverlapError) {
+        console.error('Error checking for time overlaps in recurring bookings:', timeOverlapError);
+        toast({
+          title: "Error",
+          description: "Failed to check for time conflicts. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (timeOverlapRecurringBookings && timeOverlapRecurringBookings.length > 0) {
+        toast({
+          title: "Time Conflict",
+          description: "You have other lessons scheduled during this recurring time period. Please choose a different time slot.",
+          variant: "destructive",
+        });
+        return;
+      }
       
       // Create recurring booking pattern
       const { data, error } = await supabase
@@ -1852,156 +1985,242 @@ const StudentDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100">
-      {/* Hero/Header Section */}
-      <section className="py-12 bg-gradient-to-r from-blue-700 via-purple-600 to-indigo-700 shadow-lg">
+      {/* Hero/Header Section - Mobile responsive */}
+      <section className="py-8 sm:py-12 bg-gradient-to-r from-blue-700 via-purple-600 to-indigo-700 shadow-lg">
         <div className="container mx-auto px-4 flex flex-col items-center justify-center text-center">
-          <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-20 w-20 mb-4 rounded-full shadow-lg border-4 border-white/80 bg-white/80 object-contain" />
-          <h1 className="text-4xl sm:text-5xl font-extrabold mb-2 bg-gradient-to-r from-white via-blue-200 to-purple-200 bg-clip-text text-transparent drop-shadow-lg">
+          <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-16 sm:h-20 w-16 sm:w-20 mb-4 rounded-full shadow-lg border-4 border-white/80 bg-white/80 object-contain" />
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold mb-2 bg-gradient-to-r from-white via-blue-200 to-purple-200 bg-clip-text text-transparent drop-shadow-lg">
             Damon Music Academy
           </h1>
-          <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
             Student Panel
           </h2>
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="text-lg font-semibold text-white drop-shadow">Welcome, {studentProfile?.student_name || 'Student'}</span>
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-semibold ml-2 shadow">
-              <User className="h-4 w-4 mr-1" /> Student
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mb-2">
+            <span className="text-base sm:text-lg font-semibold text-white drop-shadow">Welcome, {studentProfile?.student_name || 'Student'}</span>
+            <span className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs sm:text-sm font-semibold shadow">
+              <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Student
             </span>
           </div>
-          <p className="text-white/90 text-base sm:text-lg mb-4">Your musical journey starts here. Access lessons, bookings, resources, and more!</p>
-          <div className="flex justify-end w-full max-w-4xl mx-auto mt-2">
-            <Button variant="outline" size="sm" className="bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10 mr-2">
-              <Bell className="w-4 h-4 mr-2 text-blue-700" />
-              Notifications
+          <p className="text-white/90 text-sm sm:text-base lg:text-lg mb-4 px-4">Your musical journey starts here. Access lessons, bookings, resources, and more!</p>
+          <div className="flex flex-col sm:flex-row justify-center w-full max-w-4xl mx-auto mt-2 gap-2">
+            <Button variant="outline" size="sm" className="bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10 text-xs sm:text-sm">
+              <Bell className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-blue-700" />
+              <span className="hidden sm:inline">Notifications</span>
+              <span className="sm:hidden">Notifications</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleSignOut} className="bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10">
-              <LogOut className="w-4 h-4 mr-2 text-blue-700" />
-              Sign Out
+            <Button variant="outline" size="sm" onClick={handleSignOut} className="bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10 text-xs sm:text-sm">
+              <LogOut className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-blue-700" />
+              <span className="hidden sm:inline">Sign Out</span>
+              <span className="sm:hidden">Logout</span>
             </Button>
           </div>
         </div>
       </section>
-      <main className="w-full max-w-6xl px-2 sm:px-4 lg:px-8 py-8 mx-auto">
-        <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-4 sm:p-8 shadow-xl border border-primary/10">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="flex flex-wrap w-full bg-white/80 shadow-sm rounded-lg overflow-x-auto gap-1 justify-center">
+      <main className="w-full max-w-6xl px-2 sm:px-4 lg:px-8 py-4 sm:py-8 mx-auto">
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-3 sm:p-4 lg:p-8 shadow-xl border border-primary/10">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+            {/* Mobile dropdown for tabs */}
+            <div className="lg:hidden">
+              <Select value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
+                <SelectTrigger className="w-full bg-white/80 shadow-sm rounded-lg border border-primary/20">
+                  <SelectValue placeholder="Select section" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dashboard">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4" />
+                      <span>Dashboard</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="bookings">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      <span>Bookings</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="schedule">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4" />
+                      <span>Schedule</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="calendar">
+                    <div className="flex items-center gap-2">
+                      <CalendarIcon className="w-4 h-4" />
+                      <span>Calendar</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="materials">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4" />
+                      <span>Materials</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="practice">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      <span>Practice</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="progress">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4" />
+                      <span>Progress</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="messages">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4" />
+                      <span>Messages</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="payments">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4" />
+                      <span>Payments</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="account">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      <span>Account</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="invoices">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      <span>Invoices</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="video-conferencing">
+                    <div className="flex items-center gap-2">
+                      <Video className="w-4 h-4" />
+                      <span>Video Conferencing</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Desktop horizontal tabs */}
+            <TabsList className="hidden lg:flex flex-wrap w-full bg-white/80 shadow-sm rounded-lg overflow-x-auto gap-1 justify-center p-1">
               <TabsTrigger value="dashboard" className="flex items-center space-x-2">
                 <BarChart3 className="w-4 h-4" />
-                <span className="hidden sm:inline">Dashboard</span>
+                <span>Dashboard</span>
               </TabsTrigger>
               <TabsTrigger value="bookings" className="flex items-center space-x-2">
                 <Calendar className="w-4 h-4" />
-                <span className="hidden sm:inline">Bookings</span>
+                <span>Bookings</span>
               </TabsTrigger>
               <TabsTrigger value="schedule" className="flex items-center space-x-2">
                 <CalendarDays className="w-4 h-4" />
-                <span className="hidden sm:inline">Schedule</span>
+                <span>Schedule</span>
               </TabsTrigger>
               <TabsTrigger value="calendar" className="flex items-center space-x-2">
                 <CalendarIcon className="w-4 h-4" />
-                <span className="hidden sm:inline">Calendar</span>
+                <span>Calendar</span>
               </TabsTrigger>
               <TabsTrigger value="materials" className="flex items-center space-x-2">
                 <BookOpen className="w-4 h-4" />
-                <span className="hidden sm:inline">Materials</span>
+                <span>Materials</span>
               </TabsTrigger>
               <TabsTrigger value="practice" className="flex items-center space-x-2">
                 <Clock className="w-4 h-4" />
-                <span className="hidden sm:inline">Practice</span>
+                <span>Practice</span>
               </TabsTrigger>
               <TabsTrigger value="progress" className="flex items-center space-x-2">
                 <TrendingUp className="w-4 h-4" />
-                <span className="hidden sm:inline">Progress</span>
+                <span>Progress</span>
               </TabsTrigger>
               <TabsTrigger value="messages" className="flex items-center space-x-2">
                 <MessageSquare className="w-4 h-4" />
-                <span className="hidden sm:inline">Messages</span>
+                <span>Messages</span>
               </TabsTrigger>
               <TabsTrigger value="payments" className="flex items-center space-x-2">
                 <CreditCard className="w-4 h-4" />
-                <span className="hidden sm:inline">Payments</span>
+                <span>Payments</span>
               </TabsTrigger>
               <TabsTrigger value="account" className="flex items-center space-x-2">
                 <User className="w-4 h-4" />
-                <span className="hidden sm:inline">Account</span>
+                <span>Account</span>
               </TabsTrigger>
               <TabsTrigger value="invoices" className="flex items-center space-x-2">
                 <FileText className="w-4 h-4" />
-                <span className="hidden sm:inline">Invoices</span>
+                <span>Invoices</span>
               </TabsTrigger>
               <TabsTrigger value="video-conferencing" className="flex items-center space-x-2">
                 <Video className="w-4 h-4" />
-                <span className="hidden sm:inline">Video Conferencing</span>
+                <span>Video Conferencing</span>
               </TabsTrigger>
             </TabsList>
 
-            {/* Dashboard Tab */}
-            <TabsContent value="dashboard" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Dashboard Tab - Mobile responsive grid */}
+            <TabsContent value="dashboard" className="space-y-4 sm:space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Upcoming Lessons</CardTitle>
-                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-xs sm:text-sm font-medium">Upcoming Lessons</CardTitle>
+                    <CalendarDays className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{lessons.filter(l => l.status === 'scheduled').length}</div>
+                    <div className="text-xl sm:text-2xl font-bold">{lessons.filter(l => l.status === 'scheduled').length}</div>
                     <p className="text-xs text-muted-foreground">This week</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Practice Hours</CardTitle>
-                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-xs sm:text-sm font-medium">Practice Hours</CardTitle>
+                    <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{practiceLogs.reduce((acc, log) => acc + log.duration_minutes, 0)}</div>
+                    <div className="text-xl sm:text-2xl font-bold">{practiceLogs.reduce((acc, log) => acc + log.duration_minutes, 0)}</div>
                     <p className="text-xs text-muted-foreground">Minutes this month</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Unread Messages</CardTitle>
-                    <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-xs sm:text-sm font-medium">Unread Messages</CardTitle>
+                    <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{messages.filter(m => !m.is_read).length}</div>
+                    <div className="text-xl sm:text-2xl font-bold">{messages.filter(m => !m.is_read).length}</div>
                     <p className="text-xs text-muted-foreground">New messages</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Outstanding Balance</CardTitle>
-                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-xs sm:text-sm font-medium">Outstanding Balance</CardTitle>
+                    <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{formatCurrency(payments.filter(p => p.status === 'pending').reduce((acc, p) => acc + p.amount, 0))}</div>
+                    <div className="text-xl sm:text-2xl font-bold">{formatCurrency(payments.filter(p => p.status === 'pending').reduce((acc, p) => acc + p.amount, 0))}</div>
                     <p className="text-xs text-muted-foreground">Due payments</p>
                   </CardContent>
                 </Card>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Next Lesson</CardTitle>
-                    <CardDescription>Your upcoming lesson details</CardDescription>
+                    <CardTitle className="text-base sm:text-lg">Next Lesson</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Your upcoming lesson details</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {lessons.filter(l => l.status === 'scheduled').length > 0 ? (
                       <div className="space-y-4">
                         {lessons.filter(l => l.status === 'scheduled').slice(0, 1).map(lesson => (
-                          <div key={lesson.id} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                          <div key={lesson.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-blue-50 rounded-lg gap-2">
                             <div>
-                              <h4 className="font-semibold">{lesson.title}</h4>
-                              <p className="text-sm text-gray-600">{formatDate(lesson.lesson_date)} at {formatTime(lesson.start_time)}</p>
-                              <p className="text-sm text-gray-600">Duration: {lesson.start_time} - {lesson.end_time}</p>
+                              <h4 className="font-semibold text-sm sm:text-base">{lesson.title}</h4>
+                              <p className="text-xs sm:text-sm text-gray-600">{formatDate(lesson.lesson_date)} at {formatTime(lesson.start_time)}</p>
+                              <p className="text-xs sm:text-sm text-gray-600">Duration: {lesson.start_time} - {lesson.end_time}</p>
                             </div>
                             <Badge className={getStatusColor(lesson.status)}>{lesson.status}</Badge>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-gray-500">No upcoming lessons scheduled</p>
+                      <p className="text-gray-500 text-sm">No upcoming lessons scheduled</p>
                     )}
                   </CardContent>
                 </Card>
@@ -2092,10 +2311,20 @@ const StudentDashboard = () => {
                         .filter(slot => selectedTeacher === 'all' || slot.teacher_id === selectedTeacher)
                         .filter(slot => slot.current_bookings < slot.max_students)
                         .map(slot => (
-                          <div key={slot.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
+                          <div key={slot.id} className={`p-4 border rounded-lg hover:shadow-md transition-shadow ${
+                            slot.has_conflict ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                          }`}>
                             <div className="flex items-center justify-between mb-2">
                               <h4 className="font-semibold">{slot.teacher_name}</h4>
-                              <Badge variant="secondary">{slot.slot_type}</Badge>
+                              <div className="flex gap-2">
+                                <Badge variant="secondary">{slot.slot_type}</Badge>
+                                {slot.has_conflict && (
+                                  <Badge variant="destructive" className="flex items-center gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    Conflict
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
                               <div>
@@ -2114,6 +2343,13 @@ const StudentDashboard = () => {
                             {slot.description && (
                               <p className="text-sm text-gray-600 mb-3">{slot.description}</p>
                             )}
+                            {slot.has_conflict && (
+                              <div className="mb-3 p-3 bg-red-100 border border-red-200 rounded-lg">
+                                <p className="text-sm text-red-700 font-medium">
+                                  ⚠️ You have another lesson scheduled during this time period
+                                </p>
+                              </div>
+                            )}
                             <Button 
                               onClick={() => {
                                 setSelectedTimeSlot(slot);
@@ -2126,15 +2362,20 @@ const StudentDashboard = () => {
                                 });
                                 setShowBookingModal(true);
                               }}
-                              disabled={slot.current_bookings >= slot.max_students || (bookingStatus && !bookingStatus.can_book_more)}
+                              disabled={
+                                slot.current_bookings >= slot.max_students || 
+                                (bookingStatus && !bookingStatus.can_book_more) ||
+                                slot.has_conflict
+                              }
                               className="w-full"
                             >
                               {slot.current_bookings >= slot.max_students ? 'Full' : 
-                               (bookingStatus && !bookingStatus.can_book_more) ? 'Limit Reached' : 'Book This Slot'}
+                               (bookingStatus && !bookingStatus.can_book_more) ? 'Limit Reached' :
+                               slot.has_conflict ? 'Time Conflict' : 'Book This Slot'}
                             </Button>
                             
                             {/* Add recurring booking option for instruments */}
-                            {slot.slot_type === 'regular' && slot.current_bookings < slot.max_students && (
+                            {slot.slot_type === 'regular' && slot.current_bookings < slot.max_students && !slot.has_conflict && (
                               <Button 
                                 variant="outline"
                                 onClick={() => handleBookRecurringSlot(slot)}

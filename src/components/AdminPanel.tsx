@@ -1386,225 +1386,310 @@ const AdminPanel = () => {
   }
 
   return (
-    <section id="admin" className="py-24 bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5 min-h-screen">
+    <section id="admin" className="py-8 sm:py-12 lg:py-24 bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5 min-h-screen">
       <div className="container mx-auto px-4">
-        <div className="flex justify-between items-center mb-16">
-          <div className="text-center flex-1">
-            <div className="flex items-center justify-center mb-6">
+        {/* Mobile-friendly header layout */}
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-8 lg:mb-16 gap-4">
+          <div className="text-center lg:text-left flex-1">
+            <div className="flex items-center justify-center lg:justify-start mb-4 lg:mb-6">
               <Link to="/" className="group">
                 <img 
                   alt="Damon Music Academy Logo" 
                   src="/damon-logo.png" 
-                  className="h-16 sm:h-20 object-contain transition-transform duration-300 group-hover:scale-105 cursor-pointer" 
+                  className="h-12 sm:h-16 lg:h-20 object-contain transition-transform duration-300 group-hover:scale-105 cursor-pointer" 
                 />
               </Link>
             </div>
-            <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 lg:mb-6 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
               Damon Music Academy Dashboard
             </h2>
-            <p className="text-xl text-muted-foreground">
+            <p className="text-base sm:text-lg lg:text-xl text-muted-foreground">
               {userRole === 'super_admin' ? 'Super Admin Panel - Full System Access' : 'Orchestrating student success and managing musical journeys'}
             </p>
-            <div className="flex items-center justify-center gap-2 mt-2">
+            <div className="flex items-center justify-center lg:justify-start gap-2 mt-2">
               {userRole === 'super_admin' ? (
-                <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs sm:text-sm">
                   <Shield className="h-3 w-3 mr-1" />
                   Super Admin
                 </Badge>
               ) : (
-                <Badge className="bg-gradient-to-r from-primary to-accent text-white">
+                <Badge className="bg-gradient-to-r from-primary to-accent text-white text-xs sm:text-sm">
                   <UserCog className="h-3 w-3 mr-1" />
                   Admin
                 </Badge>
               )}
             </div>
           </div>
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-col sm:flex-row lg:flex-col items-center sm:justify-center lg:items-end gap-2">
             <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-primary/20">
               <div className="w-6 h-6 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center">
                 <UserCog className="w-3 h-3 text-white" />
               </div>
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{user?.email}</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[120px] sm:max-w-none">{user?.email}</p>
                 <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
               </div>
             </div>
             <Button
               variant="outline"
               onClick={() => handleSignOut()}
-              className="flex items-center gap-2 bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10"
+              className="flex items-center gap-2 bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10 text-xs sm:text-sm"
             >
               <LogOut className="h-4 w-4" />
-              Sign Out
+              <span className="hidden sm:inline">Sign Out</span>
+              <span className="sm:hidden">Logout</span>
             </Button>
           </div>
         </div>
 
-        <div className="flex justify-start mb-8 overflow-x-auto scrollbar-thin scrollbar-thumb-primary/40 scrollbar-track-transparent" style={{ WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory' }}>
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-2 shadow-xl border border-primary/10 flex gap-2 min-w-max" style={{ minWidth: 'fit-content' }}>
-            <Button
-              variant={activeTab === 'stats' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('stats')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-              style={{ minWidth: 120 }}
-            >
-              <Piano className="h-4 w-4 mr-2" />
-              Overview
-            </Button>
-            <Button
-              variant={activeTab === 'students' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('students')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-              style={{ minWidth: 120 }}
-            >
-              <Users className="h-4 w-4 mr-2" />
-              Students ({activeStudents.length})
-            </Button>
-            <Button
-              variant={activeTab === 'registrations' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('registrations')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-              style={{ minWidth: 120 }}
-            >
-              <Guitar className="h-4 w-4 mr-2" />
-              Applications ({registrations.length})
-            </Button>
-            <Button
-              variant={activeTab === 'events' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('events')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-              style={{ minWidth: 120 }}
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Events
-            </Button>
-            <Button
-              variant={activeTab === 'messages' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('messages')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-              style={{ minWidth: 120 }}
-            >
-              <Mic className="h-4 w-4 mr-2" />
-              Messages ({contactMessages.length})
-            </Button>
-            <Button
-              variant={activeTab === 'schedule' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('schedule')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-              style={{ minWidth: 120 }}
-            >
-              <Clock className="h-4 w-4 mr-2" />
-              Schedule
-            </Button>
-            {userRole === 'super_admin' && (
+        {/* Mobile-optimized tab navigation */}
+        <div className="mb-6 lg:mb-8">
+          {/* Mobile dropdown for tabs */}
+          <div className="lg:hidden">
+            <Select value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
+              <SelectTrigger className="w-full bg-white/90 backdrop-blur-sm border border-primary/20 rounded-xl">
+                <SelectValue placeholder="Select section" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="stats">
+                  <div className="flex items-center gap-2">
+                    <Piano className="h-4 w-4" />
+                    <span>Overview</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="students">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <span>Students ({activeStudents.length})</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="registrations">
+                  <div className="flex items-center gap-2">
+                    <Guitar className="h-4 w-4" />
+                    <span>Applications ({registrations.length})</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="events">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>Events</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="messages">
+                  <div className="flex items-center gap-2">
+                    <Mic className="h-4 w-4" />
+                    <span>Messages ({contactMessages.length})</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="schedule">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <span>Schedule</span>
+                  </div>
+                </SelectItem>
+                {userRole === 'super_admin' && (
+                  <SelectItem value="admins">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      <span>Admins ({adminProfiles.length})</span>
+                    </div>
+                  </SelectItem>
+                )}
+                <SelectItem value="teachers">
+                  <div className="flex items-center gap-2">
+                    <UserCog className="h-4 w-4" />
+                    <span>Teachers</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="quotes">
+                  <div className="flex items-center gap-2">
+                    <Quote className="h-4 w-4" />
+                    <span>Quotes ({quotes.length})</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="gallery">
+                  <div className="flex items-center gap-2">
+                    <Image className="h-4 w-4" />
+                    <span>Gallery</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="finances">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    <span>Finances</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Desktop horizontal tabs */}
+          <div className="hidden lg:flex justify-start overflow-x-auto scrollbar-thin scrollbar-thumb-primary/40 scrollbar-track-transparent" style={{ WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory' }}>
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-2 shadow-xl border border-primary/10 flex gap-2 min-w-max" style={{ minWidth: 'fit-content' }}>
               <Button
-                variant={activeTab === 'admins' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('admins')}
+                variant={activeTab === 'stats' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('stats')}
                 className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
                 style={{ minWidth: 120 }}
               >
-                <Shield className="h-4 w-4 mr-2" />
-                Admins ({adminProfiles.length})
+                <Piano className="h-4 w-4 mr-2" />
+                Overview
               </Button>
-            )}
-            <Button
-              variant={activeTab === 'teachers' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('teachers')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-              style={{ minWidth: 120 }}
-            >
-              <UserCog className="h-4 w-4 mr-2" />
-              Teachers
-            </Button>
-            <Button
-              variant={activeTab === 'quotes' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('quotes')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-              style={{ minWidth: 120 }}
-            >
-              <Quote className="h-4 w-4 mr-2" />
-              Quotes ({quotes.length})
-            </Button>
-            <Button
-              variant={activeTab === 'gallery' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('gallery')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-              style={{ minWidth: 120 }}
-            >
-              <Image className="h-4 w-4 mr-2" />
-              Gallery
-            </Button>
-            <Button
-              variant={activeTab === 'finances' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('finances')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-              style={{ minWidth: 120 }}
-            >
-              <DollarSign className="h-4 w-4 mr-2" />
-              Finances
-            </Button>
+              <Button
+                variant={activeTab === 'students' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('students')}
+                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+                style={{ minWidth: 120 }}
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Students ({activeStudents.length})
+              </Button>
+              <Button
+                variant={activeTab === 'registrations' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('registrations')}
+                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+                style={{ minWidth: 120 }}
+              >
+                <Guitar className="h-4 w-4 mr-2" />
+                Applications ({registrations.length})
+              </Button>
+              <Button
+                variant={activeTab === 'events' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('events')}
+                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+                style={{ minWidth: 120 }}
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Events
+              </Button>
+              <Button
+                variant={activeTab === 'messages' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('messages')}
+                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+                style={{ minWidth: 120 }}
+              >
+                <Mic className="h-4 w-4 mr-2" />
+                Messages ({contactMessages.length})
+              </Button>
+              <Button
+                variant={activeTab === 'schedule' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('schedule')}
+                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+                style={{ minWidth: 120 }}
+              >
+                <Clock className="h-4 w-4 mr-2" />
+                Schedule
+              </Button>
+              {userRole === 'super_admin' && (
+                <Button
+                  variant={activeTab === 'admins' ? 'default' : 'ghost'}
+                  onClick={() => setActiveTab('admins')}
+                  className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+                  style={{ minWidth: 120 }}
+                >
+                  <Shield className="h-4 w-4 mr-2" />
+                  Admins ({adminProfiles.length})
+                </Button>
+              )}
+              <Button
+                variant={activeTab === 'teachers' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('teachers')}
+                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+                style={{ minWidth: 120 }}
+              >
+                <UserCog className="h-4 w-4 mr-2" />
+                Teachers
+              </Button>
+              <Button
+                variant={activeTab === 'quotes' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('quotes')}
+                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+                style={{ minWidth: 120 }}
+              >
+                <Quote className="h-4 w-4 mr-2" />
+                Quotes ({quotes.length})
+              </Button>
+              <Button
+                variant={activeTab === 'gallery' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('gallery')}
+                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+                style={{ minWidth: 120 }}
+              >
+                <Image className="h-4 w-4 mr-2" />
+                Gallery
+              </Button>
+              <Button
+                variant={activeTab === 'finances' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('finances')}
+                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+                style={{ minWidth: 120 }}
+              >
+                <DollarSign className="h-4 w-4 mr-2" />
+                Finances
+              </Button>
 
+            </div>
           </div>
         </div>
 
-        {/* Stats Overview */}
+        {/* Stats Overview - Mobile responsive grid */}
         <div style={{ display: activeTab === 'stats' ? 'block' : 'none' }}>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <Card className="shadow-xl border-0 bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Active Students</p>
-                    <p className="text-3xl font-bold text-primary">{activeStudents.length}</p>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">Active Students</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-primary">{activeStudents.length}</p>
                     <p className="text-xs text-muted-foreground mt-1">Currently enrolled</p>
                   </div>
-                  <div className="p-3 bg-primary/20 rounded-full">
-                    <Star className="h-8 w-8 text-primary" />
+                  <div className="p-2 sm:p-3 bg-primary/20 rounded-full">
+                    <Star className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
                   </div>
                 </div>
               </CardContent>
             </Card>
             
             <Card className="shadow-xl border-0 bg-gradient-to-br from-accent/10 to-accent/5 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Pending Applications</p>
-                    <p className="text-3xl font-bold text-accent">{pendingCount}</p>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">Pending Applications</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-accent">{pendingCount}</p>
                     <p className="text-xs text-muted-foreground mt-1">Awaiting review</p>
                   </div>
-                  <div className="p-3 bg-accent/20 rounded-full">
-                    <Calendar className="h-8 w-8 text-accent" />
+                  <div className="p-2 sm:p-3 bg-accent/20 rounded-full">
+                    <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-accent" />
                   </div>
                 </div>
               </CardContent>
             </Card>
             
             <Card className="shadow-xl border-0 bg-gradient-to-br from-secondary/10 to-secondary/5 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">New Messages</p>
-                    <p className="text-3xl font-bold text-secondary">{unreadMessages}</p>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">New Messages</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-secondary">{unreadMessages}</p>
                     <p className="text-xs text-muted-foreground mt-1">Unread inquiries</p>
                   </div>
-                  <div className="p-3 bg-secondary/20 rounded-full">
-                    <Mail className="h-8 w-8 text-secondary" />
+                  <div className="p-2 sm:p-3 bg-secondary/20 rounded-full">
+                    <Mail className="h-6 w-6 sm:h-8 sm:w-8 text-secondary" />
                   </div>
                 </div>
               </CardContent>
             </Card>
             
             <Card className="shadow-xl border-0 bg-gradient-to-br from-green-100 to-green-50 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Total Registrations</p>
-                    <p className="text-3xl font-bold text-green-600">{registrations.length}</p>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">Total Registrations</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-green-600">{registrations.length}</p>
                     <p className="text-xs text-muted-foreground mt-1">All applications</p>
                   </div>
-                  <div className="p-3 bg-green-100 rounded-full">
-                    <BookOpen className="h-8 w-8 text-green-600" />
+                  <div className="p-2 sm:p-3 bg-green-100 rounded-full">
+                    <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
                   </div>
                 </div>
               </CardContent>
