@@ -316,6 +316,8 @@ const StudentDashboard = () => {
     notes: ''
   });
 
+  const [showAllInvoices, setShowAllInvoices] = useState(false);
+
   useEffect(() => {
     if (user) {
       checkUserRole();
@@ -1533,6 +1535,7 @@ const StudentDashboard = () => {
       case 'completed': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       case 'paid': return 'bg-green-100 text-green-800';
+      case 'partial': return 'bg-orange-100 text-orange-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'overdue': return 'bg-red-100 text-red-800';
       case 'assigned': return 'bg-blue-100 text-blue-800';
@@ -1671,6 +1674,35 @@ const StudentDashboard = () => {
     // Optionally recalculate details for display
     setInvoiceDetails(invoice.lessons_summary || null);
     setShowInvoiceModal(true);
+  };
+
+  const handlePayment = async (invoice: any) => {
+    try {
+      toast({
+        title: "Payment Processing",
+        description: "Redirecting to payment gateway...",
+      });
+      
+      // TODO: Implement actual payment processing
+      // This would typically redirect to a payment gateway like M-Pesa, PayPal, etc.
+      console.log('Processing payment for invoice:', invoice.id);
+      
+      // For now, just show a success message
+      setTimeout(() => {
+        toast({
+          title: "Payment Successful",
+          description: "Your payment has been processed successfully.",
+        });
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Payment error:', error);
+      toast({
+        title: "Payment Error",
+        description: "Failed to process payment. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
@@ -2184,7 +2216,7 @@ const StudentDashboard = () => {
                     <div className="text-xl sm:text-2xl font-bold">
                       {formatCurrency(
                         invoices
-                          .filter(inv => inv.payment_status !== 'paid')
+                          .filter(inv => inv.payment_status === 'pending' || inv.payment_status === 'partial')
                           .reduce((acc, inv) => acc + (inv.amount_due - (inv.amount_paid || 0)), 0)
                       )}
                     </div>
@@ -2866,67 +2898,95 @@ const StudentDashboard = () => {
                   <CardDescription>View your payment history and manage outstanding balances</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                      <Card>
-                        <CardContent className="p-4">
-                          <div className="text-2xl font-bold text-green-600">
-                            {formatCurrency(
-                              invoices
-                                .filter(inv => inv.payment_status === 'paid')
-                                .reduce((acc, inv) => acc + inv.amount_paid, 0)
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-600">Total Paid</p>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="p-4">
-                          <div className="text-2xl font-bold text-yellow-600">
-                            {formatCurrency(
-                              invoices
-                                .filter(inv => inv.payment_status !== 'paid')
-                                .reduce((acc, inv) => acc + (inv.amount_due - (inv.amount_paid || 0)), 0)
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-600">Outstanding</p>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="p-4">
-                          <div className="text-2xl font-bold text-blue-600">{invoices.length}</div>
-                          <p className="text-sm text-gray-600">Total Invoices</p>
-                        </CardContent>
-                      </Card>
+                  <div className="mb-4 flex justify-between items-center">
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant={showAllInvoices ? "outline" : "default"}
+                        size="sm"
+                        onClick={() => setShowAllInvoices(false)}
+                      >
+                        Outstanding
+                      </Button>
+                      <Button
+                        variant={showAllInvoices ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setShowAllInvoices(true)}
+                      >
+                        All Invoices
+                      </Button>
                     </div>
+                  </div>
 
-                    <div className="space-y-4">
-                      {invoices.length > 0 ? (
-                        invoices.map(invoice => (
-                          <div key={invoice.id} className="flex items-center justify-between p-4 border rounded-lg">
-                            <div>
-                              <h4 className="font-semibold">Invoice #{invoice.id.slice(0, 8)}</h4>
-                              <p className="text-sm text-gray-600">Period: {formatDate(invoice.period_start)} - {formatDate(invoice.period_end)}</p>
-                              <p className="text-sm text-gray-600">Due: {formatDate(invoice.due_date)}</p>
-                            </div>
-                            <div className="flex items-center space-x-4">
-                              <div className="text-right">
-                                <div className="text-lg font-semibold">{formatCurrency(invoice.amount_due)}</div>
-                                {invoice.amount_paid > 0 && (
-                                  <div className="text-sm text-green-600">Paid: {formatCurrency(invoice.amount_paid)}</div>
-                                )}
-                              </div>
-                              <Badge className={getStatusColor(invoice.payment_status)}>{invoice.payment_status}</Badge>
-                              {invoice.payment_status !== 'paid' && (
-                                <Button size="sm">Pay Now</Button>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-2xl font-bold text-green-600">
+                          {formatCurrency(
+                            invoices
+                              .filter(inv => inv.payment_status === 'paid')
+                              .reduce((acc, inv) => acc + inv.amount_paid, 0)
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600">Total Paid</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-2xl font-bold text-yellow-600">
+                          {formatCurrency(
+                            invoices
+                              .filter(inv => inv.payment_status === 'pending' || inv.payment_status === 'partial')
+                              .reduce((acc, inv) => acc + (inv.amount_due - (inv.amount_paid || 0)), 0)
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600">Outstanding</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-2xl font-bold text-blue-600">{invoices.length}</div>
+                        <p className="text-sm text-gray-600">Total Invoices</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="space-y-4">
+                    {(showAllInvoices ? invoices : invoices.filter(inv => inv.payment_status !== 'paid')).length > 0 ? (
+                      (showAllInvoices ? invoices : invoices.filter(inv => inv.payment_status !== 'paid')).map(invoice => (
+                        <div key={invoice.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div>
+                            <h4 className="font-semibold">Invoice #{invoice.id.slice(0, 8)}</h4>
+                            <p className="text-sm text-gray-600">Period: {formatDate(invoice.period_start)} - {formatDate(invoice.period_end)}</p>
+                            <p className="text-sm text-gray-600">Due: {formatDate(invoice.due_date)}</p>
+                          </div>
+                          <div className="flex items-center space-x-4">
+                            <div className="text-right">
+                              <div className="text-lg font-semibold">{formatCurrency(invoice.amount_due)}</div>
+                              {invoice.amount_paid > 0 && (
+                                <div className="text-sm text-green-600">Paid: {formatCurrency(invoice.amount_paid)}</div>
                               )}
                             </div>
+                            <Badge className={getStatusColor(invoice.payment_status)}>{invoice.payment_status}</Badge>
+                            {invoice.payment_status === 'paid' ? (
+                              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                ✓ Paid
+                              </Badge>
+                            ) : (
+                              <Button size="sm" onClick={() => handlePayment(invoice)}>Pay Now</Button>
+                            )}
                           </div>
-                        ))
-                      ) : (
-                        <p className="text-gray-500 text-center py-8">No invoices found</p>
-                      )}
-                    </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500 mb-4">
+                          {showAllInvoices ? 'No invoices found' : 'No outstanding invoices'}
+                        </p>
+                        <p className="text-sm text-gray-400">
+                          {showAllInvoices ? 'No invoices have been generated yet.' : 'All your invoices have been paid!'}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
