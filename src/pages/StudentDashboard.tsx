@@ -457,46 +457,32 @@ const StudentDashboard = () => {
 
       // Fetch messages
       const { data: messagesData, error: messagesError } = await supabase
-        .from('portal_messages')
+        .from('messages')
         .select('*')
-        .eq('recipient_id', user?.id)
+        .eq('recipient_id', student.id)
         .order('created_at', { ascending: false });
 
       if (!messagesError && messagesData) {
         setMessages(messagesData);
       }
 
-      // Fetch payments
+      // Fetch payments with proper invoice linking
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('payments')
-        .select('*')
-        .eq('student_id', student.id)
-        .order('created_at', { ascending: false });
-
-      if (!paymentsError && paymentsData) {
-        setPayments(paymentsData);
-      }
-
-      // Fetch assignments
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('assignments')
-        .select('*')
+        .select(`
+          *,
+          invoices(
+            id,
+            amount_due,
+            payment_status,
+            amount_paid
+          )
+        `)
         .eq('student_id', student.id)
         .order('due_date', { ascending: true });
 
-      if (!assignmentsError && assignmentsData) {
-        setAssignments(assignmentsData);
-      }
-
-      // Fetch lesson materials
-      const { data: materialsData, error: materialsError } = await supabase
-        .from('lesson_materials')
-        .select('*')
-        .eq('lesson_id', student.id)
-        .order('created_at', { ascending: false });
-
-      if (!materialsError && materialsData) {
-        setMaterials(materialsData);
+      if (!paymentsError && paymentsData) {
+        setPayments(paymentsData);
       }
 
       // Fetch available time slots
@@ -505,19 +491,21 @@ const StudentDashboard = () => {
       // Fetch teachers
       await fetchTeachers();
       
+      // Fetch my bookings
+      await fetchMyBookings();
+      
       // Fetch meeting rooms
       await fetchMeetingRooms();
       
-      // Fetch invoices
+      // Fetch booking status for session limits
+      await fetchBookingStatus();
+      
+      // Fetch invoices with payment status
       await fetchInvoices(student.id);
-
+      
     } catch (error) {
       console.error('Error fetching student data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load student data",
-        variant: "destructive",
-      });
+      toast({ title: 'Error', description: 'Failed to load student data', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -2193,7 +2181,13 @@ const StudentDashboard = () => {
                     <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold">{formatCurrency(payments.filter(p => p.status === 'pending').reduce((acc, p) => acc + p.amount, 0))}</div>
+                    <div className="text-xl sm:text-2xl font-bold">
+                      {formatCurrency(
+                        invoices
+                          .filter(inv => inv.payment_status !== 'paid')
+                          .reduce((acc, inv) => acc + (inv.amount_due - (inv.amount_paid || 0)), 0)
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">Due payments</p>
                   </CardContent>
                 </Card>
@@ -2876,46 +2870,61 @@ const StudentDashboard = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                       <Card>
                         <CardContent className="p-4">
-                          <div className="text-2xl font-bold text-green-600">{formatCurrency(payments.filter(p => p.status === 'completed').reduce((acc, p) => acc + p.amount, 0))}</div>
+                          <div className="text-2xl font-bold text-green-600">
+                            {formatCurrency(
+                              invoices
+                                .filter(inv => inv.payment_status === 'paid')
+                                .reduce((acc, inv) => acc + inv.amount_paid, 0)
+                            )}
+                          </div>
                           <p className="text-sm text-gray-600">Total Paid</p>
                         </CardContent>
                       </Card>
                       <Card>
                         <CardContent className="p-4">
-                          <div className="text-2xl font-bold text-yellow-600">{formatCurrency(payments.filter(p => p.status === 'pending').reduce((acc, p) => acc + p.amount, 0))}</div>
+                          <div className="text-2xl font-bold text-yellow-600">
+                            {formatCurrency(
+                              invoices
+                                .filter(inv => inv.payment_status !== 'paid')
+                                .reduce((acc, inv) => acc + (inv.amount_due - (inv.amount_paid || 0)), 0)
+                            )}
+                          </div>
                           <p className="text-sm text-gray-600">Outstanding</p>
                         </CardContent>
                       </Card>
                       <Card>
                         <CardContent className="p-4">
-                          <div className="text-2xl font-bold text-blue-600">{payments.length}</div>
+                          <div className="text-2xl font-bold text-blue-600">{invoices.length}</div>
                           <p className="text-sm text-gray-600">Total Invoices</p>
                         </CardContent>
                       </Card>
                     </div>
 
                     <div className="space-y-4">
-                      {payments.length > 0 ? (
-                        payments.map(payment => (
-                          <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      {invoices.length > 0 ? (
+                        invoices.map(invoice => (
+                          <div key={invoice.id} className="flex items-center justify-between p-4 border rounded-lg">
                             <div>
-                              <h4 className="font-semibold">{payment.payment_type}</h4>
-                              <p className="text-sm text-gray-600">Due: {formatDate(payment.due_date)}</p>
-                              {payment.paid_date && (
-                                <p className="text-sm text-gray-600">Paid: {formatDate(payment.paid_date)}</p>
-                              )}
+                              <h4 className="font-semibold">Invoice #{invoice.id.slice(0, 8)}</h4>
+                              <p className="text-sm text-gray-600">Period: {formatDate(invoice.period_start)} - {formatDate(invoice.period_end)}</p>
+                              <p className="text-sm text-gray-600">Due: {formatDate(invoice.due_date)}</p>
                             </div>
                             <div className="flex items-center space-x-4">
-                              <span className="text-lg font-semibold">{formatCurrency(payment.amount)}</span>
-                              <Badge className={getStatusColor(payment.status)}>{payment.status}</Badge>
-                              {payment.status === 'pending' && (
+                              <div className="text-right">
+                                <div className="text-lg font-semibold">{formatCurrency(invoice.amount_due)}</div>
+                                {invoice.amount_paid > 0 && (
+                                  <div className="text-sm text-green-600">Paid: {formatCurrency(invoice.amount_paid)}</div>
+                                )}
+                              </div>
+                              <Badge className={getStatusColor(invoice.payment_status)}>{invoice.payment_status}</Badge>
+                              {invoice.payment_status !== 'paid' && (
                                 <Button size="sm">Pay Now</Button>
                               )}
                             </div>
                           </div>
                         ))
                       ) : (
-                        <p className="text-gray-500 text-center py-8">No payment records found</p>
+                        <p className="text-gray-500 text-center py-8">No invoices found</p>
                       )}
                     </div>
                   </div>

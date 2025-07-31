@@ -14,8 +14,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
-import { calculateStudentInvoice, InvoiceCalculationResult } from '../lib/invoiceUtils';
-import { Invoice } from '../integrations/supabase/types';
 import VideoConferenceModal from '../components/VideoConferenceModal';
 import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking } from '../lib/videoConferencing';
 
@@ -181,10 +179,7 @@ const TeacherDashboard = () => {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
   const [makeupCredits, setMakeupCredits] = useState<any[]>([]);
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-  const [invoiceDetails, setInvoiceDetails] = useState<any>(null);
+
   const navigate = useNavigate();
 
   // Modal states
@@ -404,25 +399,11 @@ const TeacherDashboard = () => {
   // Helper to map day_of_week to day name (handles both text and number formats)
   const getDayName = (dayNum: number | string) => {
     const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-    
-    // If it's already a day name, return it
-    if (typeof dayNum === 'string' && days.includes(dayNum)) {
-      return dayNum;
-    }
-    
-    // If it's a number, convert to day name
-    const idx = typeof dayNum === 'string' ? parseInt(dayNum, 10) : dayNum;
+    const idx = typeof dayNum === 'string' ? parseInt(dayNum) : dayNum;
     return days[(idx || 1) - 1] || "Monday";
   };
 
-  const fetchInvoices = async () => {
-    // Fetch all invoices (for all students)
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('*, students(student_name)')
-      .order('period_start', { ascending: false });
-    if (!error && data) setInvoices(data);
-  };
+
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -531,10 +512,10 @@ const TeacherDashboard = () => {
       // Fetch invoices
       await fetchInvoices();
 
-      // Fetch user's meeting rooms
+      // Fetch meeting rooms
       await fetchMeetingRooms();
-
-      // Fetch teacher's bookings
+      
+      // Fetch teacher bookings
       await fetchTeacherBookings();
 
     } catch (error) {
@@ -1112,26 +1093,7 @@ const TeacherDashboard = () => {
     setEventModalOpen(true);
   };
 
-  const handleViewInvoice = (invoice: any) => {
-    setSelectedInvoice(invoice);
-    setInvoiceDetails(invoice.lessons_summary || null);
-    setShowInvoiceModal(true);
-  };
 
-  const handleGenerateInvoice = async (studentId: string, periodStart: string, periodEnd: string) => {
-    const result = await calculateStudentInvoice(studentId, periodStart, periodEnd);
-    // Store in Supabase
-    await supabase.from('invoices').insert({
-      student_id: studentId,
-      period_start: periodStart,
-      period_end: periodEnd,
-      lessons_summary: result,
-      amount_due: result.total,
-      status: 'pending',
-      due_date: periodEnd,
-    });
-    await fetchInvoices();
-  };
 
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [selectedBookingForReschedule, setSelectedBookingForReschedule] = useState<any>(null);
@@ -1359,12 +1321,7 @@ const TeacherDashboard = () => {
                       <span>Calendar</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="invoices">
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4" />
-                      <span>Invoices</span>
-                    </div>
-                  </SelectItem>
+
                   <SelectItem value="bookings">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
@@ -1415,10 +1372,7 @@ const TeacherDashboard = () => {
                 <CalendarIcon className="w-5 h-5" />
                 <span>Calendar</span>
               </TabsTrigger>
-              <TabsTrigger value="invoices" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-orange-700 data-[state=active]:bg-orange-100 data-[state=active]:shadow-md transition-all">
-                <FileText className="w-5 h-5" />
-                <span>Invoices</span>
-              </TabsTrigger>
+
               <TabsTrigger value="bookings" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
                 <Calendar className="w-5 h-5" />
                 <span>Bookings</span>
