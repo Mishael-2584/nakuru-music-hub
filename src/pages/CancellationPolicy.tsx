@@ -16,9 +16,10 @@ const CancellationPolicy = () => (
       <h2 className="text-xl font-semibold mt-8 mb-2 text-primary">Individual Lesson Cancellations</h2>
       <ul className="list-disc pl-6 mb-4 text-base">
         <li><b>24-Hour Notice Required:</b> To be eligible for a make-up lesson, we require a minimum of 24 hours' notice before your scheduled lesson time.</li>
-        <li><b>Timely Cancellations (&gt;24 hours):</b> If you provide more than 24 hours' notice via the Student Portal, a make-up credit will be automatically added to your account. We offer one make-up lesson credit per student, per month.</li>
+        <li><b>Timely Cancellations (&gt;24 hours):</b> If you provide more than 24 hours' notice via the Student Portal, a make-up credit will be automatically added to your account. Students are eligible for two make-up lesson credits per student, per month. Make-up lessons are subject to teacher availability and must be completed within the current billing period/term. Once a make-up lesson is scheduled, it cannot be cancelled or rescheduled again; missing it will result in forfeiture.</li>
         <li><b>Late Cancellations (&lt;24 hours):</b> Cancellations made with less than 24 hours' notice will be forfeited. The student will be charged the full fee for the missed lesson.</li>
         <li><b>No-Shows:</b> Failure to attend a lesson without notice is considered a forfeited lesson, and the full fee will be charged.</li>
+        <li><b>Group Sessions:</b> Make-up lessons are not provided for missed group sessions due to the collaborative and progressive nature of these classes.</li>
       </ul>
       <hr className="my-6 border-accent/30" />
       <h2 className="text-xl font-semibold mt-8 mb-2 text-primary">Cancellation by the Academy</h2>

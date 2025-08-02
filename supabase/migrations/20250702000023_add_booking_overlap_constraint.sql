@@ -3,9 +3,18 @@
 
 -- Add a unique constraint to prevent overlapping bookings for the same student
 -- This ensures that a student cannot have multiple confirmed bookings at the same time
-ALTER TABLE public.bookings 
-ADD CONSTRAINT unique_student_booking_time 
-UNIQUE (student_id, booking_date, start_time, end_time, status) 
+-- Note: We'll use a partial index instead of a WHERE clause in UNIQUE constraint
+-- First, let's clean up any existing duplicates by keeping only the most recent booking
+DELETE FROM public.bookings 
+WHERE id NOT IN (
+  SELECT DISTINCT ON (student_id, booking_date, start_time, end_time) id
+  FROM public.bookings 
+  WHERE status = 'confirmed'
+  ORDER BY student_id, booking_date, start_time, end_time, created_at DESC
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS unique_student_booking_time 
+ON public.bookings (student_id, booking_date, start_time, end_time) 
 WHERE status = 'confirmed';
 
 -- Add a check constraint to prevent overlapping time ranges for the same student on the same date

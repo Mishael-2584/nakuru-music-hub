@@ -503,6 +503,9 @@ const StudentDashboard = () => {
       // Fetch booking status for session limits
       await fetchBookingStatus();
       
+      // Fetch make-up credits
+      await fetchMakeupCredits();
+      
       // Fetch invoices with payment status
       await fetchInvoices(student.id);
       
@@ -855,6 +858,30 @@ const StudentDashboard = () => {
     }
   };
 
+  // Fetch make-up credits
+  const fetchMakeupCredits = async () => {
+    if (!studentProfile) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('makeup_credits')
+        .select('*')
+        .eq('student_id', studentProfile.id)
+        .eq('is_used', false)
+        .gte('expires_at', new Date().toISOString().split('T')[0])
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching makeup credits:', error);
+        return;
+      }
+      
+      setMakeupCredits(data || []);
+    } catch (error) {
+      console.error('Error fetching makeup credits:', error);
+    }
+  };
+
   // Handle opening video conference
   const handleOpenVideoConference = (booking: Booking) => {
     if (booking.meeting_room) {
@@ -1157,6 +1184,18 @@ const StudentDashboard = () => {
   // Handle canceling a booking with 24-hour policy
   const handleCancelBooking = async (bookingId: string, bookingDate: string, startTime: string) => {
     try {
+      // Find the booking to check if it's a make-up lesson
+      const booking = myBookings.find(b => b.id === bookingId);
+      
+      if (booking?.lesson_type === 'makeup') {
+        toast({
+          title: "Cannot Cancel Make-up Lesson",
+          description: "Make-up lessons cannot be cancelled or rescheduled once scheduled. Missing it will result in forfeiture.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       // Check if it's within 24 hours
       const lessonDateTime = new Date(`${bookingDate}T${startTime}`);
       const currentDateTime = new Date();
@@ -1188,10 +1227,14 @@ const StudentDashboard = () => {
       
       await fetchMyBookings();
       await fetchAvailableTimeSlots();
+      await fetchMakeupCredits(); // Refresh make-up credits
+      
+      // Get the response message from the database function
+      const responseMessage = data?.message || "Lesson cancelled successfully.";
       
       const message = hoursDiff < 24 
         ? "Lesson cancelled. As this was within the 24-hour window, the lesson has been forfeited."
-        : "Lesson cancelled successfully. A make-up lesson credit has been added to your account.";
+        : responseMessage;
       
       toast({
         title: "Booking Cancelled",
@@ -1959,6 +2002,15 @@ const StudentDashboard = () => {
     if (!selectedMakeupCredit || !studentProfile) return;
 
     try {
+      // Show warning about make-up lesson policy
+      const confirmed = window.confirm(
+        "Important: Once a make-up lesson is scheduled, it cannot be cancelled or rescheduled. Missing it will result in forfeiture. Do you want to proceed?"
+      );
+      
+      if (!confirmed) {
+        return;
+      }
+
       const { data, error } = await supabase
         .from('bookings')
         .insert({
@@ -1992,7 +2044,7 @@ const StudentDashboard = () => {
 
       toast({
         title: "Success",
-        description: "Make-up lesson booked successfully!",
+        description: "Make-up lesson booked successfully! Remember: This lesson cannot be cancelled or rescheduled.",
       });
     } catch (error) {
       console.error('Error booking makeup lesson:', error);
@@ -2162,52 +2214,52 @@ const StudentDashboard = () => {
 
             {/* Desktop horizontal tabs */}
             <TabsList className="hidden lg:flex flex-wrap w-full bg-white/80 shadow-sm rounded-lg overflow-x-auto gap-1 justify-center p-1">
-              <TabsTrigger value="dashboard" className="flex items-center space-x-2">
-                <BarChart3 className="w-4 h-4" />
+              <TabsTrigger value="dashboard" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-md transition-all">
+                <BarChart3 className="w-5 h-5" />
                 <span>Dashboard</span>
               </TabsTrigger>
-              <TabsTrigger value="bookings" className="flex items-center space-x-2">
-                <Calendar className="w-4 h-4" />
+              <TabsTrigger value="bookings" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
+                <Calendar className="w-5 h-5" />
                 <span>Bookings</span>
               </TabsTrigger>
-              <TabsTrigger value="schedule" className="flex items-center space-x-2">
-                <CalendarDays className="w-4 h-4" />
+              <TabsTrigger value="schedule" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-blue-700 data-[state=active]:bg-blue-100 data-[state=active]:shadow-md transition-all">
+                <CalendarDays className="w-5 h-5" />
                 <span>Schedule</span>
               </TabsTrigger>
-              <TabsTrigger value="calendar" className="flex items-center space-x-2">
-                <CalendarIcon className="w-4 h-4" />
+              <TabsTrigger value="calendar" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-gray-700 data-[state=active]:bg-gray-100 data-[state=active]:shadow-md transition-all">
+                <CalendarIcon className="w-5 h-5" />
                 <span>Calendar</span>
               </TabsTrigger>
-              <TabsTrigger value="materials" className="flex items-center space-x-2">
-                <BookOpen className="w-4 h-4" />
+              <TabsTrigger value="materials" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
+                <BookOpen className="w-5 h-5" />
                 <span>Materials</span>
               </TabsTrigger>
-              <TabsTrigger value="practice" className="flex items-center space-x-2">
-                <Clock className="w-4 h-4" />
+              <TabsTrigger value="practice" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all">
+                <Clock className="w-5 h-5" />
                 <span>Practice</span>
               </TabsTrigger>
-              <TabsTrigger value="progress" className="flex items-center space-x-2">
-                <TrendingUp className="w-4 h-4" />
+              <TabsTrigger value="progress" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-orange-700 data-[state=active]:bg-orange-100 data-[state=active]:shadow-md transition-all">
+                <TrendingUp className="w-5 h-5" />
                 <span>Progress</span>
               </TabsTrigger>
-              <TabsTrigger value="messages" className="flex items-center space-x-2">
-                <MessageSquare className="w-4 h-4" />
+              <TabsTrigger value="messages" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-pink-600 data-[state=active]:bg-pink-100 data-[state=active]:shadow-md transition-all">
+                <MessageSquare className="w-5 h-5" />
                 <span>Messages</span>
               </TabsTrigger>
-              <TabsTrigger value="payments" className="flex items-center space-x-2">
-                <CreditCard className="w-4 h-4" />
+              <TabsTrigger value="payments" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
+                <CreditCard className="w-5 h-5" />
                 <span>Payments</span>
               </TabsTrigger>
-              <TabsTrigger value="account" className="flex items-center space-x-2">
-                <User className="w-4 h-4" />
+              <TabsTrigger value="account" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-secondary data-[state=active]:bg-secondary/10 data-[state=active]:shadow-md transition-all">
+                <User className="w-5 h-5" />
                 <span>Account</span>
               </TabsTrigger>
-              <TabsTrigger value="invoices" className="flex items-center space-x-2">
-                <FileText className="w-4 h-4" />
+              <TabsTrigger value="invoices" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-gray-700 data-[state=active]:bg-gray-100 data-[state=active]:shadow-md transition-all">
+                <FileText className="w-5 h-5" />
                 <span>Invoices</span>
               </TabsTrigger>
-              <TabsTrigger value="video-conferencing" className="flex items-center space-x-2">
-                <Video className="w-4 h-4" />
+              <TabsTrigger value="video-conferencing" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:shadow-md transition-all">
+                <Video className="w-5 h-5" />
                 <span>Video Conferencing</span>
               </TabsTrigger>
             </TabsList>
