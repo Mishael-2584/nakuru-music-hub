@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +30,7 @@ interface TeacherProfile {
   status: string;
   created_at: string;
   user_id?: string; // Add user_id field
+  profile_photo_url?: string;
   notFound?: boolean;
 }
 
@@ -372,6 +374,24 @@ const TeacherDashboard = () => {
   // Get booking count for a time slot
   const getBookingCount = (slotId: string) => {
     return bookings.filter(booking => booking.time_slot_id === slotId).length;
+  };
+
+  // Determine slot status based on bookings and capacity
+  const getSlotStatus = (slot: TimeSlot) => {
+    const bookingCount = getBookingCount(slot.id);
+    const maxStudents = slot.max_students || 1;
+    
+    if (bookingCount === 0) {
+      return { status: 'Available', color: 'bg-green-100 text-green-800' };
+    } else if (bookingCount >= maxStudents) {
+      return { status: 'Booked', color: 'bg-red-100 text-red-800' };
+    } else {
+      // Group slot with some bookings but still has capacity
+      return { 
+        status: `Partially Booked (${bookingCount}/${maxStudents})`, 
+        color: 'bg-orange-100 text-orange-800' 
+      };
+    }
   };
 
   // Handle edit time slot with booking check
@@ -1255,11 +1275,23 @@ const TeacherDashboard = () => {
           <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
             Teacher Panel
           </h2>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mb-2">
-            <span className="text-base sm:text-lg font-semibold text-white drop-shadow">Welcome, {profile?.name || 'Teacher'}</span>
-            <span className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs sm:text-sm font-semibold shadow">
-              <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Teacher
-            </span>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-2">
+            <Avatar className="h-12 w-12 sm:h-14 sm:w-14 border-2 border-white/80 shadow-lg">
+              <AvatarImage 
+                src={profile?.profile_photo_url} 
+                alt={profile?.name || 'Teacher'} 
+                className="object-cover"
+              />
+              <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold text-lg">
+                {profile?.name?.charAt(0)?.toUpperCase() || 'T'}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <span className="text-base sm:text-lg font-semibold text-white drop-shadow">Welcome, {profile?.name || 'Teacher'}</span>
+              <span className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs sm:text-sm font-semibold shadow">
+                <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Teacher
+              </span>
+            </div>
           </div>
           <p className="text-white/90 text-sm sm:text-base lg:text-lg mb-4 px-4">Empowering music education and managing your teaching journey</p>
           <div className="flex flex-col sm:flex-row justify-center w-full max-w-4xl mx-auto mt-2 gap-2">
@@ -1805,8 +1837,8 @@ const TeacherDashboard = () => {
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <Badge className={slot.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                              {slot.is_available ? 'Available' : 'Unavailable'}
+                            <Badge className={getSlotStatus(slot).color}>
+                              {getSlotStatus(slot).status}
                             </Badge>
                             <Button 
                               variant="outline" 

@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video, AlertTriangle } from 'lucide-react';
+import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar';
 import { useToast } from '../hooks/use-toast';
 import PasswordChangePrompt from '../components/PasswordChangePrompt';
 import { useNavigate } from 'react-router-dom';
@@ -2003,6 +2004,29 @@ const StudentDashboard = () => {
     }
   };
 
+  // Get booking count for a time slot
+  const getBookingCount = (slotId: string) => {
+    return myBookings.filter(booking => booking.time_slot_id === slotId).length;
+  };
+
+  // Determine slot status based on bookings and capacity
+  const getSlotStatus = (slot: AvailableTimeSlot) => {
+    const bookingCount = slot.current_bookings || 0;
+    const maxStudents = slot.max_students || 1;
+    
+    if (bookingCount === 0) {
+      return { status: 'Available', color: 'bg-green-100 text-green-800' };
+    } else if (bookingCount >= maxStudents) {
+      return { status: 'Booked', color: 'bg-red-100 text-red-800' };
+    } else {
+      // Group slot with some bookings but still has capacity
+      return { 
+        status: `Partially Booked (${bookingCount}/${maxStudents})`, 
+        color: 'bg-orange-100 text-orange-800' 
+      };
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100">
       {/* Hero/Header Section - Mobile responsive */}
@@ -2017,11 +2041,23 @@ const StudentDashboard = () => {
           <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
             Student Panel
           </h2>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mb-2">
-            <span className="text-base sm:text-lg font-semibold text-white drop-shadow">Welcome, {studentProfile?.student_name || 'Student'}</span>
-            <span className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs sm:text-sm font-semibold shadow">
-              <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Student
-            </span>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-2">
+            <Avatar className="h-12 w-12 sm:h-14 sm:w-14 border-2 border-white/80 shadow-lg">
+              <AvatarImage 
+                src={studentProfile?.profile_photo_url} 
+                alt={studentProfile?.student_name || 'Student'} 
+                className="object-cover"
+              />
+              <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold text-lg">
+                {studentProfile?.student_name?.charAt(0)?.toUpperCase() || 'S'}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <span className="text-base sm:text-lg font-semibold text-white drop-shadow">Welcome, {studentProfile?.student_name || 'Student'}</span>
+              <span className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs sm:text-sm font-semibold shadow">
+                <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Student
+              </span>
+            </div>
           </div>
           <p className="text-white/90 text-sm sm:text-base lg:text-lg mb-4 px-4">Your musical journey starts here. Access lessons, bookings, resources, and more!</p>
           <div className="flex flex-col sm:flex-row justify-center w-full max-w-4xl mx-auto mt-2 gap-2">
@@ -2345,6 +2381,9 @@ const StudentDashboard = () => {
                             <div className="flex items-center justify-between mb-2">
                               <h4 className="font-semibold">{slot.teacher_name}</h4>
                               <div className="flex gap-2">
+                                <Badge className={getSlotStatus(slot).color}>
+                                  {getSlotStatus(slot).status}
+                                </Badge>
                                 <Badge variant="secondary">{slot.slot_type}</Badge>
                                 {slot.has_conflict && (
                                   <Badge variant="destructive" className="flex items-center gap-1">
