@@ -53,7 +53,7 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
     // Dynamic intro message based on course_category
     let introMessage = '';
     if (registration.course_category === 'Music') {
-      introMessage = "Thank you for choosing us for your musical journey!";
+      introMessage = "Thank you for choosing us for your creative journey!";
     } else if (registration.course_category === 'Art') {
       introMessage = "Thank you for choosing us to explore your artistic talents!";
     } else if (registration.course_category === 'Production') {
@@ -333,7 +333,7 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
 
           <div class="footer">
             <p>Thank you for choosing Damon Music Academy!</p>
-            <p>We look forward to helping you achieve your musical dreams.</p>
+            <p>We look forward to helping you achieve your creative dreams.</p>
             <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
           </div>
         </div>

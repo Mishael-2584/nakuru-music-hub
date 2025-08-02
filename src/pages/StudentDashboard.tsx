@@ -2059,7 +2059,7 @@ const StudentDashboard = () => {
               </span>
             </div>
           </div>
-          <p className="text-white/90 text-sm sm:text-base lg:text-lg mb-4 px-4">Your musical journey starts here. Access lessons, bookings, resources, and more!</p>
+          <p className="text-white/90 text-sm sm:text-base lg:text-lg mb-4 px-4">Your creative journey starts here. Access lessons, bookings, resources, and more!</p>
           <div className="flex flex-col sm:flex-row justify-center w-full max-w-4xl mx-auto mt-2 gap-2">
             <Button variant="outline" size="sm" className="bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10 text-xs sm:text-sm">
               <Bell className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-blue-700" />

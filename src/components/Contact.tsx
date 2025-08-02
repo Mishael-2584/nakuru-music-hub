@@ -75,7 +75,7 @@ const Contact = () => {
             Get in Touch
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Ready to start your musical journey? We'd love to hear from you!
+            Ready to start your creative journey? We'd love to hear from you!
           </p>
         </div>
         
