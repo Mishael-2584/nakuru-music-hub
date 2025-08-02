@@ -509,8 +509,7 @@ const TeacherDashboard = () => {
         console.log('[TeacherDashboard] Lessons loaded:', lessonsData?.length || 0);
       }
 
-      // Fetch invoices
-      await fetchInvoices();
+      
 
       // Fetch meeting rooms
       await fetchMeetingRooms();
@@ -2000,84 +1999,7 @@ const TeacherDashboard = () => {
               </Card>
             </TabsContent>
 
-            {/* Invoices Tab */}
-            <TabsContent value="invoices" className="mt-8">
-              <Card className="shadow-lg border-0 bg-white/95">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-xl font-bold">All Student Invoices</CardTitle>
-                    <CardDescription>View and generate invoices for students</CardDescription>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr>
-                          <th>Student</th>
-                          <th>Period</th>
-                          <th>Amount Due</th>
-                          <th>Status</th>
-                          <th>Due Date</th>
-                          <th>PDF</th>
-                          <th>Details</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {invoices.map(inv => (
-                          <tr key={inv.id}>
-                            <td>{inv.students?.student_name || '-'}</td>
-                            <td>{inv.period_start} - {inv.period_end}</td>
-                            <td>KES {inv.amount_due.toLocaleString()}</td>
-                            <td>{inv.status}</td>
-                            <td>{inv.due_date}</td>
-                            <td>{inv.pdf_url ? <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer">Download</a> : '-'}</td>
-                            <td><Button size="sm" variant="outline" onClick={() => handleViewInvoice(inv)}>View</Button></td>
-                            <td>
-                              <Button size="sm" variant="outline" onClick={() => handleGenerateInvoice(inv.student_id, inv.period_start, inv.period_end)}>Regenerate</Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-              {/* Invoice details modal */}
-              <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Invoice Breakdown</DialogTitle>
-                  </DialogHeader>
-                  {invoiceDetails ? (
-                    <div className="space-y-4">
-                      <table className="min-w-full text-sm">
-                        <thead>
-                          <tr>
-                            <th>Description</th>
-                            <th>Quantity</th>
-                            <th>Unit Price</th>
-                            <th>Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {invoiceDetails.lineItems.map((item, idx) => (
-                            <tr key={idx}>
-                              <td>{item.description}</td>
-                              <td>{item.quantity}</td>
-                              <td>KES {item.unitPrice.toLocaleString()}</td>
-                              <td>KES {item.amount.toLocaleString()}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      <div className="text-right font-bold">Total: KES {invoiceDetails.total.toLocaleString()}</div>
-                    </div>
-                  ) : <p>No breakdown available.</p>}
-                </DialogContent>
-              </Dialog>
-            </TabsContent>
+
 
             {/* Bookings Tab */}
             <TabsContent value="bookings" className="mt-8">
@@ -2112,8 +2034,6 @@ const TeacherDashboard = () => {
                                 {booking.notes && <p className="text-sm text-gray-600">Notes: {booking.notes}</p>}
                               </div>
                               <div className="flex flex-col space-y-2">
-                                <Button size="sm" variant="outline" onClick={() => handleViewInvoice(booking)}>View Invoice</Button>
-                                <Button size="sm" variant="outline" onClick={() => handleGenerateInvoice(booking.student_id, booking.period_start, booking.period_end)}>Generate Invoice</Button>
                                 {!booking.meeting_link && (
                                   <Button 
                                     size="sm" 
@@ -2153,8 +2073,6 @@ const TeacherDashboard = () => {
                                 {booking.notes && <p className="text-sm text-gray-600">Notes: {booking.notes}</p>}
                               </div>
                               <div className="flex flex-col space-y-2">
-                                <Button size="sm" variant="outline" onClick={() => handleViewInvoice(booking)}>View Invoice</Button>
-                                <Button size="sm" variant="outline" onClick={() => handleGenerateInvoice(booking.student_id, booking.period_start, booking.period_end)}>Generate Invoice</Button>
                                 {!booking.meeting_link && (
                                   <Button 
                                     size="sm" 
