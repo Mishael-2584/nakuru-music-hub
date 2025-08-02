@@ -1246,7 +1246,9 @@ const TeacherDashboard = () => {
       {/* Hero/Header Section - Mobile responsive */}
       <section className="py-8 sm:py-12 bg-gradient-to-r from-blue-700 via-purple-600 to-indigo-700 shadow-lg">
         <div className="container mx-auto px-4 flex flex-col items-center justify-center text-center">
-          <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-16 sm:h-20 w-16 sm:w-20 mb-4 rounded-full shadow-lg border-4 border-white/80 bg-white/80 object-contain" />
+          <Link to="/" className="group">
+            <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-16 sm:h-20 w-16 sm:w-20 mb-4 rounded-full shadow-lg border-4 border-white/80 bg-white/80 object-contain transition-transform duration-300 group-hover:scale-105 cursor-pointer" />
+          </Link>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold mb-2 bg-gradient-to-r from-white via-blue-200 to-purple-200 bg-clip-text text-transparent drop-shadow-lg">
             Damon Music Academy
           </h1>
