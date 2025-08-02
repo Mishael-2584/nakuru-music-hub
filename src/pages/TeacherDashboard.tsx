@@ -226,83 +226,33 @@ const TeacherDashboard = () => {
 
   // Time slot management functions
   const handleAddTimeSlot = async () => {
-    if (!user) return;
-
-    // Check if teacher profile is properly set up
-    if (!profile || !profile.id || profile.id === 'not-found') {
-      toast({
-        title: "Account Error",
-        description: "Your teacher account is not properly set up. Please contact the administrator.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validation: required fields
-    if (!newTimeSlot.day_of_week || !newTimeSlot.start_time || !newTimeSlot.end_time) {
-      toast({
-        title: "Missing Fields",
-        description: "Please fill in all required fields (day, start time, end time).",
-        variant: "destructive",
-      });
-      return;
-    }
-    // Validation: start < end
-    if (newTimeSlot.start_time >= newTimeSlot.end_time) {
-      toast({
-        title: "Invalid Time",
-        description: "Start time must be before end time.",
-        variant: "destructive",
-      });
-      return;
-    }
-    // Validation: overlap
-    const overlap = timeSlots.some(slot =>
-      slot.day_of_week === newTimeSlot.day_of_week &&
-      // Check if times overlap
-      ((newTimeSlot.start_time < slot.end_time && newTimeSlot.end_time > slot.start_time))
-    );
-    if (overlap) {
-      toast({
-        title: "Overlapping Slot",
-        description: "This time slot overlaps with an existing slot.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Prepare payload
-    const payload = {
-      teacher_id: profile?.id,
-      day_of_week: newTimeSlot.day_of_week, // Keep as text: 'Monday', 'Tuesday', etc.
-      start_time: newTimeSlot.start_time,
-      end_time: newTimeSlot.end_time,
-      is_available: true,
-      slot_type: newTimeSlot.slot_type || 'regular',
-      max_students: newTimeSlot.max_students || 1,
-      description: newTimeSlot.description
-    };
-    console.log('[handleAddTimeSlot] Payload:', payload);
-
     try {
+      if (!profile?.id) {
+        throw new Error('Teacher profile not found');
+      }
+
       const { data, error } = await supabase
         .from('time_slots')
-        .insert(payload)
+        .insert({
+          teacher_id: profile.id,
+          day_of_week: newTimeSlot.day_of_week,
+          start_time: newTimeSlot.start_time,
+          end_time: newTimeSlot.end_time,
+          slot_type: newTimeSlot.slot_type,
+          max_students: newTimeSlot.max_students,
+          description: newTimeSlot.description,
+          is_available: true
+        })
         .select()
         .single();
 
       if (error) {
-        console.error('[handleAddTimeSlot] Supabase error:', error);
-        toast({
-          title: "Error",
-          description: error.message || "Failed to add time slot",
-          variant: "destructive",
-        });
-        return;
+        throw error;
       }
 
       setTimeSlots([...timeSlots, data]);
-      setShowTimeSlotModal(false);
+      
+      // Reset form and close modal
       setNewTimeSlot({
         day_of_week: 'Monday',
         start_time: '',
@@ -311,6 +261,7 @@ const TeacherDashboard = () => {
         max_students: 1,
         description: ''
       });
+      setShowTimeSlotModal(false);
 
       toast({
         title: "Success",
@@ -342,6 +293,18 @@ const TeacherDashboard = () => {
       setTimeSlots(timeSlots.map(slot => 
         slot.id === slotId ? { ...slot, ...data } : slot
       ));
+
+      // Close modal and reset form
+      setShowTimeSlotModal(false);
+      setEditingTimeSlot(null);
+      setNewTimeSlot({
+        day_of_week: 'Monday',
+        start_time: '',
+        end_time: '',
+        slot_type: 'regular',
+        max_students: 1,
+        description: ''
+      });
 
       toast({
         title: "Success",
@@ -382,6 +345,55 @@ const TeacherDashboard = () => {
         variant: "destructive",
       });
     }
+  };
+
+  // Handle delete time slot with booking check
+  const handleDeleteTimeSlotWithCheck = (slot: TimeSlot) => {
+    if (hasBookings(slot.id)) {
+      const bookingCount = getBookingCount(slot.id);
+      const confirmed = window.confirm(
+        `This time slot has ${bookingCount} booking${bookingCount > 1 ? 's' : ''}. ` +
+        `Deleting it will also cancel all associated bookings. Are you sure you want to continue?`
+      );
+      
+      if (!confirmed) {
+        return;
+      }
+    }
+    
+    handleDeleteTimeSlot(slot.id);
+  };
+
+  // Check if a time slot has any bookings
+  const hasBookings = (slotId: string) => {
+    return bookings.some(booking => booking.time_slot_id === slotId);
+  };
+
+  // Get booking count for a time slot
+  const getBookingCount = (slotId: string) => {
+    return bookings.filter(booking => booking.time_slot_id === slotId).length;
+  };
+
+  // Handle edit time slot with booking check
+  const handleEditTimeSlot = (slot: TimeSlot) => {
+    if (hasBookings(slot.id)) {
+      toast({
+        title: "Cannot Edit",
+        description: "This time slot has bookings and cannot be edited. Please cancel existing bookings first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setEditingTimeSlot(slot);
+    setNewTimeSlot({
+      day_of_week: slot.day_of_week,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+      slot_type: slot.slot_type || 'regular',
+      max_students: slot.max_students || 1,
+      description: slot.description || ''
+    });
+    setShowTimeSlotModal(true);
   };
 
   // Add state for time slot management
@@ -1278,12 +1290,7 @@ const TeacherDashboard = () => {
                       <span>Dashboard</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="schedule">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      <span>Schedule</span>
-                    </div>
-                  </SelectItem>
+
                   <SelectItem value="students">
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4" />
@@ -1314,10 +1321,10 @@ const TeacherDashboard = () => {
                       <span>Make-up Credits</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="calendar">
+                  <SelectItem value="schedule">
                     <div className="flex items-center gap-2">
                       <CalendarIcon className="w-4 h-4" />
-                      <span>Calendar</span>
+                      <span>Schedule</span>
                     </div>
                   </SelectItem>
 
@@ -1343,10 +1350,7 @@ const TeacherDashboard = () => {
                 <Bell className="w-5 h-5" />
                 <span>Dashboard</span>
               </TabsTrigger>
-              <TabsTrigger value="schedule" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-accent data-[state=active]:bg-accent/10 data-[state=active]:shadow-md transition-all">
-                <Calendar className="w-5 h-5" />
-                <span>Schedule</span>
-              </TabsTrigger>
+
               <TabsTrigger value="students" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-secondary data-[state=active]:bg-secondary/10 data-[state=active]:shadow-md transition-all">
                 <Users className="w-5 h-5" />
                 <span>Students</span>
@@ -1367,9 +1371,9 @@ const TeacherDashboard = () => {
                 <Badge className="w-5 h-5" />
                 <span>Make-up Credits</span>
               </TabsTrigger>
-              <TabsTrigger value="calendar" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-gray-700 data-[state=active]:bg-gray-100 data-[state=active]:shadow-md transition-all">
+              <TabsTrigger value="schedule" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-gray-700 data-[state=active]:bg-gray-100 data-[state=active]:shadow-md transition-all">
                 <CalendarIcon className="w-5 h-5" />
-                <span>Calendar</span>
+                <span>Schedule</span>
               </TabsTrigger>
 
               <TabsTrigger value="bookings" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
@@ -1477,70 +1481,7 @@ const TeacherDashboard = () => {
               </div>
             </TabsContent>
 
-            {/* Schedule Tab - Mobile responsive */}
-            <TabsContent value="schedule" className="mt-6 sm:mt-8">
-              <Card className="shadow-lg border-0 bg-white/95">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-base sm:text-lg">Time Slot Management</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">Manage your available teaching slots</CardDescription>
-                  </div>
-                  <Button onClick={() => setShowLessonModal(true)} className="text-xs sm:text-sm">
-                    <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                    <span className="hidden sm:inline">Add Time Slot</span>
-                    <span className="sm:hidden">Add Slot</span>
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {timeSlots.length > 0 ? (
-                      timeSlots.map((slot) => (
-                        <div key={slot.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-gray-50 rounded-lg gap-2">
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                            <div className="flex items-center gap-2">
-                              <Clock className="h-4 w-4 text-blue-600" />
-                              <span className="font-semibold text-sm sm:text-base">{getDayName(slot.day_of_week)}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs sm:text-sm text-gray-600">{slot.start_time} - {slot.end_time}</span>
-                              <Badge variant={slot.is_available ? "default" : "secondary"} className="text-xs">
-                                {slot.is_available ? "Available" : "Booked"}
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleUpdateTimeSlot(slot.id, { is_available: !slot.is_available })}
-                              className="text-xs"
-                            >
-                              <Edit className="w-3 h-3 mr-1" />
-                              <span className="hidden sm:inline">Edit</span>
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDeleteTimeSlot(slot.id)}
-                              className="text-xs"
-                            >
-                              <Trash2 className="w-3 h-3 mr-1" />
-                              <span className="hidden sm:inline">Delete</span>
-                            </Button>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8">
-                        <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-500 text-sm">No time slots configured yet</p>
-                        <p className="text-xs text-gray-400 mt-1">Add your first time slot to start receiving bookings</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+
 
             {/* Students Tab */}
             <TabsContent value="students" className="mt-8">
@@ -1778,7 +1719,7 @@ const TeacherDashboard = () => {
                       </DialogTrigger>
                       <DialogContent className="sm:max-w-[425px]">
                         <DialogHeader>
-                          <DialogTitle>Add New Time Slot</DialogTitle>
+                          <DialogTitle>{editingTimeSlot ? 'Edit Time Slot' : 'Add New Time Slot'}</DialogTitle>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
                           <div className="grid grid-cols-4 items-center gap-4">
@@ -1824,8 +1765,21 @@ const TeacherDashboard = () => {
                           </div>
                         </div>
                         <div className="flex justify-end space-x-2">
-                          <Button variant="outline" onClick={() => setShowTimeSlotModal(false)}>Cancel</Button>
-                          <Button onClick={handleAddTimeSlot}>Add Slot</Button>
+                          <Button variant="outline" onClick={() => {
+                            setShowTimeSlotModal(false);
+                            setEditingTimeSlot(null);
+                            setNewTimeSlot({
+                              day_of_week: 'Monday',
+                              start_time: '',
+                              end_time: '',
+                              slot_type: 'regular',
+                              max_students: 1,
+                              description: ''
+                            });
+                          }}>Cancel</Button>
+                          <Button onClick={editingTimeSlot ? () => handleUpdateTimeSlot(editingTimeSlot.id, newTimeSlot) : handleAddTimeSlot}>
+                            {editingTimeSlot ? 'Update Slot' : 'Add Slot'}
+                          </Button>
                         </div>
                       </DialogContent>
                     </Dialog>
@@ -1841,16 +1795,27 @@ const TeacherDashboard = () => {
                               <p className="text-sm text-gray-600">{slot.start_time} - {slot.end_time}</p>
                               <p className="text-xs text-gray-500">{slot.slot_type} | Max: {slot.max_students}</p>
                               {slot.description && <p className="text-xs text-gray-500">{slot.description}</p>}
+                              {hasBookings(slot.id) && (
+                                <p className="text-xs text-orange-600 font-medium">
+                                  ⚠️ {getBookingCount(slot.id)} booking{getBookingCount(slot.id) > 1 ? 's' : ''}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
                             <Badge className={slot.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
                               {slot.is_available ? 'Available' : 'Unavailable'}
                             </Badge>
-                            <Button variant="outline" size="sm" onClick={() => setEditingTimeSlot(slot)}>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => handleEditTimeSlot(slot)}
+                              disabled={hasBookings(slot.id)}
+                              title={hasBookings(slot.id) ? "Cannot edit - has bookings" : "Edit time slot"}
+                            >
                               <Edit className="w-4 h-4" />
                             </Button>
-                            <Button variant="destructive" size="sm" onClick={() => handleDeleteTimeSlot(slot.id)}>
+                            <Button variant="destructive" size="sm" onClick={() => handleDeleteTimeSlotWithCheck(slot)}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
@@ -1903,10 +1868,10 @@ const TeacherDashboard = () => {
               </Card>
             </TabsContent>
 
-            {/* Calendar Tab */}
-            <TabsContent value="calendar" className="mt-8">
+            {/* Schedule Tab */}
+            <TabsContent value="schedule" className="mt-8">
               <Card className="p-6 bg-white shadow-lg rounded-lg">
-                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><CalendarIcon className="w-5 h-5" /> My Teaching Calendar</h2>
+                                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><CalendarIcon className="w-5 h-5" /> My Teaching Schedule</h2>
                 
 
                 
