@@ -180,8 +180,6 @@ const TeacherDashboard = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
-  const [makeupCredits, setMakeupCredits] = useState<any[]>([]);
-
   const navigate = useNavigate();
 
   // Modal states
@@ -208,8 +206,6 @@ const TeacherDashboard = () => {
     description: '',
     file_url: ''
   });
-  const [showAssignMakeupModal, setShowAssignMakeupModal] = useState(false);
-  const [selectedCredit, setSelectedCredit] = useState<any>(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   // Add video conferencing state
@@ -233,6 +229,36 @@ const TeacherDashboard = () => {
         throw new Error('Teacher profile not found');
       }
 
+      // Validate required fields
+      if (!newTimeSlot.start_time || !newTimeSlot.end_time) {
+        toast({
+          title: "Validation Error",
+          description: "Please fill in both start time and end time",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate that end time is after start time
+      if (newTimeSlot.start_time >= newTimeSlot.end_time) {
+        toast({
+          title: "Validation Error",
+          description: "End time must be after start time",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('[handleAddTimeSlot] Adding time slot:', {
+        teacher_id: profile.id,
+        day_of_week: newTimeSlot.day_of_week,
+        start_time: newTimeSlot.start_time,
+        end_time: newTimeSlot.end_time,
+        slot_type: newTimeSlot.slot_type,
+        max_students: newTimeSlot.max_students,
+        description: newTimeSlot.description
+      });
+
       const { data, error } = await supabase
         .from('time_slots')
         .insert({
@@ -252,6 +278,7 @@ const TeacherDashboard = () => {
         throw error;
       }
 
+      console.log('✅ Time slot created successfully:', data);
       setTimeSlots([...timeSlots, data]);
       
       // Reset form and close modal
@@ -281,6 +308,18 @@ const TeacherDashboard = () => {
 
   const handleUpdateTimeSlot = async (slotId: string, updates: Partial<TimeSlot>) => {
     try {
+      // Validate time fields if they're being updated
+      if (updates.start_time && updates.end_time) {
+        if (updates.start_time >= updates.end_time) {
+          toast({
+            title: "Validation Error",
+            description: "End time must be after start time",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       const { data, error } = await supabase
         .from('time_slots')
         .update(updates)
@@ -521,10 +560,11 @@ const TeacherDashboard = () => {
         .order('day_of_week', { ascending: true });
 
       if (timeSlotsError) {
-        console.error('Error fetching time slots:', timeSlotsError);
+        console.error('❌ Error fetching time slots:', timeSlotsError);
       } else {
+        console.log('✅ Time slots loaded:', timeSlotsData?.length || 0);
+        console.log('📋 Time slots data:', timeSlotsData);
         setTimeSlots(timeSlotsData || []);
-        console.log('[TeacherDashboard] Time slots loaded:', timeSlotsData?.length || 0);
       }
 
       // Fetch teacher's lessons
@@ -1349,12 +1389,7 @@ const TeacherDashboard = () => {
                       <span>Availability</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="makeup-credits">
-                    <div className="flex items-center gap-2">
-                      <Badge className="w-4 h-4" />
-                      <span>Make-up Credits</span>
-                    </div>
-                  </SelectItem>
+
                   <SelectItem value="schedule">
                     <div className="flex items-center gap-2">
                       <CalendarIcon className="w-4 h-4" />
@@ -1401,10 +1436,7 @@ const TeacherDashboard = () => {
                 <Clock className="w-5 h-5" />
                 <span>Availability</span>
               </TabsTrigger>
-              <TabsTrigger value="makeup-credits" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all">
-                <Badge className="w-5 h-5" />
-                <span>Make-up Credits</span>
-              </TabsTrigger>
+
               <TabsTrigger value="schedule" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-gray-700 data-[state=active]:bg-gray-100 data-[state=active]:shadow-md transition-all">
                 <CalendarIcon className="w-5 h-5" />
                 <span>Schedule</span>
@@ -1863,44 +1895,7 @@ const TeacherDashboard = () => {
               </Card>
             </TabsContent>
 
-            {/* Make-up Credits Tab */}
-            <TabsContent value="makeup-credits" className="mt-8">
-              <Card className="shadow-lg border-0 bg-white/95">
-                <CardHeader>
-                  <CardTitle className="text-xl font-bold">Students' Make-up Credits</CardTitle>
-                  <CardDescription>View and manage make-up credits for your students.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {makeupCredits.length > 0 ? (
-                      makeupCredits.map(credit => (
-                        <div key={credit.id} className="p-4 border rounded-lg bg-green-50 flex flex-col md:flex-row md:items-center md:justify-between">
-                          <div>
-                            <div className="font-semibold text-green-800">{credit.students?.student_name || 'Unknown Student'}</div>
-                            <div className="text-xs text-gray-600">{credit.students?.email}</div>
-                            <div className="text-sm text-green-700 mt-1">Type: {credit.credit_type}</div>
-                            <div className="text-sm text-green-700">Expires: {formatDate(credit.expires_at)}</div>
-                          </div>
-                          <div className="flex flex-col items-end gap-2 mt-2 md:mt-0">
-                            <Badge variant="secondary" className="bg-green-200 text-green-800">
-                              {credit.is_used ? 'Used' : 'Available'}
-                            </Badge>
-                            {!credit.is_used && (
-                              <Button size="sm" variant="outline" className="mt-2 border-green-300 text-green-700 hover:bg-green-100"
-                                onClick={() => { setSelectedCredit(credit); setShowAssignMakeupModal(true); }}>
-                                Assign Make-up Lesson
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-gray-500 text-center py-8">No make-up credits available for your students.</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+
 
             {/* Schedule Tab */}
             <TabsContent value="schedule" className="mt-8">
@@ -2145,53 +2140,7 @@ const TeacherDashboard = () => {
           </Tabs>
         </div>
       </main>
-      {/* Modal for assigning a make-up lesson */}
-      {showAssignMakeupModal && selectedCredit && (
-        <Dialog open={showAssignMakeupModal} onOpenChange={setShowAssignMakeupModal}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Assign Make-up Lesson</DialogTitle>
-            </DialogHeader>
-            <div className="mb-4">Select an available slot for this make-up lesson:</div>
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {timeSlots.filter(slot => slot.is_available).map(slot => (
-                <div key={slot.id} className="flex items-center justify-between p-2 border rounded">
-                  <div>
-                    <div className="font-semibold">{profile?.name}</div>
-                    <div className="text-xs text-gray-600">{slot.day_of_week}, {slot.start_time} - {slot.end_time}</div>
-                  </div>
-                  <Button size="sm" onClick={async () => {
-                    // Schedule the make-up lesson
-                    const { data, error } = await supabase.from('lessons').insert({
-                      student_id: selectedCredit.student_id,
-                      teacher_id: profile?.id,
-                      title: 'Make-up Lesson',
-                      lesson_date: new Date().toISOString().split('T')[0],
-                      start_time: slot.start_time,
-                      end_time: slot.end_time,
-                      lesson_type: 'makeup',
-                      notes: 'Assigned by teacher using make-up credit',
-                    }).select().single();
-                    if (!error) {
-                      // Mark the credit as used
-                      await supabase.from('makeup_credits').update({ is_used: true, used_at: new Date().toISOString() }).eq('id', selectedCredit.id);
-                      setShowAssignMakeupModal(false);
-                      toast({ title: 'Success', description: 'Make-up lesson assigned!' });
-                      // Optionally refresh credits/lessons
-                      fetchTeacherData(profile?.id);
-                    } else {
-                      toast({ title: 'Error', description: 'Failed to assign make-up lesson.' });
-                    }
-                  }}>Assign</Button>
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-end mt-4">
-              <Button variant="outline" onClick={() => setShowAssignMakeupModal(false)}>Cancel</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+
       {/* Video Conference Modal */}
       <VideoConferenceModal
         open={showVideoConferenceModal}

@@ -138,6 +138,7 @@ interface AvailableTimeSlot {
   description?: string;
   current_bookings: number;
   has_conflict?: boolean;
+  next_available_date?: string;
 }
 
 interface Booking {
@@ -243,6 +244,7 @@ const StudentDashboard = () => {
     end_date: ''
   });
   const [makeupCredits, setMakeupCredits] = useState<any[]>([]);
+  const [isUsingMakeupCredit, setIsUsingMakeupCredit] = useState(false);
   const [bookingStatus, setBookingStatus] = useState<any>(null);
   
   // Practice log modal state
@@ -287,9 +289,6 @@ const StudentDashboard = () => {
     { value: "online", label: "Online" }
   ];
 
-  const [showMakeupBookingModal, setShowMakeupBookingModal] = useState(false);
-  const [selectedMakeupCredit, setSelectedMakeupCredit] = useState(null);
-
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
@@ -311,11 +310,8 @@ const StudentDashboard = () => {
     notes: ''
   });
 
-  // Add makeup booking state
-  const [makeupBooking, setMakeupBooking] = useState({
-    booking_date: '',
-    notes: ''
-  });
+
+  const [isBookingWithMakeupCredit, setIsBookingWithMakeupCredit] = useState(false);
 
   const [showAllInvoices, setShowAllInvoices] = useState(false);
 
@@ -434,7 +430,8 @@ const StudentDashboard = () => {
         .select('profile_photo_url, date_of_birth')
         .eq('id', user?.id)
         .single();
-      setStudentProfile({ ...student, ...profile });
+      const studentProfileData = { ...student, ...profile };
+      setStudentProfile(studentProfileData);
       
       // Fetch lessons
       const { data: lessonsData, error: lessonsError } = await supabase
@@ -487,9 +484,6 @@ const StudentDashboard = () => {
       if (!paymentsError && paymentsData) {
         setPayments(paymentsData);
       }
-
-      // Fetch available time slots
-      await fetchAvailableTimeSlots();
       
       // Fetch teachers
       await fetchTeachers();
@@ -503,11 +497,14 @@ const StudentDashboard = () => {
       // Fetch booking status for session limits
       await fetchBookingStatus();
       
-      // Fetch make-up credits
-      await fetchMakeupCredits();
+      // Fetch make-up credits with the student data directly
+      await fetchMakeupCreditsWithData(studentProfileData);
       
       // Fetch invoices with payment status
       await fetchInvoices(student.id);
+      
+      // Fetch available time slots with the student data directly
+      await fetchAvailableTimeSlotsWithData(studentProfileData);
       
     } catch (error) {
       console.error('Error fetching student data:', error);
@@ -690,91 +687,147 @@ const StudentDashboard = () => {
   };
 
   // Check if a time slot conflicts with existing bookings
+  // Conflicts are now handled by the database function
   const checkBookingConflict = async (timeSlot: AvailableTimeSlot) => {
-    if (!studentProfile) return false;
-    
-    try {
-      const bookingDate = getNextAvailableDateISO(timeSlot.day_of_week);
-      
-      const { data: conflictingBookings, error } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('student_id', studentProfile.id)
-        .eq('booking_date', bookingDate)
-        .eq('status', 'confirmed')
-        .or(`start_time.lt.${timeSlot.end_time},end_time.gt.${timeSlot.start_time}`);
-
-      if (error) {
-        console.error('Error checking booking conflicts:', error);
-        return false;
-      }
-
-      return conflictingBookings && conflictingBookings.length > 0;
-    } catch (error) {
-      console.error('Error checking booking conflicts:', error);
-      return false;
-    }
+    // This function is no longer needed as conflicts are handled server-side
+    return false;
   };
 
   // Fetch available time slots with conflict checking
   const fetchAvailableTimeSlots = async () => {
-    if (!studentProfile) return;
+    if (!studentProfile) {
+      console.log('❌ No student profile, skipping time slot fetch');
+      return;
+    }
 
     try {
+      console.log('🔄 Fetching available time slots for student:', studentProfile.id);
+      
+      // Use the new database function that handles everything server-side
       const { data, error } = await supabase
-        .from('time_slots')
-        .select(`
-          *,
-          teachers!inner(
-            id,
-            name,
-            email
-          )
-        `)
-        .eq('is_available', true)
-        .order('day_of_week', { ascending: true })
-        .order('start_time', { ascending: true });
+        .rpc('get_available_time_slots_for_student', { 
+          student_id_param: studentProfile.id 
+        });
 
       if (error) {
-        console.error('Error fetching time slots:', error);
+        console.error('❌ Error fetching time slots:', error);
+        console.error('❌ Error details:', error.message, error.details, error.hint);
         return;
       }
 
-      if (data) {
-        // Check for conflicts for each time slot
-        const timeSlotsWithConflicts = await Promise.all(
-          data.map(async (slot) => {
-            const hasConflict = await checkBookingConflict(slot);
-            return {
-              ...slot,
-              teacher_name: slot.teachers?.name || 'Unknown Teacher',
-              teacher_email: slot.teachers?.email || '',
-              has_conflict: hasConflict
-            };
-          })
-        );
+      console.log('✅ Time slots fetched:', data?.length || 0, 'slots');
+      console.log('📋 Time slots data:', data);
 
-        setAvailableTimeSlots(timeSlotsWithConflicts);
+      if (data && data.length > 0) {
+        // Transform the data to match the expected interface
+        const transformedSlots = data.map((slot: any) => ({
+          id: slot.id,
+          teacher_id: slot.teacher_id,
+          teacher_name: slot.teacher_name,
+          teacher_email: slot.teacher_email,
+          day_of_week: slot.day_of_week,
+          start_time: slot.start_time,
+          end_time: slot.end_time,
+          is_available: slot.is_available,
+          slot_type: slot.slot_type,
+          max_students: slot.max_students,
+          description: slot.description,
+          current_bookings: 0, // Will be calculated if needed
+          has_conflict: slot.has_conflict,
+          next_available_date: slot.next_available_date
+        }));
+
+        console.log('✅ Processed time slots:', transformedSlots);
+        setAvailableTimeSlots(transformedSlots);
+      } else {
+        console.log('⚠️ No time slots found or data is empty');
+        setAvailableTimeSlots([]);
       }
     } catch (error) {
-      console.error('Error fetching time slots:', error);
+      console.error('❌ Error in fetchAvailableTimeSlots:', error);
+    }
+  };
+
+  // Test function to manually trigger time slot fetch
+  const testTimeSlotFetch = async () => {
+    console.log('🧪 Testing time slot fetch...');
+    await fetchAvailableTimeSlots();
+  };
+
+  // Fetch available time slots with student data passed directly
+  const fetchAvailableTimeSlotsWithData = async (studentData: StudentProfile) => {
+    try {
+      console.log('🔄 Fetching available time slots for student:', studentData.id);
+      
+      // Use the new database function that handles everything server-side
+      const { data, error } = await supabase
+        .rpc('get_available_time_slots_for_student', { 
+          student_id_param: studentData.id 
+        });
+
+      if (error) {
+        console.error('❌ Error fetching time slots:', error);
+        console.error('❌ Error details:', error.message, error.details, error.hint);
+        return;
+      }
+
+      console.log('✅ Time slots fetched:', data?.length || 0, 'slots');
+      console.log('📋 Time slots data:', data);
+
+      if (data && data.length > 0) {
+        // Transform the data to match the expected interface
+        const transformedSlots = data.map((slot: any) => ({
+          id: slot.id,
+          teacher_id: slot.teacher_id,
+          teacher_name: slot.teacher_name,
+          teacher_email: slot.teacher_email,
+          day_of_week: slot.day_of_week,
+          start_time: slot.start_time,
+          end_time: slot.end_time,
+          is_available: slot.is_available,
+          slot_type: slot.slot_type,
+          max_students: slot.max_students,
+          description: slot.description,
+          current_bookings: 0, // Will be calculated if needed
+          has_conflict: slot.has_conflict,
+          next_available_date: slot.next_available_date
+        }));
+
+        console.log('✅ Processed time slots:', transformedSlots);
+        setAvailableTimeSlots(transformedSlots);
+      } else {
+        console.log('⚠️ No time slots found or data is empty');
+        setAvailableTimeSlots([]);
+      }
+    } catch (error) {
+      console.error('❌ Error in fetchAvailableTimeSlotsWithData:', error);
     }
   };
 
   // Fetch all teachers
   const fetchTeachers = async () => {
     try {
+      console.log('🔄 Fetching teachers...');
+      
       const { data, error } = await supabase
         .from('teachers')
         .select('*')
-        .eq('status', 'active')
+        .in('status', ['active', 'approved'])
         .order('name', { ascending: true });
 
-      if (!error && data) {
+      if (error) {
+        console.error('❌ Error fetching teachers:', error);
+        return;
+      }
+
+      console.log('✅ Teachers fetched:', data?.length || 0);
+      console.log('📋 Teachers data:', data);
+      
+      if (data) {
         setTeachers(data);
       }
     } catch (error) {
-      console.error('Error fetching teachers:', error);
+      console.error('❌ Error in fetchTeachers:', error);
     }
   };
 
@@ -863,22 +916,56 @@ const StudentDashboard = () => {
     if (!studentProfile) return;
     
     try {
+      console.log('🔄 Fetching make-up credits for student:', studentProfile.id);
+      
+      // Use the new database function for better performance and accuracy
       const { data, error } = await supabase
-        .from('makeup_credits')
-        .select('*')
-        .eq('student_id', studentProfile.id)
-        .eq('is_used', false)
-        .gte('expires_at', new Date().toISOString().split('T')[0])
-        .order('created_at', { ascending: false });
+        .rpc('get_student_makeup_credits', { student_id_param: studentProfile.id });
       
       if (error) {
-        console.error('Error fetching makeup credits:', error);
+        console.error('❌ Error fetching makeup credits:', error);
         return;
       }
       
-      setMakeupCredits(data || []);
+      console.log('✅ Make-up credits fetched:', data);
+      
+      // Filter to only show available credits (not used, not expired)
+      const availableCredits = data?.filter(credit => 
+        !credit.is_used && credit.days_until_expiry > 0
+      ) || [];
+      
+      console.log('✅ Available make-up credits:', availableCredits);
+      setMakeupCredits(availableCredits);
     } catch (error) {
-      console.error('Error fetching makeup credits:', error);
+      console.error('❌ Error in fetchMakeupCredits:', error);
+    }
+  };
+
+  // Fetch make-up credits with student data passed directly
+  const fetchMakeupCreditsWithData = async (studentData: StudentProfile) => {
+    try {
+      console.log('🔄 Fetching make-up credits for student:', studentData.id);
+      
+      // Use the new database function for better performance and accuracy
+      const { data, error } = await supabase
+        .rpc('get_student_makeup_credits', { student_id_param: studentData.id });
+      
+      if (error) {
+        console.error('❌ Error fetching makeup credits:', error);
+        return;
+      }
+      
+      console.log('✅ Make-up credits fetched:', data);
+      
+      // Filter to only show available credits (not used, not expired)
+      const availableCredits = data?.filter(credit => 
+        !credit.is_used && credit.days_until_expiry > 0
+      ) || [];
+      
+      console.log('✅ Available make-up credits:', availableCredits);
+      setMakeupCredits(availableCredits);
+    } catch (error) {
+      console.error('❌ Error in fetchMakeupCreditsWithData:', error);
     }
   };
 
@@ -904,6 +991,7 @@ const StudentDashboard = () => {
 
   // Get next available date for a given day of the week
   const getNextAvailableDate = (dayOfWeek: string): string => {
+    // Use database function for consistency
     const today = new Date();
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const targetDayIndex = dayNames.indexOf(dayOfWeek);
@@ -931,6 +1019,7 @@ const StudentDashboard = () => {
 
   // Get next available date as ISO string for booking
   const getNextAvailableDateISO = (dayOfWeek: string): string => {
+    // Use database function for consistency
     const today = new Date();
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const targetDayIndex = dayNames.indexOf(dayOfWeek);
@@ -938,29 +1027,15 @@ const StudentDashboard = () => {
     if (targetDayIndex === -1) return '';
     
     const currentDayIndex = today.getDay();
-    const currentTime = today.getHours() * 60 + today.getMinutes(); // Current time in minutes
     let daysToAdd = targetDayIndex - currentDayIndex;
     
-    // If it's the same day, check if the time slot has already passed
-    if (daysToAdd === 0 && selectedTimeSlot) {
-      const slotTime = selectedTimeSlot.start_time;
-      const [slotHour, slotMinute] = slotTime.split(':').map(Number);
-      const slotTimeInMinutes = slotHour * 60 + slotMinute;
-      
-      if (currentTime >= slotTimeInMinutes) {
-        // Slot has passed today, book for next week
-        daysToAdd = 7;
-      }
-      // If slot hasn't passed, daysToAdd remains 0 (same day)
-    } else if (daysToAdd <= 0) {
-      // Target day has passed this week, get next week's date
+    // If the target day has passed this week, get next week's date
+    if (daysToAdd <= 0) {
       daysToAdd += 7;
     }
     
     const nextDate = new Date(today);
     nextDate.setDate(today.getDate() + daysToAdd);
-    
-    
     
     return nextDate.toISOString().split('T')[0];
   };
@@ -970,12 +1045,18 @@ const StudentDashboard = () => {
     if (!selectedTimeSlot || !studentProfile) return;
 
     try {
-      // Check session limits before booking
-      const { data: bookingStatus, error: statusError } = await supabase
-        .rpc('get_student_booking_status', { student_id_param: studentProfile.id });
+      // Automatically calculate the next available date for the selected day
+      const bookingDate = getNextAvailableDateISO(selectedTimeSlot.day_of_week);
+      
+      // Check booking capacity with enhanced validation (includes makeup credits)
+      const { data: bookingCapacity, error: capacityError } = await supabase
+        .rpc('validate_student_booking_capacity', { 
+          student_id_param: studentProfile.id,
+          booking_date_param: bookingDate
+        });
 
-      if (statusError) {
-        console.error('Error checking booking status:', statusError);
+      if (capacityError) {
+        console.error('Error checking booking capacity:', capacityError);
         toast({
           title: "Error",
           description: "Failed to check booking limits. Please try again.",
@@ -984,7 +1065,7 @@ const StudentDashboard = () => {
         return;
       }
 
-      if (!bookingStatus || bookingStatus.length === 0) {
+      if (!bookingCapacity) {
         toast({
           title: "Error",
           description: "Unable to verify booking limits. Please contact support.",
@@ -992,22 +1073,50 @@ const StudentDashboard = () => {
         });
         return;
       }
-
-      const status = bookingStatus[0];
       
-      if (!status.can_book_more) {
-        toast({
-          title: "Booking Limit Reached",
-          description: `You have already booked ${status.current_week_bookings} out of ${status.sessions_per_week} sessions this week. Please wait until next week or contact your teacher to reschedule.`,
-          variant: "destructive",
-        });
-        return;
+      console.log('📊 Booking capacity:', bookingCapacity);
+      
+      // If student can't book more sessions, check if they have make-up credits
+      if (!bookingCapacity.can_book) {
+        const availableCredits = bookingCapacity.available_makeup_credits || 0;
+        
+        if (availableCredits > 0) {
+          // If booking with makeup credit is explicitly requested, proceed
+          if (isBookingWithMakeupCredit) {
+            console.log('✅ Booking with makeup credit as requested');
+            setIsUsingMakeupCredit(true);
+          } else {
+            // Ask user if they want to use a make-up credit
+            const useMakeupCredit = window.confirm(
+              `You have reached your weekly session limit (${bookingCapacity.current_bookings}/${bookingCapacity.total_capacity}).\n\n` +
+              `You have ${availableCredits} make-up credit(s) available.\n\n` +
+              `Would you like to use a make-up credit for this booking?`
+            );
+            
+            if (!useMakeupCredit) {
+              toast({
+                title: "Booking Cancelled",
+                description: "You can book again next week or use a make-up credit.",
+                variant: "destructive",
+              });
+              return;
+            }
+            
+            // Continue with booking using make-up credit
+            console.log('✅ User chose to use make-up credit for booking');
+            setIsUsingMakeupCredit(true);
+          }
+        } else {
+          toast({
+            title: "Booking Limit Reached",
+            description: `You have already booked ${bookingCapacity.current_bookings} out of ${bookingCapacity.total_capacity} sessions this week. Please wait until next week or contact your teacher to reschedule.`,
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
       const isOnline = studentProfile.learning_mode === 'online';
-      
-      // Automatically calculate the next available date for the selected day
-      const bookingDate = getNextAvailableDateISO(selectedTimeSlot.day_of_week);
       
       // Check for overlapping bookings at the same time
       const { data: overlappingBookings, error: overlapError } = await supabase
@@ -1039,13 +1148,15 @@ const StudentDashboard = () => {
       }
 
       // Additional check for any overlapping time ranges on the same date
+      // This checks if the new booking overlaps with any existing bookings
       const { data: timeOverlapBookings, error: timeOverlapError } = await supabase
         .from('bookings')
         .select('*')
         .eq('student_id', studentProfile.id)
         .eq('booking_date', bookingDate)
         .eq('status', 'confirmed')
-        .or(`start_time.lt.${selectedTimeSlot.end_time},end_time.gt.${selectedTimeSlot.start_time}`);
+        .lt('start_time', selectedTimeSlot.end_time)
+        .gt('end_time', selectedTimeSlot.start_time);
 
       if (timeOverlapError) {
         console.error('Error checking for time overlaps:', timeOverlapError);
@@ -1058,6 +1169,7 @@ const StudentDashboard = () => {
       }
 
       if (timeOverlapBookings && timeOverlapBookings.length > 0) {
+        console.log('Time conflict detected:', timeOverlapBookings);
         toast({
           title: "Time Conflict",
           description: "You have another lesson scheduled during this time period. Please choose a different time slot.",
@@ -1086,6 +1198,36 @@ const StudentDashboard = () => {
 
       if (error) {
         throw error;
+      }
+
+      // If student used a make-up credit, mark it as used
+      if (!bookingCapacity.can_book && bookingCapacity.available_makeup_credits > 0 && booking) {
+        try {
+          console.log('🎫 Using make-up credit for booking:', booking.id);
+          
+          const { data: creditUsage, error: creditError } = await supabase
+            .rpc('use_makeup_credit_for_booking', { 
+              student_id_param: studentProfile.id,
+              booking_id_param: booking.id 
+            });
+          
+          if (creditError) {
+            console.error('❌ Error using make-up credit:', creditError);
+            toast({
+              title: "Warning",
+              description: "Lesson booked successfully, but there was an issue with the make-up credit. Please contact support.",
+              variant: "destructive",
+            });
+          } else if (creditUsage?.success) {
+            console.log('✅ Make-up credit used successfully:', creditUsage);
+            toast({
+              title: "Make-up Credit Used",
+              description: "A make-up credit has been used for this booking.",
+            });
+          }
+        } catch (creditError) {
+          console.error('❌ Error in make-up credit usage:', creditError);
+        }
       }
 
       // Create meeting room for online lessons
@@ -1153,6 +1295,7 @@ const StudentDashboard = () => {
       // Update available time slots
       await fetchAvailableTimeSlots();
       await fetchMyBookings();
+      await fetchMakeupCredits(); // Refresh make-up credits after booking
 
       setShowBookingModal(false);
       setSelectedTimeSlot(null);
@@ -1213,9 +1356,9 @@ const StudentDashboard = () => {
       }
       
       // Call the enhanced cancellation function
-      const { data, error } = await supabase.rpc('cancel_booking_with_policy', {
-        booking_id: bookingId,
-        cancellation_reason: hoursDiff < 24 ? 'Late cancellation' : 'Student cancellation'
+      const { data, error } = await supabase.rpc('cancel_booking_with_enhanced_policy', {
+        booking_id_param: bookingId,
+        cancellation_reason_param: hoursDiff < 24 ? 'Late cancellation' : 'Student cancellation'
       });
       
       if (error) {
@@ -1228,6 +1371,8 @@ const StudentDashboard = () => {
       await fetchMyBookings();
       await fetchAvailableTimeSlots();
       await fetchMakeupCredits(); // Refresh make-up credits
+      
+      console.log('🔄 After cancellation - refreshing all data');
       
       // Get the response message from the database function
       const responseMessage = data?.message || "Lesson cancelled successfully.";
@@ -1997,64 +2142,7 @@ const StudentDashboard = () => {
   (window as any).testMultipleUpdateMethods = testMultipleUpdateMethods;
   (window as any).testWithRLSDisabled = testWithRLSDisabled;
 
-  // Add function to handle makeup lesson booking
-  const handleBookMakeupLesson = async () => {
-    if (!selectedMakeupCredit || !studentProfile) return;
 
-    try {
-      // Show warning about make-up lesson policy
-      const confirmed = window.confirm(
-        "Important: Once a make-up lesson is scheduled, it cannot be cancelled or rescheduled. Missing it will result in forfeiture. Do you want to proceed?"
-      );
-      
-      if (!confirmed) {
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('bookings')
-        .insert({
-          student_id: studentProfile.id,
-          teacher_id: selectedMakeupCredit.teacher_id,
-          booking_date: makeupBooking.booking_date,
-          start_time: selectedMakeupCredit.start_time,
-          end_time: selectedMakeupCredit.end_time,
-          status: 'confirmed',
-          lesson_type: 'makeup',
-          notes: makeupBooking.notes,
-          mode: studentProfile.learning_mode
-        })
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      // Mark makeup credit as used
-      await supabase
-        .from('makeup_credits')
-        .update({ is_used: true })
-        .eq('id', selectedMakeupCredit.id);
-
-      await fetchMyBookings();
-      setShowMakeupBookingModal(false);
-      setSelectedMakeupCredit(null);
-      setMakeupBooking({ booking_date: '', notes: '' });
-
-      toast({
-        title: "Success",
-        description: "Make-up lesson booked successfully! Remember: This lesson cannot be cancelled or rescheduled.",
-      });
-    } catch (error) {
-      console.error('Error booking makeup lesson:', error);
-      toast({
-        title: "Error",
-        description: "Failed to book make-up lesson",
-        variant: "destructive",
-      });
-    }
-  };
 
   // Get booking count for a time slot
   const getBookingCount = (slotId: string) => {
@@ -2374,8 +2462,12 @@ const StudentDashboard = () => {
                 {/* Available Time Slots */}
                 <Card>
                   <CardHeader>
+                                    <div className="flex items-center justify-between">
+                  <div>
                     <CardTitle>Available Time Slots</CardTitle>
                     <CardDescription>Book lessons with our teachers</CardDescription>
+                  </div>
+                </div>
                   </CardHeader>
                   <CardContent>
                     {/* Session Limit Display */}
@@ -2659,13 +2751,17 @@ const StudentDashboard = () => {
                             <div className="text-sm text-green-700">
                               <p>Expires: {formatDate(credit.expires_at)}</p>
                               <p>Type: {credit.credit_type}</p>
+                              <p>Days Left: {credit.days_until_expiry} days</p>
                             </div>
                             {!credit.is_used && (
                               <Button 
                                 variant="outline" 
                                 size="sm" 
                                 className="mt-2 border-green-300 text-green-700 hover:bg-green-100"
-                                onClick={() => { setSelectedMakeupCredit(credit); setShowMakeupBookingModal(true); }}
+                                onClick={() => { 
+                                  setIsBookingWithMakeupCredit(true);
+                                  setShowBookingModal(true);
+                                }}
                               >
                                 Book Make-up Lesson
                               </Button>
@@ -3421,12 +3517,62 @@ const StudentDashboard = () => {
       />
 
       {/* Booking Modal */}
-      <Dialog open={showBookingModal} onOpenChange={setShowBookingModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Book Time Slot</DialogTitle>
+      <Dialog open={showBookingModal} onOpenChange={(open) => {
+        setShowBookingModal(open);
+        if (open) {
+          // Ensure time slots are loaded when modal opens
+          if (availableTimeSlots.length === 0) {
+            fetchAvailableTimeSlots();
+          }
+        } else {
+          setIsUsingMakeupCredit(false);
+          setIsBookingWithMakeupCredit(false);
+          setSelectedTimeSlot(null);
+        }
+      }}>
+        <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto p-4 sm:p-6 mx-auto">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-xl">
+              {isBookingWithMakeupCredit ? 'Book Make-up Lesson' : 'Book Time Slot'}
+            </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-6">
+            {/* Time Slot Selection */}
+            {!selectedTimeSlot && (
+              <div className="mb-4">
+                <Label className="text-sm font-medium">Select a Time Slot</Label>
+                <div className="mt-2 max-h-80 overflow-y-auto space-y-2 p-2">
+                  {availableTimeSlots
+                    .filter(slot => slot.current_bookings < slot.max_students)
+                    .map(slot => (
+                      <div 
+                        key={slot.id} 
+                        className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors shadow-sm"
+                        onClick={() => setSelectedTimeSlot(slot)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-base mb-1">{slot.teacher_name}</h4>
+                            <p className="text-sm text-gray-600 mb-1">
+                              {slot.day_of_week} • {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {slot.slot_type} • {slot.max_students - slot.current_bookings} spots available
+                            </p>
+                          </div>
+                          <Badge variant="secondary" className="text-xs ml-2">
+                            {getSlotStatus(slot).status}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  {availableTimeSlots.filter(slot => slot.current_bookings < slot.max_students).length === 0 && (
+                    <p className="text-gray-500 text-center py-4">No available time slots found</p>
+                  )}
+                </div>
+              </div>
+            )}
+            
             {selectedTimeSlot && (
               <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                 <h4 className="font-semibold mb-2">Selected Time Slot</h4>
@@ -3437,6 +3583,14 @@ const StudentDashboard = () => {
                   <p><strong>Type:</strong> {selectedTimeSlot.slot_type}</p>
                   <p><strong>Next Available:</strong> {getNextAvailableDate(selectedTimeSlot.day_of_week)}</p>
                 </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setSelectedTimeSlot(null)}
+                  className="mt-2"
+                >
+                  Change Time Slot
+                </Button>
               </div>
             )}
             
@@ -3464,8 +3618,30 @@ const StudentDashboard = () => {
                 className="col-span-3"
               />
             </div>
+            
+            {/* Make-up Credit Indicator */}
+            {(isUsingMakeupCredit || isBookingWithMakeupCredit) && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-blue-800">
+                    🎫 Make-up Credit Will Be Used
+                  </span>
+                </div>
+                <p className="text-xs text-blue-600 mt-1">
+                  This booking will use one of your available make-up credits.
+                </p>
+                {isBookingWithMakeupCredit && (
+                  <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
+                    <p className="text-xs text-orange-700 font-medium">
+                      ⚠️ Important: Once a make-up lesson is scheduled, it cannot be cancelled or rescheduled.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-6 pt-4 border-t">
             <Button variant="outline" onClick={() => setShowBookingModal(false)}>
               Cancel
             </Button>
@@ -3473,7 +3649,8 @@ const StudentDashboard = () => {
               onClick={handleBookTimeSlot}
               disabled={!selectedTimeSlot}
             >
-              Book Lesson
+              {!selectedTimeSlot ? 'Select a Time Slot' : 
+               isBookingWithMakeupCredit ? 'Book Make-up Lesson' : 'Book Lesson'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3538,60 +3715,7 @@ const StudentDashboard = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Make-up Credit Booking Modal */}
-      <Dialog open={showMakeupBookingModal} onOpenChange={setShowMakeupBookingModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Book Make-up Lesson</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {selectedMakeupCredit && (
-              <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                <h4 className="font-semibold mb-2">Make-up Credit Details</h4>
-                <div className="text-sm text-gray-600">
-                  <p><strong>Student:</strong> {selectedMakeupCredit.student_name}</p>
-                  <p><strong>Expires:</strong> {formatDate(selectedMakeupCredit.expires_at)}</p>
-                  <p><strong>Reason:</strong> {selectedMakeupCredit.reason}</p>
-                </div>
-              </div>
-            )}
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="makeup_date" className="text-right">Date</Label>
-              <Input
-                id="makeup_date"
-                type="date"
-                value={makeupBooking.booking_date}
-                onChange={(e) => setMakeupBooking({...makeupBooking, booking_date: e.target.value})}
-                className="col-span-3"
-                min={new Date().toISOString().split('T')[0]}
-              />
-            </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="makeup_notes" className="text-right">Notes</Label>
-              <Textarea
-                id="makeup_notes"
-                value={makeupBooking.notes}
-                onChange={(e) => setMakeupBooking({...makeupBooking, notes: e.target.value})}
-                placeholder="Any special requests or notes..."
-                className="col-span-3"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowMakeupBookingModal(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleBookMakeupLesson}
-              disabled={!makeupBooking.booking_date || !selectedMakeupCredit}
-            >
-              Book Make-up Lesson
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
     </div>
   );
 };
