@@ -1154,7 +1154,7 @@ const StudentDashboard = () => {
           } else {
             // Ask user if they want to use a make-up credit
             const useMakeupCredit = window.confirm(
-              `You have reached your weekly session limit (${bookingCapacity.current_bookings}/${bookingCapacity.total_capacity}).\n\n` +
+              `You have reached your enrollment limit of ${bookingCapacity.total_capacity} session${bookingCapacity.total_capacity !== 1 ? 's' : ''} per week (${bookingCapacity.current_bookings}/${bookingCapacity.total_capacity} used).\n\n` +
               `You have ${availableCredits} make-up credit(s) available.\n\n` +
               `Would you like to use a make-up credit for this booking?`
             );
@@ -1184,8 +1184,8 @@ const StudentDashboard = () => {
           }
           
           toast({
-            title: "Booking Limit Reached",
-            description: `You have already booked ${bookingCapacity.current_bookings} out of ${bookingCapacity.total_capacity} sessions this week. Please wait until next week or contact your teacher to reschedule.`,
+            title: "Enrollment Limit Reached",
+            description: `You have already booked ${bookingCapacity.current_bookings} out of ${bookingCapacity.total_capacity} session${bookingCapacity.total_capacity !== 1 ? 's' : ''} this week (based on your enrollment). Please wait until next week or contact your teacher to reschedule.`,
             variant: "destructive",
           });
           return;
@@ -1400,7 +1400,7 @@ const StudentDashboard = () => {
     }
   };
 
-  // Handle canceling a booking with 24-hour policy
+  // Handle canceling a booking with enhanced policy
   const handleCancelBooking = async (bookingId: string, bookingDate: string, startTime: string) => {
     try {
       // Find the booking to check if it's a make-up lesson
@@ -1420,12 +1420,28 @@ const StudentDashboard = () => {
       const currentDateTime = new Date();
       const hoursDiff = (lessonDateTime.getTime() - currentDateTime.getTime()) / (1000 * 60 * 60);
       
+      // Get student's cancellation status to provide better feedback
+      let cancellationStatus = null;
+      if (studentProfile) {
+        const { data: statusData } = await supabase.rpc('get_student_cancellation_status', {
+          student_id_param: studentProfile.id
+        });
+        cancellationStatus = statusData;
+      }
+      
+      let warningMessage = "";
+      let shouldProceed = true;
+      
       if (hoursDiff < 24) {
         // Late cancellation - show warning
-        const confirmed = window.confirm(
-          "This lesson is within the 24-hour window. As per our policy, cancelling now will forfeit the lesson and the full fee will be charged. Are you sure you want to cancel?"
-        );
-        
+        warningMessage = "This lesson is within the 24-hour window. As per our policy, cancelling now will forfeit the lesson and the full fee will be charged. Are you sure you want to cancel?";
+      } else if (cancellationStatus && cancellationStatus.next_cancellation_will_be_charged) {
+        // Beyond the 2-per-billing-period limit
+        warningMessage = "You have already used your 2 make-up credits for this billing period. Cancelling this lesson will result in no make-up credit being issued, and you will be charged for the lesson as if it were a no-show. Are you sure you want to proceed?";
+      }
+      
+      if (warningMessage) {
+        const confirmed = window.confirm(warningMessage);
         if (!confirmed) {
           return;
         }
@@ -1442,7 +1458,7 @@ const StudentDashboard = () => {
       }
       
       // Send notification emails
-      await sendCancellationNotifications(bookingId, hoursDiff < 24);
+      await sendCancellationNotifications(bookingId, hoursDiff < 24, data?.charged_as_no_show || false);
       
       await fetchMyBookings();
       await fetchAvailableTimeSlots();
@@ -1453,13 +1469,18 @@ const StudentDashboard = () => {
       // Get the response message from the database function
       const responseMessage = data?.message || "Lesson cancelled successfully.";
       
-      const message = hoursDiff < 24 
-        ? "Lesson cancelled. As this was within the 24-hour window, the lesson has been forfeited."
-        : responseMessage;
+      let finalMessage = responseMessage;
+      
+      if (hoursDiff < 24) {
+        finalMessage = "Lesson cancelled. As this was within the 24-hour window, the lesson has been forfeited.";
+      } else if (data?.charged_as_no_show) {
+        finalMessage = "Lesson cancelled. No make-up credit issued as you have exceeded the 2-cancellation limit per billing period. You will be charged for this lesson as if it were a no-show.";
+      }
       
       toast({
         title: "Booking Cancelled",
-        description: message,
+        description: finalMessage,
+        variant: data?.charged_as_no_show ? "destructive" : "default",
       });
     } catch (error) {
       console.error('Error cancelling booking:', error);
@@ -1472,10 +1493,17 @@ const StudentDashboard = () => {
   };
 
   // Send cancellation notifications
-  const sendCancellationNotifications = async (bookingId: string, isLateCancellation: boolean) => {
+  const sendCancellationNotifications = async (bookingId: string, isLateCancellation: boolean, chargedAsNoShow: boolean = false) => {
     try {
       const booking = myBookings.find(b => b.id === bookingId);
       if (!booking) return;
+      
+      let cancellationType = isLateCancellation ? 'Late' : 'Timely';
+      let cancellationDetails = isLateCancellation 
+        ? 'This was a late cancellation and the lesson is forfeited.' 
+        : chargedAsNoShow 
+          ? 'This was a timely cancellation but no make-up credit was issued as the student has exceeded the 2-cancellation limit per billing period. The student will be charged as if it were a no-show.'
+          : 'This was a timely cancellation and a make-up credit was issued.';
       
       // Send notification to admin
       await supabase.rpc('send_booking_notification', {
@@ -1483,8 +1511,8 @@ const StudentDashboard = () => {
         notification_type: 'cancellation',
         recipient_type: 'admin',
         recipient_email: 'admin@damonmusicacademy.co.ke',
-        subject: `Lesson Cancellation - ${isLateCancellation ? 'Late' : 'Timely'}`,
-        message: `Student ${studentProfile?.student_name} cancelled their lesson with ${booking.teacher_name} on ${formatDate(booking.booking_date)}. ${isLateCancellation ? 'This was a late cancellation and the lesson is forfeited.' : 'This was a timely cancellation and a make-up credit was issued.'}`
+        subject: `Lesson Cancellation - ${cancellationType}`,
+        message: `Student ${studentProfile?.student_name} cancelled their lesson with ${booking.teacher_name} on ${formatDate(booking.booking_date)}. ${cancellationDetails}`
       });
       
       // Send notification to teacher
@@ -2602,7 +2630,10 @@ const StudentDashboard = () => {
                     {/* Session Limit Display */}
                     {bookingStatus && (
                       <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <h4 className="font-semibold text-blue-800 mb-2">Your Session Limits</h4>
+                        <h4 className="font-semibold text-blue-800 mb-2">Your Enrollment Session Limits</h4>
+                        <p className="text-sm text-blue-700 mb-3">
+                          Based on your enrollment: {bookingStatus.sessions_per_week} session{bookingStatus.sessions_per_week !== 1 ? 's' : ''} per week
+                        </p>
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
                             <span className="font-medium">Sessions per week:</span> {bookingStatus.sessions_per_week}
@@ -2620,10 +2651,28 @@ const StudentDashboard = () => {
                             </span>
                           </div>
                         </div>
+                        {makeupCredits.length > 0 && (
+                          <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <p className="text-sm text-green-700 font-medium">
+                              💚 You have {makeupCredits.length} makeup credit{makeupCredits.length !== 1 ? 's' : ''} available
+                            </p>
+                            <p className="text-xs text-green-600 mt-1">
+                              Makeup credits can be used to book additional sessions beyond your weekly limit
+                            </p>
+                          </div>
+                        )}
                         {!bookingStatus.can_book_more && (
-                          <p className="text-sm text-red-600 mt-2">
-                            You have reached your weekly session limit. Please contact your teacher to reschedule or wait until next week.
-                          </p>
+                          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <p className="text-sm text-amber-700 font-medium">
+                              ⚠️ You have reached your weekly session limit
+                            </p>
+                            <p className="text-xs text-amber-600 mt-1">
+                              {makeupCredits.length > 0 
+                                ? 'You can use your makeup credits to book additional sessions, or contact your teacher to reschedule.'
+                                : 'Please contact your teacher to reschedule or wait until next week.'
+                              }
+                            </p>
+                          </div>
                         )}
                       </div>
                     )}
@@ -2867,6 +2916,33 @@ const StudentDashboard = () => {
                     <CardDescription>Available credits from cancelled lessons</CardDescription>
                   </CardHeader>
                   <CardContent>
+                    {/* Cancellation Status Indicator */}
+                    {studentProfile && (
+                      <div className="mb-4 p-3 border rounded-lg bg-blue-50 border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-semibold text-blue-800">Cancellation Status</h4>
+                            <p className="text-sm text-blue-700">
+                              You can cancel lessons at any time, but make-up credits are limited to 2 per billing period.
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-blue-800">
+                              {makeupCredits.filter(credit => !credit.is_used).length}/2
+                            </div>
+                            <div className="text-xs text-blue-600">Credits Used</div>
+                          </div>
+                        </div>
+                        {makeupCredits.filter(credit => !credit.is_used).length >= 2 && (
+                          <div className="mt-2 p-2 bg-yellow-100 border border-yellow-300 rounded">
+                            <p className="text-sm text-yellow-800">
+                              ⚠️ You have used all 2 make-up credits for this billing period. 
+                              Future cancellations will be charged as no-shows.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <div className="space-y-4">
                       {makeupCredits.filter(credit => !credit.is_used).length > 0 ? (
                         makeupCredits
