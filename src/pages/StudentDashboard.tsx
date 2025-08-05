@@ -312,6 +312,7 @@ const StudentDashboard = () => {
 
 
   const [isBookingWithMakeupCredit, setIsBookingWithMakeupCredit] = useState(false);
+  const [timeSlotConflicts, setTimeSlotConflicts] = useState<{[key: string]: boolean}>({});
 
   const [showAllInvoices, setShowAllInvoices] = useState(false);
 
@@ -327,6 +328,13 @@ const StudentDashboard = () => {
       fetchBookingStatus();
     }
   }, [studentProfile]);
+
+  // Check conflicts when time slots are loaded
+  useEffect(() => {
+    if (availableTimeSlots.length > 0 && studentProfile) {
+      checkAllTimeSlotConflicts();
+    }
+  }, [availableTimeSlots, studentProfile]);
 
   useEffect(() => {
     if (studentProfile) {
@@ -1048,6 +1056,17 @@ const StudentDashboard = () => {
       // Automatically calculate the next available date for the selected day
       const bookingDate = getNextAvailableDateISO(selectedTimeSlot.day_of_week);
       
+      // Check for time conflicts before proceeding with booking
+      const hasConflict = await checkTimeSlotConflict(selectedTimeSlot);
+      if (hasConflict) {
+        toast({
+          title: "Time Conflict Detected",
+          description: "You already have a lesson scheduled during this time. Please choose a different time slot.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       // Check booking capacity with enhanced validation (includes makeup credits)
       const { data: bookingCapacity, error: capacityError } = await supabase
         .rpc('validate_student_booking_capacity', { 
@@ -1107,6 +1126,16 @@ const StudentDashboard = () => {
             setIsUsingMakeupCredit(true);
           }
         } else {
+          // Check if user is trying to book with makeup credit but has none available
+          if (isBookingWithMakeupCredit) {
+            toast({
+              title: "No Make-up Credits Available",
+              description: "You don't have any available make-up credits. Please book a regular session or wait until next week.",
+              variant: "destructive",
+            });
+            return;
+          }
+          
           toast({
             title: "Booking Limit Reached",
             description: `You have already booked ${bookingCapacity.current_bookings} out of ${bookingCapacity.total_capacity} sessions this week. Please wait until next week or contact your teacher to reschedule.`,
@@ -2167,6 +2196,68 @@ const StudentDashboard = () => {
     }
   };
 
+  // Check if a time slot conflicts with existing bookings for the current student
+  const checkTimeSlotConflict = async (timeSlot: AvailableTimeSlot) => {
+    if (!studentProfile) return false;
+    
+    const bookingDate = getNextAvailableDateISO(timeSlot.day_of_week);
+    
+    try {
+      // Check for overlapping bookings at the same time
+      const { data: overlappingBookings, error: overlapError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('student_id', studentProfile.id)
+        .eq('booking_date', bookingDate)
+        .eq('start_time', timeSlot.start_time)
+        .eq('end_time', timeSlot.end_time)
+        .eq('status', 'confirmed');
+
+      if (overlapError) {
+        console.error('Error checking for overlapping bookings:', overlapError);
+        return false;
+      }
+
+      if (overlappingBookings && overlappingBookings.length > 0) {
+        return true;
+      }
+
+      // Additional check for any overlapping time ranges on the same date
+      const { data: timeOverlapBookings, error: timeOverlapError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('student_id', studentProfile.id)
+        .eq('booking_date', bookingDate)
+        .eq('status', 'confirmed')
+        .lt('start_time', timeSlot.end_time)
+        .gt('end_time', timeSlot.start_time);
+
+      if (timeOverlapError) {
+        console.error('Error checking for time overlaps:', timeOverlapError);
+        return false;
+      }
+
+      return timeOverlapBookings && timeOverlapBookings.length > 0;
+    } catch (error) {
+      console.error('Error checking time slot conflict:', error);
+      return false;
+    }
+  };
+
+  // Check all time slot conflicts and update state
+  const checkAllTimeSlotConflicts = async () => {
+    if (!studentProfile || availableTimeSlots.length === 0) return;
+    
+    const conflicts: {[key: string]: boolean} = {};
+    
+    for (const slot of availableTimeSlots) {
+      const hasConflict = await checkTimeSlotConflict(slot);
+      conflicts[slot.id] = hasConflict;
+    }
+    
+    setTimeSlotConflicts(conflicts);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100">
       {/* Hero/Header Section - Mobile responsive */}
@@ -2739,21 +2830,24 @@ const StudentDashboard = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {makeupCredits.length > 0 ? (
-                        makeupCredits.map(credit => (
-                          <div key={credit.id} className="p-4 border rounded-lg bg-green-50">
-                            <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-semibold text-green-800">Make-up Credit</h4>
-                              <Badge variant="secondary" className="bg-green-200 text-green-800">
-                                {credit.is_used ? 'Used' : 'Available'}
-                              </Badge>
-                            </div>
-                            <div className="text-sm text-green-700">
-                              <p>Expires: {formatDate(credit.expires_at)}</p>
-                              <p>Type: {credit.credit_type}</p>
-                              <p>Days Left: {credit.days_until_expiry} days</p>
-                            </div>
-                            {!credit.is_used && (
+                      {makeupCredits.filter(credit => !credit.is_used).length > 0 ? (
+                        makeupCredits
+                          .filter(credit => !credit.is_used) // Only show unused credits
+                          .map(credit => (
+                            <div key={credit.id} className="p-4 border rounded-lg bg-green-50 border-green-200">
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="font-semibold text-green-800">
+                                  Make-up Credit
+                                </h4>
+                                <Badge variant="secondary" className="bg-green-200 text-green-800">
+                                  Available
+                                </Badge>
+                              </div>
+                              <div className="text-sm text-green-700">
+                                <p>Expires: {formatDate(credit.expires_at)}</p>
+                                <p>Type: {credit.credit_type}</p>
+                                <p>Days Left: {credit.days_until_expiry} days</p>
+                              </div>
                               <Button 
                                 variant="outline" 
                                 size="sm" 
@@ -2765,9 +2859,8 @@ const StudentDashboard = () => {
                               >
                                 Book Make-up Lesson
                               </Button>
-                            )}
-                          </div>
-                        ))
+                            </div>
+                          ))
                       ) : (
                         <p className="text-gray-500 text-center py-8">No make-up credits available</p>
                       )}
@@ -3524,10 +3617,13 @@ const StudentDashboard = () => {
           if (availableTimeSlots.length === 0) {
             fetchAvailableTimeSlots();
           }
+          // Check for conflicts when modal opens
+          checkAllTimeSlotConflicts();
         } else {
           setIsUsingMakeupCredit(false);
           setIsBookingWithMakeupCredit(false);
           setSelectedTimeSlot(null);
+          setTimeSlotConflicts({});
         }
       }}>
         <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto p-4 sm:p-6 mx-auto">
@@ -3544,28 +3640,43 @@ const StudentDashboard = () => {
                 <div className="mt-2 max-h-80 overflow-y-auto space-y-2 p-2">
                   {availableTimeSlots
                     .filter(slot => slot.current_bookings < slot.max_students)
-                    .map(slot => (
-                      <div 
-                        key={slot.id} 
-                        className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors shadow-sm"
-                        onClick={() => setSelectedTimeSlot(slot)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-base mb-1">{slot.teacher_name}</h4>
-                            <p className="text-sm text-gray-600 mb-1">
-                              {slot.day_of_week} • {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {slot.slot_type} • {slot.max_students - slot.current_bookings} spots available
-                            </p>
+                    .map(slot => {
+                      const hasConflict = timeSlotConflicts[slot.id] || false;
+                      
+                      return (
+                        <div 
+                          key={slot.id} 
+                          className={`p-4 border rounded-lg transition-colors shadow-sm ${
+                            hasConflict 
+                              ? 'bg-red-50 border-red-200 cursor-not-allowed opacity-60' 
+                              : 'hover:bg-gray-50 cursor-pointer'
+                          }`}
+                          onClick={() => !hasConflict && setSelectedTimeSlot(slot)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-base mb-1">{slot.teacher_name}</h4>
+                              <p className="text-sm text-gray-600 mb-1">
+                                {slot.day_of_week} • {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {slot.slot_type} • {slot.max_students - slot.current_bookings} spots available
+                              </p>
+                              {hasConflict && (
+                                <p className="text-xs text-red-600 mt-1 font-medium">
+                                  ⚠️ Time conflict with existing booking
+                                </p>
+                              )}
+                            </div>
+                            <Badge variant="secondary" className={`text-xs ml-2 ${
+                              hasConflict ? 'bg-red-200 text-red-800' : ''
+                            }`}>
+                              {hasConflict ? 'Conflict' : getSlotStatus(slot).status}
+                            </Badge>
                           </div>
-                          <Badge variant="secondary" className="text-xs ml-2">
-                            {getSlotStatus(slot).status}
-                          </Badge>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   {availableTimeSlots.filter(slot => slot.current_bookings < slot.max_students).length === 0 && (
                     <p className="text-gray-500 text-center py-4">No available time slots found</p>
                   )}
