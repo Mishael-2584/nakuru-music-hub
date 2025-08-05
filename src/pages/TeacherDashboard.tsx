@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
 import VideoConferenceModal from '../components/VideoConferenceModal';
 import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking } from '../lib/videoConferencing';
+import MessagingUI from '../components/MessagingUI';
 
 interface TeacherProfile {
   id: string;
@@ -36,6 +37,7 @@ interface TeacherProfile {
 
 interface Student {
   id: string;
+  user_id: string;
   student_name: string;
   email: string;
   phone: string;
@@ -176,6 +178,7 @@ const TeacherDashboard = () => {
   const [isTeacher, setIsTeacher] = useState<boolean | null>(null);
   const [profile, setProfile] = useState<TeacherProfile | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
+  const [adminProfiles, setAdminProfiles] = useState<any[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
@@ -583,6 +586,24 @@ const TeacherDashboard = () => {
 
       
 
+      // Fetch portal messages
+      const { data: messagesData, error: messagesError } = await supabase
+        .from('portal_messages')
+        .select('*')
+        .eq('recipient_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (!messagesError && messagesData) {
+        setMessages(messagesData);
+        console.log('[TeacherDashboard] Messages loaded:', messagesData?.length || 0);
+      }
+
+      // Fetch students for messaging
+      await fetchStudents();
+      
+      // Fetch admin profiles for messaging
+      await fetchAdminProfiles();
+      
       // Fetch meeting rooms
       await fetchMeetingRooms();
       
@@ -591,6 +612,52 @@ const TeacherDashboard = () => {
 
     } catch (error) {
       console.error('Error fetching teacher data:', error);
+    }
+  };
+
+  // Fetch students for messaging
+  const fetchStudents = async () => {
+    try {
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('students')
+        .select('id, user_id, student_name, email, phone, instrument, learning_mode, age, proficiency_level, status, enrollment_date')
+        .eq('status', 'active')
+        .not('user_id', 'is', null);
+
+      if (studentsError) {
+        console.error('Error fetching students:', studentsError);
+      } else {
+        setStudents(studentsData || []);
+        console.log('[TeacherDashboard] Students loaded:', studentsData?.length || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching students:', error);
+    }
+  };
+
+  // Fetch admin profiles for messaging
+  const fetchAdminProfiles = async () => {
+    try {
+      console.log('🔄 Fetching admin profiles...');
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('role', 'admin')
+        .order('email', { ascending: true });
+
+      if (error) {
+        console.error('❌ Error fetching admin profiles:', error);
+        return;
+      }
+
+      console.log('✅ Admin profiles fetched:', data?.length || 0);
+      
+      if (data) {
+        setAdminProfiles(data);
+      }
+    } catch (error) {
+      console.error('❌ Error in fetchAdminProfiles:', error);
     }
   };
 
@@ -680,6 +747,7 @@ const TeacherDashboard = () => {
           .from('students')
           .select(`
             id,
+            user_id,
             student_name,
             email,
             phone,
@@ -730,6 +798,7 @@ const TeacherDashboard = () => {
             console.log('[TeacherDashboard] No student data found, creating fallback...');
             finalStudentsData = studentIds.map(studentId => ({
               id: studentId,
+              user_id: studentId, // Use the same ID as fallback
               student_name: `Student ${studentId.slice(0, 8)}`,
               email: 'student@example.com',
               phone: '',
@@ -1424,9 +1493,14 @@ const TeacherDashboard = () => {
                 <Users className="w-5 h-5" />
                 <span>Students</span>
               </TabsTrigger>
-              <TabsTrigger value="messages" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-pink-600 data-[state=active]:bg-pink-100 data-[state=active]:shadow-md transition-all">
+              <TabsTrigger value="messages" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-pink-600 data-[state=active]:bg-pink-100 data-[state=active]:shadow-md transition-all relative">
                 <MessageSquare className="w-5 h-5" />
                 <span>Messages</span>
+                {messages.filter(m => !m.is_read).length > 0 && (
+                  <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">
+                    {messages.filter(m => !m.is_read).length}
+                  </Badge>
+                )}
               </TabsTrigger>
               <TabsTrigger value="resources" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
                 <BookOpen className="w-5 h-5" />
@@ -1591,88 +1665,29 @@ const TeacherDashboard = () => {
 
             {/* Messages Tab */}
             <TabsContent value="messages" className="mt-8">
-              <Card className="shadow-lg border-0 bg-white/95">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-xl font-bold">Messages</CardTitle>
-                    <CardDescription>Communicate securely with students, parents, and admin.</CardDescription>
-                  </div>
-                  <Dialog open={showMessageModal} onOpenChange={setShowMessageModal}>
-                    <DialogTrigger asChild>
-                      <Button>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Send Message
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      <DialogHeader>
-                        <DialogTitle>Send New Message</DialogTitle>
-                      </DialogHeader>
-                      <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="recipient" className="text-right">To</Label>
-                          <Select value={newMessage.recipient_id} onValueChange={(value) => setNewMessage({...newMessage, recipient_id: value})}>
-                            <SelectTrigger className="col-span-3">
-                              <SelectValue placeholder="Select recipient" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {students.map(student => (
-                                <SelectItem key={student.id} value={student.id}>
-                                  {student.student_name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="subject" className="text-right">Subject</Label>
-                          <Input
-                            id="subject"
-                            value={newMessage.subject}
-                            onChange={(e) => setNewMessage({...newMessage, subject: e.target.value})}
-                            className="col-span-3"
-                          />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="message" className="text-right">Message</Label>
-                          <Textarea
-                            id="message"
-                            value={newMessage.message}
-                            onChange={(e) => setNewMessage({...newMessage, message: e.target.value})}
-                            className="col-span-3"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex justify-end space-x-2">
-                        <Button variant="outline" onClick={() => setShowMessageModal(false)}>
-                          Cancel
-                        </Button>
-                        <Button onClick={handleSendMessage}>
-                          Send Message
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {messages.length > 0 ? (
-                      messages.map(message => (
-                        <div key={message.id} className={`p-4 border rounded-lg ${!message.is_read ? 'bg-blue-50 border-blue-200' : ''}`}>
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-semibold">{message.subject}</h4>
-                            <div className="flex items-center space-x-2">
-                              {!message.is_read && <Badge variant="secondary">New</Badge>}
-                              <span className="text-sm text-gray-500">{formatDate(message.created_at)}</span>
-                            </div>
-                          </div>
-                          <p className="text-gray-700">{message.message}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-gray-500 text-center py-8">No messages yet</p>
-                    )}
-                  </div>
+              <Card className="shadow-lg border-0 bg-white/95 h-[600px]">
+                <CardContent className="p-0 h-full">
+                  <MessagingUI
+                    recipients={[
+                      ...students.map(student => ({
+                        id: student.id,
+                        user_id: student.user_id,
+                        name: student.student_name,
+                        email: student.email,
+                        type: 'student' as const
+                      })),
+                      ...adminProfiles.map(admin => ({
+                        id: admin.id,
+                        user_id: admin.id, // admin.id is the user_id from profiles table
+                        name: `Admin (${admin.email})`,
+                        email: admin.email,
+                        type: 'admin' as const
+                      }))
+                    ]}
+                    currentUserId={user?.id || ''}
+                    currentUserName={profile?.name || ''}
+                    userType="teacher"
+                  />
                 </CardContent>
               </Card>
             </TabsContent>

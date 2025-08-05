@@ -21,6 +21,7 @@ import { calculateStudentInvoice, InvoiceCalculationResult } from '../lib/invoic
 import { Invoice } from '../integrations/supabase/types';
 import VideoConferenceModal from '../components/VideoConferenceModal';
 import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getMeetingDuration } from '../lib/videoConferencing';
+import MessagingUI from '../components/MessagingUI';
 
 interface StudentProfile {
   id: string;
@@ -163,6 +164,7 @@ interface Booking {
 
 interface Teacher {
   id: string;
+  user_id: string;
   name: string;
   email: string;
   phone: string;
@@ -232,6 +234,7 @@ const StudentDashboard = () => {
   const [availableTimeSlots, setAvailableTimeSlots] = useState<AvailableTimeSlot[]>([]);
   const [myBookings, setMyBookings] = useState<Booking[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [adminProfiles, setAdminProfiles] = useState<any[]>([]);
   const [selectedTeacher, setSelectedTeacher] = useState<string>('all');
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showRecurringBookingModal, setShowRecurringBookingModal] = useState(false);
@@ -328,6 +331,20 @@ const StudentDashboard = () => {
       fetchBookingStatus();
     }
   }, [studentProfile]);
+
+  // Check all time slot conflicts and update state
+  const checkAllTimeSlotConflicts = async () => {
+    if (!studentProfile || availableTimeSlots.length === 0) return;
+    
+    const conflicts: {[key: string]: boolean} = {};
+    
+    for (const slot of availableTimeSlots) {
+      const hasConflict = await checkTimeSlotConflict(slot);
+      conflicts[slot.id] = hasConflict;
+    }
+    
+    setTimeSlotConflicts(conflicts);
+  };
 
   // Check conflicts when time slots are loaded
   useEffect(() => {
@@ -463,11 +480,11 @@ const StudentDashboard = () => {
         setPracticeLogs(practiceData);
       }
 
-      // Fetch messages
+      // Fetch portal messages
       const { data: messagesData, error: messagesError } = await supabase
-        .from('messages')
+        .from('portal_messages')
         .select('*')
-        .eq('recipient_id', student.id)
+        .eq('recipient_id', user.id)
         .order('created_at', { ascending: false });
 
       if (!messagesError && messagesData) {
@@ -495,6 +512,9 @@ const StudentDashboard = () => {
       
       // Fetch teachers
       await fetchTeachers();
+      
+      // Fetch admin profiles
+      await fetchAdminProfiles();
       
       // Fetch my bookings
       await fetchMyBookings();
@@ -819,8 +839,9 @@ const StudentDashboard = () => {
       
       const { data, error } = await supabase
         .from('teachers')
-        .select('*')
+        .select('id, user_id, name, email, phone, bio, experience, category, subjects, status')
         .in('status', ['active', 'approved'])
+        .not('user_id', 'is', null)
         .order('name', { ascending: true });
 
       if (error) {
@@ -836,6 +857,32 @@ const StudentDashboard = () => {
       }
     } catch (error) {
       console.error('❌ Error in fetchTeachers:', error);
+    }
+  };
+
+  // Fetch admin profiles for messaging
+  const fetchAdminProfiles = async () => {
+    try {
+      console.log('🔄 Fetching admin profiles...');
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('role', 'admin')
+        .order('email', { ascending: true });
+
+      if (error) {
+        console.error('❌ Error fetching admin profiles:', error);
+        return;
+      }
+
+      console.log('✅ Admin profiles fetched:', data?.length || 0);
+      
+      if (data) {
+        setAdminProfiles(data);
+      }
+    } catch (error) {
+      console.error('❌ Error in fetchAdminProfiles:', error);
     }
   };
 
@@ -2244,20 +2291,6 @@ const StudentDashboard = () => {
     }
   };
 
-  // Check all time slot conflicts and update state
-  const checkAllTimeSlotConflicts = async () => {
-    if (!studentProfile || availableTimeSlots.length === 0) return;
-    
-    const conflicts: {[key: string]: boolean} = {};
-    
-    for (const slot of availableTimeSlots) {
-      const hasConflict = await checkTimeSlotConflict(slot);
-      conflicts[slot.id] = hasConflict;
-    }
-    
-    setTimeSlotConflicts(conflicts);
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100">
       {/* Hero/Header Section - Mobile responsive */}
@@ -2421,9 +2454,14 @@ const StudentDashboard = () => {
                 <TrendingUp className="w-5 h-5" />
                 <span>Progress</span>
               </TabsTrigger>
-              <TabsTrigger value="messages" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-pink-600 data-[state=active]:bg-pink-100 data-[state=active]:shadow-md transition-all">
+              <TabsTrigger value="messages" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-pink-600 data-[state=active]:bg-pink-100 data-[state=active]:shadow-md transition-all relative">
                 <MessageSquare className="w-5 h-5" />
                 <span>Messages</span>
+                {messages.filter(m => !m.is_read).length > 0 && (
+                  <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">
+                    {messages.filter(m => !m.is_read).length}
+                  </Badge>
+                )}
               </TabsTrigger>
               <TabsTrigger value="payments" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
                 <CreditCard className="w-5 h-5" />
@@ -3100,74 +3138,29 @@ const StudentDashboard = () => {
 
             {/* Messages Tab */}
             <TabsContent value="messages" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Messages</CardTitle>
-                  <CardDescription>Communicate with your teachers and academy staff</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <Dialog open={showMessageModal} onOpenChange={setShowMessageModal}>
-                      <Button className="w-full">
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        Send New Message
-                      </Button>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>Send Message</DialogTitle>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="subject" className="text-right">Subject</Label>
-                            <Input
-                              id="subject"
-                              value={newMessage.subject}
-                              onChange={(e) => setNewMessage({...newMessage, subject: e.target.value})}
-                              className="col-span-3"
-                              placeholder="Message subject"
-                            />
-                          </div>
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="message" className="text-right">Message</Label>
-                            <Textarea
-                              id="message"
-                              value={newMessage.message}
-                              onChange={(e) => setNewMessage({...newMessage, message: e.target.value})}
-                              className="col-span-3"
-                              placeholder="Your message..."
-                            />
-                          </div>
-                        </div>
-                        <div className="flex justify-end space-x-2">
-                          <Button variant="outline" onClick={() => setShowMessageModal(false)}>
-                            Cancel
-                          </Button>
-                          <Button onClick={handleSendMessage}>
-                            Send Message
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                    
-                    <div className="space-y-4">
-                      {messages.length > 0 ? (
-                        messages.map(message => (
-                          <div key={message.id} className={`p-4 border rounded-lg ${!message.is_read ? 'bg-blue-50 border-blue-200' : ''}`}>
-                            <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-semibold">{message.subject}</h4>
-                              <div className="flex items-center space-x-2">
-                                {!message.is_read && <Badge variant="secondary">New</Badge>}
-                                <span className="text-sm text-gray-500">{formatDate(message.created_at)}</span>
-                              </div>
-                            </div>
-                            <p className="text-gray-700">{message.message}</p>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-gray-500 text-center py-8">No messages yet</p>
-                      )}
-                    </div>
-                  </div>
+              <Card className="h-[600px]">
+                <CardContent className="p-0 h-full">
+                  <MessagingUI
+                    recipients={[
+                      ...teachers.map(teacher => ({
+                        id: teacher.id,
+                        user_id: teacher.user_id,
+                        name: teacher.name,
+                        email: teacher.email,
+                        type: 'teacher' as const
+                      })),
+                      ...adminProfiles.map(admin => ({
+                        id: admin.id,
+                        user_id: admin.id, // admin.id is the user_id from profiles table
+                        name: `Admin (${admin.email})`,
+                        email: admin.email,
+                        type: 'admin' as const
+                      }))
+                    ]}
+                    currentUserId={user?.id || ''}
+                    currentUserName={studentProfile?.student_name || ''}
+                    userType="student"
+                  />
                 </CardContent>
               </Card>
             </TabsContent>

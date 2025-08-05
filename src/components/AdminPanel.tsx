@@ -1,8 +1,8 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X, Image } from "lucide-react";
+import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X, Image, MessageSquare } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,13 +13,15 @@ import AdminNewsManager from "@/components/AdminNewsManager";
 import AdminGalleryManager from "@/components/AdminGalleryManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { sendAcceptedEmail, sendDeclinedEmail, sendTeacherAcceptedEmail, sendTeacherDeclinedEmail, sendTeacherRequestInfoEmail, sendQuoteEmail, sendInvoiceEmail, sendApplicationConfirmationEmail, sendPaymentConfirmationEmail } from "@/lib/emailService";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { generateQuotePDF } from "@/lib/pdfGenerator";
 import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
 import { generateInvoiceForRegistration } from "@/lib/invoiceUtils";
+import MessagingUI from './MessagingUI';
 
 interface Registration {
   id: string;
@@ -103,7 +105,8 @@ const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes' | 'gallery' | 'finances'>('stats');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
-  const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
+
+  const [portalMessages, setPortalMessages] = useState<any[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [adminProfiles, setAdminProfiles] = useState<AdminProfile[]>([]);
   const [classSchedule, setClassSchedule] = useState<ClassSchedule[]>([]);
@@ -157,6 +160,16 @@ const AdminPanel = () => {
   const [invoiceHistory, setInvoiceHistory] = useState<any[]>([]);
   const [invoiceHistoryStudent, setInvoiceHistoryStudent] = useState<any>(null);
   const [selectedHistoryInvoice, setSelectedHistoryInvoice] = useState<any>(null);
+
+  // Portal messaging state
+  const [showPortalMessageModal, setShowPortalMessageModal] = useState(false);
+  const [newPortalMessage, setNewPortalMessage] = useState({
+    subject: '',
+    message: '',
+    recipient_id: ''
+  });
+  const [students, setStudents] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
 
   // Filter registrations based on search term
   const filteredRegistrations = useMemo(() => {
@@ -324,23 +337,7 @@ const AdminPanel = () => {
         setRegistrations(regData || []);
       }
 
-      console.log("AdminPanel: Fetching contact messages...");
-      const { data: msgData, error: msgError } = await supabase
-        .from('contact_messages')
-        .select('*')
-        .order('created_at', { ascending: false });
 
-      if (msgError) {
-        console.error("Error fetching messages:", msgError);
-        toast({
-          title: "Error",
-          description: "Failed to load messages: " + msgError.message,
-          variant: "destructive",
-        });
-      } else {
-              console.log("AdminPanel: Messages fetched successfully:", msgData?.length || 0, "records");
-      setContactMessages(msgData || []);
-    }
 
     console.log("AdminPanel: Fetching quotes...");
     const { data: quotesData, error: quotesError } = await supabase
@@ -382,12 +379,12 @@ const AdminPanel = () => {
       }
 
       // Fetch students data
-      const { data: studentsData, error: studentsError } = await supabase
+      const { data: activeStudentsData, error: activeStudentsError } = await supabase
         .from('students')
         .select('*')
         .order('created_at', { ascending: false });
-      if (!studentsError && studentsData) {
-        setActiveStudents(studentsData.map(s => ({
+      if (!activeStudentsError && activeStudentsData) {
+        setActiveStudents(activeStudentsData.map(s => ({
           ...s,
           receipt_number: s.receipt_number || '',
           phone: s.phone || '',
@@ -406,6 +403,52 @@ const AdminPanel = () => {
           date_of_birth: s.date_of_birth || '',
           // Remove profile_photo_url
         })));
+      }
+
+      // Fetch students and teachers for portal messaging
+      console.log("AdminPanel: Fetching students for portal messaging...");
+      const { data: portalStudentsData, error: portalStudentsError } = await supabase
+        .from('students')
+        .select('user_id, student_name, email')
+        .eq('status', 'active')
+        .not('user_id', 'is', null)
+        .order('student_name', { ascending: true });
+
+      if (portalStudentsError) {
+        console.error("Error fetching students:", portalStudentsError);
+      } else {
+        console.log("AdminPanel: Students fetched successfully:", portalStudentsData?.length || 0, "records");
+        setStudents(portalStudentsData || []);
+      }
+
+      console.log("AdminPanel: Fetching teachers for portal messaging...");
+      const { data: portalTeachersData, error: portalTeachersError } = await supabase
+        .from('teachers')
+        .select('user_id, name, email')
+        .in('status', ['active', 'approved'])
+        .not('user_id', 'is', null)
+        .order('name', { ascending: true });
+
+      if (portalTeachersError) {
+        console.error("Error fetching teachers:", portalTeachersError);
+      } else {
+        console.log("AdminPanel: Teachers fetched successfully:", portalTeachersData?.length || 0, "records");
+        setTeachers(portalTeachersData || []);
+      }
+
+      // Fetch portal messages for unread badge
+      console.log("AdminPanel: Fetching portal messages...");
+      const { data: portalMsgData, error: portalMsgError } = await supabase
+        .from('portal_messages')
+        .select('*')
+        .eq('recipient_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (portalMsgError) {
+        console.error("Error fetching portal messages:", portalMsgError);
+      } else {
+        console.log("AdminPanel: Portal messages fetched successfully:", portalMsgData?.length || 0, "records");
+        setPortalMessages(portalMsgData || []);
       }
 
     } catch (error) {
@@ -467,6 +510,46 @@ const AdminPanel = () => {
       
       // Force redirect even if sign out fails
       navigate("/auth");
+    }
+  };
+
+  const handleSendPortalMessage = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('portal_messages')
+        .insert({
+          sender_id: user.id,
+          recipient_id: newPortalMessage.recipient_id,
+          subject: newPortalMessage.subject,
+          message: newPortalMessage.message
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setShowPortalMessageModal(false);
+      setNewPortalMessage({
+        subject: '',
+        message: '',
+        recipient_id: ''
+      });
+
+      toast({
+        title: "Success",
+        description: "Portal message sent successfully!",
+      });
+    } catch (error) {
+      console.error('Error sending portal message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send portal message",
+        variant: "destructive",
+      });
     }
   };
 
@@ -759,31 +842,7 @@ const AdminPanel = () => {
     }
   };
 
-  const markMessageAsRead = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('contact_messages')
-        .update({ is_read: true })
-        .eq('id', id);
 
-      if (error) {
-        console.error("Error marking message as read:", error);
-        return;
-      }
-
-      setContactMessages(prev => 
-        prev.map(msg => 
-          msg.id === id ? { ...msg, is_read: true } : msg
-        )
-      );
-
-      toast({
-        title: "Message marked as read",
-      });
-    } catch (error) {
-      console.error("Unexpected error:", error);
-    }
-  };
 
   const toggleExpanded = (id: string) => {
     setExpandedCards(prev => {
@@ -815,7 +874,6 @@ const AdminPanel = () => {
   };
 
   const pendingCount = registrations.filter(reg => reg.status === 'pending').length;
-  const unreadMessages = contactMessages.filter(msg => !msg.is_read).length;
 
   useEffect(() => {
     const fetchTeachers = async () => {
@@ -1477,8 +1535,8 @@ const AdminPanel = () => {
                 </SelectItem>
                 <SelectItem value="messages">
                   <div className="flex items-center gap-2">
-                    <Mic className="h-4 w-4" />
-                    <span>Messages ({contactMessages.length})</span>
+                    <MessageSquare className="h-4 w-4" />
+                    <span>Messages</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="schedule">
@@ -1562,14 +1620,20 @@ const AdminPanel = () => {
                 <Calendar className="h-4 w-4 mr-2" />
                 Events
               </Button>
+
               <Button
                 variant={activeTab === 'messages' ? 'default' : 'ghost'}
                 onClick={() => setActiveTab('messages')}
-                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start relative"
                 style={{ minWidth: 120 }}
               >
-                <Mic className="h-4 w-4 mr-2" />
-                Messages ({contactMessages.length})
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Messages
+                {portalMessages && portalMessages.filter(m => !m.is_read).length > 0 && (
+                  <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">
+                    {portalMessages.filter(m => !m.is_read).length}
+                  </Badge>
+                )}
               </Button>
               <Button
                 variant={activeTab === 'schedule' ? 'default' : 'ghost'}
@@ -1670,7 +1734,7 @@ const AdminPanel = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs sm:text-sm font-medium text-muted-foreground">New Messages</p>
-                    <p className="text-2xl sm:text-3xl font-bold text-secondary">{unreadMessages}</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-secondary">{portalMessages.filter(m => !m.is_read).length}</p>
                     <p className="text-xs text-muted-foreground mt-1">Unread inquiries</p>
                   </div>
                   <div className="p-2 sm:p-3 bg-secondary/20 rounded-full">
@@ -2170,55 +2234,47 @@ const AdminPanel = () => {
           </div>
         </div>
 
+
+
         {/* Messages Tab */}
         <div style={{ display: activeTab === 'messages' ? 'block' : 'none' }}>
           <div className="space-y-6">
             <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Musical Conversations
+              Messaging System
             </h3>
             
-            <div className="grid gap-4">
-              {contactMessages.map((message) => (
-                <Card key={message.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h4 className="text-xl font-bold text-primary">{message.name}</h4>
-                        <p className="text-muted-foreground flex items-center gap-2">
-                          <Mail className="h-4 w-4" />
-                          {message.email}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {!message.is_read && (
-                          <Badge variant="destructive">New Melody</Badge>
-                        )}
-                        <Badge variant="outline">{new Date(message.created_at).toLocaleDateString()}</Badge>
-                      </div>
-                    </div>
-                    
-                    <div className="p-3 bg-accent/5 rounded-lg border border-accent/10 mb-4">
-                      <h5 className="font-semibold text-accent mb-2">{message.subject}</h5>
-                      <p className="text-muted-foreground">{message.message}</p>
-                    </div>
-                    
-                    <div className="flex space-x-2">
-                      {!message.is_read && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => markMessageAsRead(message.id)}
-                          className="bg-white/80 border-primary/20 hover:bg-primary/10"
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          Mark as Read
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm h-[600px]">
+              <CardContent className="p-0 h-full">
+                <MessagingUI
+                  recipients={[
+                    ...students.map(student => ({
+                      id: student.id,
+                      user_id: student.user_id,
+                      name: student.student_name,
+                      email: student.email,
+                      type: 'student' as const
+                    })),
+                    ...teachers.map(teacher => ({
+                      id: teacher.id,
+                      user_id: teacher.user_id,
+                      name: teacher.name,
+                      email: teacher.email,
+                      type: 'teacher' as const
+                    })),
+                    ...adminProfiles.map(admin => ({
+                      id: admin.id,
+                      user_id: admin.id, // admin.id is the user_id from profiles table
+                      name: `Admin (${admin.email})`,
+                      email: admin.email,
+                      type: 'admin' as const
+                    }))
+                  ]}
+                  currentUserId={user?.id || ''}
+                  currentUserName="Admin"
+                  userType="admin"
+                />
+              </CardContent>
+            </Card>
           </div>
         </div>
 
