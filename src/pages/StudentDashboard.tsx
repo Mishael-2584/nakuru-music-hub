@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video, AlertTriangle } from 'lucide-react';
+import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar';
 import { useToast } from '../hooks/use-toast';
 import PasswordChangePrompt from '../components/PasswordChangePrompt';
@@ -230,11 +230,22 @@ const StudentDashboard = () => {
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [passwordChecked, setPasswordChecked] = useState(false);
   
+  // Classroom state
+  const [classroomJoinCode, setClassroomJoinCode] = useState('');
+  const [studentClassrooms, setStudentClassrooms] = useState<any[]>([]);
+  const [selectedClassroom, setSelectedClassroom] = useState<any | null>(null);
+  const [classroomFeed, setClassroomFeed] = useState<any[]>([]);
+  const [postComments, setPostComments] = useState<Record<string, any[]>>({});
+  const [newComment, setNewComment] = useState<Record<string, string>>({});
+  
   // Booking system state
   const [availableTimeSlots, setAvailableTimeSlots] = useState<AvailableTimeSlot[]>([]);
   const [myBookings, setMyBookings] = useState<Booking[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [adminProfiles, setAdminProfiles] = useState<any[]>([]);
+  const [teacherAuthProfiles, setTeacherAuthProfiles] = useState<any[]>([]);
+
+
   const [selectedTeacher, setSelectedTeacher] = useState<string>('all');
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showRecurringBookingModal, setShowRecurringBookingModal] = useState(false);
@@ -329,8 +340,17 @@ const StudentDashboard = () => {
     if (studentProfile) {
       fetchMyBookings();
       fetchBookingStatus();
+      // Ensure classrooms load when profile is available (on refresh)
+      fetchStudentClassrooms();
     }
   }, [studentProfile]);
+
+  // Load classrooms whenever user visits the Classroom tab
+  useEffect(() => {
+    if (activeTab === 'classroom' && studentProfile?.id) {
+      fetchStudentClassrooms();
+    }
+  }, [activeTab, studentProfile?.id]);
 
   // Check all time slot conflicts and update state
   const checkAllTimeSlotConflicts = async () => {
@@ -364,6 +384,13 @@ const StudentDashboard = () => {
       });
     }
   }, [studentProfile]);
+
+  // Auto-refresh invoice status when switching to payments tab
+  useEffect(() => {
+    if (activeTab === 'payments' && studentProfile?.id) {
+      refreshInvoiceStatus();
+    }
+  }, [activeTab, studentProfile?.id]);
 
   const checkUserRole = async () => {
     try {
@@ -509,9 +536,11 @@ const StudentDashboard = () => {
       if (!paymentsError && paymentsData) {
         setPayments(paymentsData);
       }
-      
+
       // Fetch teachers
       await fetchTeachers();
+      // Ensure all teacher auth profiles are available for messaging recipients
+      await fetchTeacherAuthProfiles();
       
       // Fetch admin profiles
       await fetchAdminProfiles();
@@ -530,10 +559,10 @@ const StudentDashboard = () => {
       
       // Fetch invoices with payment status
       await fetchInvoices(student.id);
-      
+
       // Fetch available time slots with the student data directly
       await fetchAvailableTimeSlotsWithData(studentProfileData);
-      
+
     } catch (error) {
       console.error('Error fetching student data:', error);
       toast({ title: 'Error', description: 'Failed to load student data', variant: 'destructive' });
@@ -749,17 +778,17 @@ const StudentDashboard = () => {
       if (data && data.length > 0) {
         // Transform the data to match the expected interface
         const transformedSlots = data.map((slot: any) => ({
-          id: slot.id,
-          teacher_id: slot.teacher_id,
+            id: slot.id,
+            teacher_id: slot.teacher_id,
           teacher_name: slot.teacher_name,
           teacher_email: slot.teacher_email,
-          day_of_week: slot.day_of_week,
-          start_time: slot.start_time,
-          end_time: slot.end_time,
-          is_available: slot.is_available,
-          slot_type: slot.slot_type,
-          max_students: slot.max_students,
-          description: slot.description,
+            day_of_week: slot.day_of_week,
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+            is_available: slot.is_available,
+            slot_type: slot.slot_type,
+            max_students: slot.max_students,
+            description: slot.description,
           current_bookings: 0, // Will be calculated if needed
           has_conflict: slot.has_conflict,
           next_available_date: slot.next_available_date
@@ -776,11 +805,9 @@ const StudentDashboard = () => {
     }
   };
 
-  // Test function to manually trigger time slot fetch
-  const testTimeSlotFetch = async () => {
-    console.log('🧪 Testing time slot fetch...');
-    await fetchAvailableTimeSlots();
-  };
+
+
+
 
   // Fetch available time slots with student data passed directly
   const fetchAvailableTimeSlotsWithData = async (studentData: StudentProfile) => {
@@ -835,54 +862,62 @@ const StudentDashboard = () => {
   // Fetch all teachers
   const fetchTeachers = async () => {
     try {
-      console.log('🔄 Fetching teachers...');
-      
       const { data, error } = await supabase
         .from('teachers')
         .select('id, user_id, name, email, phone, bio, experience, category, subjects, status')
-        .in('status', ['active', 'approved'])
         .not('user_id', 'is', null)
         .order('name', { ascending: true });
 
       if (error) {
-        console.error('❌ Error fetching teachers:', error);
+        console.error('Error fetching teachers:', error);
         return;
       }
 
-      console.log('✅ Teachers fetched:', data?.length || 0);
-      console.log('📋 Teachers data:', data);
-      
       if (data) {
         setTeachers(data);
       }
     } catch (error) {
-      console.error('❌ Error in fetchTeachers:', error);
+      console.error('Error in fetchTeachers:', error);
     }
   };
 
   // Fetch admin profiles for messaging
   const fetchAdminProfiles = async () => {
     try {
-      console.log('🔄 Fetching admin profiles...');
-      
       const { data, error } = await supabase
         .from('profiles')
         .select('id, email')
-        .eq('role', 'admin')
+        .in('role', ['admin', 'super_admin'])
         .order('email', { ascending: true });
 
       if (error) {
-        console.error('❌ Error fetching admin profiles:', error);
+        console.error('Error fetching admin profiles:', error);
         return;
       }
 
-      console.log('✅ Admin profiles fetched:', data?.length || 0);
-      
       if (data) {
         setAdminProfiles(data);
       }
     } catch (error) {
-      console.error('❌ Error in fetchAdminProfiles:', error);
+      console.error('Error in fetchAdminProfiles:', error);
+    }
+  };
+
+  // Fetch teacher auth profiles (role = 'teacher') to ensure all teachers are available as recipients
+  const fetchTeacherAuthProfiles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, profile_photo_url')
+        .eq('role', 'teacher')
+        .order('email', { ascending: true });
+      if (error) {
+        console.error('Error fetching teacher auth profiles:', error);
+        return;
+      }
+      setTeacherAuthProfiles(data || []);
+    } catch (err) {
+      console.error('Error in fetchTeacherAuthProfiles:', err);
     }
   };
 
@@ -910,8 +945,8 @@ const StudentDashboard = () => {
             try {
               const meetingRoom = await getMeetingRoomByBooking(booking.id);
               return {
-                ...booking,
-                teacher_name: booking.time_slots?.teachers?.name || 'Unknown Teacher',
+          ...booking,
+          teacher_name: booking.time_slots?.teachers?.name || 'Unknown Teacher',
                 day_of_week: booking.time_slots?.day_of_week || '',
                 meeting_room: meetingRoom
               };
@@ -1042,6 +1077,119 @@ const StudentDashboard = () => {
   const handleOpenMeetingRoom = (meetingRoom: MeetingRoom) => {
     setSelectedMeetingRoom(meetingRoom);
     setShowVideoConferenceModal(true);
+  };
+
+  // Classroom helpers
+  const fetchStudentClassrooms = async () => {
+    if (!studentProfile) return;
+    
+    try {
+      // Use a proper join to avoid ambiguous column references
+      const { data, error } = await supabase
+        .from('classroom_enrollments')
+        .select(`
+          classroom_id,
+          classrooms!inner(
+            id,
+            name,
+            status,
+            class_code,
+            teacher_id,
+            teachers(name)
+          )
+        `)
+        .eq('student_id', studentProfile.id);
+        
+      if (error) {
+        console.error('Error fetching student classrooms:', error);
+        return;
+      }
+      
+      const classrooms = (data || []).map((enrollment: any) => ({
+        id: enrollment.classrooms.id,
+        name: enrollment.classrooms.name,
+        status: enrollment.classrooms.status,
+        class_code: enrollment.classrooms.class_code,
+        teacher_id: enrollment.classrooms.teacher_id,
+        teacher_name: enrollment.classrooms.teachers?.name || 'Teacher'
+      }));
+      
+      setStudentClassrooms(classrooms);
+    } catch (error) {
+      console.error('Error in fetchStudentClassrooms:', error);
+    }
+  };
+
+  const fetchClassroomFeed = async (classroomId: string) => {
+    const { data, error } = await supabase.rpc('get_classroom_feed', { classroom_id_param: classroomId });
+    if (!error) {
+      setClassroomFeed(data || []);
+      // Preload comments for each post
+      const commentsMap: Record<string, any[]> = {};
+      for (const post of data || []) {
+        const { data: cm } = await supabase.rpc('get_post_comments', { post_id_param: post.post_id });
+        commentsMap[post.post_id] = cm || [];
+      }
+      setPostComments(commentsMap);
+    }
+  };
+
+  const handleJoinClassroom = async () => {
+    if (!studentProfile || !classroomJoinCode) return;
+    
+    try {
+      const { data, error } = await supabase.rpc('enroll_student_with_code', {
+        student_id_param: studentProfile.id,
+        class_code_param: classroomJoinCode.trim().toUpperCase()
+      });
+      
+      if (error) {
+        console.error('Classroom join error:', error);
+        toast({ 
+          title: 'Join Failed', 
+          description: error.message || 'Invalid or inactive class code.', 
+          variant: 'destructive' 
+        });
+        return;
+      }
+      
+      toast({ 
+        title: 'Success!', 
+        description: 'You have successfully joined the classroom.' 
+      });
+      setClassroomJoinCode('');
+      await fetchStudentClassrooms();
+    } catch (error) {
+      console.error('Error joining classroom:', error);
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to join classroom. Please try again.', 
+        variant: 'destructive' 
+      });
+    }
+  };
+
+  const selectClassroom = async (c: any) => {
+    setSelectedClassroom(c);
+    await fetchClassroomFeed(c.id);
+  };
+
+  const handleAddComment = async (postId: string) => {
+    if (!studentProfile) return;
+    const text = (newComment[postId] || '').trim();
+    if (!text) return;
+    const { error } = await supabase.rpc('add_classroom_comment', {
+      post_id_param: postId,
+      author_student_id_param: studentProfile.id,
+      author_teacher_id_param: null,
+      content_param: text
+    });
+    if (!error) {
+      setNewComment(prev => ({ ...prev, [postId]: '' }));
+      // Refresh comments for this post
+      const { data: cm } = await supabase.rpc('get_post_comments', { post_id_param: postId });
+      setPostComments(prev => ({ ...prev, [postId]: cm || [] }));
+    }
   };
 
   // Get next available date for a given day of the week
@@ -1935,30 +2083,53 @@ const StudentDashboard = () => {
   const upcomingBookings = myBookings.filter(booking => !isPastBooking(booking));
   const pastBookings = myBookings.filter(booking => isPastBooking(booking));
 
-  // Defensive check before fetching invoices
-  const fetchInvoices = async (studentId: string) => {
+  // Enhanced invoice fetching with live status checking
+  const fetchInvoices = async (studentId: string, showRefreshMessage = false) => {
     if (!studentId || studentId === 'undefined' || studentId === undefined || studentId === null) {
       console.error('Invalid or missing studentId for invoice query:', studentId);
       toast({ title: 'Error', description: 'Invalid or missing student ID for invoice query.', variant: 'destructive' });
       return;
     }
-    // Fetch invoices from Supabase
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('period_start', { ascending: false });
-    if (error) {
-      console.error('Error fetching invoices:', error);
-      toast({ title: 'Error', description: 'Failed to fetch invoices.', variant: 'destructive' });
-      return;
+    
+    try {
+      // Fetch invoices with latest status from Supabase
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('student_id', studentId)
+        .order('period_start', { ascending: false });
+        
+      if (error) {
+        console.error('Error fetching invoices:', error);
+        toast({ title: 'Error', description: 'Failed to fetch invoices.', variant: 'destructive' });
+        return;
+      }
+      
+      if (!data || data.length === 0) {
+        console.warn('No invoices found for student:', studentId);
+        setInvoices([]);
+        return;
+      }
+      
+      setInvoices(data);
+      
+      if (showRefreshMessage) {
+        toast({
+          title: "Status Updated",
+          description: "Invoice statuses have been refreshed.",
+        });
+      }
+    } catch (error) {
+      console.error('Error in fetchInvoices:', error);
+      toast({ title: 'Error', description: 'Failed to refresh invoice status.', variant: 'destructive' });
     }
-    if (!data || data.length === 0) {
-      console.warn('No invoices found for student:', studentId);
-      setInvoices([]);
-      return;
+  };
+
+  // Function to refresh invoice status in real-time
+  const refreshInvoiceStatus = async () => {
+    if (studentProfile?.id) {
+      await fetchInvoices(studentProfile.id, true);
     }
-    setInvoices(data);
   };
 
   // Handler to view invoice breakdown
@@ -1971,6 +2142,43 @@ const StudentDashboard = () => {
 
   const handlePayment = async (invoice: any) => {
     try {
+      // First, check the current live status of the invoice
+      const { data: currentInvoice, error: statusError } = await supabase
+        .from('invoices')
+        .select('payment_status, amount_due, amount_paid')
+        .eq('id', invoice.id)
+        .single();
+
+      if (statusError) {
+        console.error('Error checking invoice status:', statusError);
+        toast({
+          title: "Error",
+          description: "Failed to verify invoice status. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check if invoice is already paid
+      if (currentInvoice.payment_status === 'paid') {
+        toast({
+          title: "Already Paid",
+          description: "This invoice has already been paid. Refreshing status...",
+        });
+        await refreshInvoiceStatus();
+        return;
+      }
+
+      // Check if invoice is fully paid but status not updated
+      if (currentInvoice.amount_paid >= currentInvoice.amount_due) {
+        toast({
+          title: "Payment Complete",
+          description: "This invoice appears to be fully paid. Refreshing status...",
+        });
+        await refreshInvoiceStatus();
+        return;
+      }
+
       toast({
         title: "Payment Processing",
         description: "Redirecting to payment gateway...",
@@ -1980,8 +2188,11 @@ const StudentDashboard = () => {
       // This would typically redirect to a payment gateway like M-Pesa, PayPal, etc.
       console.log('Processing payment for invoice:', invoice.id);
       
-      // For now, just show a success message
-      setTimeout(() => {
+      // For now, simulate payment processing
+      setTimeout(async () => {
+        // After payment is processed, refresh the invoice status
+        await refreshInvoiceStatus();
+        
         toast({
           title: "Payment Successful",
           description: "Your payment has been processed successfully.",
@@ -2123,128 +2334,9 @@ const StudentDashboard = () => {
     setPendingProfileUpdate(null);
   };
 
-  // Add a test function that can be called from console
-  const testLearningModeUpdate = async () => {
-    if (!studentProfile) {
-      console.log('❌ No student profile available');
-      return;
-    }
-    
-    console.log('🧪 Testing learning mode update...');
-    console.log('Current learning_mode:', studentProfile.learning_mode);
-    
-    // Try direct update without RPC
-    const { data, error } = await supabase
-      .from('students')
-      .update({ learning_mode: 'online' })
-      .eq('id', studentProfile.id)
-      .eq('user_id', studentProfile.user_id)
-      .select();
-    
-    console.log('🧪 Direct update result:', { data, error });
-    
-    // Check the result
-    const { data: checkData, error: checkError } = await supabase
-      .from('students')
-      .select('learning_mode')
-      .eq('id', studentProfile.id)
-      .single();
-    
-    console.log('🧪 After update check:', { data: checkData, error: checkError });
-  };
 
-  // Add another test function that tries different approaches
-  const testMultipleUpdateMethods = async () => {
-    if (!studentProfile) {
-      console.log('❌ No student profile available');
-      return;
-    }
-    
-    console.log('🧪 Testing multiple update methods...');
-    
-    // Method 1: Direct update
-    console.log('Method 1: Direct update');
-    const { data: data1, error: error1 } = await supabase
-      .from('students')
-      .update({ learning_mode: 'online' })
-      .eq('id', studentProfile.id)
-      .select();
-    console.log('Result 1:', { data: data1, error: error1 });
-    
-    // Method 2: Update with user_id check
-    console.log('Method 2: Update with user_id check');
-    const { data: data2, error: error2 } = await supabase
-      .from('students')
-      .update({ learning_mode: 'home' })
-      .eq('id', studentProfile.id)
-      .eq('user_id', studentProfile.user_id)
-      .select();
-    console.log('Result 2:', { data: data2, error: error2 });
-    
-    // Method 3: Try with different field
-    console.log('Method 3: Update phone instead');
-    const { data: data3, error: error3 } = await supabase
-      .from('students')
-      .update({ phone: 'TEST_PHONE' })
-      .eq('id', studentProfile.id)
-      .select();
-    console.log('Result 3:', { data: data3, error: error3 });
-    
-    // Final check
-    const { data: finalCheck, error: finalError } = await supabase
-      .from('students')
-      .select('learning_mode, phone')
-      .eq('id', studentProfile.id)
-      .single();
-    console.log('Final check:', { data: finalCheck, error: finalError });
-  };
 
-  // Add a function to test with RLS disabled
-  const testWithRLSDisabled = async () => {
-    if (!studentProfile) {
-      console.log('❌ No student profile available');
-      return;
-    }
-    
-    console.log('🧪 Testing with RLS disabled...');
-    
-    // Try to disable RLS temporarily (this might not work from client)
-    const { data: disableData, error: disableError } = await supabase.rpc('exec_sql', {
-      sql: 'ALTER TABLE public.students DISABLE ROW LEVEL SECURITY;'
-    });
-    
-    console.log('Disable RLS result:', { data: disableData, error: disableError });
-    
-    // Try the update
-    const { data: updateData, error: updateError } = await supabase
-      .from('students')
-      .update({ learning_mode: 'online' })
-      .eq('id', studentProfile.id)
-      .select();
-    
-    console.log('Update with RLS disabled:', { data: updateData, error: updateError });
-    
-    // Re-enable RLS
-    const { data: enableData, error: enableError } = await supabase.rpc('exec_sql', {
-      sql: 'ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;'
-    });
-    
-    console.log('Enable RLS result:', { data: enableData, error: enableError });
-    
-    // Final check
-    const { data: finalCheck, error: finalError } = await supabase
-      .from('students')
-      .select('learning_mode')
-      .eq('id', studentProfile.id)
-      .single();
-    
-    console.log('Final check:', { data: finalCheck, error: finalError });
-  };
 
-  // Make them available globally for testing
-  (window as any).testLearningModeUpdate = testLearningModeUpdate;
-  (window as any).testMultipleUpdateMethods = testMultipleUpdateMethods;
-  (window as any).testWithRLSDisabled = testWithRLSDisabled;
 
 
 
@@ -2348,8 +2440,8 @@ const StudentDashboard = () => {
               <span className="text-base sm:text-lg font-semibold text-white drop-shadow">Welcome, {studentProfile?.student_name || 'Student'}</span>
               <span className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs sm:text-sm font-semibold shadow">
                 <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Student
-              </span>
-            </div>
+            </span>
+          </div>
           </div>
           <p className="text-white/90 text-sm sm:text-base lg:text-lg mb-4 px-4">Your creative journey starts here. Access lessons, bookings, resources, and more!</p>
           <div className="flex flex-col sm:flex-row justify-center w-full max-w-4xl mx-auto mt-2 gap-2">
@@ -2378,67 +2470,67 @@ const StudentDashboard = () => {
                 <SelectContent>
                   <SelectItem value="dashboard">
                     <div className="flex items-center gap-2">
-                      <BarChart3 className="w-4 h-4" />
+                <BarChart3 className="w-4 h-4" />
                       <span>Dashboard</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="bookings">
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
+                <Calendar className="w-4 h-4" />
                       <span>Bookings</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="schedule">
                     <div className="flex items-center gap-2">
-                      <CalendarDays className="w-4 h-4" />
+                <CalendarDays className="w-4 h-4" />
                       <span>Schedule</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="calendar">
                     <div className="flex items-center gap-2">
-                      <CalendarIcon className="w-4 h-4" />
+                <CalendarIcon className="w-4 h-4" />
                       <span>Calendar</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="materials">
                     <div className="flex items-center gap-2">
-                      <BookOpen className="w-4 h-4" />
+                <BookOpen className="w-4 h-4" />
                       <span>Materials</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="practice">
                     <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
+                <Clock className="w-4 h-4" />
                       <span>Practice</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="progress">
                     <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4" />
+                <TrendingUp className="w-4 h-4" />
                       <span>Progress</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="messages">
                     <div className="flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4" />
+                <MessageSquare className="w-4 h-4" />
                       <span>Messages</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="payments">
                     <div className="flex items-center gap-2">
-                      <CreditCard className="w-4 h-4" />
+                <CreditCard className="w-4 h-4" />
                       <span>Payments</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="account">
                     <div className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
+                <User className="w-4 h-4" />
                       <span>Account</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="invoices">
                     <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4" />
+                <FileText className="w-4 h-4" />
                       <span>Invoices</span>
                     </div>
                   </SelectItem>
@@ -2470,9 +2562,9 @@ const StudentDashboard = () => {
                 <CalendarIcon className="w-5 h-5" />
                 <span>Calendar</span>
               </TabsTrigger>
-              <TabsTrigger value="materials" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
+              <TabsTrigger value="classroom" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
                 <BookOpen className="w-5 h-5" />
-                <span>Materials</span>
+                <span>Classroom</span>
               </TabsTrigger>
               <TabsTrigger value="practice" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all">
                 <Clock className="w-5 h-5" />
@@ -2548,13 +2640,13 @@ const StudentDashboard = () => {
                     <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold">
-                      {formatCurrency(
-                        invoices
-                          .filter(inv => inv.payment_status === 'pending' || inv.payment_status === 'partial')
-                          .reduce((acc, inv) => acc + (inv.amount_due - (inv.amount_paid || 0)), 0)
-                      )}
-                    </div>
+                                            <div className="text-xl sm:text-2xl font-bold text-red-600">
+                          {formatCurrency(
+                            invoices
+                              .filter(inv => inv.payment_status === 'pending' || inv.payment_status === 'partial')
+                              .reduce((acc, inv) => acc + (inv.amount_due - (inv.amount_paid || 0)), 0)
+                          )}
+                        </div>
                     <p className="text-xs text-muted-foreground">Due payments</p>
                   </CardContent>
                 </Card>
@@ -2627,6 +2719,7 @@ const StudentDashboard = () => {
                 </div>
                   </CardHeader>
                   <CardContent>
+
                     {/* Session Limit Display */}
                     {bookingStatus && (
                       <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -2706,7 +2799,7 @@ const StudentDashboard = () => {
                                 <Badge className={getSlotStatus(slot).color}>
                                   {getSlotStatus(slot).status}
                                 </Badge>
-                                <Badge variant="secondary">{slot.slot_type}</Badge>
+                              <Badge variant="secondary">{slot.slot_type}</Badge>
                                 {slot.has_conflict && (
                                   <Badge variant="destructive" className="flex items-center gap-1">
                                     <AlertTriangle className="h-3 w-3" />
@@ -2949,19 +3042,19 @@ const StudentDashboard = () => {
                           .filter(credit => !credit.is_used) // Only show unused credits
                           .map(credit => (
                             <div key={credit.id} className="p-4 border rounded-lg bg-green-50 border-green-200">
-                              <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center justify-between mb-2">
                                 <h4 className="font-semibold text-green-800">
                                   Make-up Credit
                                 </h4>
-                                <Badge variant="secondary" className="bg-green-200 text-green-800">
+                              <Badge variant="secondary" className="bg-green-200 text-green-800">
                                   Available
-                                </Badge>
-                              </div>
-                              <div className="text-sm text-green-700">
-                                <p>Expires: {formatDate(credit.expires_at)}</p>
-                                <p>Type: {credit.credit_type}</p>
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-green-700">
+                              <p>Expires: {formatDate(credit.expires_at)}</p>
+                              <p>Type: {credit.credit_type}</p>
                                 <p>Days Left: {credit.days_until_expiry} days</p>
-                              </div>
+                            </div>
                               <Button 
                                 variant="outline" 
                                 size="sm" 
@@ -2973,8 +3066,8 @@ const StudentDashboard = () => {
                               >
                                 Book Make-up Lesson
                               </Button>
-                            </div>
-                          ))
+                          </div>
+                        ))
                       ) : (
                         <p className="text-gray-500 text-center py-8">No make-up credits available</p>
                       )}
@@ -3021,39 +3114,83 @@ const StudentDashboard = () => {
               </Card>
             </TabsContent>
 
-            {/* Materials Tab */}
-            <TabsContent value="materials" className="space-y-6">
+            {/* Classroom Tab */}
+            <TabsContent value="classroom" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Lesson Materials</CardTitle>
-                  <CardDescription>Access your course materials, assignments, and resources</CardDescription>
+                  <CardTitle>Classroom</CardTitle>
+                  <CardDescription>Join classes with a code, view posts, and participate</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {materials.length > 0 ? (
-                      materials.map(material => (
-                        <Card key={material.id} className="hover:shadow-md transition-shadow cursor-pointer">
-                          <CardContent className="p-4">
-                            <div className="flex items-center space-x-3">
-                              <FileText className="w-8 h-8 text-blue-600" />
-                              <div className="flex-1">
-                                <h4 className="font-semibold">{material.title}</h4>
-                                <p className="text-sm text-gray-600">{material.description}</p>
-                                <p className="text-xs text-gray-500">Updated {formatDate(material.created_at)}</p>
+                  <div className="space-y-6">
+                    {/* Join by Code */}
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="font-semibold mb-2">Join Classroom</h4>
+                      <div className="flex gap-2">
+                        <Input placeholder="Enter class code" value={classroomJoinCode} onChange={(e) => setClassroomJoinCode(e.target.value)} />
+                        <Button onClick={handleJoinClassroom} disabled={!classroomJoinCode}>Join</Button>
                               </div>
-                              {material.file_url && (
-                                <Button size="sm" variant="outline">
-                                  <Download className="w-4 h-4" />
-                                </Button>
-                              )}
                             </div>
+
+                    {/* My Classrooms */}
+                    <div className="space-y-3">
+                      <h4 className="font-semibold">My Classrooms</h4>
+                      {studentClassrooms.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {studentClassrooms.map(c => (
+                            <Card key={c.id} className="cursor-pointer" onClick={() => navigate(`/classrooms/${c.id}`)}>
+                              <CardContent className="p-4 flex items-center justify-between">
+                                <div>
+                                  <div className="font-semibold">{c.name}</div>
+                                  <div className="text-xs text-gray-500">Teacher: {c.teacher_name}</div>
+                                </div>
+                                <Badge variant="secondary">{c.status}</Badge>
                           </CardContent>
                         </Card>
-                      ))
+                          ))}
+                        </div>
                     ) : (
-                      <div className="col-span-full text-center py-8">
-                        <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-500">No materials available yet</p>
+                        <p className="text-gray-500">You haven't joined any classrooms yet.</p>
+                      )}
+                      </div>
+
+                    {/* Selected Classroom Feed */}
+                    {selectedClassroom && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold">{selectedClassroom.name} — Feed</h4>
+                          {selectedClassroom.class_code && (
+                            <Badge>Code: {selectedClassroom.class_code}</Badge>
+                          )}
+                        </div>
+
+                        <div className="space-y-4">
+                          {classroomFeed.length > 0 ? classroomFeed.map(post => (
+                            <Card key={post.post_id}>
+                              <CardHeader>
+                                <CardTitle className="text-base">{post.author_name}</CardTitle>
+                                <CardDescription>{new Date(post.created_at).toLocaleString()}</CardDescription>
+                              </CardHeader>
+                              <CardContent>
+                                <p className="whitespace-pre-wrap">{post.content}</p>
+                                <div className="mt-3 text-sm text-gray-600">{post.comments_count} comment(s)</div>
+                                {/* Comments */}
+                                {postComments[post.post_id]?.map(cm => (
+                                  <div key={cm.id} className="mt-3 p-3 border rounded">
+                                    <div className="text-xs text-gray-500">{cm.author_name} ({cm.author_role}) • {new Date(cm.created_at).toLocaleString()}</div>
+                                    <div>{cm.content}</div>
+                                  </div>
+                                ))}
+                                <div className="mt-3 flex gap-2">
+                                  <Input placeholder="Write a comment" value={newComment[post.post_id] || ''} onChange={(e) => setNewComment(prev => ({...prev, [post.post_id]: e.target.value}))} />
+                                  <Button size="sm" onClick={() => handleAddComment(post.post_id)}>Comment</Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          )) : (
+                            <p className="text-gray-500">No posts yet.</p>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -3217,22 +3354,49 @@ const StudentDashboard = () => {
               <Card className="h-[600px]">
                 <CardContent className="p-0 h-full">
                   <MessagingUI
-                    recipients={[
-                      ...teachers.map(teacher => ({
+                    recipients={(() => {
+                      // Teachers from teachers table, fallback to profile.id by email when user_id is missing
+                      const teacherRecipients = teachers.map(teacher => ({
                         id: teacher.id,
-                        user_id: teacher.user_id,
-                        name: teacher.name,
+                        user_id: teacher.user_id || (teacherAuthProfiles.find(tp => tp.email === teacher.email)?.id ?? ''),
+                        name: teacher.name || teacher.email,
                         email: teacher.email,
-                        type: 'teacher' as const
-                      })),
-                      ...adminProfiles.map(admin => ({
+                        type: 'teacher' as const,
+                        profile_photo_url: teacherAuthProfiles.find(tp => tp.id === teacher.user_id)?.profile_photo_url || undefined
+                      })).filter(t => t.user_id);
+                      
+                      // Include teacher auth profiles not already covered
+                      const additionalTeacherRecipients = teacherAuthProfiles
+                        .filter(tp => !teachers.some(t => (t.user_id || teacherAuthProfiles.find(ap => ap.email === t.email)?.id) === tp.id))
+                        .map(tp => ({
+                          id: tp.id,
+                          user_id: tp.id,
+                          name: tp.email,
+                          email: tp.email,
+                          type: 'teacher' as const,
+                          profile_photo_url: tp.profile_photo_url
+                        }));
+                      
+                      // Admins
+                      const adminRecipients = adminProfiles.map(admin => ({
                         id: admin.id,
-                        user_id: admin.id, // admin.id is the user_id from profiles table
+                        user_id: admin.id,
                         name: `Admin (${admin.email})`,
                         email: admin.email,
-                        type: 'admin' as const
-                      }))
-                    ]}
+                        type: 'admin' as const,
+                        profile_photo_url: undefined
+                      }));
+
+                      const allRecipients = [
+                        ...teacherRecipients,
+                        ...additionalTeacherRecipients,
+                        ...adminRecipients
+                      ];
+
+
+
+                      return allRecipients;
+                    })()}
                     currentUserId={user?.id || ''}
                     currentUserName={studentProfile?.student_name || ''}
                     userType="student"
@@ -3245,8 +3409,21 @@ const StudentDashboard = () => {
             <TabsContent value="payments" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Payments & Invoices</CardTitle>
-                  <CardDescription>View your payment history and manage outstanding balances</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Payments & Invoices</CardTitle>
+                      <CardDescription>View your payment history and manage outstanding balances</CardDescription>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={refreshInvoiceStatus}
+                      className="flex items-center gap-2"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Refresh Status
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="mb-4 flex justify-between items-center">
@@ -3268,9 +3445,9 @@ const StudentDashboard = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <Card>
-                      <CardContent className="p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      <Card>
+                        <CardContent className="p-4">
                         <div className="text-2xl font-bold text-green-600">
                           {formatCurrency(
                             invoices
@@ -3278,11 +3455,11 @@ const StudentDashboard = () => {
                               .reduce((acc, inv) => acc + inv.amount_paid, 0)
                           )}
                         </div>
-                        <p className="text-sm text-gray-600">Total Paid</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-4">
+                          <p className="text-sm text-gray-600">Total Paid</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4">
                         <div className="text-2xl font-bold text-yellow-600">
                           {formatCurrency(
                             invoices
@@ -3290,45 +3467,99 @@ const StudentDashboard = () => {
                               .reduce((acc, inv) => acc + (inv.amount_due - (inv.amount_paid || 0)), 0)
                           )}
                         </div>
-                        <p className="text-sm text-gray-600">Outstanding</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-4">
+                          <p className="text-sm text-gray-600">Outstanding</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4">
                         <div className="text-2xl font-bold text-blue-600">{invoices.length}</div>
-                        <p className="text-sm text-gray-600">Total Invoices</p>
-                      </CardContent>
-                    </Card>
-                  </div>
+                          <p className="text-sm text-gray-600">Total Invoices</p>
+                        </CardContent>
+                      </Card>
+                    </div>
 
-                  <div className="space-y-4">
+                    <div className="space-y-4">
                     {(showAllInvoices ? invoices : invoices.filter(inv => inv.payment_status !== 'paid')).length > 0 ? (
-                      (showAllInvoices ? invoices : invoices.filter(inv => inv.payment_status !== 'paid')).map(invoice => (
-                        <div key={invoice.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div>
-                            <h4 className="font-semibold">Invoice #{invoice.id.slice(0, 8)}</h4>
-                            <p className="text-sm text-gray-600">Period: {formatDate(invoice.period_start)} - {formatDate(invoice.period_end)}</p>
-                            <p className="text-sm text-gray-600">Due: {formatDate(invoice.due_date)}</p>
-                          </div>
-                          <div className="flex items-center space-x-4">
-                            <div className="text-right">
-                              <div className="text-lg font-semibold">{formatCurrency(invoice.amount_due)}</div>
-                              {invoice.amount_paid > 0 && (
-                                <div className="text-sm text-green-600">Paid: {formatCurrency(invoice.amount_paid)}</div>
+                      (showAllInvoices ? invoices : invoices.filter(inv => inv.payment_status !== 'paid')).map(invoice => {
+                        const isPaid = invoice.payment_status === 'paid';
+                        const isFullyPaid = invoice.amount_paid >= invoice.amount_due;
+                        const remainingAmount = Math.max(0, invoice.amount_due - (invoice.amount_paid || 0));
+                        
+                        return (
+                          <div key={invoice.id} className={`flex items-center justify-between p-4 border rounded-lg ${isPaid ? 'bg-green-50 border-green-200' : 'bg-white'}`}>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h4 className="font-semibold">Invoice #{invoice.id.slice(0, 8)}</h4>
+                                {isPaid && (
+                                  <Badge className="bg-green-100 text-green-800 text-xs">
+                                    ✓ PAID
+                                  </Badge>
+                                )}
+                                {isFullyPaid && !isPaid && (
+                                  <Badge className="bg-blue-100 text-blue-800 text-xs">
+                                    PAYMENT COMPLETE
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-600">Period: {formatDate(invoice.period_start)} - {formatDate(invoice.period_end)}</p>
+                              <p className="text-sm text-gray-600">Due: {formatDate(invoice.due_date)}</p>
+                              {invoice.payment_status === 'partial' && (
+                                <p className="text-sm text-amber-600 font-medium mt-1">
+                                  Partial payment received
+                                </p>
                               )}
                             </div>
-                            <Badge className={getStatusColor(invoice.payment_status)}>{invoice.payment_status}</Badge>
-                            {invoice.payment_status === 'paid' ? (
-                              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                                ✓ Paid
-                              </Badge>
-                            ) : (
-                              <Button size="sm" onClick={() => handlePayment(invoice)}>Pay Now</Button>
-                            )}
+                            <div className="flex items-center space-x-4">
+                              <div className="text-right">
+                                <div className="text-lg font-semibold">{formatCurrency(invoice.amount_due)}</div>
+                                {invoice.amount_paid > 0 && (
+                                  <div className="text-sm text-green-600">Paid: {formatCurrency(invoice.amount_paid)}</div>
+                                )}
+                                {remainingAmount > 0 && !isPaid && (
+                                  <div className="text-sm text-red-600 font-medium">
+                                    Remaining: {formatCurrency(remainingAmount)}
+                                  </div>
+                                )}
+                              </div>
+                              <Badge className={getStatusColor(invoice.payment_status)}>{invoice.payment_status}</Badge>
+                              {isPaid || isFullyPaid ? (
+                                <div className="flex flex-col items-center gap-1">
+                                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                    ✓ Paid
+                                  </Badge>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => handleViewInvoice(invoice)}
+                                    className="text-xs"
+                                  >
+                                    View Details
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    onClick={() => handlePayment(invoice)}
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                  >
+                                    Pay {remainingAmount > 0 ? formatCurrency(remainingAmount) : 'Now'}
+                                  </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => handleViewInvoice(invoice)}
+                                    className="text-xs"
+                                  >
+                                    View Details
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))
-                    ) : (
+                        );
+                      })
+                      ) : (
                       <div className="text-center py-8">
                         <p className="text-gray-500 mb-4">
                           {showAllInvoices ? 'No invoices found' : 'No outstanding invoices'}
@@ -3836,64 +4067,7 @@ const StudentDashboard = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Recurring Booking Modal */}
-      <Dialog open={showRecurringBookingModal} onOpenChange={setShowRecurringBookingModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Book Recurring Lessons</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {selectedTimeSlot && (
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                <h4 className="font-semibold mb-2">Selected Time Slot</h4>
-                <div className="text-sm text-gray-600">
-                  <p><strong>Teacher:</strong> {selectedTimeSlot.teacher_name}</p>
-                  <p><strong>Day:</strong> {selectedTimeSlot.day_of_week}</p>
-                  <p><strong>Time:</strong> {formatTime(selectedTimeSlot.start_time)} - {formatTime(selectedTimeSlot.end_time)}</p>
-                  <p><strong>Start Date:</strong> {getNextAvailableDate(selectedTimeSlot.day_of_week)}</p>
-                  <p><strong>End Date:</strong> {getRecurringEndDate(selectedTimeSlot.day_of_week, recurringBooking.frequency)}</p>
-                </div>
-              </div>
-            )}
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="recurring_frequency" className="text-right">Frequency</Label>
-              <Select value={recurringBooking.frequency} onValueChange={(value) => setRecurringBooking({...recurringBooking, frequency: value})}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select frequency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="biweekly">Bi-weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="recurring_notes" className="text-right">Notes</Label>
-              <Textarea
-                id="recurring_notes"
-                value={recurringBooking.notes}
-                onChange={(e) => setRecurringBooking({...recurringBooking, notes: e.target.value})}
-                placeholder="Any special requests or notes..."
-                className="col-span-3"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRecurringBookingModal(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSubmitRecurringBooking}
-              disabled={!selectedTimeSlot}
-            >
-              Book Recurring Lessons
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
 
 
     </div>

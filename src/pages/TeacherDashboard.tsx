@@ -4,7 +4,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video } from "lucide-react";
+import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video, Copy, Check, ChevronLeft, ChevronRight, Phone, Mail, Award } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -189,6 +189,22 @@ const TeacherDashboard = () => {
   const [showLessonModal, setShowLessonModal] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [showMaterialModal, setShowMaterialModal] = useState(false);
+  // Classroom state
+  const [showCreateClassroomModal, setShowCreateClassroomModal] = useState(false);
+  const [newClassroom, setNewClassroom] = useState({ name: '', description: '' });
+  const [teacherClassrooms, setTeacherClassrooms] = useState<any[]>([]);
+  const [selectedTeacherClassroom, setSelectedTeacherClassroom] = useState<any | null>(null);
+  const [newPostContent, setNewPostContent] = useState('');
+  const [teacherClassroomFeed, setTeacherClassroomFeed] = useState<any[]>([]);
+  const [copiedCodes, setCopiedCodes] = useState<Set<string>>(new Set());
+  
+  // Students pagination and details
+  const [studentsPage, setStudentsPage] = useState(1);
+  const [studentsPerPage] = useState(10);
+  const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
+  const [showStudentDetailsModal, setShowStudentDetailsModal] = useState(false);
+  const [studentBookings, setStudentBookings] = useState<any[]>([]);
+  
   const [newLesson, setNewLesson] = useState({
     title: '',
     description: '',
@@ -615,20 +631,37 @@ const TeacherDashboard = () => {
     }
   };
 
-  // Fetch students for messaging
+  // Fetch students who have booked sessions with this teacher
   const fetchStudents = async () => {
+    if (!profile?.id) return;
+    
     try {
+      // Get students who have bookings with this teacher
       const { data: studentsData, error: studentsError } = await supabase
         .from('students')
-        .select('id, user_id, student_name, email, phone, instrument, learning_mode, age, proficiency_level, status, enrollment_date')
-        .eq('status', 'active')
+        .select(`
+          id, user_id, student_name, email, phone, instrument, 
+          learning_mode, age, proficiency_level, status, enrollment_date,
+          bookings!inner(teacher_id)
+        `)
+        .eq('bookings.teacher_id', profile.id)
         .not('user_id', 'is', null);
 
       if (studentsError) {
         console.error('Error fetching students:', studentsError);
       } else {
-        setStudents(studentsData || []);
-        console.log('[TeacherDashboard] Students loaded:', studentsData?.length || 0);
+        // Remove duplicates (students might have multiple bookings)
+        const uniqueStudents = studentsData?.reduce((acc: any[], student) => {
+          if (!acc.find(s => s.id === student.id)) {
+            // Remove the bookings data from the student object
+            const { bookings, ...studentData } = student;
+            acc.push(studentData);
+          }
+          return acc;
+        }, []) || [];
+        
+        setStudents(uniqueStudents);
+        console.log('[TeacherDashboard] Students with bookings loaded:', uniqueStudents.length);
       }
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -638,26 +671,22 @@ const TeacherDashboard = () => {
   // Fetch admin profiles for messaging
   const fetchAdminProfiles = async () => {
     try {
-      console.log('🔄 Fetching admin profiles...');
-      
       const { data, error } = await supabase
         .from('profiles')
         .select('id, email')
-        .eq('role', 'admin')
+        .in('role', ['admin', 'super_admin'])
         .order('email', { ascending: true });
 
       if (error) {
-        console.error('❌ Error fetching admin profiles:', error);
+        console.error('Error fetching admin profiles:', error);
         return;
       }
 
-      console.log('✅ Admin profiles fetched:', data?.length || 0);
-      
       if (data) {
         setAdminProfiles(data);
       }
     } catch (error) {
-      console.error('❌ Error in fetchAdminProfiles:', error);
+      console.error('Error in fetchAdminProfiles:', error);
     }
   };
 
@@ -1355,6 +1384,119 @@ const TeacherDashboard = () => {
     fetchAvailableTimeSlotsForReschedule();
   };
 
+  // Classroom handlers
+  const fetchTeacherClassrooms = async () => {
+    if (!profile) return;
+    const { data, error } = await supabase
+      .from('classrooms')
+      .select('id, name, status, class_code')
+      .eq('teacher_id', profile.id)
+      .order('created_at', { ascending: false });
+    if (!error) setTeacherClassrooms(data || []);
+  };
+
+  useEffect(() => {
+    if (profile && isTeacher && isApproved) {
+      fetchTeacherClassrooms();
+    }
+  }, [profile, isTeacher, isApproved]);
+
+  const handleCreateClassroom = async () => {
+    if (!profile || !newClassroom.name.trim()) return;
+    const { data, error } = await supabase.rpc('create_classroom', {
+      teacher_id_param: profile.id,
+      name_param: newClassroom.name.trim(),
+      description_param: newClassroom.description || null
+    });
+    if (!error) {
+      setShowCreateClassroomModal(false);
+      setNewClassroom({ name: '', description: '' });
+      await fetchTeacherClassrooms();
+      toast({ title: 'Submitted', description: 'Classroom submitted for approval.' });
+    } else {
+      toast({ title: 'Error', description: 'Failed to create classroom.', variant: 'destructive' });
+    }
+  };
+
+  const handleCopyClassCode = async (classCode: string) => {
+    try {
+      await navigator.clipboard.writeText(classCode);
+      setCopiedCodes(prev => new Set(prev).add(classCode));
+      toast({ title: 'Success', description: 'Class code copied to clipboard!' });
+      
+      // Reset the copied state after 3 seconds
+      setTimeout(() => {
+        setCopiedCodes(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(classCode);
+          return newSet;
+        });
+      }, 3000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      toast({ title: 'Error', description: 'Failed to copy class code', variant: 'destructive' });
+    }
+  };
+
+  const handleViewStudentDetails = async (student: any) => {
+    setSelectedStudent(student);
+    setShowStudentDetailsModal(true);
+    
+    // Fetch student's booking history with this teacher
+    if (!profile?.id) return;
+    
+    try {
+      const { data: bookingsData, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          time_slots(day_of_week, start_time, end_time)
+        `)
+        .eq('student_id', student.id)
+        .eq('teacher_id', profile.id)
+        .order('booking_date', { ascending: false });
+
+      if (!error) {
+        setStudentBookings(bookingsData || []);
+      }
+    } catch (error) {
+      console.error('Error fetching student bookings:', error);
+    }
+  };
+
+  // Pagination logic
+  const totalStudents = students.length;
+  const totalPages = Math.ceil(totalStudents / studentsPerPage);
+  const startIndex = (studentsPage - 1) * studentsPerPage;
+  const endIndex = startIndex + studentsPerPage;
+  const paginatedStudents = students.slice(startIndex, endIndex);
+
+  const goToPage = (page: number) => {
+    setStudentsPage(page);
+  };
+
+  const selectTeacherClassroom = async (c: any) => {
+    setSelectedTeacherClassroom(c);
+    const { data, error } = await supabase.rpc('get_classroom_feed', { classroom_id_param: c.id });
+    if (!error) setTeacherClassroomFeed(data || []);
+  };
+
+  const handleCreatePost = async () => {
+    if (!selectedTeacherClassroom || !profile) return;
+    const content = newPostContent.trim();
+    if (!content) return;
+    const { error } = await supabase.rpc('create_classroom_post', {
+      classroom_id_param: selectedTeacherClassroom.id,
+      author_teacher_id_param: profile.id,
+      content_param: content
+    });
+    if (!error) {
+      setNewPostContent('');
+      const { data } = await supabase.rpc('get_classroom_feed', { classroom_id_param: selectedTeacherClassroom.id });
+      setTeacherClassroomFeed(data || []);
+    }
+  };
+
   if (loading || checking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5">
@@ -1446,10 +1588,10 @@ const TeacherDashboard = () => {
                       <span>Messages</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="resources">
+                  <SelectItem value="classroom">
                     <div className="flex items-center gap-2">
                       <BookOpen className="w-4 h-4" />
-                      <span>Resources</span>
+                      <span>Classroom</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="availability">
@@ -1502,9 +1644,9 @@ const TeacherDashboard = () => {
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="resources" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
+              <TabsTrigger value="classroom" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
                 <BookOpen className="w-5 h-5" />
-                <span>Resources</span>
+                <span>Classroom</span>
               </TabsTrigger>
               <TabsTrigger value="availability" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-blue-700 data-[state=active]:bg-blue-100 data-[state=active]:shadow-md transition-all">
                 <Clock className="w-5 h-5" />
@@ -1625,40 +1767,169 @@ const TeacherDashboard = () => {
 
             {/* Students Tab */}
             <TabsContent value="students" className="mt-8">
-              <Card className="shadow-lg border-0 bg-white/95">
-                <CardHeader>
-                  <CardTitle className="text-xl font-bold">Student Management</CardTitle>
-                  <CardDescription>Mark attendance, add lesson notes, upload resources, view progress.</CardDescription>
+              <Card className="shadow-xl border-0 bg-gradient-to-br from-purple-50 to-blue-50">
+                <CardHeader className="bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-t-lg">
+                  <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <Users className="w-6 h-6" />
+                    My Students
+                  </CardTitle>
+                  <CardDescription className="text-purple-100">
+                    Students who have booked sessions with you • {students.length} total
+                  </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {students.length > 0 ? (
-                      students.map(student => (
-                        <div key={student.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center space-x-4">
-                            <User className="w-10 h-10 text-blue-600" />
-                            <div>
-                              <h4 className="font-semibold">{student.student_name}</h4>
-                              <p className="text-sm text-gray-600">{student.email}</p>
-                              <p className="text-sm text-gray-600">Instrument: {student.instrument}</p>
-                              <p className="text-sm text-gray-600">Level: {student.proficiency_level}</p>
-                            </div>
+                <CardContent className="p-6">
+                  {students.length > 0 ? (
+                    <>
+                      {/* Students List */}
+                      <div className="space-y-3 mb-6">
+                        {paginatedStudents.map((student, index) => (
+                          <Card key={student.id} className="hover:shadow-md transition-all duration-300 border-l-4 border-l-purple-500">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-4 flex-1">
+                                  {/* Student Avatar */}
+                                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                                    {student.student_name.charAt(0)}
+                                  </div>
+                                  
+                                  {/* Student Info - Desktop */}
+                                  <div className="hidden md:flex items-center space-x-6 flex-1">
+                                    <div className="min-w-0 flex-1">
+                                      <h4 className="font-semibold text-gray-800 text-lg truncate">{student.student_name}</h4>
+                                      <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                                        <div className="flex items-center gap-1">
+                                          <Mail className="w-3 h-3" />
+                                          <span className="truncate">{student.email}</span>
+                                        </div>
+                                        {student.phone && (
+                                          <div className="flex items-center gap-1">
+                                            <Phone className="w-3 h-3" />
+                                            <span>{student.phone}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-4 text-sm">
+                                      <div className="flex items-center gap-1">
+                                        <Music className="w-4 h-4 text-purple-500" />
+                                        <span className="text-gray-700">{student.instrument}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <Award className="w-4 h-4 text-blue-500" />
+                                        <span className="text-gray-700">{student.proficiency_level}</span>
+                                      </div>
+                                    </div>
+                                    
+                                    <Badge className={`${getStatusColor(student.status)} text-xs flex-shrink-0`}>
+                                      {student.status}
+                                    </Badge>
+                                  </div>
+                                  
+                                  {/* Student Info - Mobile */}
+                                  <div className="md:hidden flex-1 min-w-0">
+                                    <h4 className="font-semibold text-gray-800 truncate">{student.student_name}</h4>
+                                    <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
+                                      <Music className="w-3 h-3 text-purple-500" />
+                                      <span className="truncate">{student.instrument}</span>
+                                    </div>
+                                    <Badge className={`${getStatusColor(student.status)} text-xs mt-2 inline-block`}>
+                                      {student.status}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                
+                                {/* Actions */}
+                                <div className="flex items-center space-x-2 flex-shrink-0">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => handleViewStudentDetails(student)}
+                                    className="hidden sm:flex"
+                                  >
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    View Details
+                                  </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => handleViewStudentDetails(student)}
+                                    className="sm:hidden w-8 h-8 p-0"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                      
+                      {/* Pagination */}
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-between border-t pt-4">
+                          <div className="text-sm text-gray-600">
+                            Showing {startIndex + 1}-{Math.min(endIndex, totalStudents)} of {totalStudents} students
                           </div>
                           <div className="flex items-center space-x-2">
-                            <Badge className={getStatusColor(student.status)}>{student.status}</Badge>
-                            <Button variant="outline" size="sm">
-                              <Eye className="w-4 h-4" />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => goToPage(studentsPage - 1)}
+                              disabled={studentsPage === 1}
+                            >
+                              <ChevronLeft className="w-4 h-4" />
                             </Button>
-                            <Button variant="outline" size="sm">
-                              <Edit className="w-4 h-4" />
+                            
+                            <div className="flex items-center space-x-1">
+                              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                const page = i + 1;
+                                return (
+                                  <Button
+                                    key={page}
+                                    variant={studentsPage === page ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => goToPage(page)}
+                                    className="w-8 h-8 p-0"
+                                  >
+                                    {page}
+                                  </Button>
+                                );
+                              })}
+                              {totalPages > 5 && (
+                                <>
+                                  <span className="text-gray-400">...</span>
+                                  <Button
+                                    variant={studentsPage === totalPages ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => goToPage(totalPages)}
+                                    className="w-8 h-8 p-0"
+                                  >
+                                    {totalPages}
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                            
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => goToPage(studentsPage + 1)}
+                              disabled={studentsPage === totalPages}
+                            >
+                              <ChevronRight className="w-4 h-4" />
                             </Button>
                           </div>
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-gray-500 text-center py-8">No students assigned</p>
-                    )}
-                  </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-12">
+                      <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-500 text-lg font-medium">No students have booked sessions yet</p>
+                      <p className="text-gray-400 text-sm mt-2">Students will appear here once they book lessons with you</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -1668,22 +1939,36 @@ const TeacherDashboard = () => {
               <Card className="shadow-lg border-0 bg-white/95 h-[600px]">
                 <CardContent className="p-0 h-full">
                   <MessagingUI
-                    recipients={[
-                      ...students.map(student => ({
+                    recipients={(() => {
+                      // Students
+                      const studentRecipients = students.map(student => ({
                         id: student.id,
                         user_id: student.user_id,
                         name: student.student_name,
                         email: student.email,
-                        type: 'student' as const
-                      })),
-                      ...adminProfiles.map(admin => ({
+                        type: 'student' as const,
+                        profile_photo_url: undefined // Students table doesn't have profile_photo_url
+                      })).filter(s => s.user_id); // Ensure user_id exists
+                      
+                      // Admins
+                      const adminRecipients = adminProfiles.map(admin => ({
                         id: admin.id,
-                        user_id: admin.id, // admin.id is the user_id from profiles table
+                        user_id: admin.id,
                         name: `Admin (${admin.email})`,
                         email: admin.email,
-                        type: 'admin' as const
-                      }))
-                    ]}
+                        type: 'admin' as const,
+                        profile_photo_url: undefined
+                      }));
+
+                      const allRecipients = [
+                        ...studentRecipients,
+                        ...adminRecipients
+                      ];
+
+
+
+                      return allRecipients;
+                    })()}
                     currentUserId={user?.id || ''}
                     currentUserName={profile?.name || ''}
                     userType="teacher"
@@ -1692,91 +1977,147 @@ const TeacherDashboard = () => {
               </Card>
             </TabsContent>
 
-            {/* Resources Tab */}
-            <TabsContent value="resources" className="mt-8">
+            {/* Classroom Tab */}
+            <TabsContent value="classroom" className="mt-8">
               <Card className="shadow-lg border-0 bg-white/95">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle className="text-xl font-bold">Academy Resources</CardTitle>
-                    <CardDescription>Access internal documents and policies.</CardDescription>
+                    <CardTitle className="text-xl font-bold">Classroom</CardTitle>
+                    <CardDescription>Create classrooms and post updates</CardDescription>
                   </div>
-                  <Dialog open={showMaterialModal} onOpenChange={setShowMaterialModal}>
+                  <Dialog open={showCreateClassroomModal} onOpenChange={setShowCreateClassroomModal}>
                     <DialogTrigger asChild>
                       <Button>
-                        <Upload className="w-4 h-4 mr-2" />
-                        Upload Material
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Classroom
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[425px]">
                       <DialogHeader>
-                        <DialogTitle>Upload New Material</DialogTitle>
+                        <DialogTitle>New Classroom</DialogTitle>
                       </DialogHeader>
                       <div className="grid gap-4 py-4">
                         <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="material_title" className="text-right">Title</Label>
-                          <Input
-                            id="material_title"
-                            value={newMaterial.title}
-                            onChange={(e) => setNewMaterial({...newMaterial, title: e.target.value})}
-                            className="col-span-3"
-                          />
+                          <Label htmlFor="classroom_name" className="text-right">Name</Label>
+                          <Input id="classroom_name" value={newClassroom.name} onChange={(e) => setNewClassroom({ ...newClassroom, name: e.target.value })} className="col-span-3" />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="material_description" className="text-right">Description</Label>
-                          <Textarea
-                            id="material_description"
-                            value={newMaterial.description}
-                            onChange={(e) => setNewMaterial({...newMaterial, description: e.target.value})}
-                            className="col-span-3"
-                          />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="material_file" className="text-right">File URL</Label>
-                          <Input
-                            id="material_file"
-                            value={newMaterial.file_url}
-                            onChange={(e) => setNewMaterial({...newMaterial, file_url: e.target.value})}
-                            className="col-span-3"
-                            placeholder="https://example.com/file.pdf"
-                          />
+                          <Label htmlFor="classroom_desc" className="text-right">Description</Label>
+                          <Textarea id="classroom_desc" value={newClassroom.description} onChange={(e) => setNewClassroom({ ...newClassroom, description: e.target.value })} className="col-span-3" />
                         </div>
                       </div>
                       <div className="flex justify-end space-x-2">
-                        <Button variant="outline" onClick={() => setShowMaterialModal(false)}>
-                          Cancel
-                        </Button>
-                        <Button onClick={handleAddMaterial}>
-                          Upload Material
-                        </Button>
+                        <Button variant="outline" onClick={() => setShowCreateClassroomModal(false)}>Cancel</Button>
+                        <Button onClick={handleCreateClassroom}>Submit</Button>
                       </div>
                     </DialogContent>
                   </Dialog>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {materials.length > 0 ? (
-                      materials.map(material => (
-                        <Card key={material.id} className="hover:shadow-md transition-shadow cursor-pointer">
-                          <CardContent className="p-4">
-                            <div className="flex items-center space-x-3">
-                              <FileText className="w-8 h-8 text-blue-600" />
-                              <div className="flex-1">
-                                <h4 className="font-semibold">{material.title}</h4>
-                                <p className="text-sm text-gray-600">{material.description}</p>
-                              </div>
-                              {material.file_url && (
-                                <Button size="sm" variant="outline">
-                                  <Download className="w-4 h-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))
-                    ) : (
-                      <div className="col-span-full text-center py-8">
-                        <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-500">No materials available yet</p>
+                  <div className="space-y-6">
+                    {/* Teacher's classrooms list */}
+                    <div className="space-y-3">
+                      <h4 className="font-semibold">My Classrooms</h4>
+                      {teacherClassrooms.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {teacherClassrooms.map(c => (
+                            <Card key={c.id} className="hover:shadow-lg transition-shadow duration-300 border-l-4 border-l-purple-500">
+                              <CardContent className="p-4">
+                                <div className="flex items-start justify-between mb-3">
+                                  <div className="flex-1">
+                                    <div className="font-semibold text-lg text-gray-800 mb-1">{c.name}</div>
+                                    <div className="text-sm text-gray-600 mb-2">
+                                      Status: <Badge className={`ml-1 ${c.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                        {c.status}
+                                      </Badge>
+                                    </div>
+                                    {c.class_code && (
+                                      <div className="flex items-center gap-2 mb-3">
+                                        <span className="text-sm text-gray-600">Class Code:</span>
+                                        <Badge variant="outline" className="font-mono text-sm px-2 py-1">
+                                          {c.class_code}
+                                        </Badge>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleCopyClassCode(c.class_code);
+                                          }}
+                                          className="h-6 w-6 p-0 hover:bg-purple-100"
+                                        >
+                                          {copiedCodes.has(c.class_code) ? (
+                                            <Check className="h-3 w-3 text-green-500" />
+                                          ) : (
+                                            <Copy className="h-3 w-3 text-gray-500" />
+                                          )}
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => navigate(`/classrooms/${c.id}`)}
+                                    className="flex-1"
+                                  >
+                                    <BookOpen className="h-4 w-4 mr-2" />
+                                    Open Classroom
+                                  </Button>
+                                  {c.class_code && (
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCopyClassCode(c.class_code);
+                                      }}
+                                      className="px-3"
+                                    >
+                                      {copiedCodes.has(c.class_code) ? (
+                                        <Check className="h-4 w-4" />
+                                      ) : (
+                                        <Copy className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500">No classrooms yet.</p>
+                      )}
+                    </div>
+
+                    {/* Feed composer and posts for selected classroom */}
+                    {selectedTeacherClassroom && (
+                      <div className="space-y-4">
+                        <div className="p-3 border rounded">
+                          <div className="font-semibold mb-2">Post to {selectedTeacherClassroom.name}</div>
+                          <Textarea placeholder="Share an update with your class" value={newPostContent} onChange={(e) => setNewPostContent(e.target.value)} />
+                          <div className="mt-2 flex justify-end">
+                            <Button size="sm" onClick={handleCreatePost} disabled={!newPostContent.trim()}>Post</Button>
+                          </div>
+                        </div>
+                        <div className="space-y-3">
+                          {teacherClassroomFeed.length > 0 ? teacherClassroomFeed.map(post => (
+                            <Card key={post.post_id}>
+                              <CardHeader>
+                                <CardTitle className="text-base">{post.author_name}</CardTitle>
+                                <CardDescription>{new Date(post.created_at).toLocaleString()}</CardDescription>
+                              </CardHeader>
+                              <CardContent>
+                                <p className="whitespace-pre-wrap">{post.content}</p>
+                              </CardContent>
+                            </Card>
+                          )) : (
+                            <p className="text-gray-500">No posts yet.</p>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2156,41 +2497,185 @@ const TeacherDashboard = () => {
         </div>
       </main>
 
-      {/* Video Conference Modal */}
-      <VideoConferenceModal
-        open={showVideoConferenceModal}
-        onClose={() => setShowVideoConferenceModal(false)}
-        meetingRoom={selectedMeetingRoom}
-        userName={profile?.name || 'Teacher'}
-        userRole="teacher"
-      />
-      {/* Reschedule Modal */}
-      <Dialog open={showRescheduleModal} onOpenChange={setShowRescheduleModal}>
-        <DialogContent className="sm:max-w-[425px]">
+      {/* Student Details Modal */}
+      <Dialog open={showStudentDetailsModal} onOpenChange={setShowStudentDetailsModal}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Reschedule Booking</DialogTitle>
-          </DialogHeader>
-          <div className="mb-4">Select a new date and time slot for the booking:</div>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
-            {availableTimeSlotsForReschedule.map(slot => (
-              <div key={slot.id} className="flex items-center justify-between p-2 border rounded">
-                <div>
-                  <div className="font-semibold">{profile?.name}</div>
-                  <div className="text-xs text-gray-600">{slot.day_of_week}, {slot.start_time} - {slot.end_time}</div>
-                </div>
-                <Button size="sm" onClick={async () => {
-                  setRescheduleTimeSlot(slot);
-                  setRescheduleDate(new Date().toISOString().split('T')[0]);
-                  handleRescheduleBooking();
-                }}>Select</Button>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                {selectedStudent?.student_name?.charAt(0)}
               </div>
-            ))}
-          </div>
-          <div className="flex justify-end mt-4">
-            <Button variant="outline" onClick={() => setShowRescheduleModal(false)}>Cancel</Button>
-          </div>
+              {selectedStudent?.student_name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedStudent && (
+            <div className="space-y-6">
+              {/* Student Information */}
+              <Card className="border-l-4 border-l-purple-500">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <User className="w-5 h-5" />
+                    Student Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-gray-500" />
+                      <span className="font-medium">Email:</span>
+                      <span className="text-gray-700">{selectedStudent.email}</span>
+                    </div>
+                    {selectedStudent.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-gray-500" />
+                        <span className="font-medium">Phone:</span>
+                        <span className="text-gray-700">{selectedStudent.phone}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Music className="w-4 h-4 text-purple-500" />
+                      <span className="font-medium">Instrument:</span>
+                      <span className="text-gray-700">{selectedStudent.instrument}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Award className="w-4 h-4 text-blue-500" />
+                      <span className="font-medium">Level:</span>
+                      <span className="text-gray-700">{selectedStudent.proficiency_level}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-green-500" />
+                      <span className="font-medium">Learning Mode:</span>
+                      <span className="text-gray-700">{(selectedStudent as any).learning_mode || 'Not specified'}</span>
+                    </div>
+                    {selectedStudent.age && (
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-gray-500" />
+                        <span className="font-medium">Age:</span>
+                        <span className="text-gray-700">{selectedStudent.age} years</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-gray-500" />
+                      <span className="font-medium">Enrolled:</span>
+                      <span className="text-gray-700">
+                        {selectedStudent.enrollment_date ? new Date(selectedStudent.enrollment_date).toLocaleDateString() : 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">Status:</span>
+                      <Badge className={getStatusColor(selectedStudent.status)}>
+                        {selectedStudent.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Booking History */}
+              <Card className="border-l-4 border-l-blue-500">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <CalendarIcon className="w-5 h-5" />
+                    Booking History ({studentBookings.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {studentBookings.length > 0 ? (
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {studentBookings.slice(0, 10).map((booking, index) => (
+                        <div key={booking.id} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-4 text-sm">
+                              <div className="flex items-center gap-1">
+                                <Calendar className="w-4 h-4 text-purple-500" />
+                                <span className="font-medium">
+                                  {new Date(booking.booking_date).toLocaleDateString()}
+                                </span>
+                              </div>
+                              {booking.time_slots && (
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-4 h-4 text-blue-500" />
+                                  <span>
+                                    {booking.time_slots.start_time} - {booking.time_slots.end_time}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">Type:</span>
+                                <span>{booking.lesson_type}</span>
+                              </div>
+                            </div>
+                            {booking.notes && (
+                              <p className="text-xs text-gray-600 mt-1">Notes: {booking.notes}</p>
+                            )}
+                          </div>
+                          <Badge className={`text-xs ${
+                            booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                            booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {booking.status}
+                          </Badge>
+                        </div>
+                      ))}
+                      {studentBookings.length > 10 && (
+                        <p className="text-sm text-gray-500 text-center py-2">
+                          Showing latest 10 bookings out of {studentBookings.length} total
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <CalendarIcon className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                      <p>No booking history available</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Quick Actions */}
+              <Card className="border-l-4 border-l-green-500">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Target className="w-5 h-5" />
+                    Quick Actions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-3">
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4" />
+                      Send Message
+                    </Button>
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      Schedule Lesson
+                    </Button>
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      Add Notes
+                    </Button>
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <Mail className="w-4 h-4" />
+                      Send Email
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowStudentDetailsModal(false)}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 };

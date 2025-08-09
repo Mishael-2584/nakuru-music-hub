@@ -33,6 +33,7 @@ import StudentCodeOfConduct from "./pages/StudentCodeOfConduct";
 import MediaReleasePolicy from "./pages/MediaReleasePolicy";
 import CancellationPolicy from "./pages/CancellationPolicy";
 import PasswordChangePrompt from "./components/PasswordChangePrompt";
+import ClassroomPage from "./pages/ClassroomPage";
 import FAQ from "./pages/FAQ";
 
 const queryClient = new QueryClient();
@@ -92,6 +93,7 @@ const App = () => (
             <Route path="/email-debug" element={<EmailDebug />} />
             <Route path="/student" element={<StudentDashboard />} />
             <Route path="/teacher" element={<TeacherDashboard />} />
+            <Route path="/classrooms/:id" element={<ClassroomPage />} />
             <Route path="/teacher-signup" element={<TeacherSignup />} />
             <Route path="/pending-teacher" element={<PendingTeacherPage />} />
             <Route path="/signout" element={<SignOut />} />

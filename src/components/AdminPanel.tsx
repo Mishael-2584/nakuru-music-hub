@@ -170,6 +170,56 @@ const AdminPanel = () => {
   });
   const [students, setStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
+  // Classroom approval state
+  const [pendingClassrooms, setPendingClassrooms] = useState<any[]>([]);
+  const [approvedClassrooms, setApprovedClassrooms] = useState<any[]>([]);
+
+  const fetchPendingClassrooms = async () => {
+    const { data, error } = await supabase
+      .from('classrooms')
+      .select('id, name, created_at, teacher_id, teachers(name)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    if (!error) setPendingClassrooms((data || []).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      teacher_name: c.teachers?.name || 'Teacher'
+    })));
+  };
+
+  const fetchApprovedClassrooms = async () => {
+    const { data, error } = await supabase
+      .from('classrooms')
+      .select('id, name, class_code, approved_at, teacher_id, teachers(name)')
+      .eq('status', 'approved')
+      .order('approved_at', { ascending: false });
+    if (!error) setApprovedClassrooms((data || []).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      class_code: c.class_code,
+      approved_at: c.approved_at,
+      teacher_name: c.teachers?.name || 'Teacher'
+    })));
+  };
+
+  useEffect(() => {
+    fetchPendingClassrooms();
+    fetchApprovedClassrooms();
+  }, []);
+
+  const handleApproveClassroom = async (classroomId: string) => {
+    const { data, error } = await supabase.rpc('approve_classroom', {
+      classroom_id_param: classroomId,
+      approved_by_param: user?.id || null
+    });
+    if (!error) {
+      toast({ title: 'Approved', description: 'Classroom approved and code generated.' });
+      await fetchPendingClassrooms();
+      await fetchApprovedClassrooms();
+    } else {
+      toast({ title: 'Error', description: 'Failed to approve classroom.', variant: 'destructive' });
+    }
+  };
 
   // Filter registrations based on search term
   const filteredRegistrations = useMemo(() => {
@@ -357,25 +407,23 @@ const AdminPanel = () => {
       setQuotes(quotesData || []);
     }
 
-    // Fetch admin profiles for super admin
-      if (userRole === 'super_admin') {
-        console.log("AdminPanel: Fetching admin profiles...");
-        try {
-          const { data: adminData, error: adminError } = await supabase
-            .from('profiles')
-            .select('id, email, role, created_at')
-            .in('role', ['admin', 'super_admin'])
-            .order('created_at', { ascending: false });
+      // Fetch admin profiles for messaging (both admin and super_admin)
+      console.log("AdminPanel: Fetching admin profiles for messaging...");
+      try {
+        const { data: adminData, error: adminError } = await supabase
+          .from('profiles')
+          .select('id, email, role, created_at')
+          .in('role', ['admin', 'super_admin'])
+          .order('created_at', { ascending: false });
 
-          if (adminError) {
-            console.error("Error fetching admin profiles:", adminError);
-          } else {
-            console.log("AdminPanel: Admin profiles fetched successfully:", adminData?.length || 0, "records");
-            setAdminProfiles(adminData || []);
-          }
-        } catch (error) {
-          console.error("Error fetching admin profiles:", error);
+        if (adminError) {
+          console.error("Error fetching admin profiles:", adminError);
+        } else {
+          console.log("AdminPanel: Admin profiles fetched successfully:", adminData?.length || 0, "records");
+          setAdminProfiles(adminData || []);
         }
+      } catch (error) {
+        console.error("Error fetching admin profiles:", error);
       }
 
       // Fetch students data
@@ -410,7 +458,6 @@ const AdminPanel = () => {
       const { data: portalStudentsData, error: portalStudentsError } = await supabase
         .from('students')
         .select('user_id, student_name, email')
-        .eq('status', 'active')
         .not('user_id', 'is', null)
         .order('student_name', { ascending: true });
 
@@ -425,8 +472,7 @@ const AdminPanel = () => {
       const { data: portalTeachersData, error: portalTeachersError } = await supabase
         .from('teachers')
         .select('user_id, name, email')
-        .in('status', ['active', 'approved'])
-        .not('user_id', 'is', null)
+        .not('user_id', 'is', null) // Removed status filter to include all teachers
         .order('name', { ascending: true });
 
       if (portalTeachersError) {
@@ -1783,6 +1829,8 @@ const AdminPanel = () => {
           </Tabs>
         </div>
 
+
+
         {/* Schedule Tab */}
         <div style={{ display: activeTab === 'schedule' ? 'block' : 'none' }}>
           <div className="space-y-6">
@@ -2246,29 +2294,49 @@ const AdminPanel = () => {
             <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm h-[600px]">
               <CardContent className="p-0 h-full">
                 <MessagingUI
-                  recipients={[
-                    ...students.map(student => ({
-                      id: student.id,
+                  recipients={(() => {
+                    // Students
+                    const studentRecipients = students.map(student => ({
+                      id: student.id || student.user_id,
                       user_id: student.user_id,
                       name: student.student_name,
                       email: student.email,
-                      type: 'student' as const
-                    })),
-                    ...teachers.map(teacher => ({
-                      id: teacher.id,
+                      type: 'student' as const,
+                      profile_photo_url: undefined // Students table doesn't have profile_photo_url
+                    })).filter(s => s.user_id); // Ensure user_id exists
+
+                    // Teachers
+                    const teacherRecipients = teachers.map(teacher => ({
+                      id: teacher.id || teacher.user_id,
                       user_id: teacher.user_id,
                       name: teacher.name,
                       email: teacher.email,
-                      type: 'teacher' as const
-                    })),
-                    ...adminProfiles.map(admin => ({
-                      id: admin.id,
-                      user_id: admin.id, // admin.id is the user_id from profiles table
-                      name: `Admin (${admin.email})`,
-                      email: admin.email,
-                      type: 'admin' as const
-                    }))
-                  ]}
+                      type: 'teacher' as const,
+                      profile_photo_url: undefined // Teachers table doesn't have profile_photo_url
+                    })).filter(t => t.user_id); // Ensure user_id exists
+
+                    // Admins (exclude current user)
+                    const adminRecipients = adminProfiles
+                      .filter(admin => admin.id !== user?.id) // Don't include current admin user
+                      .map(admin => ({
+                        id: admin.id,
+                        user_id: admin.id,
+                        name: `Admin (${admin.email})`,
+                        email: admin.email,
+                        type: 'admin' as const,
+                        profile_photo_url: undefined
+                      }));
+
+                    const allRecipients = [
+                      ...studentRecipients,
+                      ...teacherRecipients,
+                      ...adminRecipients
+                    ];
+
+
+
+                    return allRecipients;
+                  })()}
                   currentUserId={user?.id || ''}
                   currentUserName="Admin"
                   userType="admin"
@@ -2282,9 +2350,11 @@ const AdminPanel = () => {
         {activeTab === 'teachers' && (
           <div className="mt-8">
             <Tabs defaultValue="pending" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
+              <TabsList className="grid w-full grid-cols-4 md:w-[800px]">
                 <TabsTrigger value="pending">Pending Teachers</TabsTrigger>
                 <TabsTrigger value="approved">Approved Teachers</TabsTrigger>
+                <TabsTrigger value="classrooms">Classroom Approvals</TabsTrigger>
+                <TabsTrigger value="approved-classrooms">Current Classrooms</TabsTrigger>
               </TabsList>
               <TabsContent value="pending" className="mt-6">
                 {teacherLoading ? (
@@ -2386,6 +2456,63 @@ const AdminPanel = () => {
                     ))}
                   </div>
                 )}
+              </TabsContent>
+              <TabsContent value="classrooms" className="mt-6">
+                <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+                  <CardHeader>
+                    <CardTitle>Pending Classrooms</CardTitle>
+                    <CardDescription>Approve teacher-created classrooms to generate class codes</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {pendingClassrooms.length > 0 ? (
+                      <div className="space-y-3">
+                        {pendingClassrooms.map((c) => (
+                          <div key={c.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div>
+                              <div className="font-semibold">{c.name}</div>
+                              <div className="text-xs text-gray-500">Teacher: {c.teacher_name}</div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => handleApproveClassroom(c.id)}>Approve</Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">No classrooms pending approval.</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="approved-classrooms" className="mt-6">
+                <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+                  <CardHeader>
+                    <CardTitle>Current Classrooms</CardTitle>
+                    <CardDescription>All approved classrooms and their codes</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {approvedClassrooms.length > 0 ? (
+                      <div className="space-y-3">
+                        {approvedClassrooms.map((c) => (
+                          <div key={c.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div>
+                              <div className="font-semibold">{c.name}</div>
+                              <div className="text-xs text-gray-500">Teacher: {c.teacher_name}</div>
+                              <div className="text-xs text-gray-500">Code: {c.class_code}</div>
+                              <div className="text-xs text-gray-400">Approved: {c.approved_at ? new Date(c.approved_at).toLocaleString() : '-'}</div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(c.class_code || '')}>Copy Code</Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">No approved classrooms yet.</p>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </div>

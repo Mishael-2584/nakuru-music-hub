@@ -1,5 +1,6 @@
--- Migration: Update cancellation policy to implement new limit (restored to resolve remote mismatch)
--- Allows cancellations beyond 2 per billing period but issues no make-up credits beyond the limit
+-- Migration: Update cancellation policy to implement new limit (renumbered to avoid conflict)
+-- This migration updates the cancellation logic to allow cancellations beyond 2 per billing period
+-- but without issuing make-up credits and charging as if it were a no-show
 
 CREATE OR REPLACE FUNCTION can_student_cancel(student_id_param UUID)
 RETURNS JSON AS $$
@@ -127,7 +128,8 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- Allows cancellations beyond 2 per billing period but issues no make-up credits beyond the limit
+-- This migration updates the cancellation logic to allow cancellations beyond 2 per billing period
+-- but without issuing make-up credits and charging as if it were a no-show
 
 CREATE OR REPLACE FUNCTION can_student_cancel(student_id_param UUID)
 RETURNS JSON AS $$

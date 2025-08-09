@@ -39,6 +39,7 @@ interface Recipient {
   name: string;
   email: string;
   type: 'student' | 'teacher' | 'admin';
+  profile_photo_url?: string;
 }
 
 interface MessagingUIProps {
@@ -56,14 +57,7 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
 }) => {
   const { toast } = useToast();
   
-  // Debug logging
-  console.log('🔍 MessagingUI props:', { 
-    recipientsCount: recipients.length, 
-    recipients, 
-    currentUserId, 
-    currentUserName, 
-    userType 
-  });
+
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -80,6 +74,80 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
   const [filter, setFilter] = useState<'all' | 'unread' | 'sent'>('all');
   const [loading, setLoading] = useState(false);
   const chatScrollRef = React.useRef<HTMLDivElement>(null);
+  // Cache for resolved user names to avoid repeated queries
+  const [userCache, setUserCache] = useState<Map<string, { name: string; type: string }>>(new Map());
+
+  // Enhanced name resolution function
+  const resolveUserName = async (userId: string): Promise<{ name: string; type: string }> => {
+    // Check cache first
+    if (userCache.has(userId)) {
+      return userCache.get(userId)!;
+    }
+
+    // Check recipients array first
+    const recipient = recipients.find(r => r.user_id === userId);
+    if (recipient) {
+      const result = { name: recipient.name, type: recipient.type };
+      setUserCache(prev => new Map(prev).set(userId, result));
+      return result;
+    }
+
+    // Query database tables
+    try {
+      // Try students table
+      const { data: student } = await supabase
+        .from('students')
+        .select('user_id, student_name, email')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (student) {
+        const result = { name: student.student_name || student.email, type: 'student' };
+        setUserCache(prev => new Map(prev).set(userId, result));
+        return result;
+      }
+
+      // Try teachers table
+      const { data: teacher } = await supabase
+        .from('teachers')
+        .select('user_id, name, email')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (teacher) {
+        const result = { name: teacher.name || teacher.email, type: 'teacher' };
+        setUserCache(prev => new Map(prev).set(userId, result));
+        return result;
+      }
+
+      // Try profiles table for admins
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, email, role')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (profile) {
+        const result = { 
+          name: profile.email || `User ${userId.slice(0, 6)}`, 
+          type: profile.role === 'admin' || profile.role === 'super_admin' ? 'admin' : 'admin'
+        };
+        setUserCache(prev => new Map(prev).set(userId, result));
+        return result;
+      }
+
+      // Fallback
+      const result = { name: `User ${userId.slice(0, 6)}`, type: 'admin' };
+      setUserCache(prev => new Map(prev).set(userId, result));
+      return result;
+
+    } catch (error) {
+      console.error('Error resolving user name:', error);
+      const result = { name: `User ${userId.slice(0, 6)}`, type: 'admin' };
+      setUserCache(prev => new Map(prev).set(userId, result));
+      return result;
+    }
+  };
 
   const fetchMessages = async () => {
     try {
@@ -122,22 +190,29 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
       
       const conversationsList: Conversation[] = [];
       
-      conversationMap.forEach((messages, otherUserId) => {
-        const sortedMessages = messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      // Resolve names for all conversation participants
+      const userIds = Array.from(conversationMap.keys());
+      const resolvedUsers = await Promise.all(
+        userIds.map(async (userId) => ({
+          userId,
+          ...(await resolveUserName(userId))
+        }))
+      );
+
+      conversationMap.forEach((msgs, otherUserId) => {
+        const sortedMessages = msgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         const lastMessage = sortedMessages[sortedMessages.length - 1];
-        const unreadCount = messages.filter(msg => !msg.is_read && msg.type === 'received').length;
-        
-        const otherUser = recipients.find(r => r.user_id === otherUserId);
-        if (otherUser) {
-          conversationsList.push({
-            otherUserId,
-            otherUserName: otherUser.name,
-            otherUserType: otherUser.type,
-            messages: sortedMessages,
-            lastMessage,
-            unreadCount
-          });
-        }
+        const unreadCount = msgs.filter(msg => !msg.is_read && msg.type === 'received').length;
+
+        const resolvedUser = resolvedUsers.find(u => u.userId === otherUserId);
+        conversationsList.push({
+          otherUserId,
+          otherUserName: resolvedUser ? resolvedUser.name : `User ${otherUserId.slice(0, 6)}`,
+          otherUserType: resolvedUser ? resolvedUser.type as 'student' | 'teacher' | 'admin' : 'admin',
+          messages: sortedMessages,
+          lastMessage,
+          unreadCount
+        });
       });
       
       // Sort conversations by last message time
@@ -307,15 +382,31 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
   };
 
   const getRecipientName = (recipientId: string) => {
+    // Check cache first
+    if (userCache.has(recipientId)) {
+      return userCache.get(recipientId)!.name;
+    }
+    
+    // Check recipients array
     const recipient = recipients.find(r => r.user_id === recipientId);
-    console.log('🔍 getRecipientName:', { recipientId, recipient, allRecipients: recipients });
-    return recipient ? recipient.name : 'Unknown';
+    if (recipient) return recipient.name;
+    
+    // Fallback while name resolves
+    return `User ${recipientId.slice(0, 6)}`;
   };
 
   const getSenderName = (senderId: string) => {
+    // Check cache first
+    if (userCache.has(senderId)) {
+      return userCache.get(senderId)!.name;
+    }
+    
+    // Check recipients array
     const sender = recipients.find(r => r.user_id === senderId);
-    console.log('🔍 getSenderName:', { senderId, sender, allRecipients: recipients });
-    return sender ? sender.name : 'Unknown';
+    if (sender) return sender.name;
+    
+    // Fallback while name resolves
+    return `User ${senderId.slice(0, 6)}`;
   };
 
   const filteredConversations = conversations.filter(conversation => {
@@ -357,6 +448,8 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
     }
   }, [selectedConversation?.messages.length]);
 
+  const composeRecipients = recipients.filter(r => r.user_id !== currentUserId && r.type !== userType);
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between p-4 border-b">
@@ -391,7 +484,7 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
                     <SelectValue placeholder="Select recipient" />
                   </SelectTrigger>
                   <SelectContent>
-                    {recipients.map(recipient => (
+                    {composeRecipients.map(recipient => (
                       <SelectItem key={recipient.user_id} value={recipient.user_id}>
                         {recipient.name} ({recipient.type})
                       </SelectItem>
@@ -483,6 +576,10 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
                 <div className="flex items-start justify-between">
                   <div className="flex items-start space-x-3 flex-1">
                     <Avatar className="w-10 h-10">
+                      <AvatarImage 
+                        src={recipients.find(r => r.user_id === conversation.otherUserId)?.profile_photo_url} 
+                        alt={conversation.otherUserName}
+                      />
                       <AvatarFallback>
                         {conversation.otherUserName.charAt(0).toUpperCase()}
                       </AvatarFallback>
