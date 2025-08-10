@@ -2093,25 +2093,25 @@ const StudentDashboard = () => {
     
     try {
       // Fetch invoices with latest status from Supabase
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('period_start', { ascending: false });
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('period_start', { ascending: false });
         
-      if (error) {
-        console.error('Error fetching invoices:', error);
-        toast({ title: 'Error', description: 'Failed to fetch invoices.', variant: 'destructive' });
-        return;
-      }
+    if (error) {
+      console.error('Error fetching invoices:', error);
+      toast({ title: 'Error', description: 'Failed to fetch invoices.', variant: 'destructive' });
+      return;
+    }
       
-      if (!data || data.length === 0) {
-        console.warn('No invoices found for student:', studentId);
-        setInvoices([]);
-        return;
-      }
+    if (!data || data.length === 0) {
+      console.warn('No invoices found for student:', studentId);
+      setInvoices([]);
+      return;
+    }
       
-      setInvoices(data);
+    setInvoices(data);
       
       if (showRefreshMessage) {
         toast({
@@ -2492,10 +2492,10 @@ const StudentDashboard = () => {
                       <span>Calendar</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="materials">
+                  <SelectItem value="classroom">
                     <div className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4" />
-                      <span>Materials</span>
+                      <span>Classroom</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="practice">
@@ -3411,8 +3411,8 @@ const StudentDashboard = () => {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle>Payments & Invoices</CardTitle>
-                      <CardDescription>View your payment history and manage outstanding balances</CardDescription>
+                  <CardTitle>Payments & Invoices</CardTitle>
+                  <CardDescription>View your payment history and manage outstanding balances</CardDescription>
                     </div>
                     <Button 
                       variant="outline" 
@@ -3518,9 +3518,9 @@ const StudentDashboard = () => {
                                 {remainingAmount > 0 && !isPaid && (
                                   <div className="text-sm text-red-600 font-medium">
                                     Remaining: {formatCurrency(remainingAmount)}
-                                  </div>
+                            </div>
                                 )}
-                              </div>
+                          </div>
                               <Badge className={getStatusColor(invoice.payment_status)}>{invoice.payment_status}</Badge>
                               {isPaid || isFullyPaid ? (
                                 <div className="flex flex-col items-center gap-1">
@@ -3554,8 +3554,8 @@ const StudentDashboard = () => {
                                     View Details
                                   </Button>
                                 </div>
-                              )}
-                            </div>
+                      )}
+                    </div>
                           </div>
                         );
                       })
