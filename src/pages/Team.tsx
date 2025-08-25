@@ -676,7 +676,7 @@ const Team = () => {
     <>
       <Header />
       <main className="min-h-screen bg-gradient-to-br from-[#f8f6ff] via-[#f9f7fd] to-[#f6f8ff] py-0 px-0">
-        <div className="max-w-7xl mx-auto pt-32 pb-20 px-4 md:px-8">
+        <div className="max-w-7xl mx-auto pt-32 lg:pt-36 pb-20 px-4 md:px-8">
           {/* Header */}
           <div className="text-center mb-12">
             <div className="mb-4">

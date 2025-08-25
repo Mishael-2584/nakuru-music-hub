@@ -16,7 +16,7 @@ const Shop = () => {
     <>
       <Header />
       <main className="bg-gradient-to-br from-[#f8f6ff] via-[#f9f7fd] to-[#f6f8ff] py-0 px-0">
-        <div className="max-w-7xl mx-auto flex flex-col gap-8 pt-32 pb-20 px-2 md:px-8">
+        <div className="max-w-7xl mx-auto flex flex-col gap-8 pt-32 lg:pt-36 pb-20 px-2 md:px-8">
           {/* Header Section */}
           <div className="text-center mb-8">
             <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent mb-4">Shop</h1>

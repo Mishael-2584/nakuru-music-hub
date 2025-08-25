@@ -97,7 +97,7 @@ const EventDetail = () => {
     <div className="min-h-screen">
       <Header />
       
-      <section className="py-8">
+      <section className="pt-32 lg:pt-36 pb-8">
         <div className="container mx-auto px-4">
           <Button variant="outline" asChild className="mb-6">
             <Link to="/events">

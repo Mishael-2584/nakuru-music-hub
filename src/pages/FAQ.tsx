@@ -76,7 +76,7 @@ const faqData = [
 const FAQ = () => (
   <div className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-pink-100 relative flex flex-col">
     <Header />
-    <div className="flex-1 pt-32 pb-16 px-4 sm:px-8 lg:px-32">
+    <div className="flex-1 pt-32 lg:pt-36 pb-16 px-4 sm:px-8 lg:px-32">
       <Card className="max-w-4xl mx-auto shadow-2xl border-0 border-l-8 border-primary bg-white/90">
         <CardHeader className="text-center">
           <CardTitle className="text-4xl font-extrabold text-primary mb-2 tracking-tight drop-shadow">Frequently Asked Questions</CardTitle>

@@ -95,7 +95,7 @@ const Hero = () => {
 
   return (
     <>
-      <section className="relative min-h-screen flex items-center overflow-hidden pt-20">
+      <section className="relative min-h-screen flex items-center overflow-hidden pt-32 lg:pt-36">
         {/* Background carousel */}
         <div className="absolute inset-0">
           <div 
@@ -133,7 +133,7 @@ const Hero = () => {
         
         <button
           onClick={nextSlide}
-          className="absolute right-4 top-1/2 transform -translate-x-1/2 z-20 p-2 rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-colors"
+          className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20 p-2 rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-colors"
         >
           <ChevronRight className="h-6 w-6 text-white" />
         </button>
@@ -153,7 +153,7 @@ const Hero = () => {
         
         {/* Content */}
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-4xl">
+          <div className="max-w-4xl mx-auto">
             {currentSlideData.isMain && (
               <div className="mb-6 flex items-center gap-2">
                 <div className="flex items-center gap-1">
@@ -165,7 +165,7 @@ const Hero = () => {
               </div>
             )}
             
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
               <span className="text-white">{currentSlideData.title}</span>
               <br />
               <span className="bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
@@ -173,15 +173,15 @@ const Hero = () => {
               </span>
             </h1>
             
-            <p className="text-xl md:text-2xl text-white/90 mb-8 max-w-2xl leading-relaxed">
+            <p className="text-lg sm:text-xl md:text-2xl text-white/90 mb-6 sm:mb-8 max-w-2xl leading-relaxed">
               {currentSlideData.description}
             </p>
             
             {/* Exam Bodies Logos - Only show on exam slide and mobile only */}
             {currentSlideData.id === 5 && currentSlideData.logos && (
-              <div className="mb-8 block sm:hidden">
+              <div className="mb-6 sm:mb-8 block sm:hidden">
                 <h3 className="text-lg font-semibold text-white mb-4">Our Examination Partners:</h3>
-                <div className="flex flex-wrap justify-center gap-6 max-w-4xl">
+                <div className="flex flex-wrap justify-center gap-4 sm:gap-6 max-w-4xl">
                   {currentSlideData.logos.map((logo, index) => (
                     <div 
                       key={index} 
@@ -190,7 +190,7 @@ const Hero = () => {
                       <img 
                         src={logo.logoUrl} 
                         alt={logo.alt}
-                        className="max-h-12 w-auto object-contain opacity-85 hover:opacity-100 transition-all duration-300 drop-shadow-lg"
+                        className="max-h-10 sm:max-h-12 w-auto object-contain opacity-85 hover:opacity-100 transition-all duration-300 drop-shadow-lg"
                         onError={(e) => {
                           // Fallback to text if image fails to load
                           const target = e.target as HTMLImageElement;
@@ -213,11 +213,11 @@ const Hero = () => {
               </div>
             )}
             
-            <div className="flex flex-col sm:flex-row gap-4 mb-12">
-              <Button asChild size="lg" className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold px-8 py-4 text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+            <div className="flex flex-col sm:flex-row gap-4 mb-8 sm:mb-12">
+              <Button asChild size="lg" className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
                 <Link to="/courses">
                   Start Your Journey
-                  <ArrowRight className="ml-2 h-5 w-5" />
+                  <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
                 </Link>
               </Button>
               
@@ -225,35 +225,35 @@ const Hero = () => {
                 onClick={handleWatchDemo}
                 variant="outline" 
                 size="lg" 
-                className="border-2 border-white text-black hover:bg-white hover:text-black font-semibold px-8 py-4 text-lg rounded-full backdrop-blur-sm transition-all duration-300"
+                className="border-2 border-white text-black hover:bg-white hover:text-black font-semibold px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg rounded-full backdrop-blur-sm transition-all duration-300"
               >
-                <Play className="mr-2 h-5 w-5" />
+                <Play className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                 Watch Demo
               </Button>
             </div>
             
             {currentSlideData.isMain && (
-              <div className="grid grid-cols-3 gap-8 max-w-2xl">
+              <div className="grid grid-cols-3 gap-4 sm:gap-8 max-w-2xl">
                 <div className="text-center">
                   <div className="flex items-center justify-center mb-2">
-                    <Users className="h-8 w-8 text-primary" />
+                    <Users className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
                   </div>
-                  <div className="text-2xl font-bold text-white">500+</div>
-                  <div className="text-white/80 text-sm">Active Students</div>
+                  <div className="text-xl sm:text-2xl font-bold text-white">500+</div>
+                  <div className="text-white/80 text-xs sm:text-sm">Active Students</div>
                 </div>
                 <div className="text-center">
                   <div className="flex items-center justify-center mb-2">
-                    <Award className="h-8 w-8 text-primary" />
+                    <Award className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
                   </div>
-                  <div className="text-2xl font-bold text-white">15+</div>
-                  <div className="text-white/80 text-sm">Expert Instructors</div>
+                  <div className="text-xl sm:text-2xl font-bold text-white">15+</div>
+                  <div className="text-white/80 text-xs sm:text-sm">Expert Instructors</div>
                 </div>
                 <div className="text-center">
                   <div className="flex items-center justify-center mb-2">
-                    <Star className="h-8 w-8 text-primary" />
+                    <Star className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
                   </div>
-                  <div className="text-2xl font-bold text-white">10+</div>
-                  <div className="text-white/80 text-sm">Years of Excellence</div>
+                  <div className="text-xl sm:text-2xl font-bold text-white">4.8</div>
+                  <div className="text-white/80 text-xs sm:text-sm">Average Rating</div>
                 </div>
               </div>
             )}

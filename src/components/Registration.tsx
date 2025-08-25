@@ -586,23 +586,25 @@ const Registration = () => {
   };
 
   const renderStepIndicator = () => (
-    <div className="flex items-center justify-center mb-8">
-      {[1, 2, 3, 4].map((step) => (
-        <div key={step} className="flex items-center">
-          <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 ${
-            step <= currentStep 
-              ? 'bg-gradient-to-r from-primary to-accent border-transparent text-white' 
-              : 'border-gray-300 text-gray-400'
-          }`}>
-            {step < currentStep ? <CheckCircle className="w-5 h-5" /> : step}
+    <div className="flex items-center justify-center mb-8 px-4">
+      <div className="flex items-center max-w-full overflow-hidden">
+        {[1, 2, 3, 4].map((step) => (
+          <div key={step} className="flex items-center flex-shrink-0">
+            <div className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 transition-all duration-300 ${
+              step <= currentStep 
+                ? 'bg-gradient-to-r from-primary to-accent border-transparent text-white' 
+                : 'border-gray-300 text-gray-400'
+            }`}>
+              {step < currentStep ? <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" /> : step}
+            </div>
+            {step < 4 && (
+              <div className={`w-8 sm:w-12 md:w-16 h-1 mx-1 sm:mx-2 transition-all duration-300 ${
+                step < currentStep ? 'bg-gradient-to-r from-primary to-accent' : 'bg-gray-300'
+              }`} />
+            )}
           </div>
-          {step < 4 && (
-            <div className={`w-16 h-1 mx-2 transition-all duration-300 ${
-              step < currentStep ? 'bg-gradient-to-r from-primary to-accent' : 'bg-gray-300'
-            }`} />
-          )}
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 
@@ -616,7 +618,7 @@ const Registration = () => {
         <p className="text-gray-600">Let's start with your basic details</p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         <div className="space-y-2">
           <Label htmlFor="student_name" className="text-sm font-medium text-gray-700">Full Name *</Label>
           <Input
@@ -644,7 +646,7 @@ const Registration = () => {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         <div className="space-y-2">
           <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email Address *</Label>
           <div className="relative">
@@ -664,13 +666,13 @@ const Registration = () => {
           <Label htmlFor="phone" className="text-sm font-medium text-gray-700">Phone Number *</Label>
           <div className="flex">
             <Select value={formData.country_code} onValueChange={(value) => setFormData({...formData, country_code: value})}>
-              <SelectTrigger className="w-24 h-12 border-r-0 rounded-r-none border-gray-300">
+              <SelectTrigger className="w-20 md:w-24 h-12 border-r-0 rounded-r-none border-gray-300 text-xs md:text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {countryCodes.map((country) => (
                   <SelectItem key={country.code} value={country.code}>
-                    <span>{country.flag} {country.country} ({country.code})</span>
+                    <span className="text-xs md:text-sm">{country.flag} {country.country} ({country.code})</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -703,16 +705,123 @@ const Registration = () => {
         </div>
       </div>
 
+      {/* Mobile-optimized Date of Birth with Year Dropdown */}
       <div className="space-y-4">
         <Label htmlFor="date_of_birth" className="text-sm font-medium text-gray-700">Date of Birth <span className="text-red-500">*</span></Label>
-        <Input
-          id="date_of_birth"
-          type="date"
-          value={formData.date_of_birth}
-          onChange={e => setFormData({ ...formData, date_of_birth: e.target.value })}
-          required
-          className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
-        />
+        
+        {/* Desktop: Regular date input */}
+        <div className="hidden md:block">
+          <Input
+            id="date_of_birth"
+            type="date"
+            value={formData.date_of_birth}
+            onChange={e => setFormData({ ...formData, date_of_birth: e.target.value })}
+            required
+            className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
+          />
+        </div>
+
+        {/* Mobile: Custom date picker with year dropdown */}
+        <div className="md:hidden space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            {/* Day */}
+            <div className="space-y-1">
+              <Label className="text-xs font-medium text-gray-600">Day</Label>
+              <Select 
+                value={formData.date_of_birth ? new Date(formData.date_of_birth).getDate().toString() : ""}
+                onValueChange={(day) => {
+                  const currentDate = formData.date_of_birth ? new Date(formData.date_of_birth) : new Date();
+                  const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), parseInt(day));
+                  setFormData({ ...formData, date_of_birth: newDate.toISOString().split('T')[0] });
+                }}
+              >
+                <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
+                  <SelectValue placeholder="Day" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                    <SelectItem key={day} value={day.toString()}>
+                      {day}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Month */}
+            <div className="space-y-1">
+              <Label className="text-xs font-medium text-gray-600">Month</Label>
+              <Select 
+                value={formData.date_of_birth ? (new Date(formData.date_of_birth).getMonth() + 1).toString() : ""}
+                onValueChange={(month) => {
+                  const currentDate = formData.date_of_birth ? new Date(formData.date_of_birth) : new Date();
+                  const newDate = new Date(currentDate.getFullYear(), parseInt(month) - 1, currentDate.getDate());
+                  setFormData({ ...formData, date_of_birth: newDate.toISOString().split('T')[0] });
+                }}
+              >
+                <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
+                  <SelectValue placeholder="Month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    { value: "1", label: "January" },
+                    { value: "2", label: "February" },
+                    { value: "3", label: "March" },
+                    { value: "4", label: "April" },
+                    { value: "5", label: "May" },
+                    { value: "6", label: "June" },
+                    { value: "7", label: "July" },
+                    { value: "8", label: "August" },
+                    { value: "9", label: "September" },
+                    { value: "10", label: "October" },
+                    { value: "11", label: "November" },
+                    { value: "12", label: "December" }
+                  ].map((month) => (
+                    <SelectItem key={month.value} value={month.value}>
+                      {month.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Year */}
+            <div className="space-y-1">
+              <Label className="text-xs font-medium text-gray-600">Year</Label>
+              <Select 
+                value={formData.date_of_birth ? new Date(formData.date_of_birth).getFullYear().toString() : ""}
+                onValueChange={(year) => {
+                  const currentDate = formData.date_of_birth ? new Date(formData.date_of_birth) : new Date();
+                  const newDate = new Date(parseInt(year), currentDate.getMonth(), currentDate.getDate());
+                  setFormData({ ...formData, date_of_birth: newDate.toISOString().split('T')[0] });
+                }}
+              >
+                <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {Array.from({ length: 50 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {/* Show selected date */}
+          {formData.date_of_birth && (
+            <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded border">
+              Selected: {new Date(formData.date_of_birth).toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -720,7 +829,7 @@ const Registration = () => {
         <RadioGroup 
           value={formData.medical_condition} 
           onValueChange={(value) => setFormData({...formData, medical_condition: value, medical_details: value === "no" ? "" : formData.medical_details})}
-          className="flex gap-6"
+          className="flex flex-col sm:flex-row gap-4 sm:gap-6"
         >
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="no" id="no-medical" />
@@ -751,7 +860,7 @@ const Registration = () => {
 
       {parseInt(formData.age) < 18 && (
         <>
-          <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-6 space-y-4">
+          <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-4 md:p-6 space-y-4">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
                 <span className="text-white text-sm font-bold">!</span>
@@ -759,7 +868,7 @@ const Registration = () => {
               <h4 className="font-semibold text-orange-800 text-lg">Parent/Guardian Information Required</h4>
             </div>
             <p className="text-orange-700 text-sm">Since you are under 18, we require parent/guardian contact information.</p>
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="parent_name" className="text-sm font-medium text-gray-700">
                   Parent/Guardian Name <span className="text-red-500">*</span>
