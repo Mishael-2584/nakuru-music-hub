@@ -1384,25 +1384,25 @@ const Registration = () => {
   };
 
   return (
-    <section id="registration" className="py-24 bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5 min-h-screen">
+    <section id="registration" className="pt-32 lg:pt-36 pb-24 bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5 min-h-screen">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-16">
-          <div className="flex items-center justify-center mb-6">
-            <div className="p-4 bg-gradient-to-r from-primary to-accent rounded-full shadow-2xl">
-              <Music className="h-12 w-12 text-white" />
+        <div className="text-center mb-8 sm:mb-16">
+          <div className="flex items-center justify-center mb-4 sm:mb-6">
+            <div className="p-3 sm:p-4 bg-gradient-to-r from-primary to-accent rounded-full shadow-2xl">
+              <Music className="h-8 w-8 sm:h-12 sm:w-12 text-white" />
             </div>
           </div>
-          <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
             Start Your Creative Journey
           </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
             Join hundreds of students who have discovered their passion at Damon Music Academy
           </p>
         </div>
 
         <div className="max-w-4xl mx-auto">
           <Card className="bg-white/95 backdrop-blur-sm border-0 shadow-2xl">
-            <CardContent className="p-8">
+            <CardContent className="p-4 sm:p-6 lg:p-8">
               {!isSubmitted && renderStepIndicator()}
               
               <form onSubmit={handleSubmit}>
@@ -1458,7 +1458,7 @@ const Registration = () => {
         </div>
 
           {/* Stats Cards */}
-        <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto mt-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 max-w-4xl mx-auto mt-8 sm:mt-12 lg:mt-16">
           <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
               <CardContent className="p-6 text-center">
                 <div className="flex items-center justify-center mb-4">
