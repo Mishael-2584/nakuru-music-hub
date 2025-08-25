@@ -61,9 +61,23 @@ const MessageCenter: React.FC<MessageCenterProps> = ({
     message_type: 'general'
   });
 
+  // Search functionality for recipients
+  const [recipientSearchTerm, setRecipientSearchTerm] = useState('');
+  const [showRecipientDropdown, setShowRecipientDropdown] = useState(false);
+  const [selectedRecipient, setSelectedRecipient] = useState<User | null>(null);
+
   const inboxMessages = messages.filter(m => m.recipient_id === currentUser.id);
   const sentMessages = messages.filter(m => m.sender_id === currentUser.id);
   const unreadMessages = inboxMessages.filter(m => !m.is_read);
+
+  // Filter recipients for search
+  const filteredRecipients = users.filter(user => 
+    user.id !== currentUser.id && (
+      user.name.toLowerCase().includes(recipientSearchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(recipientSearchTerm.toLowerCase()) ||
+      user.role.toLowerCase().includes(recipientSearchTerm.toLowerCase())
+    )
+  );
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,6 +93,30 @@ const MessageCenter: React.FC<MessageCenterProps> = ({
       message_type: 'general'
     });
   };
+
+  // Close recipient dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.recipient-search-container')) {
+        setShowRecipientDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Reset recipient search when modal closes
+  useEffect(() => {
+    if (!showComposeModal) {
+      setRecipientSearchTerm('');
+      setSelectedRecipient(null);
+      setShowRecipientDropdown(false);
+    }
+  }, [showComposeModal]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -167,18 +205,44 @@ const MessageCenter: React.FC<MessageCenterProps> = ({
             <form onSubmit={handleSendMessage} className="space-y-4">
               <div>
                 <Label htmlFor="recipient">To</Label>
-                <Select value={newMessage.recipient_id} onValueChange={(value) => setNewMessage({...newMessage, recipient_id: value})}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select recipient" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.filter(user => user.id !== currentUser.id).map(user => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.name} ({user.role})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative recipient-search-container">
+                  <Input
+                    id="recipient"
+                    placeholder="Search for recipient..."
+                    value={selectedRecipient ? `${selectedRecipient.name} (${selectedRecipient.role})` : recipientSearchTerm}
+                    onChange={(e) => {
+                      setRecipientSearchTerm(e.target.value);
+                      setSelectedRecipient(null);
+                      setNewMessage({...newMessage, recipient_id: ''});
+                      setShowRecipientDropdown(true);
+                    }}
+                    onFocus={() => setShowRecipientDropdown(true)}
+                    className="w-full"
+                  />
+                  {showRecipientDropdown && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {filteredRecipients.length > 0 ? (
+                        filteredRecipients.map(user => (
+                          <div
+                            key={user.id}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                            onClick={() => {
+                              setSelectedRecipient(user);
+                              setNewMessage({...newMessage, recipient_id: user.id});
+                              setRecipientSearchTerm('');
+                              setShowRecipientDropdown(false);
+                            }}
+                          >
+                            <div className="font-medium">{user.name}</div>
+                            <div className="text-sm text-gray-500">{user.email} ({user.role})</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-4 py-2 text-gray-500">No recipients found</div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>

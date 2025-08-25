@@ -200,75 +200,123 @@ const Auth = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 lg:grid lg:grid-cols-2">
-      {/* Left side - Branding */}
-      <div className="hidden lg:flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800 text-white p-12">
-        <div className="max-w-md text-center">
-            <Link to="/" className="group">
-              <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-20 mx-auto mb-8 bg-white/10 rounded-lg p-2 transition-transform duration-300 group-hover:scale-105 cursor-pointer" />
-            </Link>
-          <h1 className="text-4xl font-bold mb-4">Music Academy Portal</h1>
-          <p className="text-gray-300 mb-8">
+    <div className="h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 lg:grid lg:grid-cols-2 overflow-hidden">
+      {/* Left side - Clean Branding */}
+      <div className="hidden lg:flex flex-col items-center justify-center bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 text-white p-8 relative">
+        {/* Subtle background elements */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 to-indigo-600/5"></div>
+        <div className="absolute top-8 left-8 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl"></div>
+        <div className="absolute bottom-8 right-8 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl"></div>
+        
+        <div className="max-w-sm text-center relative z-10">
+          {/* Clean Logo Section */}
+          <Link to="/" className="group block mb-8">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-xl blur-md group-hover:blur-lg transition-all duration-300"></div>
+              <div className="relative bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 shadow-lg transition-all duration-300 group-hover:scale-105 group-hover:shadow-blue-500/20">
+                <img 
+                  src="/damon-logo.png" 
+                  alt="Damon Music Academy Logo" 
+                  className="h-20 mx-auto transition-transform duration-300 group-hover:rotate-2" 
+                />
+              </div>
+            </div>
+          </Link>
+          
+          {/* Clean Typography */}
+          <h1 className="text-4xl font-bold mb-4 text-white">
+            Music Academy Portal
+          </h1>
+          <p className="text-lg text-slate-300 mb-8 leading-relaxed">
             Access your personalized dashboard as an Admin, Student, or Teacher.
           </p>
-          <div className="space-y-4 text-left">
-            <div className="flex items-center gap-3 bg-white/5 p-4 rounded-lg">
-              <ShieldCheck className="w-6 h-6 text-primary" />
-              <span>Secure, role-based access for all users.</span>
+          
+          {/* Clean Feature Cards */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 bg-white/5 backdrop-blur-sm p-4 rounded-lg border border-white/10 hover:bg-white/10 transition-all duration-300 group">
+              <div className="p-2 bg-blue-500/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                <ShieldCheck className="w-5 h-5 text-blue-300" />
+              </div>
+              <span className="text-sm font-medium text-slate-200">Secure, role-based access for all users.</span>
             </div>
-            <div className="flex items-center gap-3 bg-white/5 p-4 rounded-lg">
-              <Music className="w-6 h-6 text-primary" />
-              <span>All your creative content, managed in one place.</span>
+            <div className="flex items-center gap-3 bg-white/5 backdrop-blur-sm p-4 rounded-lg border border-white/10 hover:bg-white/10 transition-all duration-300 group">
+              <div className="p-2 bg-indigo-500/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                <Music className="w-5 h-5 text-indigo-300" />
+              </div>
+              <span className="text-sm font-medium text-slate-200">All your creative content, managed in one place.</span>
             </div>
           </div>
         </div>
       </div>
       
-      {/* Right side - Auth Form */}
-      <div className="flex flex-col items-center justify-center p-6 sm:p-12">
-        <div className="lg:hidden mb-8 text-center">
-            <Link to="/" className="group">
-              <img src="/damon-logo.png" alt="Damon Music Academy Logo" className="h-16 mx-auto mb-4 transition-transform duration-300 group-hover:scale-105 cursor-pointer" />
-            </Link>
-        </div>
+             {/* Right side - Clean Auth Form */}
+       <div className="flex flex-col items-center justify-center p-4 sm:p-8 bg-white/60 backdrop-blur-sm h-full overflow-y-auto">
+         {/* Mobile Logo */}
+         <div className="lg:hidden mb-6 text-center w-full">
+           <Link to="/" className="group block">
+             <div className="relative">
+               <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-lg blur-md group-hover:blur-lg transition-all duration-300"></div>
+               <div className="relative bg-white/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200 shadow-md transition-all duration-300 group-hover:scale-105">
+                 <img 
+                   src="/damon-logo.png" 
+                   alt="Damon Music Academy Logo" 
+                   className="h-20 mx-auto transition-transform duration-300 group-hover:rotate-2" 
+                 />
+               </div>
+             </div>
+           </Link>
+         </div>
         
         {/* Session Expired Alert */}
         {sessionExpired && (
-          <Alert className="mb-6 w-full max-w-xs">
-            <AlertDescription>
+          <Alert className="mb-6 w-full max-w-xs border-red-200 bg-red-50">
+            <AlertDescription className="text-red-800 text-sm">
               Your session has expired. Please sign in again to continue.
             </AlertDescription>
           </Alert>
         )}
         
+        {/* Clean Role Selection */}
         <div className="mb-6 w-full max-w-xs">
+          <h2 className="text-xl font-bold text-gray-800 mb-4 text-center">Choose Your Role</h2>
           <div className="flex justify-center gap-2 mb-4">
             {roleOptions.map((role) => {
               const Icon = role.icon;
               return (
                 <button
                   key={role.value}
-                  className={`flex flex-col items-center px-4 py-2 rounded-lg border-2 transition-all duration-200 focus:outline-none ${selectedRole === role.value ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 bg-white text-gray-700'} hover:border-primary`}
+                  className={`flex flex-col items-center px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-200 ${
+                    selectedRole === role.value 
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md' 
+                      : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:shadow-sm'
+                  }`}
                   onClick={() => setSelectedRole(role.value as "admin" | "student" | "teacher")}
                   type="button"
                 >
-                  <Icon className="h-6 w-6 mb-1" />
+                  <div className={`p-2 rounded-md mb-2 transition-all duration-200 ${
+                    selectedRole === role.value 
+                      ? 'bg-blue-500 text-white' 
+                      : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
                   <span className="text-xs font-semibold">{role.label}</span>
                 </button>
               );
             })}
           </div>
         </div>
+        
         <AuthForm onSuccess={handleAuthSuccess} role={selectedRole} />
         
         {/* Force Sign Out Button for debugging */}
         {isAuthenticated && user && (
-          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800 mb-2">
+          <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg shadow-sm max-w-xs">
+            <p className="text-xs text-yellow-800 mb-2">
               If you're stuck in a login loop, click the button below to force sign out:
             </p>
             <button
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+              className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors duration-200"
               onClick={handleForceSignOut}
             >
               Force Sign Out

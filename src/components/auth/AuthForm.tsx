@@ -46,10 +46,41 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
         }
 
         if (data.user) {
-          toast({
-            title: "Welcome Back!",
-            description: "Successfully signed in to Damon Music Academy admin panel.",
-          });
+          console.log('User signed in:', data.user.id);
+          console.log('User email:', data.user.email);
+          
+          // Fetch the user's actual role from their profile
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('role, name, id')
+            .eq('id', data.user.id)
+            .single();
+
+          console.log('Profile data:', profileData);
+          console.log('Profile error:', profileError);
+          console.log('Querying profiles table with user ID:', data.user.id);
+
+          if (profileError) {
+            console.error('Error fetching user profile:', profileError);
+            // Generic fallback if profile fetch fails
+            toast({
+              title: "Welcome Back!",
+              description: "Successfully signed in to Damon Music Academy.",
+            });
+          } else {
+            // Use the actual role from the profile
+            const actualRole = profileData?.role || 'user';
+            console.log('Actual role from profile:', actualRole);
+            console.log('Profile ID:', profileData?.id);
+            
+            const panelName = actualRole === 'admin' ? 'admin panel' : actualRole === 'student' ? 'student panel' : actualRole === 'teacher' ? 'teacher panel' : 'portal';
+            console.log('Panel name for toast:', panelName);
+            
+            toast({
+              title: "Welcome Back!",
+              description: `Successfully signed in to Damon Music Academy ${panelName}.`,
+            });
+          }
           onSuccess();
         }
       } else {
@@ -169,9 +200,9 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
   };
 
   return (
-    <div className="w-full max-w-sm">
-      <Card className="shadow-lg border-gray-200 bg-white">
-        <CardHeader className="text-center">
+    <div className="w-full max-w-xs">
+      <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm rounded-xl">
+        <CardHeader className="text-center pb-4">
           <CardTitle className="text-2xl font-bold text-gray-800">
             {isLogin
               ? role === 'admin'
@@ -186,26 +217,26 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
                 : 'Teacher Registration'}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 px-6 pb-6">
           {showForgot ? (
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="reset-email">Enter your email to reset password</Label>
-                <Input
-                  id="reset-email"
-                  type="email"
-                  value={resetEmail}
-                  onChange={e => setResetEmail(e.target.value)}
-                  required
-                  placeholder="you@example.com"
-                  className="h-11"
-                />
+                                  <Input
+                    id="reset-email"
+                    type="email"
+                    value={resetEmail}
+                    onChange={e => setResetEmail(e.target.value)}
+                    required
+                    placeholder="you@example.com"
+                    className="h-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg transition-all duration-200"
+                  />
               </div>
-              <Button type="submit" className="w-full h-11 text-base font-semibold" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isLoading ? 'Please wait...' : 'Send Reset Link'}
-              </Button>
-              <Button variant="link" type="button" onClick={() => setShowForgot(false)} className="w-full text-sm">Back to Sign In</Button>
+                              <Button type="submit" className="w-full h-10 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200" disabled={isLoading}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isLoading ? 'Please wait...' : 'Send Reset Link'}
+                </Button>
+                <Button variant="link" type="button" onClick={() => setShowForgot(false)} className="w-full text-sm text-blue-600 hover:text-blue-700">Back to Sign In</Button>
             </form>
           ) : (
             <Fragment>
@@ -219,7 +250,7 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     placeholder="you@example.com"
-                    className="h-11"
+                    className="h-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg transition-all duration-200"
                   />
                 </div>
                 
@@ -233,7 +264,7 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       placeholder="••••••••••"
-                      className="h-11 pr-10"
+                      className="h-10 pr-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg transition-all duration-200"
                     />
                     <Button
                       type="button"
@@ -258,7 +289,7 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         required
                         placeholder="••••••••••"
-                        className="h-11 pr-10"
+                        className="h-10 pr-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg transition-all duration-200"
                       />
                       <Button
                         type="button"
@@ -273,13 +304,13 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
                   </div>
                 )}
                 
-                <Button type="submit" className="w-full h-11 text-base font-semibold" disabled={isLoading}>
+                <Button type="submit" className="w-full h-10 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200" disabled={isLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {isLoading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
                 </Button>
                 {role === 'teacher' && isLogin && (
-                  <div className="text-center mt-2">
-                    <a href="/teacher-signup" className="text-primary hover:underline text-sm font-medium">
+                  <div className="text-center mt-3">
+                    <a href="/teacher-signup" className="text-blue-600 hover:text-blue-700 hover:underline text-sm font-medium transition-colors duration-200">
                       Don't have an account? Sign up as a teacher
                     </a>
                   </div>
@@ -288,14 +319,14 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
               
               {role !== 'teacher' && (
                 <div className="text-center">
-                  <Button variant="link" onClick={() => setIsLogin(!isLogin)} className="text-sm text-muted-foreground">
+                  <Button variant="link" onClick={() => setIsLogin(!isLogin)} className="text-sm text-blue-600 hover:text-blue-700 transition-colors duration-200">
                     {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
                   </Button>
                 </div>
               )}
               {isLogin && (
-                <div className="text-center mt-2">
-                  <Button variant="link" type="button" className="text-sm text-primary" onClick={() => setShowForgot(true)}>
+                <div className="text-center mt-3">
+                  <Button variant="link" type="button" className="text-sm text-blue-600 hover:text-blue-700 transition-colors duration-200" onClick={() => setShowForgot(true)}>
                     Forgot Password?
                   </Button>
                 </div>
@@ -305,7 +336,7 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
         </CardContent>
       </Card>
       {!isLogin && (
-        <p className="text-xs text-muted-foreground text-center mt-4">
+        <p className="text-xs text-gray-500 text-center mt-4 bg-gray-50 p-2 rounded-lg border border-gray-200">
           Maximum of 3 admin accounts allowed. Registration requires email confirmation.
         </p>
       )}

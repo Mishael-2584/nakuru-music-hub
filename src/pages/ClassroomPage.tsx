@@ -9,7 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Upload, Download, Trash2, ArrowLeft, Users, BookOpen } from "lucide-react";
+import { FileText, Upload, Download, Trash2, ArrowLeft, Users, BookOpen, Edit3, CheckCircle } from "lucide-react";
+import { RichTextEditor } from "@/components/RichTextEditor";
+import { SimpleRichTextEditor } from "@/components/SimpleRichTextEditor";
 
 type Classroom = {
   id: string;
@@ -26,6 +28,7 @@ type FeedPost = {
   content: string;
   created_at: string;
   author_name: string;
+  comments_count: number;
 };
 
 export default function ClassroomPage() {
@@ -52,6 +55,10 @@ export default function ClassroomPage() {
 
   const [newComment, setNewComment] = useState<Record<string, string>>({});
   const [postComments, setPostComments] = useState<Record<string, any[]>>({});
+  
+  // Edit state
+  const [editingPost, setEditingPost] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
 
   const loadComments = async (postId: string) => {
     const { data } = await supabase.rpc('get_post_comments', { post_id_param: postId });
@@ -190,7 +197,9 @@ export default function ClassroomPage() {
     if (!uploadFile || !classroomPath) return;
     try {
       setUploading(true);
-      const fileName = `${Date.now()}-${uploadFile.name}`;
+      // Keep original filename but add timestamp prefix to avoid conflicts
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const fileName = `${timestamp}_${uploadFile.name}`;
       const fullPath = `${classroomPath}/${fileName}`;
       const { error: uploadError } = await supabase.storage.from("lesson-materials").upload(fullPath, uploadFile, { upsert: true });
       if (uploadError) throw uploadError;
@@ -221,6 +230,65 @@ export default function ClassroomPage() {
       console.error(err);
       toast({ title: "Error", description: "Failed to delete file", variant: "destructive" });
     }
+  };
+
+  // Post editing functions
+  const handleEditPost = (postId: string, content: string) => {
+    setEditingPost(postId);
+    setEditContent(content);
+  };
+
+  const handleSaveEdit = async (postId: string) => {
+    if (!editContent.trim()) return;
+    try {
+      const { error } = await supabase.rpc("update_classroom_post", {
+        post_id_param: postId,
+        new_content_param: editContent.trim(),
+      });
+      if (error) throw error;
+      setEditingPost(null);
+      setEditContent("");
+      await loadFeed(classroom!.id);
+      toast({ title: "Updated", description: "Post has been updated." });
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: "Error", description: "Failed to update post", variant: "destructive" });
+    }
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    if (!confirm("Are you sure you want to delete this post?")) return;
+    try {
+      const { error } = await supabase.rpc("delete_classroom_post", {
+        post_id_param: postId,
+      });
+      if (error) throw error;
+      await loadFeed(classroom!.id);
+      toast({ title: "Deleted", description: "Post has been deleted." });
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: "Error", description: "Failed to delete post", variant: "destructive" });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingPost(null);
+    setEditContent("");
+  };
+
+  // Function to render HTML content safely
+  const renderContent = (content: string) => {
+    return content;
+  };
+
+  // Function to get original filename from stored filename
+  const getOriginalFileName = (storedName: string) => {
+    // Remove timestamp prefix if it exists
+    const timestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z_/;
+    if (timestampPattern.test(storedName)) {
+      return storedName.replace(timestampPattern, '');
+    }
+    return storedName;
   };
 
   if (loading) {
@@ -291,7 +359,7 @@ export default function ClassroomPage() {
               className="rounded-lg font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white"
             >
               <Users className="h-4 w-4 mr-2"/>
-              Feed
+              Class Feed
             </TabsTrigger>
             <TabsTrigger 
               value="materials"
@@ -308,29 +376,29 @@ export default function ClassroomPage() {
                 <CardHeader className="bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-t-lg">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Users className="h-5 w-5"/>
-                    Share an Update
+                    Create an Assignment
                   </CardTitle>
                   <CardDescription className="text-purple-100">
-                    Post announcements, assignments, or updates for your students
+                    Announce a new assignment, share a resource, or post a question for discussion.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="p-6">
-                  <Textarea 
-                    value={newPost} 
-                    onChange={(e) => setNewPost(e.target.value)} 
-                    placeholder="Share something with your classroom..."
-                    className="min-h-[100px] border-2 focus:border-purple-300"
-                  />
-                  <div className="mt-4 flex justify-end">
-                    <Button 
-                      onClick={handleCreatePost} 
-                      disabled={!newPost.trim()}
-                      className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
-                    >
-                      Post Update
-                    </Button>
-                  </div>
-                </CardContent>
+                                                   <CardContent className="p-6">
+                    <SimpleRichTextEditor
+                      content={newPost}
+                      onChange={setNewPost}
+                      placeholder="Announce a new assignment, share a resource, or post a question for discussion."
+                      className="min-h-[200px]"
+                    />
+                   <div className="mt-4 flex justify-end">
+                     <Button 
+                       onClick={handleCreatePost} 
+                       disabled={!newPost.trim()}
+                       className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+                     >
+                       Post Update
+                     </Button>
+                   </div>
+                 </CardContent>
               </Card>
             )}
 
@@ -341,16 +409,93 @@ export default function ClassroomPage() {
                     <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
                       {post.author_name.charAt(0)}
                     </div>
-                    <div>
-                      <CardTitle className="text-lg text-gray-800">{post.author_name}</CardTitle>
-                      <CardDescription className="text-gray-500">
-                        {new Date(post.created_at).toLocaleDateString()} at {new Date(post.created_at).toLocaleTimeString()}
-                      </CardDescription>
-                    </div>
+                                         <div>
+                                                <div className="flex items-center gap-2">
+                           <CardTitle className="text-lg text-gray-800">{post.author_name}</CardTitle>
+                           {classroom && classroom.teacher_name === post.author_name && (
+                             <CheckCircle className="h-5 w-5 text-blue-600" title="Verified Teacher" />
+                           )}
+                         </div>
+                       <CardDescription className="text-gray-500">
+                         {new Date(post.created_at).toLocaleDateString()} at {new Date(post.created_at).toLocaleTimeString()}
+                       </CardDescription>
+                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-6">
-                  <p className="whitespace-pre-wrap text-gray-700 leading-relaxed">{post.content}</p>
+                                 <CardContent className="p-6">
+                                       {editingPost === post.post_id ? (
+                      <div className="space-y-4">
+                        <SimpleRichTextEditor
+                          content={editContent}
+                          onChange={setEditContent}
+                          placeholder="Edit your post..."
+                          className="min-h-[200px]"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            variant="outline"
+                            onClick={handleCancelEdit}
+                          >
+                            Cancel
+                          </Button>
+                          <Button 
+                            onClick={() => handleSaveEdit(post.post_id)}
+                            disabled={!editContent.trim()}
+                            className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+                          >
+                            Save Changes
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                     <div className="space-y-4">
+                                               <div 
+                          className="prose prose-sm sm:prose lg:prose-lg xl:prose-2xl max-w-none text-gray-700 leading-relaxed"
+                          dangerouslySetInnerHTML={{ __html: renderContent(post.content) }}
+                          style={{
+                            '--tw-prose-body': '#374151',
+                            '--tw-prose-headings': '#111827',
+                            '--tw-prose-links': '#2563eb',
+                            '--tw-prose-bold': '#111827',
+                            '--tw-prose-counters': '#6b7280',
+                            '--tw-prose-bullets': '#d1d5db',
+                            '--tw-prose-hr': '#e5e7eb',
+                            '--tw-prose-quotes': '#111827',
+                            '--tw-prose-quote-borders': '#e5e7eb',
+                            '--tw-prose-captions': '#6b7280',
+                            '--tw-prose-code': '#111827',
+                            '--tw-prose-pre-code': '#e5e7eb',
+                            '--tw-prose-pre-bg': '#1f2937',
+                            '--tw-prose-th-borders': '#d1d5db',
+                            '--tw-prose-td-borders': '#e5e7eb',
+                          } as React.CSSProperties}
+                        />
+                       
+                       {/* Post actions for teachers */}
+                       {isTeacherOfClass && (
+                         <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+                           <Button
+                             variant="ghost"
+                             size="sm"
+                             onClick={() => handleEditPost(post.post_id, post.content)}
+                             className="text-gray-600 hover:text-purple-600"
+                           >
+                             <Edit3 className="h-4 w-4 mr-1" />
+                             Edit
+                           </Button>
+                           <Button
+                             variant="ghost"
+                             size="sm"
+                             onClick={() => handleDeletePost(post.post_id)}
+                             className="text-gray-600 hover:text-red-600"
+                           >
+                             <Trash2 className="h-4 w-4 mr-1" />
+                             Delete
+                           </Button>
+                         </div>
+                       )}
+                     </div>
+                   )}
 
                   {/* Comments */}
                   <div className="mt-6 space-y-3">
@@ -433,10 +578,12 @@ export default function ClassroomPage() {
                       <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
                         <FileText className="h-6 w-6 text-white"/>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-gray-800 truncate" title={f.name}>{f.name}</div>
-                        <div className="text-sm text-gray-500">{Math.round((f.metadata?.size || 0) / 1024)} KB</div>
-                      </div>
+                                             <div className="flex-1 min-w-0">
+                         <div className="font-semibold text-gray-800 truncate" title={getOriginalFileName(f.name)}>
+                           {getOriginalFileName(f.name)}
+                         </div>
+                         <div className="text-sm text-gray-500">{Math.round((f.metadata?.size || 0) / 1024)} KB</div>
+                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <a href={filePublicUrl(f.name)} target="_blank" rel="noreferrer" className="flex-1">
@@ -472,9 +619,11 @@ export default function ClassroomPage() {
               )}
             </div>
           </TabsContent>
-        </Tabs>
-      </div>
-    </div>
-  );
-}
+                 </Tabs>
+       </div>
+
+       
+     </div>
+   );
+ }
 

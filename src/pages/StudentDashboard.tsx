@@ -2111,6 +2111,18 @@ const StudentDashboard = () => {
       return;
     }
       
+    console.log('Fetched invoices data:', data);
+    console.log('Invoice count:', data.length);
+          data.forEach((inv, index) => {
+        console.log(`Invoice ${index + 1}:`, {
+          id: inv.id,
+          status: inv.status,
+          amount_due: inv.amount_due,
+          amount_paid: inv.amount_paid,
+          student_id: inv.student_id
+        });
+      });
+    
     setInvoices(data);
       
       if (showRefreshMessage) {
@@ -2128,6 +2140,23 @@ const StudentDashboard = () => {
   // Function to refresh invoice status in real-time
   const refreshInvoiceStatus = async () => {
     if (studentProfile?.id) {
+      console.log('Manual refresh triggered for student:', studentProfile.id);
+      await fetchInvoices(studentProfile.id, true);
+      
+      // Force a re-render by updating state
+      setTimeout(() => {
+        setInvoices([...invoices]);
+      }, 100);
+    }
+  };
+
+  // Function to force refresh outstanding balance
+  const forceRefreshBalance = async () => {
+    if (studentProfile?.id) {
+      console.log('Force refresh balance triggered');
+      // Clear invoices first
+      setInvoices([]);
+      // Then fetch fresh data
       await fetchInvoices(studentProfile.id, true);
     }
   };
@@ -2145,7 +2174,7 @@ const StudentDashboard = () => {
       // First, check the current live status of the invoice
       const { data: currentInvoice, error: statusError } = await supabase
         .from('invoices')
-        .select('payment_status, amount_due, amount_paid')
+        .select('status, amount_due, amount_paid')
         .eq('id', invoice.id)
         .single();
 
@@ -2160,7 +2189,7 @@ const StudentDashboard = () => {
       }
 
       // Check if invoice is already paid
-      if (currentInvoice.payment_status === 'paid') {
+      if (currentInvoice.status === 'paid') {
         toast({
           title: "Already Paid",
           description: "This invoice has already been paid. Refreshing status...",
@@ -2170,7 +2199,7 @@ const StudentDashboard = () => {
       }
 
       // Check if invoice is fully paid but status not updated
-      if (currentInvoice.amount_paid >= currentInvoice.amount_due) {
+      if (currentInvoice.status === 'paid') {
         toast({
           title: "Payment Complete",
           description: "This invoice appears to be fully paid. Refreshing status...",
@@ -2208,6 +2237,89 @@ const StudentDashboard = () => {
       });
     }
   };
+
+  // Add real-time subscription for invoice updates
+  useEffect(() => {
+    if (!studentProfile?.id) return;
+
+    console.log('Setting up invoice real-time subscription for student:', studentProfile.id);
+
+    // Subscribe to all invoice changes (more reliable)
+    const channel = supabase
+      .channel('invoice-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'invoices'
+        },
+        (payload) => {
+          console.log('Invoice update received:', payload);
+          console.log('Event type:', payload.eventType);
+          console.log('New record:', payload.new);
+          console.log('Old record:', payload.old);
+          
+          // Check if this change affects our student
+          if (payload.new && typeof payload.new === 'object' && 'student_id' in payload.new && payload.new.student_id === studentProfile.id) {
+            console.log('Change affects our student, refreshing invoices...');
+            console.log('Status changed from:', (payload.old as any)?.status, 'to:', (payload.new as any)?.status);
+            fetchInvoices(studentProfile.id);
+          } else if (payload.old && typeof payload.old === 'object' && 'student_id' in payload.old && payload.old.student_id === studentProfile.id) {
+            console.log('Change affects our student (old record), refreshing invoices...');
+            console.log('Status changed from:', (payload.old as any)?.status, 'to:', (payload.new as any)?.status);
+            fetchInvoices(studentProfile.id);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Invoice subscription status:', status);
+      });
+
+    return () => {
+      console.log('Cleaning up invoice subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [studentProfile?.id]);
+
+  // Add real-time subscription for payment updates
+  useEffect(() => {
+    if (!studentProfile?.id) return;
+
+    const channel = supabase
+      .channel('payment-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'payments',
+          filter: `student_id=eq.${studentProfile.id}`
+        },
+        (payload) => {
+          console.log('Payment update received:', payload);
+          // Refresh invoices when there's a payment change
+          fetchInvoices(studentProfile.id);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [studentProfile?.id]);
+
+  // Add periodic refresh for invoices (every 5 minutes) as backup
+  useEffect(() => {
+    if (!studentProfile?.id) return;
+
+    const interval = setInterval(() => {
+      console.log('Periodic invoice refresh...');
+      fetchInvoices(studentProfile.id);
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [studentProfile?.id]);
 
   if (loading) {
     return (
@@ -2637,17 +2749,50 @@ const StudentDashboard = () => {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-xs sm:text-sm font-medium">Outstanding Balance</CardTitle>
-                    <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => refreshInvoiceStatus()}
+                        className="h-6 w-6 p-0 hover:bg-gray-100"
+                        title="Refresh balance"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
-                                            <div className="text-xl sm:text-2xl font-bold text-red-600">
-                          {formatCurrency(
-                            invoices
-                              .filter(inv => inv.payment_status === 'pending' || inv.payment_status === 'partial')
-                              .reduce((acc, inv) => acc + (inv.amount_due - (inv.amount_paid || 0)), 0)
-                          )}
-                        </div>
-                    <p className="text-xs text-muted-foreground">Due payments</p>
+                    {(() => {
+                      const pendingInvoices = invoices.filter(inv => inv.status === 'pending' || inv.status === 'overdue');
+                      const outstandingAmount = pendingInvoices.reduce((acc, inv) => acc + inv.amount_due, 0);
+                      
+                      console.log('Outstanding balance calculation:', {
+                        totalInvoices: invoices.length,
+                        pendingInvoices: pendingInvoices.length,
+                        pendingInvoicesData: pendingInvoices.map(inv => ({
+                          id: inv.id,
+                          status: inv.status,
+                          amount_due: inv.amount_due,
+                          amount_paid: inv.amount_paid
+                        })),
+                        outstandingAmount
+                      });
+                      
+                      return (
+                        <>
+                          <div className={`text-xl sm:text-2xl font-bold ${outstandingAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            {outstandingAmount > 0 ? formatCurrency(outstandingAmount) : 'All Paid!'}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {outstandingAmount > 0 ? 'Due payments' : 'No outstanding balance'}
+                          </p>
+                          <div className="mt-2 text-xs text-gray-500">
+                            Last updated: {new Date().toLocaleTimeString()}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               </div>
@@ -3449,11 +3594,11 @@ const StudentDashboard = () => {
                       <Card>
                         <CardContent className="p-4">
                         <div className="text-2xl font-bold text-green-600">
-                          {formatCurrency(
-                            invoices
-                              .filter(inv => inv.payment_status === 'paid')
-                              .reduce((acc, inv) => acc + inv.amount_paid, 0)
-                          )}
+                                                      {formatCurrency(
+                              invoices
+                                .filter(inv => inv.status === 'paid')
+                                .reduce((acc, inv) => acc + inv.amount_due, 0)
+                            )}
                         </div>
                           <p className="text-sm text-gray-600">Total Paid</p>
                         </CardContent>
@@ -3461,11 +3606,11 @@ const StudentDashboard = () => {
                       <Card>
                         <CardContent className="p-4">
                         <div className="text-2xl font-bold text-yellow-600">
-                          {formatCurrency(
-                            invoices
-                              .filter(inv => inv.payment_status === 'pending' || inv.payment_status === 'partial')
-                              .reduce((acc, inv) => acc + (inv.amount_due - (inv.amount_paid || 0)), 0)
-                          )}
+                                                      {formatCurrency(
+                              invoices
+                                .filter(inv => inv.status === 'pending' || inv.status === 'overdue')
+                                .reduce((acc, inv) => acc + inv.amount_due, 0)
+                            )}
                         </div>
                           <p className="text-sm text-gray-600">Outstanding</p>
                         </CardContent>
@@ -3479,9 +3624,9 @@ const StudentDashboard = () => {
                     </div>
 
                     <div className="space-y-4">
-                    {(showAllInvoices ? invoices : invoices.filter(inv => inv.payment_status !== 'paid')).length > 0 ? (
-                      (showAllInvoices ? invoices : invoices.filter(inv => inv.payment_status !== 'paid')).map(invoice => {
-                        const isPaid = invoice.payment_status === 'paid';
+                    {                (showAllInvoices ? invoices : invoices.filter(inv => inv.status !== 'paid')).length > 0 ? (
+                  (showAllInvoices ? invoices : invoices.filter(inv => inv.status !== 'paid')).map(invoice => {
+                    const isPaid = invoice.status === 'paid';
                         const isFullyPaid = invoice.amount_paid >= invoice.amount_due;
                         const remainingAmount = Math.max(0, invoice.amount_due - (invoice.amount_paid || 0));
                         
@@ -3759,8 +3904,21 @@ const StudentDashboard = () => {
             <TabsContent value="invoices" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Invoices</CardTitle>
-                  <CardDescription>View your lesson invoices and download PDFs</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Invoices</CardTitle>
+                      <CardDescription>View your lesson invoices and download PDFs</CardDescription>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => refreshInvoiceStatus()}
+                      className="flex items-center gap-2"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -3778,10 +3936,17 @@ const StudentDashboard = () => {
                         </thead>
                         <tbody>
                           {invoices.map(inv => (
-                            <tr key={inv.id}>
+                            <tr key={inv.id} className="border-b">
                               <td>{inv.period_start} - {inv.period_end}</td>
                               <td className="text-right">KES {inv.amount_due.toLocaleString()}</td>
-                              <td className="text-center">{inv.status}</td>
+                              <td className="text-center">
+                                <Badge 
+                                  variant={inv.status === 'paid' ? 'default' : inv.status === 'overdue' ? 'destructive' : 'secondary'}
+                                  className="text-xs"
+                                >
+                                  {inv.status === 'paid' ? 'Paid' : inv.status === 'overdue' ? 'Overdue' : 'Pending'}
+                                </Badge>
+                              </td>
                               <td className="text-center">{inv.due_date}</td>
                               <td className="text-center">{inv.pdf_url ? <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer">Download</a> : '-'}</td>
                               <td className="text-center"><Button size="sm" variant="outline" onClick={() => handleViewInvoice(inv)}>View</Button></td>
