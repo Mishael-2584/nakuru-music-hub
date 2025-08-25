@@ -80,11 +80,10 @@ const Header = () => {
               </a>
               <a 
                 href="tel:+254713490535" 
-                className="flex items-center gap-1 hover:text-primary-200 transition-colors"
+                className="hidden sm:flex items-center gap-1 hover:text-primary-200 transition-colors"
               >
                 <Phone className="h-4 w-4" />
-                <span className="hidden sm:inline">+254 713 490 535</span>
-                <span className="sm:hidden">+254 713 490 535</span>
+                <span>+254 713 490 535</span>
               </a>
               <a 
                 href="mailto:info@damonmusicacademy.co.ke" 
@@ -98,26 +97,43 @@ const Header = () => {
             
             {/* Quick Actions */}
             <div className="flex items-center gap-3">
-              <a 
-                href="https://wa.me/254701195460" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 bg-green-600 hover:bg-green-700 px-3 py-1 rounded-full text-xs font-medium transition-colors"
-              >
-                <MessageCircle className="h-3 w-3" />
-                <span className="hidden sm:inline">WhatsApp</span>
-                <span className="sm:hidden">Chat</span>
-              </a>
-              <a 
-                href="https://maps.app.goo.gl/XGZaDXxaEbkdMLGj8" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 hover:text-primary-200 transition-colors text-xs"
-              >
-                <MapPin className="h-3 w-3" />
-                <span className="hidden sm:inline">Olive Inn, Nakuru</span>
-                <span className="sm:hidden">Location</span>
-              </a>
+              {/* Mobile Login/Enroll Buttons */}
+              <div className="flex items-center gap-2 sm:hidden">
+                <Link 
+                  to="/auth"
+                  className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-white/20 hover:bg-white/30 transition-colors text-white"
+                >
+                  Login
+                </Link>
+                <Link 
+                  to="/registration"
+                  className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-orange-500 hover:bg-orange-600 transition-colors text-white"
+                >
+                  Enroll
+                </Link>
+              </div>
+              
+              {/* Desktop Quick Actions */}
+              <div className="hidden sm:flex items-center gap-3">
+                <a 
+                  href="https://wa.me/254701195460" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 bg-green-600 hover:bg-green-700 px-3 py-1 rounded-full text-xs font-medium transition-colors"
+                >
+                  <MessageCircle className="h-3 w-3" />
+                  <span>WhatsApp</span>
+                </a>
+                <a 
+                  href="https://maps.app.goo.gl/XGZaDXxaEbkdMLGj8" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 hover:text-primary-200 transition-colors text-xs"
+                >
+                  <MapPin className="h-3 w-3" />
+                  <span>Olive Inn, Nakuru</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
