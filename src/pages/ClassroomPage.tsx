@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Upload, Download, Trash2, ArrowLeft, Users, BookOpen, Edit3, CheckCircle } from "lucide-react";
-import { RichTextEditor } from "@/components/RichTextEditor";
 import { SimpleRichTextEditor } from "@/components/SimpleRichTextEditor";
 
 type Classroom = {
