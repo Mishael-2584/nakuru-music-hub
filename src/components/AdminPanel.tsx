@@ -1296,6 +1296,39 @@ const AdminPanel = () => {
     });
   };
 
+  // Separate function to fetch students
+  const fetchStudents = async () => {
+    try {
+      const { data: activeStudentsData, error: activeStudentsError } = await supabase
+        .from('students')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (!activeStudentsError && activeStudentsData) {
+        setActiveStudents(activeStudentsData.map((s: any) => ({
+          ...s,
+          receipt_number: s.receipt_number || '',
+          phone: s.phone || '',
+          country_code: s.country_code || '',
+          parent_name: s.parent_name || '',
+          parent_phone: s.parent_phone || '',
+          course_category: s.course_category || '',
+          production_type: s.production_type || '',
+          proficiency_level: s.proficiency_level || '',
+          learning_mode: s.learning_mode || '',
+          owns_instrument: s.owns_instrument ?? false,
+          medical_condition: s.medical_condition || '',
+          medical_details: s.medical_details || '',
+          goals: s.goals || '',
+          preferred_schedule: s.preferred_schedule || '',
+          date_of_birth: s.date_of_birth || '',
+        })));
+      }
+    } catch (error) {
+      console.error("Error fetching students:", error);
+    }
+  };
+
   const deleteStudent = async (id: string) => {
     try {
       const { data, error } = await supabase
@@ -1315,8 +1348,9 @@ const AdminPanel = () => {
 
       console.log('✅ Student deleted from database successfully');
 
-      // Remove from local state
-      setActiveStudents(prev => prev.filter(s => s.id !== id));
+      // Refetch students data to ensure UI is in sync
+      await fetchStudents();
+      
       toast({
         title: "Student Deleted",
         description: `Student has been deleted successfully.`,
