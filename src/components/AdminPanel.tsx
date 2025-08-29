@@ -173,6 +173,10 @@ const AdminPanel = () => {
   // Classroom approval state
   const [pendingClassrooms, setPendingClassrooms] = useState<any[]>([]);
   const [approvedClassrooms, setApprovedClassrooms] = useState<any[]>([]);
+  const [showDeleteClassroomModal, setShowDeleteClassroomModal] = useState(false);
+  const [classroomToDelete, setClassroomToDelete] = useState<any>(null);
+  const [deleteClassroomPassword, setDeleteClassroomPassword] = useState('');
+  const [deleteClassroomError, setDeleteClassroomError] = useState('');
 
   const fetchPendingClassrooms = async () => {
     const { data, error } = await supabase
@@ -218,6 +222,81 @@ const AdminPanel = () => {
       await fetchApprovedClassrooms();
     } else {
       toast({ title: 'Error', description: 'Failed to approve classroom.', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteClassroom = async (classroomId: string) => {
+    try {
+      // First, delete all related records
+      // Delete classroom posts
+      const { error: postsError } = await supabase
+        .from('classroom_posts')
+        .delete()
+        .eq('classroom_id', classroomId);
+      
+      if (postsError) {
+        console.error('Error deleting classroom posts:', postsError);
+      }
+
+      // Delete classroom comments
+      const { error: commentsError } = await supabase
+        .from('classroom_comments')
+        .delete()
+        .eq('classroom_id', classroomId);
+      
+      if (commentsError) {
+        console.error('Error deleting classroom comments:', commentsError);
+      }
+
+      // Delete classroom enrollments
+      const { error: enrollmentsError } = await supabase
+        .from('classroom_enrollments')
+        .delete()
+        .eq('classroom_id', classroomId);
+      
+      if (enrollmentsError) {
+        console.error('Error deleting classroom enrollments:', enrollmentsError);
+      }
+
+      // Finally, delete the classroom
+      const { error: classroomError } = await supabase
+        .from('classrooms')
+        .delete()
+        .eq('id', classroomId);
+
+      if (classroomError) {
+        console.error('Error deleting classroom:', classroomError);
+        toast({
+          title: 'Error',
+          description: 'Failed to delete classroom',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      console.log('✅ Classroom deleted successfully');
+      
+      // Refresh the lists
+      await fetchPendingClassrooms();
+      await fetchApprovedClassrooms();
+      
+      toast({
+        title: 'Classroom Deleted',
+        description: 'Classroom and all related data have been deleted successfully.',
+      });
+      
+      // Close modal and reset state
+      setShowDeleteClassroomModal(false);
+      setClassroomToDelete(null);
+      setDeleteClassroomPassword('');
+      setDeleteClassroomError('');
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      toast({
+        title: 'Error',
+        description: 'An unexpected error occurred while deleting the classroom',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -2384,11 +2463,11 @@ const AdminPanel = () => {
         {activeTab === 'teachers' && (
           <div className="mt-8">
             <Tabs defaultValue="pending" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 md:w-[800px]">
-                <TabsTrigger value="pending">Pending Teachers</TabsTrigger>
-                <TabsTrigger value="approved">Approved Teachers</TabsTrigger>
-                <TabsTrigger value="classrooms">Classroom Approvals</TabsTrigger>
-                <TabsTrigger value="approved-classrooms">Current Classrooms</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 gap-2">
+                <TabsTrigger value="pending" className="text-xs sm:text-sm px-2 sm:px-3">Pending Teachers</TabsTrigger>
+                <TabsTrigger value="approved" className="text-xs sm:text-sm px-2 sm:px-3">Approved Teachers</TabsTrigger>
+                <TabsTrigger value="classrooms" className="text-xs sm:text-sm px-2 sm:px-3">Classroom Approvals</TabsTrigger>
+                <TabsTrigger value="approved-classrooms" className="text-xs sm:text-sm px-2 sm:px-3">Current Classrooms</TabsTrigger>
               </TabsList>
               <TabsContent value="pending" className="mt-6">
                 {teacherLoading ? (
@@ -2538,6 +2617,16 @@ const AdminPanel = () => {
                             </div>
                             <div className="flex gap-2">
                               <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(c.class_code || '')}>Copy Code</Button>
+                              <Button 
+                                size="sm" 
+                                variant="destructive" 
+                                onClick={() => {
+                                  setClassroomToDelete(c);
+                                  setShowDeleteClassroomModal(true);
+                                }}
+                              >
+                                Delete
+                              </Button>
                             </div>
                           </div>
                         ))}
@@ -3185,6 +3274,56 @@ const AdminPanel = () => {
                 </div>
               )}
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Classroom Modal */}
+        <Dialog open={showDeleteClassroomModal} onOpenChange={setShowDeleteClassroomModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Classroom</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete the classroom "{classroomToDelete?.name}"? This action cannot be undone and will remove:
+                <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                  <li>All classroom posts and comments</li>
+                  <li>All student enrollments</li>
+                  <li>The classroom itself</li>
+                </ul>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="delete-classroom-password">Admin Password</Label>
+                <Input
+                  id="delete-classroom-password"
+                  type="password"
+                  value={deleteClassroomPassword}
+                  onChange={(e) => setDeleteClassroomPassword(e.target.value)}
+                  placeholder="Enter your admin password"
+                  className="mt-1"
+                />
+              </div>
+              {deleteClassroomError && <p className="text-red-500 text-sm">{deleteClassroomError}</p>}
+            </div>
+            <DialogFooter>
+              <Button variant="destructive" onClick={async () => {
+                setDeleteClassroomError('');
+                // Verify admin password
+                const isValid = await verifyAdminPassword(deleteClassroomPassword);
+                if (!isValid) {
+                  setDeleteClassroomError('Incorrect password.');
+                  return;
+                }
+                // Proceed to delete classroom
+                await handleDeleteClassroom(classroomToDelete.id);
+              }}>Delete Classroom</Button>
+              <Button variant="outline" onClick={() => {
+                setShowDeleteClassroomModal(false);
+                setClassroomToDelete(null);
+                setDeleteClassroomPassword('');
+                setDeleteClassroomError('');
+              }}>Cancel</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
