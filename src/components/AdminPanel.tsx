@@ -2278,11 +2278,15 @@ const AdminPanel = () => {
                                     <Select
                                       value={String(registration.sessions_per_week || 1)}
                                       onValueChange={async (value) => {
-                                        // Update in Supabase and local state
+                                        // Update in both registrations and students tables
                                         const newVal = parseInt(value);
                                         await supabase.from('registrations').update({ sessions_per_week: newVal }).eq('id', registration.id);
+                                        await supabase.from('students').update({ sessions_per_week: newVal }).eq('registration_id', registration.id);
+                                        
+                                        // Update local state for both tables
                                         setRegistrations((prev) => prev.map((r) => r.id === registration.id ? { ...r, sessions_per_week: newVal } : r));
-                                        // Optionally show a toast
+                                        setActiveStudents((prev) => prev.map((s) => s.registration_id === registration.id ? { ...s, sessions_per_week: newVal } : s));
+                                        
                                         toast({ title: 'Updated', description: 'Classes per week updated.' });
                                       }}
                                     >
@@ -2293,6 +2297,32 @@ const AdminPanel = () => {
                                         {[1,2,3,4,5].map(num => (
                                           <SelectItem key={num} value={String(num)}>{num}</SelectItem>
                                         ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-gray-600">Learning Mode:</span>
+                                    <Select
+                                      value={registration.learning_mode || 'in-person'}
+                                      onValueChange={async (value) => {
+                                        // Update in both registrations and students tables
+                                        await supabase.from('registrations').update({ learning_mode: value }).eq('id', registration.id);
+                                        await supabase.from('students').update({ learning_mode: value }).eq('registration_id', registration.id);
+                                        
+                                        // Update local state for both tables
+                                        setRegistrations((prev) => prev.map((r) => r.id === registration.id ? { ...r, learning_mode: value } : r));
+                                        setActiveStudents((prev) => prev.map((s) => s.registration_id === registration.id ? { ...s, learning_mode: value } : s));
+                                        
+                                        toast({ title: 'Updated', description: 'Learning mode updated.' });
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-8 w-32 border-gray-300">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="in-person">In-Person</SelectItem>
+                                        <SelectItem value="online">Online</SelectItem>
+                                        <SelectItem value="hybrid">Hybrid</SelectItem>
                                       </SelectContent>
                                     </Select>
                                   </div>
