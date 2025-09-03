@@ -102,6 +102,14 @@ export default function ClassroomPage() {
   const [editingPost, setEditingPost] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
+  
+  // Submission confirmation state
+  const [showSubmissionConfirm, setShowSubmissionConfirm] = useState<string | null>(null);
+  const [pendingSubmission, setPendingSubmission] = useState<{
+    postId: string;
+    text: string;
+    files: PostAttachment[];
+  } | null>(null);
 
   const loadComments = async (postId: string) => {
     const { data } = await supabase.rpc('get_post_comments', { post_id_param: postId });
@@ -591,11 +599,21 @@ export default function ClassroomPage() {
     }
   };
 
-  const handleSubmitAssignment = async (postId: string, submissionText: string, attachments: PostAttachment[] = []) => {
-    if (!user || !classroom || (!submissionText.trim() && attachments.length === 0)) return;
+  const handleConfirmSubmission = async () => {
+    if (!pendingSubmission) return;
+    
+    const { postId, text, files } = pendingSubmission;
+    await handleSubmitAssignment(postId, text, files);
+    
+    // Close confirmation dialog
+    setShowSubmissionConfirm(null);
+    setPendingSubmission(null);
+  };
+
+  const handleSubmitAssignment = async (postId: string, submissionText: string, files: PostAttachment[]) => {
+    if (!user) return;
     
     try {
-      // Get student ID
       const { data: student } = await supabase
         .from('students')
         .select('id')
@@ -648,7 +666,7 @@ export default function ClassroomPage() {
       if (error) throw error;
       
       // Handle file attachments if any
-      if (attachments.length > 0 && submissionData) {
+      if (files.length > 0 && submissionData) {
         if (existingSubmission) {
           // Delete existing files first
           await supabase
@@ -658,7 +676,7 @@ export default function ClassroomPage() {
         }
         
         // Insert new files
-        const fileInserts = attachments.map(attachment => ({
+        const fileInserts = files.map(attachment => ({
           submission_id: submissionData.id,
           file_name: attachment.file_name || attachment.name,
           file_url: attachment.file_url || attachment.url,
@@ -1234,7 +1252,12 @@ export default function ClassroomPage() {
                                                 </Button>
                                                 <Button
                                                   size="sm"
-                                                  onClick={() => handleSubmitAssignment(post.post_id, newComment[post.post_id] || '', submissionFiles[post.post_id] || [])}
+                                                  onClick={() => {
+                                                    const text = newComment[post.post_id] || '';
+                                                    const files = submissionFiles[post.post_id] || [];
+                                                    setPendingSubmission({ postId: post.post_id, text, files });
+                                                    setShowSubmissionConfirm(post.post_id);
+                                                  }}
                                                   disabled={(!newComment[post.post_id]?.trim()) && (!submissionFiles[post.post_id] || submissionFiles[post.post_id].length === 0)}
                                                   className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg"
                                                 >
@@ -1462,6 +1485,38 @@ export default function ClassroomPage() {
                  </Tabs>
        </div>
 
+       {/* Submission Confirmation Dialog */}
+       {showSubmissionConfirm && (
+         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+             <div className="text-center mb-6">
+               <h3 className="text-xl font-semibold text-gray-900 mb-3">Are you sure you want to submit?</h3>
+               <p className="text-gray-600">
+                 Once submitted, you will not be able to edit your work. This action cannot be undone.
+               </p>
+             </div>
+             
+             <div className="flex gap-3 justify-center">
+               <Button
+                 variant="outline"
+                 onClick={() => {
+                   setShowSubmissionConfirm(null);
+                   setPendingSubmission(null);
+                 }}
+                 className="border-gray-300 text-gray-600 hover:bg-gray-50 px-6"
+               >
+                 Cancel
+               </Button>
+               <Button
+                 onClick={handleConfirmSubmission}
+                 className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white px-6"
+               >
+                 Yes, Submit
+               </Button>
+             </div>
+           </div>
+         </div>
+       )}
        
      </div>
    );
