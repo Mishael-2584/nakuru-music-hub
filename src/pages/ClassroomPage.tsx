@@ -21,6 +21,7 @@ type Classroom = {
   status: string;
   teacher_id: string;
   teacher_name?: string;
+  currentStudent?: { id: string; user_id: string };
 };
 
 type FeedPost = {
@@ -158,7 +159,7 @@ export default function ClassroomPage() {
         };
         setClassroom(loaded);
 
-        // Determine role in this class
+        // Determine role in this class and get current student info
         if (user?.id) {
           // Teacher?
           const { data: t } = await supabase
@@ -171,7 +172,7 @@ export default function ClassroomPage() {
           // Student?
           const { data: s } = await supabase
             .from("students")
-            .select("id")
+            .select("id, user_id")
             .eq("user_id", user.id)
             .single();
           if (s?.id) {
@@ -182,6 +183,9 @@ export default function ClassroomPage() {
               .eq("student_id", s.id)
               .maybeSingle();
             if (enr) setIsEnrolledStudent(true);
+            
+            // Store current student info in classroom object
+            setClassroom(prev => prev ? { ...prev, currentStudent: s } : null);
           }
         }
 
@@ -441,18 +445,68 @@ export default function ClassroomPage() {
         .from('assignment_submissions')
         .select(`
           *,
-          students(student_name),
-          teachers(name)
+          students(student_name, user_id),
+          teachers(name),
+          assignment_submission_files(*)
         `)
         .eq('post_id', postId);
       
       if (error) throw error;
       
-      // Transform data to include author names
+      // Get user emails for student identification
+      const userIds = [...new Set((data || []).map(sub => sub.students?.user_id).filter(Boolean))];
+      let userEmails: { [key: string]: string } = {};
+      
+      console.log('Fetching emails for user IDs:', userIds);
+      
+      if (userIds.length > 0) {
+        try {
+          const { data: profiles, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, email')
+            .in('id', userIds);
+          
+          console.log('Profiles query result:', { profiles, profileError });
+          
+          if (profileError) {
+            console.error('Profile fetch error:', profileError);
+          }
+          
+          if (profiles && profiles.length > 0) {
+            userEmails = profiles.reduce((acc, profile) => {
+              console.log('Processing profile:', profile);
+              if (profile.email) {
+                acc[profile.id] = profile.email;
+              } else {
+                acc[profile.id] = 'No email found';
+              }
+              return acc;
+            }, {} as { [key: string]: string });
+          } else {
+            console.warn('No profiles found for user IDs:', userIds);
+            // Set default for all user IDs
+            userIds.forEach(id => {
+              userEmails[id] = 'Email not available';
+            });
+          }
+        } catch (emailError) {
+          console.error('Failed to fetch user emails:', emailError);
+          // Set default for all user IDs
+          userIds.forEach(id => {
+            userEmails[id] = 'Email fetch failed';
+          });
+        }
+      }
+      
+      console.log('Final userEmails mapping:', userEmails);
+
+      // Transform data to include author names, emails and files
       const transformedSubmissions = (data || []).map(sub => ({
         ...sub,
         author_name: sub.students?.student_name || 'Unknown Student',
-        graded_by_name: sub.teachers?.name || 'Unknown Teacher'
+        author_email: userEmails[sub.students?.user_id] || 'No email',
+        graded_by_name: sub.teachers?.name || 'Unknown Teacher',
+        files: sub.assignment_submission_files || []
       }));
       
       setSubmissions(prev => ({ ...prev, [postId]: transformedSubmissions }));
@@ -463,30 +517,56 @@ export default function ClassroomPage() {
   };
 
   const handleGradeSubmission = async (submissionId: string, points: number, feedback: string) => {
-    if (!user) return;
+    if (!user) {
+      console.error('No user found');
+      return;
+    }
+    
+    console.log('Grading submission:', { submissionId, points, feedback });
     
     try {
       // Get teacher ID
-      const { data: teacher } = await supabase
+      const { data: teacher, error: teacherError } = await supabase
         .from('teachers')
         .select('id')
         .eq('user_id', user.id)
         .single();
       
-      if (!teacher) throw new Error('Teacher not found');
+      console.log('Teacher lookup result:', { teacher, teacherError });
+      
+      if (teacherError) {
+        console.error('Teacher lookup error:', teacherError);
+        throw new Error(`Teacher lookup failed: ${teacherError.message}`);
+      }
+      
+      if (!teacher) {
+        console.error('No teacher found for user:', user.id);
+        throw new Error('Teacher not found');
+      }
       
       // Update submission with grade
-      const { error } = await supabase
-        .from('assignment_submissions')
-        .update({
-          grade_points: points,
-          grade_feedback: feedback,
-          graded_by: teacher.id,
-          graded_at: new Date().toISOString()
-        })
-        .eq('id', submissionId);
+      const updateData = {
+        grade_points: points,
+        grade_feedback: feedback || null,
+        graded_by: teacher.id,
+        graded_at: new Date().toISOString()
+      };
       
-      if (error) throw error;
+      console.log('Updating submission with data:', updateData);
+      
+      const { data: updatedSubmission, error: updateError } = await supabase
+        .from('assignment_submissions')
+        .update(updateData)
+        .eq('id', submissionId)
+        .select()
+        .single();
+      
+      console.log('Update result:', { updatedSubmission, updateError });
+      
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw new Error(`Failed to update submission: ${updateError.message}`);
+      }
       
       toast({ title: 'Success', description: 'Submission graded successfully' });
       
@@ -494,17 +574,24 @@ export default function ClassroomPage() {
       const postId = Object.keys(submissions).find(key => 
         submissions[key].some(s => s.id === submissionId)
       );
+      
+      console.log('Refreshing submissions for post:', postId);
+      
       if (postId) {
         await loadSubmissions(postId);
       }
     } catch (err) {
       console.error('Failed to grade submission:', err);
-      toast({ title: 'Error', description: 'Failed to grade submission', variant: 'destructive' });
+      toast({ 
+        title: 'Error', 
+        description: `Failed to grade submission: ${err instanceof Error ? err.message : 'Unknown error'}`, 
+        variant: 'destructive' 
+      });
     }
   };
 
   const handleSubmitAssignment = async (postId: string, submissionText: string, attachments: PostAttachment[] = []) => {
-    if (!user || !classroom || !submissionText.trim()) return;
+    if (!user || !classroom || (!submissionText.trim() && attachments.length === 0)) return;
     
     try {
       // Get student ID
@@ -516,7 +603,7 @@ export default function ClassroomPage() {
       
       if (!student) throw new Error('Student not found');
       
-      // Check if already submitted
+      // Check if submission already exists and handle accordingly
       const { data: existingSubmission } = await supabase
         .from('assignment_submissions')
         .select('id')
@@ -524,24 +611,69 @@ export default function ClassroomPage() {
         .eq('student_id', student.id)
         .maybeSingle();
       
-      if (existingSubmission) {
-        toast({ title: 'Already Submitted', description: 'You have already submitted this assignment', variant: 'destructive' });
-        return;
-      }
+      let submissionData;
+      let error;
       
-      // Create submission
-      const { error } = await supabase
-        .from('assignment_submissions')
-        .insert({
-          post_id: postId,
-          student_id: student.id,
-          submission_text: submissionText.trim()
-        });
+      if (existingSubmission) {
+        // Update existing submission
+        const { data, error: updateError } = await supabase
+          .from('assignment_submissions')
+          .update({
+            submission_text: submissionText.trim() || '',
+            submitted_at: new Date().toISOString()
+          })
+          .eq('id', existingSubmission.id)
+          .select()
+          .single();
+        
+        submissionData = data;
+        error = updateError;
+      } else {
+        // Create new submission
+        const { data, error: insertError } = await supabase
+          .from('assignment_submissions')
+          .insert({
+            post_id: postId,
+            student_id: student.id,
+            submission_text: submissionText.trim() || ''
+          })
+          .select()
+          .single();
+        
+        submissionData = data;
+        error = insertError;
+      }
       
       if (error) throw error;
       
-      // Clear the submission text
+      // Handle file attachments if any
+      if (attachments.length > 0 && submissionData) {
+        if (existingSubmission) {
+          // Delete existing files first
+          await supabase
+            .from('assignment_submission_files')
+            .delete()
+            .eq('submission_id', submissionData.id);
+        }
+        
+        // Insert new files
+        const fileInserts = attachments.map(attachment => ({
+          submission_id: submissionData.id,
+          file_name: attachment.file_name || attachment.name,
+          file_url: attachment.file_url || attachment.url,
+          file_size: attachment.file_size || attachment.size
+        }));
+        
+        const { error: fileError } = await supabase
+          .from('assignment_submission_files')
+          .insert(fileInserts);
+        
+        if (fileError) throw fileError;
+      }
+      
+      // Clear the submission text and files
       setNewComment(prev => ({ ...prev, [postId]: '' }));
+      setSubmissionFiles(prev => ({ ...prev, [postId]: [] }));
       
       toast({ title: 'Success', description: 'Assignment submitted successfully' });
       
@@ -725,18 +857,6 @@ export default function ClassroomPage() {
                         </div>
                       </button>
                       
-                      <button
-                        type="button"
-                        onClick={() => setIsAssignment(false)}
-                        className="p-3 rounded-lg border-2 border-gray-200 bg-white text-gray-400 cursor-not-allowed opacity-50"
-                        disabled
-                      >
-                        <div className="flex flex-col items-center gap-2">
-                          <FileText className="h-5 w-5" />
-                          <span className="font-medium">Resource</span>
-                          <span className="text-xs text-center">Coming soon</span>
-                        </div>
-                      </button>
                     </div>
                     
                     {/* Assignment Details Form */}
@@ -965,8 +1085,8 @@ export default function ClassroomPage() {
                             <div className="border-t border-gray-100 pt-4">
                               {(() => {
                                 const isOverdue = post.due_date && new Date(post.due_date) < new Date();
-                                const hasSubmitted = submissions[post.post_id]?.some(s => s.student_id === user?.id);
-                                const userSubmission = submissions[post.post_id]?.find(s => s.student_id === user?.id);
+                                const hasSubmitted = submissions[post.post_id]?.some(s => s.student_id === classroom?.currentStudent?.id);
+                                const userSubmission = submissions[post.post_id]?.find(s => s.student_id === classroom?.currentStudent?.id);
                                 const isGraded = userSubmission?.grade_points !== undefined;
                                 
                                 return (
@@ -976,7 +1096,7 @@ export default function ClassroomPage() {
                                       <div className="flex gap-2">
                                         {hasSubmitted ? (
                                           <Badge className={isGraded ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
-                                            {isGraded ? `Graded: ${userSubmission.grade_points}/${post.max_points}` : 'Submitted - Pending Grade'}
+                                            {isGraded ? `Graded: ${userSubmission.grade_points}/${post.max_points}` : 'Submitted - Awaiting Grade'}
                                           </Badge>
                                         ) : (
                                           <Badge variant="outline" className="text-gray-600">
@@ -1000,6 +1120,31 @@ export default function ClassroomPage() {
                                           </span>
                                         </div>
                                         <div className="text-gray-700 mb-3">{userSubmission.submission_text}</div>
+                                        
+                                        {/* Show submitted files */}
+                                        {userSubmission.files && userSubmission.files.length > 0 && (
+                                          <div className="mt-3">
+                                            <span className="text-sm font-medium text-gray-600">Attached Files:</span>
+                                            <div className="mt-2 space-y-2">
+                                              {userSubmission.files.map((file: any, index: number) => (
+                                                <div key={index} className="flex items-center gap-2 p-2 bg-white rounded border">
+                                                  <FileText className="h-4 w-4 text-gray-500" />
+                                                  <a 
+                                                    href={file.file_url} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-600 hover:text-blue-800 text-sm"
+                                                  >
+                                                    {file.file_name}
+                                                  </a>
+                                                  <span className="text-xs text-gray-400">
+                                                    ({Math.round(file.file_size / 1024)} KB)
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
                                         {isGraded && userSubmission.grade_feedback && (
                                           <div className="border-t pt-3">
                                             <span className="text-sm font-medium text-gray-600">Teacher Feedback:</span>
@@ -1076,7 +1221,7 @@ export default function ClassroomPage() {
                                                 <Button
                                                   size="sm"
                                                   onClick={() => handleSubmitAssignment(post.post_id, newComment[post.post_id] || '', submissionFiles[post.post_id] || [])}
-                                                  disabled={!newComment[post.post_id]?.trim() && (!submissionFiles[post.post_id] || submissionFiles[post.post_id].length === 0)}
+                                                  disabled={(!newComment[post.post_id]?.trim()) && (!submissionFiles[post.post_id] || submissionFiles[post.post_id].length === 0)}
                                                   className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg"
                                                 >
                                                   <CheckCircle className="h-4 w-4 mr-2" />
@@ -1123,22 +1268,54 @@ export default function ClassroomPage() {
                                     <div key={submission.id} className="p-3 bg-gray-50 rounded-lg border">
                                       <div className="flex items-start justify-between mb-2">
                                         <div>
-                                          <span className="font-medium text-gray-800">Student Submission</span>
-                                          <span className="text-xs text-gray-500 ml-2">
-                                            {new Date(submission.submitted_at).toLocaleString()}
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <span className="font-medium text-gray-800">{submission.author_name}</span>
+                                            <span className="text-sm text-gray-600">({submission.author_email})</span>
+                                          </div>
+                                          <span className="text-xs text-gray-500">
+                                            Submitted: {new Date(submission.submitted_at).toLocaleString()}
                                           </span>
                                         </div>
-                                        {submission.grade_points !== undefined && (
+                                        {submission.grade_points !== undefined && submission.grade_points !== null ? (
                                           <Badge className="bg-green-100 text-green-800">
                                             {submission.grade_points}/{post.max_points} points
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="outline" className="text-gray-600">
+                                            Ungraded
                                           </Badge>
                                         )}
                                       </div>
                                       
                                       <div className="text-gray-700 mb-3">{submission.submission_text}</div>
                                       
+                                      {/* Show submitted files for teachers */}
+                                      {submission.files && submission.files.length > 0 && (
+                                        <div className="mt-3 mb-3">
+                                          <span className="text-sm font-medium text-gray-600">Attached Files:</span>
+                                          <div className="mt-2 space-y-2">
+                                            {submission.files.map((file: any, index: number) => (
+                                              <div key={index} className="flex items-center gap-2 p-2 bg-white rounded border">
+                                                <FileText className="h-4 w-4 text-gray-500" />
+                                                <a 
+                                                  href={file.file_url} 
+                                                  target="_blank" 
+                                                  rel="noopener noreferrer"
+                                                  className="text-blue-600 hover:text-blue-800 text-sm"
+                                                >
+                                                  {file.file_name}
+                                                </a>
+                                                <span className="text-xs text-gray-400">
+                                                  ({Math.round(file.file_size / 1024)} KB)
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      
                                       {/* Grading Form */}
-                                      {submission.grade_points === undefined ? (
+                                      {(submission.grade_points === undefined || submission.grade_points === null) ? (
                                         <div className="space-y-2">
                                           <div className="grid grid-cols-2 gap-2">
                                             <div>
@@ -1150,12 +1327,8 @@ export default function ClassroomPage() {
                                                 placeholder="0"
                                                 className="text-sm h-8"
                                                 onChange={(e) => {
-                                                  const newSubmissions = [...(submissions[post.post_id] || [])];
-                                                  const index = newSubmissions.findIndex(s => s.id === submission.id);
-                                                  if (index !== -1) {
-                                                    newSubmissions[index] = { ...newSubmissions[index], grade_points: parseInt(e.target.value) || 0 };
-                                                    setSubmissions(prev => ({ ...prev, [post.post_id]: newSubmissions }));
-                                                  }
+                                                  const input = e.target;
+                                                  input.dataset.points = e.target.value;
                                                 }}
                                               />
                                             </div>
@@ -1165,20 +1338,25 @@ export default function ClassroomPage() {
                                                 placeholder="Optional feedback"
                                                 className="text-sm h-8"
                                                 onChange={(e) => {
-                                                  const newSubmissions = [...(submissions[post.post_id] || [])];
-                                                  const index = newSubmissions.findIndex(s => s.id === submission.id);
-                                                  if (index !== -1) {
-                                                    newSubmissions[index] = { ...newSubmissions[index], grade_feedback: e.target.value };
-                                                    setSubmissions(prev => ({ ...prev, [post.post_id]: newSubmissions }));
-                                                  }
+                                                  const input = e.target;
+                                                  input.dataset.feedback = e.target.value;
                                                 }}
                                               />
                                             </div>
                                           </div>
                                           <Button
                                             size="sm"
-                                            onClick={() => handleGradeSubmission(submission.id, submission.grade_points || 0, submission.grade_feedback || '')}
-                                            disabled={submission.grade_points === undefined}
+                                            onClick={(e) => {
+                                              const container = e.currentTarget.parentElement;
+                                              const pointsInput = container?.querySelector('input[type="number"]') as HTMLInputElement;
+                                              const feedbackInput = container?.querySelector('input[placeholder*="feedback"]') as HTMLInputElement;
+                                              
+                                              const points = parseInt(pointsInput?.value || '0') || 0;
+                                              const feedback = feedbackInput?.value || '';
+                                              
+                                              console.log('Grade button clicked for submission:', submission.id, 'Points:', points, 'Feedback:', feedback);
+                                              handleGradeSubmission(submission.id, points, feedback);
+                                            }}
                                             className="bg-green-600 hover:bg-green-700 text-white"
                                           >
                                             Grade Submission
@@ -1186,7 +1364,7 @@ export default function ClassroomPage() {
                                         </div>
                                       ) : (
                                         <div className="text-sm text-gray-600">
-                                          <div>Graded by: {submission.graded_by}</div>
+                                          <div>Graded by: {submission.graded_by_name}</div>
                                           <div>Graded on: {new Date(submission.graded_at || '').toLocaleString()}</div>
                                           {submission.grade_feedback && (
                                             <div className="mt-1 p-2 bg-blue-50 rounded border">
