@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Upload, Download, Trash2, ArrowLeft, Users, BookOpen, Edit3, CheckCircle } from "lucide-react";
+import { FileText, Upload, Download, Trash2, ArrowLeft, Users, BookOpen, Edit3, CheckCircle, Plus } from "lucide-react";
 import { SimpleTextEditor } from "@/components/SimpleTextEditor";
 import { PostFileUpload } from "@/components/PostFileUpload";
 
@@ -101,6 +101,7 @@ export default function ClassroomPage() {
   // Edit state
   const [editingPost, setEditingPost] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const loadComments = async (postId: string) => {
     const { data } = await supabase.rpc('get_post_comments', { post_id_param: postId });
@@ -789,36 +790,47 @@ export default function ClassroomPage() {
 
         {/* Tabs Section */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-2 mb-6 bg-white shadow-lg border-0 p-1 rounded-xl">
-            <TabsTrigger 
-              value="feed" 
-              className="rounded-lg font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white"
-            >
-              <Users className="h-4 w-4 mr-2"/>
-              Class Feed
-            </TabsTrigger>
-            <TabsTrigger 
-              value="materials"
-              className="rounded-lg font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white"
-            >
-              <FileText className="h-4 w-4 mr-2"/>
-              Materials
-            </TabsTrigger>
-          </TabsList>
+          <div className="mb-6">
+            <div className="bg-gradient-to-r from-slate-50 to-gray-100 rounded-xl p-4 border border-gray-200">
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-slate-600 to-gray-700 rounded-lg flex items-center justify-center">
+                  <Users className="h-4 w-4 text-white"/>
+                </div>
+                <h2 className="text-xl font-bold text-gray-800">Class Feed</h2>
+              </div>
+              <p className="text-center text-gray-600 text-sm mt-2">
+                Latest updates, assignments, and discussions
+              </p>
+            </div>
+          </div>
 
           <TabsContent value="feed" className="mt-6 space-y-6">
             {isTeacherOfClass && (
-              <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
-                <CardHeader className="bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-t-lg">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Users className="h-5 w-5"/>
-                    Create an Assignment
-                  </CardTitle>
-                  <CardDescription className="text-purple-100">
-                    Announce a new assignment, share a resource, or post a question for discussion.
-                  </CardDescription>
-                </CardHeader>
-                                                   <CardContent className="p-6">
+              <div className="space-y-4">
+                {/* Toggle Button */}
+                <Button
+                  onClick={() => setShowCreateForm(!showCreateForm)}
+                  className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-md border border-emerald-300/50"
+                  size="lg"
+                  variant="outline"
+                >
+                  <Plus className="h-5 w-5 mr-2"/>
+                  {showCreateForm ? 'Hide Create Form' : 'Create Assignment/Post'}
+                </Button>
+
+                {/* Collapsible Form */}
+                {showCreateForm && (
+                  <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
+                    <CardHeader className="bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-t-lg">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Users className="h-5 w-5"/>
+                        Create an Assignment
+                      </CardTitle>
+                      <CardDescription className="text-purple-100">
+                        Announce a new assignment, share a resource, or post a question for discussion.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-6">
                   {/* Post Type Selection */}
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -940,8 +952,10 @@ export default function ClassroomPage() {
                        {isAssignment ? 'Create Assignment' : 'Post Update'}
                      </Button>
                   </div>
-                </CardContent>
-              </Card>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             )}
 
             {feed.length > 0 ? feed.map(post => (
@@ -1445,89 +1459,6 @@ export default function ClassroomPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="materials" className="mt-6">
-            {/* Upload Section */}
-            <Card className="mb-6 shadow-lg border-0 bg-white/90 backdrop-blur-sm">
-              <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-t-lg">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Upload className="h-5 w-5"/>
-                  Upload Materials
-                </CardTitle>
-                <CardDescription className="text-blue-100">
-                  Share files, documents, and resources with the classroom
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                  <div className="flex-1">
-                    <Input 
-                      type="file" 
-                      onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                      className="border-2 focus:border-blue-300"
-                    />
-                  </div>
-                  <Button 
-                    onClick={handleUpload} 
-                    disabled={!uploadFile || uploading}
-                    className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600"
-                  >
-                    <Upload className="h-4 w-4 mr-2" /> 
-                    {uploading ? "Uploading..." : "Upload File"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Files Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {files.length > 0 ? files.map((f) => (
-                <Card key={f.name} className="shadow-lg border-0 bg-white/90 backdrop-blur-sm hover:shadow-xl transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-3 mb-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
-                        <FileText className="h-6 w-6 text-white"/>
-                      </div>
-                                             <div className="flex-1 min-w-0">
-                         <div className="font-semibold text-gray-800 truncate" title={getDisplayFileName(f.name)}>
-                           {getDisplayFileName(f.name)}
-                         </div>
-                         <div className="text-sm text-gray-500">{Math.round((f.metadata?.size || 0) / 1024)} KB</div>
-                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <a href={filePublicUrl(f.name)} target="_blank" rel="noreferrer" className="flex-1">
-                        <Button size="sm" variant="outline" className="w-full">
-                          <Download className="h-4 w-4 mr-2"/>View
-                        </Button>
-                      </a>
-                      {(isTeacherOfClass || isEnrolledStudent) && (
-                        <Button 
-                          size="sm" 
-                          variant="destructive" 
-                          onClick={() => handleDeleteFile(f.name)}
-                          className="px-3"
-                        >
-                          <Trash2 className="h-4 w-4"/>
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )) : (
-                <div className="col-span-full">
-                  <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
-                    <CardContent className="p-12 text-center">
-                      <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4"/>
-                      <p className="text-gray-500 text-lg font-medium">No materials uploaded yet</p>
-                      <p className="text-gray-400 text-sm mt-2">
-                        Upload files to share resources with the classroom
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-            </div>
-          </TabsContent>
                  </Tabs>
        </div>
 
