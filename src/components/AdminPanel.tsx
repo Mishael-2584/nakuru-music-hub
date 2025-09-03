@@ -2323,6 +2323,7 @@ const AdminPanel = () => {
                                         <SelectItem value="in-person">In-Person</SelectItem>
                                         <SelectItem value="online">Online</SelectItem>
                                         <SelectItem value="hybrid">Hybrid</SelectItem>
+                                        <SelectItem value="home-lessons">Home Lessons</SelectItem>
                                       </SelectContent>
                                     </Select>
                                   </div>
