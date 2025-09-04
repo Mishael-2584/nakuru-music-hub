@@ -231,12 +231,10 @@ export default function ClassroomPage() {
       );
       setFeed(postsWithAttachments);
       
-      // Auto-load submissions for assignment posts if teacher
-      if (isTeacherOfClass) {
-        for (const post of postsWithAttachments) {
-          if (post.is_assignment) {
-            await loadSubmissions(post.post_id);
-          }
+      // Auto-load submissions for assignment posts (for both teachers and students)
+      for (const post of postsWithAttachments) {
+        if (post.is_assignment) {
+          await loadSubmissions(post.post_id);
         }
       }
     }
@@ -510,13 +508,24 @@ export default function ClassroomPage() {
       console.log('Final userEmails mapping:', userEmails);
 
       // Transform data to include author names, emails and files
-      const transformedSubmissions = (data || []).map(sub => ({
-        ...sub,
-        author_name: sub.students?.student_name || 'Unknown Student',
-        author_email: userEmails[sub.students?.user_id] || 'No email',
-        graded_by_name: sub.teachers?.name || 'Unknown Teacher',
-        files: sub.assignment_submission_files || []
-      }));
+      const transformedSubmissions = (data || []).map(sub => {
+        const files = sub.assignment_submission_files || [];
+        console.log(`Files for submission ${sub.id}:`, files);
+        
+        return {
+          ...sub,
+          author_name: sub.students?.student_name || 'Unknown Student',
+          author_email: userEmails[sub.students?.user_id] || 'No email',
+          graded_by_name: sub.teachers?.name || 'Unknown Teacher',
+          files: files.map(file => ({
+            id: file.id,
+            file_name: file.file_name,
+            file_url: file.file_url,
+            file_size: file.file_size || 0,
+            file_type: file.file_type || 'application/octet-stream'
+          }))
+        };
+      });
       
       setSubmissions(prev => ({ ...prev, [postId]: transformedSubmissions }));
     } catch (err) {
@@ -667,27 +676,53 @@ export default function ClassroomPage() {
       
       // Handle file attachments if any
       if (files.length > 0 && submissionData) {
+        console.log('Processing file attachments:', files);
+        
         if (existingSubmission) {
           // Delete existing files first
-          await supabase
+          const { error: deleteError } = await supabase
             .from('assignment_submission_files')
             .delete()
             .eq('submission_id', submissionData.id);
+          
+          if (deleteError) {
+            console.error('Failed to delete existing files:', deleteError);
+            throw deleteError;
+          }
         }
         
-        // Insert new files
-        const fileInserts = files.map(attachment => ({
-          submission_id: submissionData.id,
-          file_name: attachment.file_name || attachment.name,
-          file_url: attachment.file_url || attachment.url,
-          file_size: attachment.file_size || attachment.size
-        }));
+        // Filter and map files that have been uploaded
+        const uploadedFiles = files.filter(attachment => 
+          attachment.uploaded && attachment.file_url
+        );
         
-        const { error: fileError } = await supabase
-          .from('assignment_submission_files')
-          .insert(fileInserts);
+        console.log('Uploaded files to save:', uploadedFiles);
         
-        if (fileError) throw fileError;
+        if (uploadedFiles.length > 0) {
+          // Insert new files with correct property mapping
+          const fileInserts = uploadedFiles.map(attachment => {
+            const fileData = {
+              submission_id: submissionData.id,
+              file_name: attachment.file_name,
+              file_url: attachment.file_url,
+              file_size: attachment.file_size || 0
+            };
+            console.log('Inserting file data:', fileData);
+            return fileData;
+          });
+          
+          const { error: fileError, data: insertedFiles } = await supabase
+            .from('assignment_submission_files')
+            .insert(fileInserts)
+            .select();
+          
+          console.log('File insertion result:', { insertedFiles, fileError });
+          
+          if (fileError) {
+            console.error('File insertion failed:', fileError);
+            throw fileError;
+          }
+        }
       }
       
       // Clear the submission text and files
@@ -696,11 +731,29 @@ export default function ClassroomPage() {
       
       toast({ title: 'Success', description: 'Assignment submitted successfully' });
       
-      // Refresh submissions for this post
+      // Refresh submissions for this post to show updated files
       await loadSubmissions(postId);
+      
+      // Also refresh the feed to update any submission status
+      if (classroom) {
+        await loadFeed(classroom.id);
+      }
     } catch (err) {
       console.error('Failed to submit assignment:', err);
-      toast({ title: 'Error', description: 'Failed to submit assignment', variant: 'destructive' });
+      
+      // If submission failed and we have uploaded files, offer to clean them up
+      const uploadedFiles = files.filter(f => f.uploaded && f.file_url);
+      if (uploadedFiles.length > 0) {
+        console.warn('Submission failed but files were uploaded. Files:', uploadedFiles);
+        // Note: We don't auto-delete files here as they might be reusable
+        // The user can manually remove them if needed
+      }
+      
+      toast({ 
+        title: 'Error', 
+        description: `Failed to submit assignment: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -1255,6 +1308,19 @@ export default function ClassroomPage() {
                                                   onClick={() => {
                                                     const text = newComment[post.post_id] || '';
                                                     const files = submissionFiles[post.post_id] || [];
+                                                    
+                                                    // Check if there are pending uploads
+                                                    const hasPendingUploads = files.some(f => f.file && !f.uploaded);
+                                                    
+                                                    if (hasPendingUploads) {
+                                                      toast({
+                                                        title: 'Upload Required',
+                                                        description: 'Please upload all files before submitting.',
+                                                        variant: 'destructive'
+                                                      });
+                                                      return;
+                                                    }
+                                                    
                                                     setPendingSubmission({ postId: post.post_id, text, files });
                                                     setShowSubmissionConfirm(post.post_id);
                                                   }}
