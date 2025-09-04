@@ -316,6 +316,8 @@ const StudentDashboard = () => {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
+  // Learning mode change request functionality has been removed
+
   // Add recurring booking state
   const [recurringBooking, setRecurringBooking] = useState({
     start_date: '',
@@ -562,6 +564,8 @@ const StudentDashboard = () => {
 
       // Fetch available time slots with the student data directly
       await fetchAvailableTimeSlotsWithData(studentProfileData);
+      
+      // Learning mode change requests functionality has been removed
 
     } catch (error) {
       console.error('Error fetching student data:', error);
@@ -2321,6 +2325,8 @@ const StudentDashboard = () => {
     return () => clearInterval(interval);
   }, [studentProfile?.id]);
 
+  // Learning mode change request functionality has been removed
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -2367,7 +2373,6 @@ const StudentDashboard = () => {
     
     console.log('🔍 Debug: Updating profile with data:', pendingProfileUpdate);
     console.log('🔍 Debug: Current student profile:', studentProfile);
-    console.log('🔍 Debug: Learning mode being set to:', pendingProfileUpdate.learning_mode);
     
     // Re-authenticate user
     const { error: authError } = await supabase.auth.signInWithPassword({
@@ -2380,67 +2385,38 @@ const StudentDashboard = () => {
       return;
     }
     
-    console.log('✅ Auth successful, updating profile...');
+    console.log('✅ Auth successful, processing profile update...');
     
-    // Try using the RPC function first for learning_mode
-    const { data: rpcData, error: rpcError } = await supabase.rpc('test_student_update', {
-      student_id: studentProfile.id,
-      new_learning_mode: pendingProfileUpdate.learning_mode
-    });
-    
-    console.log('🔍 Debug: RPC update result:', { data: rpcData, error: rpcError });
-    
-    if (rpcError) {
-      console.error('❌ RPC error:', rpcError);
-    } else {
-      console.log('✅ RPC update successful:', rpcData);
-    }
-    
-    // Also try the direct update approach
-    const { data: updateData, error: updateError } = await supabase
-      .from('students')
-      .update({
-        learning_mode: pendingProfileUpdate.learning_mode
-      })
-      .eq('id', studentProfile.id)
-      .select();
-      
-    console.log('🔍 Debug: Direct update result:', { data: updateData, error: updateError });
-    
-    if (updateError) {
-      console.error('❌ Update error:', updateError);
-      toast({ title: 'Error', description: 'Failed to update profile.', variant: 'destructive' });
-    } else {
-      console.log('✅ Update successful:', updateData);
-      
-      // Now update the other fields
-      const { data: otherUpdateData, error: otherUpdateError } = await supabase
+    // Update profile fields (including learning_mode directly)
+    try {
+      const { data: updateData, error: updateError } = await supabase
         .from('students')
         .update({
           phone: pendingProfileUpdate.phone,
           proficiency_level: pendingProfileUpdate.proficiency_level,
           experience: pendingProfileUpdate.experience,
-          location: pendingProfileUpdate.location
+          location: pendingProfileUpdate.location,
+          learning_mode: pendingProfileUpdate.learning_mode // Update learning mode directly
         })
         .eq('id', studentProfile.id)
         .select();
       
-      console.log('🔍 Debug: Other fields update result:', { data: otherUpdateData, error: otherUpdateError });
+      console.log('🔍 Debug: Profile update result:', { data: updateData, error: updateError });
       
-      // Let's check the database again after update
-      const { data: afterUpdateData, error: afterUpdateError } = await supabase
-        .from('students')
-        .select('*')
-        .eq('id', studentProfile.id)
-        .single();
-      
-      console.log('🔍 Debug: Final database state:', afterUpdateData);
-      console.log('🔍 Debug: Final database error:', afterUpdateError);
-      
-      toast({ title: 'Success', description: 'Profile updated successfully.' });
-      setEditMode(false);
-      await fetchStudentData(); // Force refresh the data
+      if (updateError) {
+        console.error('❌ Profile update error:', updateError);
+        toast({ title: 'Error', description: 'Failed to update profile fields.', variant: 'destructive' });
+      } else {
+        console.log('✅ Profile update successful:', updateData);
+        toast({ title: 'Success', description: 'Profile updated successfully.' });
+        setEditMode(false);
+        await fetchStudentData(); // Force refresh the data
+      }
+    } catch (error) {
+      console.error('❌ Error updating profile:', error);
+      toast({ title: 'Error', description: 'Failed to update profile.', variant: 'destructive' });
     }
+    
     setShowPasswordModal(false);
     setPasswordInput('');
     setPendingProfileUpdate(null);
@@ -4239,4 +4215,4 @@ const StudentDashboard = () => {
   );
 };
 
-export default StudentDashboard; 
+export default StudentDashboard;

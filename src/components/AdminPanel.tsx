@@ -22,6 +22,7 @@ import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
 import { generateInvoiceForRegistration } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
+import LearningModeDebugTest from './LearningModeDebugTest';
 
 interface Registration {
   id: string;
@@ -102,7 +103,7 @@ interface ClassSchedule {
 }
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes' | 'gallery' | 'finances'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes' | 'gallery' | 'finances' | 'debug'>('stats');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
 
@@ -178,6 +179,14 @@ const AdminPanel = () => {
   const [deleteClassroomPassword, setDeleteClassroomPassword] = useState('');
   const [deleteClassroomError, setDeleteClassroomError] = useState('');
 
+  // Learning mode request functionality has been completely removed
+  // These state variables are kept as empty placeholders to avoid breaking changes
+  const [learningModeRequests] = useState<any[]>([]);
+  const [showLearningModeModal] = useState(false);
+  const [selectedLearningModeRequest] = useState<any>(null);
+  const [adminNotesForRequest] = useState('');
+  const [processingRequestId] = useState<string | null>(null);
+
   const fetchPendingClassrooms = async () => {
     const { data, error } = await supabase
       .from('classrooms')
@@ -209,7 +218,31 @@ const AdminPanel = () => {
   useEffect(() => {
     fetchPendingClassrooms();
     fetchApprovedClassrooms();
+    // Learning mode requests functionality has been removed
   }, []);
+
+  // Learning mode requests functionality has been completely removed
+  const fetchLearningModeRequests = async () => {
+    // This function is kept as a placeholder but its functionality has been removed
+    // We don't call setLearningModeRequests anymore since it's now a constant
+    console.log('Learning mode requests functionality has been removed');
+    return [];
+  };
+
+  // Learning mode requests functionality has been completely removed
+  const handleProcessLearningModeRequest = async (requestId: string, action: 'approved' | 'rejected', adminNotes?: string) => {
+    // This function is kept as a placeholder but its functionality has been removed
+    // We don't modify state variables anymore since they're now constants
+    console.log('Learning mode request processing has been removed');
+    return;
+  };
+
+  // Learning mode requests functionality has been completely removed
+  const handleReviewLearningModeRequest = (request: any) => {
+    // This function is kept as a placeholder but its functionality has been removed
+    console.log('Learning mode request review has been removed');
+    return;
+  };
 
   const handleApproveClassroom = async (classroomId: string) => {
     const { data, error } = await supabase.rpc('approve_classroom', {
@@ -1736,6 +1769,7 @@ const AdminPanel = () => {
                     <span>Finances</span>
                   </div>
                 </SelectItem>
+                {/* Learning Mode Requests tab removed */}
               </SelectContent>
             </Select>
           </div>
@@ -1849,6 +1883,15 @@ const AdminPanel = () => {
               >
                 <DollarSign className="h-4 w-4 mr-2" />
                 Finances
+              </Button>
+              {/* Learning Mode Requests Button - Removed */}
+              <Button
+                variant={activeTab === 'debug' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('debug')}
+                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start bg-red-100 text-red-700 border-red-300"
+                style={{ minWidth: 120 }}
+              >
+                🐛 DEBUG
               </Button>
 
             </div>
@@ -3168,6 +3211,25 @@ const AdminPanel = () => {
           </div>
         </div>
 
+        {/* Learning Mode Requests Tab - Removed */}
+
+        {/* Learning Mode Request Review Modal - Removed */}
+
+        {/* Debug Tab - REMOVE IN PRODUCTION */}
+        <div style={{ display: activeTab === 'debug' ? 'block' : 'none' }}>
+          <div className="space-y-6">
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+              <div className="flex">
+                <div className="ml-3">
+                  <p className="text-sm text-red-700">
+                    🚨 <strong>DEBUG MODE:</strong> This tab is for testing only. Remove before production deployment.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <LearningModeDebugTest />
+          </div>
+        </div>
 
         <Dialog open={showExcuseModal} onOpenChange={setShowExcuseModal}>
           <DialogContent>
