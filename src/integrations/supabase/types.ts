@@ -408,6 +408,112 @@ export interface Database {
           cv_file_path?: string | null;
         };
       };
+      portal_messages: {
+        Row: {
+          id: string;
+          created_at: string;
+          sender_id: string;
+          recipient_id: string;
+          subject: string;
+          message: string;
+          is_read: boolean;
+          message_type: string;
+          meeting_id?: string | null;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          sender_id: string;
+          recipient_id: string;
+          subject: string;
+          message: string;
+          is_read?: boolean;
+          message_type?: string;
+          meeting_id?: string | null;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          sender_id?: string;
+          recipient_id?: string;
+          subject?: string;
+          message?: string;
+          is_read?: boolean;
+          message_type?: string;
+          meeting_id?: string | null;
+        };
+      };
+      instant_meetings: {
+        Row: {
+          id: string;
+          created_at: string;
+          updated_at: string;
+          title: string;
+          description: string | null;
+          meeting_url: string;
+          host_id: string;
+          host_name: string;
+          host_role: string;
+          participants: string[];
+          max_participants: number;
+          duration: number;
+          status: string;
+          meeting_code: string;
+          is_public: boolean;
+          allow_recording: boolean;
+          started_at: string | null;
+          ended_at: string | null;
+          actual_duration: number | null;
+          participant_join_log: any;
+          scheduled_start_time: string | null;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          title: string;
+          description?: string | null;
+          meeting_url: string;
+          host_id: string;
+          host_name: string;
+          host_role: string;
+          participants?: string[];
+          max_participants?: number;
+          duration?: number;
+          status?: string;
+          meeting_code: string;
+          is_public?: boolean;
+          allow_recording?: boolean;
+          started_at?: string | null;
+          ended_at?: string | null;
+          actual_duration?: number | null;
+          participant_join_log?: any;
+          scheduled_start_time?: string | null;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          title?: string;
+          description?: string | null;
+          meeting_url?: string;
+          host_id?: string;
+          host_name?: string;
+          host_role?: string;
+          participants?: string[];
+          max_participants?: number;
+          duration?: number;
+          status?: string;
+          meeting_code?: string;
+          is_public?: boolean;
+          allow_recording?: boolean;
+          started_at?: string | null;
+          ended_at?: string | null;
+          actual_duration?: number | null;
+          participant_join_log?: any;
+          scheduled_start_time?: string | null;
+        };
+      };
     };
   };
 }
@@ -441,4 +547,42 @@ export type Payment = {
   raw_callback_data: any | null;
   created_at: string;
   updated_at: string;
+};
+
+// Enhanced portal messages type with meeting support
+export type PortalMessage = {
+  id: string;
+  created_at: string;
+  sender_id: string;
+  recipient_id: string;
+  subject: string;
+  message: string;
+  is_read: boolean;
+  message_type: 'general' | 'lesson' | 'assignment' | 'payment' | 'emergency' | 'meeting_invitation';
+  meeting_id?: string | null;
+};
+
+// Instant meeting type
+export type InstantMeeting = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  title: string;
+  description?: string | null;
+  meeting_url: string;
+  host_id: string;
+  host_name: string;
+  host_role: 'teacher' | 'admin';
+  participants: string[];
+  max_participants: number;
+  duration: number;
+  status: 'scheduled' | 'pending' | 'active' | 'completed' | 'cancelled';
+  meeting_code: string;
+  is_public: boolean;
+  allow_recording: boolean;
+  started_at?: string | null;
+  ended_at?: string | null;
+  actual_duration?: number | null;
+  participant_join_log: any;
+  scheduled_start_time?: string | null;
 };

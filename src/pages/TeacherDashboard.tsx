@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
 import VideoConferenceModal from '../components/VideoConferenceModal';
 import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking } from '../lib/videoConferencing';
 import MessagingUI from '../components/MessagingUI';
+import InstantMeetManager from '../components/InstantMeetManager';
 
 interface TeacherProfile {
   id: string;
@@ -1620,6 +1621,12 @@ const TeacherDashboard = () => {
                       <span>Video Calls</span>
                     </div>
                   </SelectItem>
+                  <SelectItem value="instant-meetings">
+                    <div className="flex items-center gap-2">
+                      <Video className="w-4 h-4" />
+                      <span>Instant Meet</span>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1665,6 +1672,10 @@ const TeacherDashboard = () => {
               <TabsTrigger value="video-conferencing" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:shadow-md transition-all">
                 <Video className="w-5 h-5" />
                 <span>Video Calls</span>
+              </TabsTrigger>
+              <TabsTrigger value="instant-meetings" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all">
+                <Video className="w-5 h-5" />
+                <span>Instant Meet</span>
               </TabsTrigger>
             </TabsList>
 
@@ -2492,6 +2503,16 @@ const TeacherDashboard = () => {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Instant Meetings Tab */}
+            <TabsContent value="instant-meetings" className="mt-8">
+              <InstantMeetManager 
+                userId={profile?.user_id || user?.id || ''}
+                userName={profile?.name || user?.email || ''}
+                userRole={profile?.category === 'admin' ? 'admin' : 'teacher'}
+                className="space-y-6"
+              />
             </TabsContent>
           </Tabs>
         </div>

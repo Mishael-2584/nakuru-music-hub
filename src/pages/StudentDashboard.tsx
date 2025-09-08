@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video, AlertTriangle, RefreshCw, Copy } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar';
 import { useToast } from '../hooks/use-toast';
 import PasswordChangePrompt from '../components/PasswordChangePrompt';
@@ -20,7 +20,7 @@ import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
 import { calculateStudentInvoice, InvoiceCalculationResult } from '../lib/invoiceUtils';
 import { Invoice } from '../integrations/supabase/types';
 import VideoConferenceModal from '../components/VideoConferenceModal';
-import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getMeetingDuration } from '../lib/videoConferencing';
+import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getMeetingDuration, getUserInvitedMeetings, joinMeetingByCode, InstantMeeting } from '../lib/videoConferencing';
 import MessagingUI from '../components/MessagingUI';
 
 interface StudentProfile {
@@ -289,6 +289,9 @@ const StudentDashboard = () => {
   const [showVideoConferenceModal, setShowVideoConferenceModal] = useState(false);
   const [selectedMeetingRoom, setSelectedMeetingRoom] = useState<MeetingRoom | null>(null);
   const [meetingRooms, setMeetingRooms] = useState<MeetingRoom[]>([]);
+  const [invitedMeetings, setInvitedMeetings] = useState<InstantMeeting[]>([]);
+  const [joinMeetingCode, setJoinMeetingCode] = useState('');
+  const [isJoiningMeeting, setIsJoiningMeeting] = useState(false);
 
   const [editMode, setEditMode] = useState(false);
   const [editProfile, setEditProfile] = useState({ phone: '', proficiency_level: '', experience: '', location: '', learning_mode: '' });
@@ -979,6 +982,10 @@ const StudentDashboard = () => {
     try {
       const rooms = await getUserMeetingRooms(studentProfile.id, 'student');
       setMeetingRooms(rooms);
+      
+      // Also fetch invited meetings
+      const invited = await getUserInvitedMeetings(studentProfile.user_id);
+      setInvitedMeetings(invited);
     } catch (error) {
       console.error('Error fetching meeting rooms:', error);
     }
@@ -1081,6 +1088,50 @@ const StudentDashboard = () => {
   const handleOpenMeetingRoom = (meetingRoom: MeetingRoom) => {
     setSelectedMeetingRoom(meetingRoom);
     setShowVideoConferenceModal(true);
+  };
+
+  // Handle joining meeting by code
+  const handleJoinByCode = async () => {
+    if (!joinMeetingCode.trim() || !studentProfile?.user_id) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a meeting code",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsJoiningMeeting(true);
+    try {
+      const meeting = await joinMeetingByCode(joinMeetingCode.trim(), studentProfile.user_id);
+      if (meeting) {
+        // Open the meeting in a new tab
+        const meetingUrl = `https://meet.jit.si/${meeting.meeting_code}`;
+        window.open(meetingUrl, '_blank');
+        
+        toast({
+          title: "Joined Meeting",
+          description: `Successfully joined meeting: ${meeting.title}`,
+        });
+        
+        setJoinMeetingCode('');
+      } else {
+        toast({
+          title: "Meeting Not Found",
+          description: "No active meeting found with that code or you're not invited",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error joining meeting:', error);
+      toast({
+        title: "Error",
+        description: "Failed to join meeting. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsJoiningMeeting(false);
+    }
   };
 
   // Classroom helpers
@@ -3984,10 +4035,106 @@ const StudentDashboard = () => {
                     <Video className="w-5 h-5" />
                     Video Conferencing
                   </CardTitle>
-                  <CardDescription>Join your online lessons and practice sessions</CardDescription>
+                  <CardDescription>Join your online lessons, practice sessions, and instant meetings</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {/* Join by Code Section */}
+                  <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h3 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                      <Video className="w-4 h-4" />
+                      Join Meeting by Code
+                    </h3>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Input
+                        placeholder="Enter meeting code (e.g., ABC123)"
+                        value={joinMeetingCode}
+                        onChange={(e) => setJoinMeetingCode(e.target.value.toUpperCase())}
+                        className="flex-1"
+                        maxLength={10}
+                      />
+                      <Button 
+                        onClick={handleJoinByCode}
+                        disabled={isJoiningMeeting || !joinMeetingCode.trim()}
+                        className="flex items-center gap-2"
+                      >
+                        {isJoiningMeeting ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        ) : (
+                          <Video className="w-4 h-4" />
+                        )}
+                        {isJoiningMeeting ? 'Joining...' : 'Join Meeting'}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-2">
+                      💡 Enter the meeting code shared by your teacher to join instantly
+                    </p>
+                  </div>
+
+                  {/* Invited Meetings Section */}
+                  {invitedMeetings.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="font-semibold text-purple-800 mb-3 flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        Invited Meetings ({invitedMeetings.length})
+                      </h3>
+                      <div className="grid gap-3">
+                        {invitedMeetings.map(meeting => (
+                          <div key={meeting.id} className="p-4 border border-purple-200 rounded-lg bg-purple-50 hover:shadow-md transition-shadow">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-semibold text-purple-900">{meeting.title}</h4>
+                              <div className="flex items-center gap-2">
+                                <Badge className={meeting.status === 'active' ? 'bg-red-500 text-white animate-pulse' : 'bg-blue-500 text-white'}>
+                                  {meeting.status === 'active' ? '🔴 LIVE' : '📅 Scheduled'}
+                                </Badge>
+                                <Badge variant="outline" className="font-mono text-xs">
+                                  {meeting.meetingCode}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm text-purple-700 mb-3">
+                              <div>
+                                <span className="font-medium">Host:</span> {meeting.hostName}
+                              </div>
+                              <div>
+                                <span className="font-medium">Duration:</span> {meeting.duration} min
+                              </div>
+                            </div>
+                            {meeting.description && (
+                              <p className="text-sm text-purple-600 mb-3 italic">"{meeting.description}"</p>
+                            )}
+                            <div className="flex gap-2">
+                              <Button 
+                                onClick={() => window.open(meeting.meetingUrl, '_blank')}
+                                className={`flex items-center gap-1 ${meeting.status === 'active' ? 'bg-red-600 hover:bg-red-700 animate-pulse' : 'bg-purple-600 hover:bg-purple-700'}`}
+                                size="sm"
+                              >
+                                <Video className="w-4 h-4" />
+                                {meeting.status === 'active' ? '🚀 Join Live Meeting' : 'Join Meeting'}
+                              </Button>
+                              <Button 
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(meeting.meetingCode);
+                                  toast({ title: "Copied", description: "Meeting code copied to clipboard" });
+                                }}
+                              >
+                                <Copy className="w-3 h-3 mr-1" />
+                                Copy Code
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Regular Meeting Rooms Section */}
                   <div className="space-y-4">
+                    <h3 className="font-semibold text-indigo-800 flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      Scheduled Lessons ({meetingRooms.length})
+                    </h3>
                     {meetingRooms.length > 0 ? (
                       meetingRooms.map(room => (
                         <div key={room.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
@@ -4031,7 +4178,11 @@ const StudentDashboard = () => {
                         </div>
                       ))
                     ) : (
-                      <p className="text-gray-500 text-center py-8">No video conference rooms found</p>
+                      <div className="text-center py-8 text-gray-500">
+                        <Video className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p>No scheduled lesson rooms found</p>
+                        <p className="text-sm mt-1">Lesson rooms will appear here when your teacher creates them</p>
+                      </div>
                     )}
                   </div>
                 </CardContent>

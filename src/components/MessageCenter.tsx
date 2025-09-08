@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, Send, Inbox, Send as SendIcon, User, Clock, Eye, Reply, Trash2, Plus } from 'lucide-react';
+import { MessageSquare, Send, Inbox, Send as SendIcon, User, Clock, Eye, Reply, Trash2, Plus, Video } from 'lucide-react';
+import MeetingInvitationCard from './MeetingInvitationCard';
 
 interface Message {
   id: string;
@@ -21,6 +22,7 @@ interface Message {
   sender_name?: string;
   recipient_name?: string;
   message_type: string;
+  meeting_id?: string | null;
 }
 
 interface User {
@@ -135,8 +137,63 @@ const MessageCenter: React.FC<MessageCenterProps> = ({
       case 'assignment': return 'bg-green-100 text-green-800';
       case 'payment': return 'bg-yellow-100 text-yellow-800';
       case 'emergency': return 'bg-red-100 text-red-800';
+      case 'meeting_invitation': return 'bg-purple-100 text-purple-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const getMessageTypeIcon = (type: string) => {
+    switch (type) {
+      case 'meeting_invitation': return <Video className="w-3 h-3 mr-1" />;
+      default: return null;
+    }
+  };
+
+  const renderMessageCard = (message: Message) => {
+    // Special rendering for meeting invitations
+    if (message.message_type === 'meeting_invitation' && message.meeting_id) {
+      return (
+        <MeetingInvitationCard
+          key={message.id}
+          meetingId={message.meeting_id}
+          subject={message.subject}
+          message={message.message}
+          senderName={message.sender_name || 'Unknown'}
+          sentAt={message.created_at}
+          currentUserId={currentUser.id}
+          currentUserName={currentUser.name}
+          isRead={message.is_read}
+          onMarkAsRead={() => onMarkAsRead(message.id)}
+        />
+      );
+    }
+
+    // Regular message rendering
+    return (
+      <div key={message.id} className={`p-4 border rounded-lg ${!message.is_read ? 'bg-blue-50 border-blue-200' : ''}`}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center space-x-2">
+            <h4 className="font-semibold">{message.subject}</h4>
+            <Badge className={getMessageTypeColor(message.message_type)}>
+              {getMessageTypeIcon(message.message_type)}
+              {message.message_type}
+            </Badge>
+            {!message.is_read && <Badge variant="secondary">New</Badge>}
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-500">{formatDate(message.created_at)}</span>
+            <Button variant="outline" size="sm" onClick={() => setSelectedMessage(message)}>
+              <Eye className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => onDeleteMessage(message.id)}>
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+        <p className="text-sm text-gray-600 mb-2">From: {message.sender_name}</p>
+        <p className="text-gray-700">{message.message.substring(0, 100)}...</p>
+      </div>
+    );
   };
 
   return (
@@ -314,30 +371,7 @@ const MessageCenter: React.FC<MessageCenterProps> = ({
 
             <TabsContent value="inbox" className="space-y-4">
               {inboxMessages.length > 0 ? (
-                inboxMessages.map(message => (
-                  <div key={message.id} className={`p-4 border rounded-lg ${!message.is_read ? 'bg-blue-50 border-blue-200' : ''}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <h4 className="font-semibold">{message.subject}</h4>
-                        <Badge className={getMessageTypeColor(message.message_type)}>
-                          {message.message_type}
-                        </Badge>
-                        {!message.is_read && <Badge variant="secondary">New</Badge>}
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-500">{formatDate(message.created_at)}</span>
-                        <Button variant="outline" size="sm" onClick={() => setSelectedMessage(message)}>
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => onDeleteMessage(message.id)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-2">From: {message.sender_name}</p>
-                    <p className="text-gray-700">{message.message.substring(0, 100)}...</p>
-                  </div>
-                ))
+                inboxMessages.map(message => renderMessageCard(message))
               ) : (
                 <p className="text-gray-500 text-center py-8">No messages in inbox</p>
               )}
@@ -345,29 +379,7 @@ const MessageCenter: React.FC<MessageCenterProps> = ({
 
             <TabsContent value="sent" className="space-y-4">
               {sentMessages.length > 0 ? (
-                sentMessages.map(message => (
-                  <div key={message.id} className="p-4 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <h4 className="font-semibold">{message.subject}</h4>
-                        <Badge className={getMessageTypeColor(message.message_type)}>
-                          {message.message_type}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-500">{formatDate(message.created_at)}</span>
-                        <Button variant="outline" size="sm" onClick={() => setSelectedMessage(message)}>
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => onDeleteMessage(message.id)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-2">To: {message.recipient_name}</p>
-                    <p className="text-gray-700">{message.message.substring(0, 100)}...</p>
-                  </div>
-                ))
+                sentMessages.map(message => renderMessageCard(message))
               ) : (
                 <p className="text-gray-500 text-center py-8">No sent messages</p>
               )}
@@ -375,30 +387,7 @@ const MessageCenter: React.FC<MessageCenterProps> = ({
 
             <TabsContent value="unread" className="space-y-4">
               {unreadMessages.length > 0 ? (
-                unreadMessages.map(message => (
-                  <div key={message.id} className="p-4 border rounded-lg bg-blue-50 border-blue-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <h4 className="font-semibold">{message.subject}</h4>
-                        <Badge className={getMessageTypeColor(message.message_type)}>
-                          {message.message_type}
-                        </Badge>
-                        <Badge variant="secondary">New</Badge>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-500">{formatDate(message.created_at)}</span>
-                        <Button variant="outline" size="sm" onClick={() => onMarkAsRead(message.id)}>
-                          Mark as Read
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => setSelectedMessage(message)}>
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-2">From: {message.sender_name}</p>
-                    <p className="text-gray-700">{message.message.substring(0, 100)}...</p>
-                  </div>
-                ))
+                unreadMessages.map(message => renderMessageCard(message))
               ) : (
                 <p className="text-gray-500 text-center py-8">No unread messages</p>
               )}
