@@ -284,8 +284,8 @@ export const updateMeetingRoomStatus = async (
 
 // Join meeting room (opens in new tab)
 export const joinMeetingRoom = (meetingUrl: string, userName: string): void => {
-  // Add user name to URL for display in meeting
-  const urlWithUser = `${meetingUrl}&userInfo.displayName=${encodeURIComponent(userName)}`;
+  // Add user name to URL for display in meeting using correct Jitsi format
+  const urlWithUser = `${meetingUrl}#userInfo.displayName="${encodeURIComponent(userName)}"`;
   window.open(urlWithUser, '_blank', 'width=1200,height=800');
 };
 
@@ -821,8 +821,19 @@ export const joinInstantMeetingRoom = async (
   // Record participation
   await joinInstantMeeting(meeting.id, userId, userName);
   
-  // Open meeting in new tab
-  const urlWithUser = `${meeting.meetingUrl}&userInfo.displayName=${encodeURIComponent(userName)}`;
+  // Debug: Log the meeting URL to console
+  console.log('Meeting URL:', meeting.meetingUrl);
+  
+  // Open meeting in new tab with correct Jitsi URL format
+  const urlWithUser = `${meeting.meetingUrl}#userInfo.displayName="${encodeURIComponent(userName)}"`;
+  console.log('Final URL with user:', urlWithUser);
+  
+  // Test if the base URL is valid
+  if (!meeting.meetingUrl.startsWith('https://meet.jit.si/')) {
+    console.error('Invalid Jitsi URL detected:', meeting.meetingUrl);
+    throw new Error('Invalid meeting URL format');
+  }
+  
   window.open(urlWithUser, '_blank', 'width=1200,height=800');
 };
 
@@ -930,12 +941,20 @@ export const deleteInstantMeeting = async (meetingId: string, hostId: string): P
   }
 };
 
-// Auto-cleanup expired meetings
+// Auto-cleanup expired meetings with conservative rules
 export const cleanupExpiredMeetings = async (): Promise<void> => {
   const { supabase } = await import('../integrations/supabase/client');
   
-  // Delete meetings that are completed/cancelled and older than 24 hours
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const now = new Date();
+  
+  // Clean up rules based on memory:
+  // - Completed meetings: delete after 24 hours
+  // - Cancelled meetings: delete after 24 hours (but teachers can manually delete anytime)
+  // - Active meetings: auto-complete after duration + 30 min grace period
+  // - Pending meetings: cancel after 4 hours
+  
+  // Delete completed/cancelled meetings older than 24 hours
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   
   const { error: cleanupError } = await supabase
     .from('instant_meetings')
@@ -945,6 +964,48 @@ export const cleanupExpiredMeetings = async (): Promise<void> => {
 
   if (cleanupError) {
     console.error('Error cleaning up old meetings:', cleanupError);
+  }
+  
+  // Auto-complete active meetings that have exceeded duration + 30 min grace period
+  const { data: activeMeetings, error: fetchError } = await supabase
+    .from('instant_meetings')
+    .select('id, started_at, duration')
+    .eq('status', 'active');
+    
+  if (!fetchError && activeMeetings) {
+    for (const meeting of activeMeetings) {
+      if (meeting.started_at) {
+        const startTime = new Date(meeting.started_at);
+        const endTimeWithGrace = new Date(startTime.getTime() + (meeting.duration + 30) * 60 * 1000);
+        
+        if (now > endTimeWithGrace) {
+          await supabase
+            .from('instant_meetings')
+            .update({
+              status: 'completed',
+              ended_at: endTimeWithGrace.toISOString(),
+              updated_at: now.toISOString()
+            })
+            .eq('id', meeting.id);
+        }
+      }
+    }
+  }
+  
+  // Cancel pending meetings older than 4 hours
+  const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+  
+  const { error: cancelError } = await supabase
+    .from('instant_meetings')
+    .update({
+      status: 'cancelled',
+      updated_at: now.toISOString()
+    })
+    .eq('status', 'pending')
+    .lt('created_at', fourHoursAgo.toISOString());
+    
+  if (cancelError) {
+    console.error('Error cancelling old pending meetings:', cancelError);
   }
 };
 

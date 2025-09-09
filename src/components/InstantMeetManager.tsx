@@ -223,12 +223,26 @@ const InstantMeetManager = ({
   };
 
   const handleDeleteMeeting = async (meetingId: string) => {
+    const meeting = meetings.find(m => m.id === meetingId);
+    if (!meeting) return;
+
+    // Show confirmation dialog
+    const confirmMessage = meeting.status === 'cancelled' || meeting.status === 'completed' 
+      ? `Are you sure you want to delete "${meeting.title}" from your meeting history? This action cannot be undone.`
+      : `Are you sure you want to delete "${meeting.title}"? This will permanently remove the meeting and cannot be undone.`;
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
     try {
       await deleteInstantMeeting(meetingId, userId);
       await fetchMeetings();
       toast({
         title: "Meeting Deleted",
-        description: "Meeting has been deleted successfully"
+        description: meeting.status === 'cancelled' || meeting.status === 'completed' 
+          ? "Meeting has been removed from your history"
+          : "Meeting has been deleted successfully"
       });
     } catch (error) {
       console.error('Error deleting meeting:', error);
@@ -303,7 +317,8 @@ const InstantMeetManager = ({
     const activeParticipants = getActiveParticipants(meeting);
     const isHost = meeting.hostId === userId;
     const canJoin = meeting.status === 'pending' || meeting.status === 'active';
-    const canManage = isHost && (meeting.status === 'pending' || meeting.status === 'active');
+    const canManage = isHost && (meeting.status === 'scheduled' || meeting.status === 'pending' || meeting.status === 'active');
+    const canDelete = isHost; // Teachers can always delete their own meetings
 
     return (
       <Card key={meeting.id} className="hover:shadow-md transition-shadow">
@@ -403,7 +418,7 @@ const InstantMeetManager = ({
                     End Meeting
                   </Button>
                 )}
-                {(meeting.status === 'pending' || meeting.status === 'active') && (
+                {(meeting.status === 'pending' || meeting.status === 'active' || meeting.status === 'scheduled') && (
                   <Button 
                     variant="destructive"
                     size="sm"
@@ -412,17 +427,28 @@ const InstantMeetManager = ({
                     Cancel
                   </Button>
                 )}
-                {canManage && (
-                  <Button 
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDeleteMeeting(meeting.id)}
-                    className="border-red-200 text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
               </>
+            )}
+            
+            {canDelete && (
+              <Button 
+                variant="outline"
+                size="sm"
+                onClick={() => handleDeleteMeeting(meeting.id)}
+                className={`border-red-200 text-red-600 hover:bg-red-50 ${
+                  meeting.status === 'cancelled' || meeting.status === 'completed' 
+                    ? 'bg-red-50/50' : ''
+                }`}
+                title={meeting.status === 'cancelled' || meeting.status === 'completed' 
+                  ? 'Remove meeting from history' 
+                  : 'Delete meeting permanently'
+                }
+              >
+                <Trash2 className="w-4 h-4" />
+                {(meeting.status === 'cancelled' || meeting.status === 'completed') && (
+                  <span className="ml-1 text-xs">Clean up</span>
+                )}
+              </Button>
             )}
 
             <Button 
