@@ -1,0 +1,474 @@
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { 
+  CheckCircle, 
+  Clock, 
+  FileText, 
+  Upload, 
+  Download,
+  AlertTriangle,
+  Star,
+  MessageSquare
+} from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { PostFileUpload } from "@/components/PostFileUpload";
+import { useToast } from "@/hooks/use-toast";
+
+interface AssignmentSubmissionPanelProps {
+  post: any;
+  isTeacher: boolean;
+  submissions?: any[];
+  currentStudentId?: string;
+  onSubmit?: (postId: string, text: string, files: any[]) => void;
+  onGrade?: (submissionId: string, points: number, feedback: string) => void;
+  onLoadSubmissions?: (postId: string) => void;
+}
+
+export default function AssignmentSubmissionPanel({ 
+  post, 
+  isTeacher, 
+  submissions = [], 
+  currentStudentId,
+  onSubmit,
+  onGrade,
+  onLoadSubmissions
+}: AssignmentSubmissionPanelProps) {
+  const { toast } = useToast();
+  const [submissionText, setSubmissionText] = useState('');
+  const [submissionFiles, setSubmissionFiles] = useState<any[]>([]);
+  const [showGradingForm, setShowGradingForm] = useState<string | null>(null);
+  const [gradePoints, setGradePoints] = useState<string>('');
+  const [gradeFeedback, setGradeFeedback] = useState<string>('');
+  const [showSubmissions, setShowSubmissions] = useState(false);
+
+  const isOverdue = post.due_date && new Date(post.due_date) < new Date();
+  const userSubmission = submissions.find(s => s.student_id === currentStudentId);
+  const hasSubmitted = !!userSubmission;
+  const isGraded = userSubmission?.grade_points !== undefined && userSubmission?.grade_points !== null;
+
+  const handleSubmission = () => {
+    if (!submissionText.trim() && submissionFiles.length === 0) {
+      toast({
+        title: 'Nothing to Submit',
+        description: 'Please add some text or upload files before submitting.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const hasPendingUploads = submissionFiles.some(f => f.file && !f.uploaded);
+    if (hasPendingUploads) {
+      toast({
+        title: 'Upload Required',
+        description: 'Please upload all files before submitting.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    onSubmit?.(post.post_id, submissionText, submissionFiles);
+    setSubmissionText('');
+    setSubmissionFiles([]);
+  };
+
+  const handleGrading = (submissionId: string) => {
+    const points = parseInt(gradePoints) || 0;
+    if (points < 0 || points > (post.max_points || 100)) {
+      toast({
+        title: 'Invalid Points',
+        description: `Points must be between 0 and ${post.max_points || 100}`,
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    onGrade?.(submissionId, points, gradeFeedback);
+    setShowGradingForm(null);
+    setGradePoints('');
+    setGradeFeedback('');
+  };
+
+  const getGradeColor = (points: number, maxPoints: number) => {
+    const percentage = (points / maxPoints) * 100;
+    if (percentage >= 90) return 'text-green-600 bg-green-50 border-green-200';
+    if (percentage >= 80) return 'text-blue-600 bg-blue-50 border-blue-200';
+    if (percentage >= 70) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+    return 'text-red-600 bg-red-50 border-red-200';
+  };
+
+  if (!post.is_assignment) return null;
+
+  return (
+    <div className="border-t border-gray-100 mt-4">
+      {/* Student View */}
+      {!isTeacher && (
+        <div className="pt-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-full ${
+                isGraded ? 'bg-green-100' : hasSubmitted ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {isGraded ? (
+                  <Star className="h-4 w-4 text-green-600" />
+                ) : hasSubmitted ? (
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                ) : (
+                  <Clock className="h-4 w-4 text-gray-600" />
+                )}
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900">Your Work</h4>
+                <p className="text-sm text-gray-600">
+                  {isGraded ? 'Graded' : hasSubmitted ? 'Submitted' : 'Not submitted'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              {isGraded && (
+                <Badge className={`${getGradeColor(userSubmission.grade_points, post.max_points || 100)} border`}>
+                  {userSubmission.grade_points}/{post.max_points || 100} points
+                </Badge>
+              )}
+              {hasSubmitted && !isGraded && (
+                <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                  Awaiting Grade
+                </Badge>
+              )}
+              {isOverdue && !hasSubmitted && (
+                <Badge variant="destructive">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  Overdue
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          {hasSubmitted ? (
+            /* Show Existing Submission */
+            <Card className="bg-gray-50 border-gray-200">
+              <CardContent className="p-4">
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">Submitted</span>
+                    <span className="text-xs text-gray-500">
+                      {formatDistanceToNow(new Date(userSubmission.submitted_at), { addSuffix: true })}
+                    </span>
+                  </div>
+                  {userSubmission.submission_text && (
+                    <div className="text-gray-800 mb-3 whitespace-pre-wrap">
+                      {userSubmission.submission_text}
+                    </div>
+                  )}
+                </div>
+
+                {/* Show submitted files */}
+                {userSubmission.files && userSubmission.files.length > 0 && (
+                  <div className="mb-3">
+                    <span className="text-sm font-medium text-gray-700 block mb-2">Attached Files:</span>
+                    <div className="space-y-2">
+                      {userSubmission.files.map((file: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-white rounded border">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-gray-500" />
+                            <span className="text-sm text-gray-800">{file.file_name}</span>
+                            <span className="text-xs text-gray-500">
+                              ({Math.round(file.file_size / 1024)} KB)
+                            </span>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(file.file_url, '_blank')}
+                            className="h-7 px-2 text-xs"
+                          >
+                            <Download className="h-3 w-3 mr-1" />
+                            View
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Show grade and feedback */}
+                {isGraded && (
+                  <div className="border-t border-gray-300 pt-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Grade & Feedback</span>
+                      <Badge className={`${getGradeColor(userSubmission.grade_points, post.max_points || 100)} border`}>
+                        {userSubmission.grade_points}/{post.max_points || 100}
+                      </Badge>
+                    </div>
+                    {userSubmission.grade_feedback && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div className="text-sm text-blue-900">{userSubmission.grade_feedback}</div>
+                      </div>
+                    )}
+                    <div className="text-xs text-gray-500 mt-2">
+                      Graded by {userSubmission.graded_by_name} • {formatDistanceToNow(new Date(userSubmission.graded_at), { addSuffix: true })}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : isOverdue ? (
+            /* Show Overdue Message */
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-4 text-center">
+                <AlertTriangle className="h-8 w-8 text-red-600 mx-auto mb-2" />
+                <h4 className="font-semibold text-red-900 mb-1">Assignment Overdue</h4>
+                <p className="text-sm text-red-700">
+                  This assignment was due {formatDistanceToNow(new Date(post.due_date), { addSuffix: true })}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            /* Show Submission Form */
+            <Card className="border-blue-200">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Upload className="h-5 w-5 text-blue-600" />
+                  Submit Assignment
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Written Response (Optional)
+                  </label>
+                  <Textarea
+                    placeholder="Enter your assignment response here..."
+                    value={submissionText}
+                    onChange={(e) => setSubmissionText(e.target.value)}
+                    className="min-h-[120px] resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Upload Files (Optional)
+                  </label>
+                  <PostFileUpload
+                    attachments={submissionFiles}
+                    onAttachmentsChange={setSubmissionFiles}
+                    maxFiles={5}
+                    acceptedTypes=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.zip,.rar"
+                    showUploadedFiles={true}
+                  />
+                </div>
+
+                <div className="flex justify-between items-center pt-2 border-t">
+                  <div className="text-sm text-gray-600">
+                    {post.due_date ? `Due ${formatDistanceToNow(new Date(post.due_date), { addSuffix: true })}` : 'No due date'}
+                  </div>
+                  <Button
+                    onClick={handleSubmission}
+                    disabled={!submissionText.trim() && submissionFiles.length === 0}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Submit Assignment
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Teacher View */}
+      {isTeacher && (
+        <div className="pt-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-full">
+                <MessageSquare className="h-4 w-4 text-purple-600" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900">Student Submissions</h4>
+                <p className="text-sm text-gray-600">
+                  {submissions.filter(s => s.grade_points !== undefined && s.grade_points !== null).length} graded of {submissions.length} submitted
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onLoadSubmissions?.(post.post_id)}
+              >
+                Refresh
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSubmissions(!showSubmissions)}
+              >
+                {showSubmissions ? 'Hide' : 'Show'} Submissions ({submissions.length})
+              </Button>
+            </div>
+          </div>
+
+          {showSubmissions && (
+            <div className="space-y-3">
+              {submissions.length === 0 ? (
+                <Card className="border-gray-200">
+                  <CardContent className="p-6 text-center text-gray-500">
+                    <MessageSquare className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                    <p>No submissions yet</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                submissions.map((submission) => (
+                  <Card key={submission.id} className="border-gray-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-gray-200 text-gray-700 text-sm">
+                              {submission.author_name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-medium text-gray-900">{submission.author_name}</div>
+                            <div className="text-sm text-gray-500">{submission.author_email}</div>
+                            <div className="text-xs text-gray-400">
+                              Submitted {formatDistanceToNow(new Date(submission.submitted_at), { addSuffix: true })}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {submission.grade_points !== undefined && submission.grade_points !== null ? (
+                          <Badge className={`${getGradeColor(submission.grade_points, post.max_points || 100)} border`}>
+                            {submission.grade_points}/{post.max_points || 100}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">Ungraded</Badge>
+                        )}
+                      </div>
+
+                      {submission.submission_text && (
+                        <div className="mb-3 p-3 bg-gray-50 rounded-lg">
+                          <div className="text-sm text-gray-800 whitespace-pre-wrap">
+                            {submission.submission_text}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Show submitted files */}
+                      {submission.files && submission.files.length > 0 && (
+                        <div className="mb-3">
+                          <div className="text-sm font-medium text-gray-700 mb-2">Attached Files:</div>
+                          <div className="space-y-1">
+                            {submission.files.map((file: any, index: number) => (
+                              <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-gray-500" />
+                                  <span className="text-sm">{file.file_name}</span>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => window.open(file.file_url, '_blank')}
+                                  className="h-6 px-2 text-xs"
+                                >
+                                  View
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Grading Section */}
+                      {submission.grade_points !== undefined && submission.grade_points !== null ? (
+                        <div className="border-t border-gray-200 pt-3">
+                          <div className="text-sm text-gray-600">
+                            <div>Graded by: {submission.graded_by_name}</div>
+                            <div>Graded: {formatDistanceToNow(new Date(submission.graded_at), { addSuffix: true })}</div>
+                            {submission.grade_feedback && (
+                              <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                                <span className="font-medium">Feedback:</span> {submission.grade_feedback}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="border-t border-gray-200 pt-3">
+                          {showGradingForm === submission.id ? (
+                            <div className="space-y-3">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Points (max {post.max_points || 100})
+                                  </label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max={post.max_points || 100}
+                                    value={gradePoints}
+                                    onChange={(e) => setGradePoints(e.target.value)}
+                                    placeholder="0"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Feedback (Optional)
+                                  </label>
+                                  <Input
+                                    value={gradeFeedback}
+                                    onChange={(e) => setGradeFeedback(e.target.value)}
+                                    placeholder="Great work!"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleGrading(submission.id)}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  Save Grade
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setShowGradingForm(null);
+                                    setGradePoints('');
+                                    setGradeFeedback('');
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => setShowGradingForm(submission.id)}
+                              className="bg-blue-600 hover:bg-blue-700"
+                            >
+                              Grade Submission
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
