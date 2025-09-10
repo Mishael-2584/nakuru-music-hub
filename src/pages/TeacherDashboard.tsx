@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
 import VideoConferenceModal from '../components/VideoConferenceModal';
-import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking } from '../lib/videoConferencing';
+import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getUserInvitedMeetings, InstantMeeting } from '../lib/videoConferencing';
 import MessagingUI from '../components/MessagingUI';
 import InstantMeetManager from '../components/InstantMeetManager';
 
@@ -232,6 +232,7 @@ const TeacherDashboard = () => {
   const [showVideoConferenceModal, setShowVideoConferenceModal] = useState(false);
   const [selectedMeetingRoom, setSelectedMeetingRoom] = useState<MeetingRoom | null>(null);
   const [meetingRooms, setMeetingRooms] = useState<MeetingRoom[]>([]);
+  const [invitedMeetings, setInvitedMeetings] = useState<InstantMeeting[]>([]);
   // Filter state
   const [calendarStudent, setCalendarStudent] = useState('all');
   const [calendarLessonType, setCalendarLessonType] = useState('all');
@@ -487,11 +488,19 @@ const TeacherDashboard = () => {
     description: ''
   });
 
-  // Helper to map day_of_week to day name (handles both text and number formats)
-  const getDayName = (dayNum: number | string) => {
-    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-    const idx = typeof dayNum === 'string' ? parseInt(dayNum) : dayNum;
-    return days[(idx || 1) - 1] || "Monday";
+  // Helper to normalize day_of_week display (handles string day names)
+  const getDayName = (dayOfWeek: string) => {
+    // If it's already a valid day name, return it trimmed
+    const validDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    const trimmedDay = (dayOfWeek || '').trim();
+    
+    // Check if it's a valid day name
+    if (validDays.includes(trimmedDay)) {
+      return trimmedDay;
+    }
+    
+    // If it's a number or invalid, default to Monday
+    return "Monday";
   };
 
 
@@ -698,6 +707,12 @@ const TeacherDashboard = () => {
     try {
       const rooms = await getUserMeetingRooms(profile.id, 'teacher');
       setMeetingRooms(rooms);
+      
+      // Also fetch invited meetings for teachers
+      if (profile.user_id) {
+        const invited = await getUserInvitedMeetings(profile.user_id);
+        setInvitedMeetings(invited);
+      }
     } catch (error) {
       console.error('Error fetching meeting rooms:', error);
     }
@@ -1616,9 +1631,15 @@ const TeacherDashboard = () => {
                     </div>
                   </SelectItem>
                   <SelectItem value="video-conferencing">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 relative">
                       <Video className="w-4 h-4" />
                       <span>Video Calls</span>
+                      {/* Live Meeting Notification Badge for mobile */}
+                      {invitedMeetings.filter(m => m.status === 'active').length > 0 && (
+                        <Badge className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 min-w-[18px] h-4 rounded-full animate-pulse flex items-center justify-center">
+                          {invitedMeetings.filter(m => m.status === 'active').length}
+                        </Badge>
+                      )}
                     </div>
                   </SelectItem>
                   <SelectItem value="instant-meetings">
@@ -1669,9 +1690,15 @@ const TeacherDashboard = () => {
                 <Calendar className="w-5 h-5" />
                 <span>Bookings</span>
               </TabsTrigger>
-              <TabsTrigger value="video-conferencing" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:shadow-md transition-all">
+              <TabsTrigger value="video-conferencing" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:shadow-md transition-all relative">
                 <Video className="w-5 h-5" />
                 <span>Video Calls</span>
+                {/* Live Meeting Notification Badge */}
+                {invitedMeetings.filter(m => m.status === 'active').length > 0 && (
+                  <Badge className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-1.5 py-0.5 min-w-[20px] h-5 rounded-full animate-pulse flex items-center justify-center">
+                    {invitedMeetings.filter(m => m.status === 'active').length}
+                  </Badge>
+                )}
               </TabsTrigger>
               <TabsTrigger value="instant-meetings" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all">
                 <Video className="w-5 h-5" />
@@ -2475,31 +2502,101 @@ const TeacherDashboard = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <p className="text-gray-700">
-                      You currently have {meetingRooms.length} video conference room(s) available.
-                      Click on a room to manage its bookings or create a new one.
-                    </p>
-                    {meetingRooms.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {meetingRooms.map(room => (
-                          <Card key={room.id} className="hover:shadow-md transition-shadow cursor-pointer">
-                            <CardContent className="p-4">
-                              <h4 className="font-semibold">{room.roomName}</h4>
-                              <p className="text-sm text-gray-600">Lesson Type: {room.lessonType}</p>
-                              <p className="text-sm text-gray-600">Date: {formatDate(room.startTime)}</p>
-                              <p className="text-sm text-gray-600">Time: {formatTime(room.startTime)} - {formatTime(room.endTime)}</p>
-                              <p className="text-sm text-gray-600">Status: {room.status}</p>
-                              <Button variant="outline" size="sm" onClick={() => handleOpenVideoConference(room)}>
-                                Join Meeting
-                              </Button>
-                            </CardContent>
-                          </Card>
-                        ))}
+                  <div className="space-y-6">
+                    {/* Invited Meetings Section */}
+                    {invitedMeetings.length > 0 && (
+                      <div className="mb-6">
+                        <h3 className="font-semibold text-purple-800 mb-3 flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          Invited Meetings ({invitedMeetings.length})
+                        </h3>
+                        <div className="grid gap-3">
+                          {invitedMeetings.map(meeting => (
+                            <div key={meeting.id} className="p-4 border border-purple-200 rounded-lg bg-purple-50 hover:shadow-md transition-shadow">
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="font-semibold text-purple-900">{meeting.title}</h4>
+                                <div className="flex items-center gap-2">
+                                  <Badge className={meeting.status === 'active' ? 'bg-red-500 text-white animate-pulse' : 'bg-blue-500 text-white'}>
+                                    {meeting.status === 'active' ? '🔴 LIVE' : '📅 Scheduled'}
+                                  </Badge>
+                                  <Badge variant="outline" className="font-mono text-xs">
+                                    {meeting.meetingCode}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4 text-sm text-purple-700 mb-3">
+                                <div>
+                                  <span className="font-medium">Host:</span> {meeting.hostName}
+                                </div>
+                                <div>
+                                  <span className="font-medium">Duration:</span> {meeting.duration} min
+                                </div>
+                              </div>
+                              {meeting.description && (
+                                <p className="text-sm text-purple-600 mb-3 italic">"{meeting.description}"</p>
+                              )}
+                              <div className="flex gap-2">
+                                <Button 
+                                  onClick={() => window.open(meeting.meetingUrl, '_blank')}
+                                  className={`flex items-center gap-1 ${
+                                    meeting.status === 'active' 
+                                      ? 'bg-red-600 hover:bg-red-700 animate-pulse' 
+                                      : 'bg-purple-600 hover:bg-purple-700'
+                                  }`}
+                                  size="sm"
+                                >
+                                  <Video className="w-4 h-4" />
+                                  {meeting.status === 'active' ? '🚀 Join Live Meeting' : 'Join Meeting'}
+                                </Button>
+                                <Button 
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(meeting.meetingCode);
+                                    toast({ title: "Copied", description: "Meeting code copied to clipboard" });
+                                  }}
+                                >
+                                  <Copy className="w-3 h-3 mr-1" />
+                                  Copy Code
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ) : (
-                      <p className="text-gray-500 text-center py-8">No video conference rooms available.</p>
                     )}
+
+                    {/* Regular Meeting Rooms Section */}
+                    <div>
+                      <h3 className="font-semibold text-indigo-800 mb-3 flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        Scheduled Lesson Rooms ({meetingRooms.length})
+                      </h3>
+                      <p className="text-gray-700 mb-4">
+                        You currently have {meetingRooms.length} video conference room(s) available.
+                        Click on a room to manage its bookings or create a new one.
+                      </p>
+                      {meetingRooms.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {meetingRooms.map(room => (
+                            <Card key={room.id} className="hover:shadow-md transition-shadow cursor-pointer">
+                              <CardContent className="p-4">
+                                <h4 className="font-semibold">{room.roomName}</h4>
+                                <p className="text-sm text-gray-600">Lesson Type: {room.lessonType}</p>
+                                <p className="text-sm text-gray-600">Date: {formatDate(room.startTime)}</p>
+                                <p className="text-sm text-gray-600">Time: {formatTime(room.startTime)} - {formatTime(room.endTime)}</p>
+                                <p className="text-sm text-gray-600">Status: {room.status}</p>
+                                <Button variant="outline" size="sm" onClick={() => handleOpenVideoConference(room)}>
+                                  Join Meeting
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-center py-8">No video conference rooms available.</p>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>

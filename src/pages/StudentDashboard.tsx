@@ -2674,9 +2674,15 @@ const StudentDashboard = () => {
                     </div>
                   </SelectItem>
                   <SelectItem value="video-conferencing">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 relative">
                       <Video className="w-4 h-4" />
                       <span>Video Conferencing</span>
+                      {/* Live Meeting Notification Badge for mobile */}
+                      {invitedMeetings.filter(m => m.status === 'active').length > 0 && (
+                        <Badge className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 min-w-[18px] h-4 rounded-full animate-pulse flex items-center justify-center">
+                          {invitedMeetings.filter(m => m.status === 'active').length}
+                        </Badge>
+                      )}
                     </div>
                   </SelectItem>
                 </SelectContent>
@@ -2734,9 +2740,15 @@ const StudentDashboard = () => {
                 <FileText className="w-5 h-5" />
                 <span>Invoices</span>
               </TabsTrigger>
-              <TabsTrigger value="video-conferencing" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:shadow-md transition-all">
+              <TabsTrigger value="video-conferencing" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:shadow-md transition-all relative">
                 <Video className="w-5 h-5" />
                 <span>Video Conferencing</span>
+                {/* Live Meeting Notification Badge */}
+                {invitedMeetings.filter(m => m.status === 'active').length > 0 && (
+                  <Badge className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-1.5 py-0.5 min-w-[20px] h-5 rounded-full animate-pulse flex items-center justify-center">
+                    {invitedMeetings.filter(m => m.status === 'active').length}
+                  </Badge>
+                )}
               </TabsTrigger>
             </TabsList>
 
@@ -2883,12 +2895,25 @@ const StudentDashboard = () => {
                 {/* Available Time Slots */}
                 <Card>
                   <CardHeader>
-                                    <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Available Time Slots</CardTitle>
-                    <CardDescription>Book lessons with our teachers</CardDescription>
-                  </div>
-                </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Available Time Slots</CardTitle>
+                        <CardDescription>Book lessons with our teachers</CardDescription>
+                      </div>
+                      <Button 
+                        onClick={() => {
+                          console.log('🔄 Manually refreshing time slots...');
+                          if (studentProfile) {
+                            fetchAvailableTimeSlotsWithData(studentProfile);
+                          }
+                        }}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Refresh
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
 
