@@ -87,7 +87,7 @@ export default function ClassroomPage() {
   const [isCreatingPost, setIsCreatingPost] = useState(false);
 
   const loadComments = async (postId: string) => {
-    const { data } = await supabase.rpc('get_post_comments', { post_id_param: postId } as any);
+    const { data } = await supabase.rpc('get_post_comments', { post_id_param: postId });
     setPostComments(prev => ({ ...prev, [postId]: data || [] }));
   };
 
@@ -105,7 +105,7 @@ export default function ClassroomPage() {
         author_student_id_param: s?.id || null,
         author_teacher_id_param: t?.id || null,
         content_param: text,
-      } as any);
+      });
       if (error) throw error;
       setNewComment(prev => ({ ...prev, [postId]: '' }));
       await loadComments(postId);
@@ -138,7 +138,7 @@ export default function ClassroomPage() {
           classroom_id_param: classroom.id,
           author_teacher_id_param: t.id,
           content_param: data.content,
-        } as any);
+        });
         
         if (error) throw error;
         
@@ -162,7 +162,7 @@ export default function ClassroomPage() {
             assignment_title: data.isAssignment ? data.assignmentTitle : null,
             due_date: data.isAssignment && data.dueDate ? data.dueDate : null,
             max_points: data.isAssignment ? data.maxPoints : null
-          } as any)
+          })
           .select('id')
           .single();
         
@@ -178,7 +178,7 @@ export default function ClassroomPage() {
             assignment_title: data.assignmentTitle,
             due_date: data.dueDate || null,
             max_points: data.maxPoints || null
-          } as any)
+          })
           .eq('id', postId);
       }
       
@@ -191,7 +191,7 @@ export default function ClassroomPage() {
               file_url: attachment.file_url,
               file_size: attachment.file_size,
               file_type: attachment.file_type
-            } as any);
+            });
           }
         }
       }
@@ -234,7 +234,7 @@ export default function ClassroomPage() {
           .update({
             submission_text: submissionText.trim() || '',
             submitted_at: new Date().toISOString()
-          } as any)
+          })
           .eq('id', existingSubmission.id)
           .select()
           .single();
@@ -318,7 +318,7 @@ export default function ClassroomPage() {
           grade_feedback: feedback || null,
           graded_by: teacher.id,
           graded_at: new Date().toISOString()
-        } as any)
+        })
         .eq('id', submissionId);
       
       if (updateError) throw updateError;
@@ -352,7 +352,7 @@ export default function ClassroomPage() {
     try {
       const { error } = await supabase.rpc("delete_classroom_post", {
         post_id_param: postId,
-      } as any);
+      });
       if (error) throw error;
       await loadFeed(classroom!.id);
       toast({ title: "Deleted", description: "Post has been deleted." });
@@ -423,7 +423,7 @@ export default function ClassroomPage() {
   }, [id, user?.id]);
 
   const loadFeed = async (classroomId: string) => {
-    const { data, error } = await supabase.rpc("get_classroom_feed", { classroom_id_param: classroomId } as any);
+    const { data, error } = await supabase.rpc("get_classroom_feed", { classroom_id_param: classroomId });
     if (!error) {
       const postsWithAttachments = await Promise.all(
         (data || []).map(async (post: any) => {

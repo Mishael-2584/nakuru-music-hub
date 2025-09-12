@@ -1,6 +1,291 @@
 export interface Database {
   public: {
     Tables: {
+      // Classroom System Tables
+      classrooms: {
+        Row: {
+          id: string;
+          created_at: string;
+          updated_at: string;
+          teacher_id: string;
+          name: string;
+          description: string | null;
+          status: 'pending' | 'approved' | 'rejected';
+          class_code: string | null;
+          approved_at: string | null;
+          approved_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          teacher_id: string;
+          name: string;
+          description?: string | null;
+          status?: 'pending' | 'approved' | 'rejected';
+          class_code?: string | null;
+          approved_at?: string | null;
+          approved_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          teacher_id?: string;
+          name?: string;
+          description?: string | null;
+          status?: 'pending' | 'approved' | 'rejected';
+          class_code?: string | null;
+          approved_at?: string | null;
+          approved_by?: string | null;
+        };
+      };
+      classroom_enrollments: {
+        Row: {
+          id: string;
+          created_at: string;
+          classroom_id: string;
+          student_id: string;
+          status: 'invited' | 'enrolled' | 'left';
+          invited_at: string | null;
+          joined_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          classroom_id: string;
+          student_id: string;
+          status?: 'invited' | 'enrolled' | 'left';
+          invited_at?: string | null;
+          joined_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          classroom_id?: string;
+          student_id?: string;
+          status?: 'invited' | 'enrolled' | 'left';
+          invited_at?: string | null;
+          joined_at?: string | null;
+        };
+      };
+      classroom_posts: {
+        Row: {
+          id: string;
+          created_at: string;
+          classroom_id: string;
+          author_teacher_id: string | null;
+          content: string;
+          is_assignment: boolean | null;
+          assignment_title: string | null;
+          due_date: string | null;
+          max_points: number | null;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          classroom_id: string;
+          author_teacher_id?: string | null;
+          content: string;
+          is_assignment?: boolean | null;
+          assignment_title?: string | null;
+          due_date?: string | null;
+          max_points?: number | null;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          classroom_id?: string;
+          author_teacher_id?: string | null;
+          content?: string;
+          is_assignment?: boolean | null;
+          assignment_title?: string | null;
+          due_date?: string | null;
+          max_points?: number | null;
+        };
+      };
+      classroom_comments: {
+        Row: {
+          id: string;
+          created_at: string;
+          post_id: string;
+          author_student_id: string | null;
+          author_teacher_id: string | null;
+          content: string;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          post_id: string;
+          author_student_id?: string | null;
+          author_teacher_id?: string | null;
+          content: string;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          post_id?: string;
+          author_student_id?: string | null;
+          author_teacher_id?: string | null;
+          content?: string;
+        };
+      };
+      classroom_post_attachments: {
+        Row: {
+          id: string;
+          created_at: string;
+          post_id: string;
+          file_name: string;
+          file_url: string;
+          file_size: number | null;
+          file_type: string | null;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          post_id: string;
+          file_name: string;
+          file_url: string;
+          file_size?: number | null;
+          file_type?: string | null;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          post_id?: string;
+          file_name?: string;
+          file_url?: string;
+          file_size?: number | null;
+          file_type?: string | null;
+        };
+      };
+      assignment_submissions: {
+        Row: {
+          id: string;
+          created_at: string;
+          post_id: string;
+          student_id: string;
+          submission_text: string | null;
+          submitted_at: string | null;
+          grade_points: number | null;
+          grade_feedback: string | null;
+          graded_by: string | null;
+          graded_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          post_id: string;
+          student_id: string;
+          submission_text?: string | null;
+          submitted_at?: string | null;
+          grade_points?: number | null;
+          grade_feedback?: string | null;
+          graded_by?: string | null;
+          graded_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          post_id?: string;
+          student_id?: string;
+          submission_text?: string | null;
+          submitted_at?: string | null;
+          grade_points?: number | null;
+          grade_feedback?: string | null;
+          graded_by?: string | null;
+          graded_at?: string | null;
+        };
+      };
+      // Core Tables
+      students: {
+        Row: {
+          id: string;
+          created_at: string;
+          updated_at: string;
+          user_id: string | null;
+          student_name: string;
+          email: string;
+          phone: string;
+          date_of_birth: string | null;
+          learning_mode: string | null;
+          profile_photo_url: string | null;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          user_id?: string | null;
+          student_name: string;
+          email: string;
+          phone: string;
+          date_of_birth?: string | null;
+          learning_mode?: string | null;
+          profile_photo_url?: string | null;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          user_id?: string | null;
+          student_name?: string;
+          email?: string;
+          phone?: string;
+          date_of_birth?: string | null;
+          learning_mode?: string | null;
+          profile_photo_url?: string | null;
+        };
+      };
+      teachers: {
+        Row: {
+          id: string;
+          created_at: string;
+          updated_at: string;
+          user_id: string | null;
+          name: string;
+          email: string;
+          phone: string;
+          password: string;
+          bio: string | null;
+          experience: string | null;
+          category: string;
+          subjects: string[];
+          status: string;
+          cv_file_path: string | null;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          user_id?: string | null;
+          name: string;
+          email: string;
+          phone: string;
+          password: string;
+          bio?: string | null;
+          experience?: string | null;
+          category: string;
+          subjects: string[];
+          status?: string;
+          cv_file_path?: string | null;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          user_id?: string | null;
+          name?: string;
+          email?: string;
+          phone?: string;
+          password?: string;
+          bio?: string | null;
+          experience?: string | null;
+          category?: string;
+          subjects?: string[];
+          status?: string;
+          cv_file_path?: string | null;
+        };
+      };
       quotes: {
         Row: {
           id: string;
@@ -513,10 +798,99 @@ export interface Database {
           participant_join_log?: any;
           scheduled_start_time?: string | null;
         };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      // Classroom RPC Functions
+      create_classroom_post: {
+        Args: {
+          classroom_id_param: string;
+          author_teacher_id_param: string;
+          content_param: string;
+        };
+        Returns: { id: string }[];
+      };
+      get_classroom_feed: {
+        Args: {
+          classroom_id_param: string;
+        };
+        Returns: {
+          post_id: string;
+          content: string;
+          created_at: string;
+          author_name: string;
+          author_teacher_id: string;
+          is_assignment: boolean;
+          assignment_title: string | null;
+          due_date: string | null;
+          max_points: number | null;
+        }[];
+      };
+      get_post_comments: {
+        Args: {
+          post_id_param: string;
+        };
+        Returns: {
+          id: string;
+          content: string;
+          created_at: string;
+          author_name: string;
+          author_role: string;
+        }[];
+      };
+      add_classroom_comment: {
+        Args: {
+          post_id_param: string;
+          author_student_id_param: string | null;
+          author_teacher_id_param: string | null;
+          content_param: string;
+        };
+        Returns: { id: string }[];
+      };
+      update_classroom_post: {
+        Args: {
+          post_id_param: string;
+          new_content_param: string;
+        };
+        Returns: undefined;
+      };
+      delete_classroom_post: {
+        Args: {
+          post_id_param: string;
+        };
+        Returns: undefined;
+      };
+      create_classroom: {
+        Args: {
+          teacher_id_param: string;
+          name_param: string;
+          description_param: string;
+        };
+        Returns: { id: string; status: string }[];
+      };
+      approve_classroom: {
+        Args: {
+          classroom_id_param: string;
+          approved_by_param: string;
+        };
+        Returns: { id: string; class_code: string; status: string }[];
+      };
+      enroll_student_with_code: {
+        Args: {
+          student_id_param: string;
+          class_code_param: string;
+        };
+        Returns: { classroom_id: string; status: string }[];
       };
     };
-  };
-}
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
 
 // Invoice type
 export type Invoice = {
