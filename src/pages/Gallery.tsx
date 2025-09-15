@@ -9,17 +9,17 @@ const GalleryPage = () => {
     <div className="bg-gray-50">
       <Header />
       
-      <main className="pt-32 lg:pt-36 pb-16 md:pb-24">
+      <main className="pt-24 sm:pt-28 lg:pt-32 pb-16 md:pb-24">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12 md:mb-16">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary font-semibold py-2 px-4 rounded-full text-sm mb-4">
               <Camera className="w-5 h-5" />
               Our Gallery
             </div>
-            <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">
               Moments from Our Creative Journey
             </h1>
-            <p className="max-w-3xl mx-auto text-base md:text-lg text-gray-600">
+            <p className="max-w-3xl mx-auto text-base md:text-lg text-gray-600 px-4">
               Explore the vibrant life at Damon Music Academy. A collection of our students' performances, classes, and special moments.
             </p>
           </div>

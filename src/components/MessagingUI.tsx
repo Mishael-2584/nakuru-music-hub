@@ -209,16 +209,16 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
         const sortedMessages = msgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         const lastMessage = sortedMessages[sortedMessages.length - 1];
         const unreadCount = msgs.filter(msg => !msg.is_read && msg.type === 'received').length;
-
+        
         const resolvedUser = resolvedUsers.find(u => u.userId === otherUserId);
-        conversationsList.push({
-          otherUserId,
+          conversationsList.push({
+            otherUserId,
           otherUserName: resolvedUser ? resolvedUser.name : `User ${otherUserId.slice(0, 6)}`,
           otherUserType: resolvedUser ? resolvedUser.type as 'student' | 'teacher' | 'admin' : 'admin',
-          messages: sortedMessages,
-          lastMessage,
-          unreadCount
-        });
+            messages: sortedMessages,
+            lastMessage,
+            unreadCount
+          });
       });
       
       // Sort conversations by last message time

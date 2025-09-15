@@ -116,7 +116,7 @@ BEGIN
     WHERE table_name = 'invoices' 
     AND column_name = 'registration_id'
   ) THEN
-    CREATE INDEX IF NOT EXISTS idx_invoices_registration_id ON public.invoices(registration_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_registration_id ON public.invoices(registration_id);
   END IF;
 
   -- invoice_id index for payments
@@ -125,6 +125,6 @@ BEGIN
     WHERE table_name = 'payments' 
     AND column_name = 'invoice_id'
   ) THEN
-    CREATE INDEX IF NOT EXISTS idx_payments_invoice_id ON public.payments(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_payments_invoice_id ON public.payments(invoice_id);
   END IF;
 END $$; 

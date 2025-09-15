@@ -676,14 +676,14 @@ const Team = () => {
     <>
       <Header />
       <main className="min-h-screen bg-gradient-to-br from-[#f8f6ff] via-[#f9f7fd] to-[#f6f8ff] py-0 px-0">
-        <div className="max-w-7xl mx-auto pt-32 lg:pt-36 pb-20 px-4 md:px-8">
+        <div className="max-w-7xl mx-auto pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20 px-4 md:px-8">
           {/* Header */}
           <div className="text-center mb-12">
             <div className="mb-4">
-              <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent leading-tight">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent leading-tight">
                 Our Team
               </h1>
-              <p className="text-lg text-muted-foreground mt-2">
+              <p className="text-base sm:text-lg text-muted-foreground mt-2 px-4">
                 Meet the passionate professionals behind Damon Music Academy
               </p>
             </div>

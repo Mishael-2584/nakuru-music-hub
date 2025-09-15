@@ -76,11 +76,11 @@ const faqData = [
 const FAQ = () => (
   <div className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-pink-100 relative flex flex-col">
     <Header />
-    <div className="flex-1 pt-32 lg:pt-36 pb-16 px-4 sm:px-8 lg:px-32">
+    <div className="flex-1 pt-24 sm:pt-28 lg:pt-32 pb-16 px-4 sm:px-8 lg:px-32">
       <Card className="max-w-4xl mx-auto shadow-2xl border-0 border-l-8 border-primary bg-white/90">
         <CardHeader className="text-center">
-          <CardTitle className="text-4xl font-extrabold text-primary mb-2 tracking-tight drop-shadow">Frequently Asked Questions</CardTitle>
-          <p className="text-lg text-muted-foreground mb-4">Find answers to common questions about our programs, enrollment, and more. If you need further assistance, please <a href="mailto:info@damonmusicacademy.co.ke" className="text-blue-600 underline">contact us</a> or use the chat below.</p>
+          <CardTitle className="text-3xl sm:text-4xl font-extrabold text-primary mb-2 tracking-tight drop-shadow">Frequently Asked Questions</CardTitle>
+          <p className="text-base sm:text-lg text-muted-foreground mb-4 px-4">Find answers to common questions about our programs, enrollment, and more. If you need further assistance, please <a href="mailto:info@damonmusicacademy.co.ke" className="text-blue-600 underline">contact us</a> or use the chat below.</p>
         </CardHeader>
         <CardContent>
           <Accordion type="multiple" className="space-y-6">

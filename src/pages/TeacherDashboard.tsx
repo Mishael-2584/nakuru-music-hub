@@ -252,32 +252,32 @@ const TeacherDashboard = () => {
 
       // Validate required fields
       if (!newTimeSlot.start_time || !newTimeSlot.end_time) {
-        toast({
+      toast({
           title: "Validation Error",
           description: "Please fill in both start time and end time",
-          variant: "destructive",
-        });
-        return;
-      }
+        variant: "destructive",
+      });
+      return;
+    }
 
       // Validate that end time is after start time
-      if (newTimeSlot.start_time >= newTimeSlot.end_time) {
-        toast({
+    if (newTimeSlot.start_time >= newTimeSlot.end_time) {
+      toast({
           title: "Validation Error",
           description: "End time must be after start time",
-          variant: "destructive",
-        });
-        return;
-      }
+        variant: "destructive",
+      });
+      return;
+    }
 
       console.log('[handleAddTimeSlot] Adding time slot:', {
         teacher_id: profile.id,
         day_of_week: newTimeSlot.day_of_week,
-        start_time: newTimeSlot.start_time,
-        end_time: newTimeSlot.end_time,
+      start_time: newTimeSlot.start_time,
+      end_time: newTimeSlot.end_time,
         slot_type: newTimeSlot.slot_type,
         max_students: newTimeSlot.max_students,
-        description: newTimeSlot.description
+      description: newTimeSlot.description
       });
 
       const { data, error } = await supabase
@@ -519,10 +519,10 @@ const TeacherDashboard = () => {
         
         // First try to find teacher by user_id (Auth UID)
         let { data: teacherProfile, error: teacherError } = await supabase
-          .from('teachers')
-          .select('*')
+              .from('teachers')
+              .select('*')
           .eq('user_id', user.id)
-          .single();
+              .single();
 
         console.log('[TeacherDashboard] Teacher lookup by user_id:', {
           found: !!teacherProfile,
@@ -533,10 +533,10 @@ const TeacherDashboard = () => {
         // If not found by user_id, try by email
         if (!teacherProfile && user.email) {
           const { data: teacherByEmail, error: emailError } = await supabase
-            .from('teachers')
-            .select('*')
-            .eq('email', user.email)
-            .single();
+          .from('teachers')
+          .select('*')
+          .eq('email', user.email)
+          .single();
 
           console.log('[TeacherDashboard] Teacher lookup by email:', {
             found: !!teacherByEmail,
@@ -555,8 +555,8 @@ const TeacherDashboard = () => {
           setIsApproved(teacherProfile.status === 'approved');
         } else {
           console.log('[TeacherDashboard] No teacher profile found');
-          setIsTeacher(false);
-          setIsApproved(false);
+            setIsTeacher(false);
+            setIsApproved(false);
         }
       } catch (error) {
         console.error('[TeacherDashboard] Error in checkUserRole:', error);
@@ -1025,16 +1025,16 @@ const TeacherDashboard = () => {
                     });
                       
                     return meetingRoom;
-                  } catch (error) {
+    } catch (error) {
                     console.error('[TeacherDashboard] Error creating meeting room for existing booking:', error);
-                    toast({
+      toast({
                       title: "Error Creating Meeting Room",
                       description: error instanceof Error ? error.message : "Failed to create meeting room. Please try again.",
-                      variant: "destructive",
-                    });
+        variant: "destructive",
+      });
                     return null;
-                  }
-                };
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -1207,19 +1207,19 @@ const TeacherDashboard = () => {
   const calendarEvents: LessonEvent[] = [
     ...lessons.map(lesson => {
       const event = {
-        id: lesson.id,
-        title: lesson.title || 'Lesson',
-        start: new Date(`${lesson.lesson_date}T${lesson.start_time}`),
-        end: new Date(`${lesson.lesson_date}T${lesson.end_time}`),
-        status: lesson.status,
-        lesson_type: lesson.lesson_type,
-        student_name: lesson.student_name,
-        notes: lesson.notes,
-        lesson_date: lesson.lesson_date,
-        start_time: lesson.start_time,
-        end_time: lesson.end_time,
+    id: lesson.id,
+    title: lesson.title || 'Lesson',
+    start: new Date(`${lesson.lesson_date}T${lesson.start_time}`),
+    end: new Date(`${lesson.lesson_date}T${lesson.end_time}`),
+    status: lesson.status,
+    lesson_type: lesson.lesson_type,
+    student_name: lesson.student_name,
+    notes: lesson.notes,
+    lesson_date: lesson.lesson_date,
+    start_time: lesson.start_time,
+    end_time: lesson.end_time,
         materials_url: lesson.materials_url || [],
-        ...lesson,
+    ...lesson,
       };
               return event;
       }),
@@ -1557,8 +1557,8 @@ const TeacherDashboard = () => {
               <span className="text-base sm:text-lg font-semibold text-white drop-shadow">Welcome, {profile?.name || 'Teacher'}</span>
               <span className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs sm:text-sm font-semibold shadow">
                 <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Teacher
-              </span>
-            </div>
+            </span>
+          </div>
           </div>
           <p className="text-white/90 text-sm sm:text-base lg:text-lg mb-4 px-4">Empowering music education and managing your teaching journey</p>
           <div className="flex flex-col sm:flex-row justify-center w-full max-w-4xl mx-auto mt-2 gap-2">
@@ -1838,7 +1838,7 @@ const TeacherDashboard = () => {
                                   {/* Student Avatar */}
                                   <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
                                     {student.student_name.charAt(0)}
-                                  </div>
+                  </div>
                                   
                                   {/* Student Info - Desktop */}
                                   <div className="hidden md:flex items-center space-x-6 flex-1">
@@ -1848,31 +1848,31 @@ const TeacherDashboard = () => {
                                         <div className="flex items-center gap-1">
                                           <Mail className="w-3 h-3" />
                                           <span className="truncate">{student.email}</span>
-                                        </div>
+                        </div>
                                         {student.phone && (
                                           <div className="flex items-center gap-1">
                                             <Phone className="w-3 h-3" />
                                             <span>{student.phone}</span>
-                                          </div>
+                        </div>
                                         )}
-                                      </div>
-                                    </div>
+                        </div>
+                        </div>
                                     
                                     <div className="flex items-center gap-4 text-sm">
                                       <div className="flex items-center gap-1">
                                         <Music className="w-4 h-4 text-purple-500" />
                                         <span className="text-gray-700">{student.instrument}</span>
-                                      </div>
+                        </div>
                                       <div className="flex items-center gap-1">
                                         <Award className="w-4 h-4 text-blue-500" />
                                         <span className="text-gray-700">{student.proficiency_level}</span>
-                                      </div>
-                                    </div>
+                        </div>
+                      </div>
                                     
                                     <Badge className={`${getStatusColor(student.status)} text-xs flex-shrink-0`}>
                                       {student.status}
                                     </Badge>
-                                  </div>
+                      </div>
                                   
                                   {/* Student Info - Mobile */}
                                   <div className="md:hidden flex-1 min-w-0">
@@ -1880,11 +1880,11 @@ const TeacherDashboard = () => {
                                     <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
                                       <Music className="w-3 h-3 text-purple-500" />
                                       <span className="truncate">{student.instrument}</span>
-                                    </div>
+                            </div>
                                     <Badge className={`${getStatusColor(student.status)} text-xs mt-2 inline-block`}>
                                       {student.status}
                                     </Badge>
-                                  </div>
+                          </div>
                                 </div>
                                 
                                 {/* Actions */}
@@ -1905,11 +1905,11 @@ const TeacherDashboard = () => {
                                     className="sm:hidden w-8 h-8 p-0"
                                   >
                                     <Eye className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
+                            </Button>
+                          </div>
+                  </div>
+                </CardContent>
+              </Card>
                         ))}
                       </div>
                       
@@ -1941,7 +1941,7 @@ const TeacherDashboard = () => {
                                     className="w-8 h-8 p-0"
                                   >
                                     {page}
-                                  </Button>
+                            </Button>
                                 );
                               })}
                               {totalPages > 5 && (
@@ -1957,7 +1957,7 @@ const TeacherDashboard = () => {
                                   </Button>
                                 </>
                               )}
-                            </div>
+                          </div>
                             
                             <Button
                               variant="outline"
@@ -1967,7 +1967,7 @@ const TeacherDashboard = () => {
                             >
                               <ChevronRight className="w-4 h-4" />
                             </Button>
-                          </div>
+                        </div>
                         </div>
                       )}
                     </>
@@ -1976,7 +1976,7 @@ const TeacherDashboard = () => {
                       <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                       <p className="text-gray-500 text-lg font-medium">No students have booked sessions yet</p>
                       <p className="text-gray-400 text-sm mt-2">Students will appear here once they book lessons with you</p>
-                    </div>
+                  </div>
                   )}
                 </CardContent>
               </Card>
@@ -2078,7 +2078,7 @@ const TeacherDashboard = () => {
                                       Status: <Badge className={`ml-1 ${c.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
                                         {c.status}
                                       </Badge>
-                                    </div>
+                            </div>
                                     {c.class_code && (
                                       <div className="flex items-center gap-2 mb-3">
                                         <span className="text-sm text-gray-600">Class Code:</span>
@@ -2100,9 +2100,9 @@ const TeacherDashboard = () => {
                                             <Copy className="h-3 w-3 text-gray-500" />
                                           )}
                                         </Button>
-                                      </div>
+                          </div>
                                     )}
-                                  </div>
+                        </div>
                                 </div>
                                 <div className="flex gap-2">
                                   <Button 
@@ -2130,16 +2130,16 @@ const TeacherDashboard = () => {
                                         <Copy className="h-4 w-4" />
                                       )}
                                     </Button>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
                           ))}
-                        </div>
+                  </div>
                       ) : (
                         <p className="text-gray-500">No classrooms yet.</p>
                       )}
-                    </div>
+                        </div>
 
                     {/* Feed composer and posts for selected classroom */}
                     {selectedTeacherClassroom && (
@@ -2149,7 +2149,7 @@ const TeacherDashboard = () => {
                           <Textarea placeholder="Share an update with your class" value={newPostContent} onChange={(e) => setNewPostContent(e.target.value)} />
                           <div className="mt-2 flex justify-end">
                             <Button size="sm" onClick={handleCreatePost} disabled={!newPostContent.trim()}>Post</Button>
-                          </div>
+                        </div>
                         </div>
                         <div className="space-y-3">
                           {teacherClassroomFeed.length > 0 ? teacherClassroomFeed.map(post => (
@@ -2157,11 +2157,11 @@ const TeacherDashboard = () => {
                               <CardHeader>
                                 <CardTitle className="text-base">{post.author_name}</CardTitle>
                                 <CardDescription>{new Date(post.created_at).toLocaleString()}</CardDescription>
-                              </CardHeader>
-                              <CardContent>
+                </CardHeader>
+                <CardContent>
                                 <p className="whitespace-pre-wrap">{post.content}</p>
-                              </CardContent>
-                            </Card>
+                          </CardContent>
+                        </Card>
                           )) : (
                             <p className="text-gray-500">No posts yet.</p>
                           )}
@@ -2366,11 +2366,11 @@ const TeacherDashboard = () => {
                 {/* Calendar */}
                 <div className="border rounded-lg p-4">
                   {filteredCalendarEvents.length > 0 ? (
-                    <LessonCalendar
-                      events={filteredCalendarEvents}
-                      onSelectEvent={handleSelectEvent}
-                      defaultView="week"
-                    />
+                <LessonCalendar
+                  events={filteredCalendarEvents}
+                  onSelectEvent={handleSelectEvent}
+                  defaultView="week"
+                />
                   ) : (
                     <div className="text-center py-8 text-gray-500">
                       <p>No events to display in calendar.</p>
@@ -2392,7 +2392,7 @@ const TeacherDashboard = () => {
                 </div>
                 
                 {selectedEvent && (
-                  <EventDetailsModal open={eventModalOpen} onClose={() => setEventModalOpen(false)} event={selectedEvent} isTeacher={isTeacher} />
+                <EventDetailsModal open={eventModalOpen} onClose={() => setEventModalOpen(false)} event={selectedEvent} isTeacher={isTeacher} />
                 )}
               </Card>
             </TabsContent>
@@ -2572,7 +2572,7 @@ const TeacherDashboard = () => {
                               </div>
                             </div>
                           ))}
-                        </div>
+                    </div>
                       </div>
                     )}
 
@@ -2640,14 +2640,14 @@ const TeacherDashboard = () => {
       {/* Student Details Modal */}
       <Dialog open={showStudentDetailsModal} onOpenChange={setShowStudentDetailsModal}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+            <DialogHeader>
             <DialogTitle className="text-2xl font-bold flex items-center gap-3">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
                 {selectedStudent?.student_name?.charAt(0)}
               </div>
               {selectedStudent?.student_name}
             </DialogTitle>
-          </DialogHeader>
+            </DialogHeader>
           
           {selectedStudent && (
             <div className="space-y-6">
@@ -2665,7 +2665,7 @@ const TeacherDashboard = () => {
                       <Mail className="w-4 h-4 text-gray-500" />
                       <span className="font-medium">Email:</span>
                       <span className="text-gray-700">{selectedStudent.email}</span>
-                    </div>
+                  </div>
                     {selectedStudent.phone && (
                       <div className="flex items-center gap-2">
                         <Phone className="w-4 h-4 text-gray-500" />
@@ -2759,19 +2759,19 @@ const TeacherDashboard = () => {
                           }`}>
                             {booking.status}
                           </Badge>
-                        </div>
-                      ))}
+                </div>
+              ))}
                       {studentBookings.length > 10 && (
                         <p className="text-sm text-gray-500 text-center py-2">
                           Showing latest 10 bookings out of {studentBookings.length} total
                         </p>
                       )}
-                    </div>
+            </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500">
                       <CalendarIcon className="w-12 h-12 text-gray-300 mx-auto mb-2" />
                       <p>No booking history available</p>
-                    </div>
+            </div>
                   )}
                 </CardContent>
               </Card>
@@ -2813,8 +2813,8 @@ const TeacherDashboard = () => {
               Close
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
 
     </div>
   );

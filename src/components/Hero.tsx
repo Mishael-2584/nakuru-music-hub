@@ -95,7 +95,7 @@ const Hero = () => {
 
   return (
     <>
-      <section className="relative min-h-screen flex items-center overflow-hidden pt-32 lg:pt-36">
+      <section className="relative min-h-screen flex items-center overflow-hidden pt-24 sm:pt-28 lg:pt-32">
         {/* Background carousel */}
         <div className="absolute inset-0">
           <div 
@@ -165,7 +165,7 @@ const Hero = () => {
               </div>
             )}
             
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
               <span className="text-white">{currentSlideData.title}</span>
               <br />
               <span className="bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
@@ -173,7 +173,7 @@ const Hero = () => {
               </span>
             </h1>
             
-            <p className="text-lg sm:text-xl md:text-2xl text-white/90 mb-6 sm:mb-8 max-w-2xl leading-relaxed">
+            <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-white/90 mb-6 sm:mb-8 max-w-2xl leading-relaxed px-4">
               {currentSlideData.description}
             </p>
             

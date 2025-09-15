@@ -16,11 +16,11 @@ const Shop = () => {
     <>
       <Header />
       <main className="bg-gradient-to-br from-[#f8f6ff] via-[#f9f7fd] to-[#f6f8ff] py-0 px-0">
-        <div className="max-w-7xl mx-auto flex flex-col gap-8 pt-32 lg:pt-36 pb-20 px-2 md:px-8">
+        <div className="max-w-7xl mx-auto flex flex-col gap-8 pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20 px-2 md:px-8">
           {/* Header Section */}
           <div className="text-center mb-8">
-            <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent mb-4">Shop</h1>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-6">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent mb-4">Shop</h1>
+            <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-6 px-4">
               Explore our curated selection of digital performance tracks, musical instruments, accessories, and official Damon Music Academy merchandise.
             </p>
             <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">

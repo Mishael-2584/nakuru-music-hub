@@ -67,16 +67,16 @@ const Header = () => {
       {/* Contact Navigation Bar */}
       <div className="bg-gradient-to-r from-primary/95 to-accent/95 backdrop-blur-sm border-b border-white/20">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between py-2 text-white">
+          <div className="flex flex-col sm:flex-row items-center justify-between py-1 sm:py-2 text-white">
             {/* Contact Info */}
-            <div className="flex flex-wrap items-center gap-4 text-sm">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
               <a 
                 href="tel:+254701195460" 
                 className="flex items-center gap-1 hover:text-primary-200 transition-colors"
               >
-                <Phone className="h-4 w-4" />
+                <Phone className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">+254 701 195 460</span>
-                <span className="sm:hidden">+254 701 195 460</span>
+                <span className="sm:hidden text-xs">+254 701 195 460</span>
               </a>
               <a 
                 href="tel:+254713490535" 
@@ -89,25 +89,25 @@ const Header = () => {
                 href="mailto:info@damonmusicacademy.co.ke" 
                 className="flex items-center gap-1 hover:text-primary-200 transition-colors"
               >
-                <Mail className="h-4 w-4" />
+                <Mail className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="hidden md:inline">info@damonmusicacademy.co.ke</span>
-                <span className="md:hidden">Email Us</span>
+                <span className="md:hidden text-xs">Email Us</span>
               </a>
             </div>
             
             {/* Quick Actions */}
             <div className="flex items-center gap-3">
               {/* Mobile Login/Enroll Buttons */}
-              <div className="flex items-center gap-2 sm:hidden">
+              <div className="flex items-center gap-1 sm:hidden">
                 <Link 
                   to="/auth"
-                  className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-white/20 hover:bg-white/30 transition-colors text-white"
+                  className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-white/20 hover:bg-white/30 transition-colors text-white"
                 >
                   Login
                 </Link>
                 <Link 
                   to="/registration"
-                  className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-orange-500 hover:bg-orange-600 transition-colors text-white"
+                  className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-500 hover:bg-orange-600 transition-colors text-white"
                 >
                   Enroll
                 </Link>
@@ -141,10 +141,10 @@ const Header = () => {
 
       {/* Main Header */}
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-16 sm:h-18 md:h-20">
           {/* Logo - Updated with new logo */}
           <Link to="/" className="flex items-center group">
-            <img alt="Damon Music Academy Logo" src="/damon-logo.png" className="h-12 sm:h-14 object-contain transition-transform duration-300 group-hover:scale-105 cursor-pointer" />
+            <img alt="Damon Music Academy Logo" src="/damon-logo.png" className="h-10 sm:h-12 md:h-14 object-contain transition-transform duration-300 group-hover:scale-105 cursor-pointer" />
           </Link>
 
           {/* Desktop Navigation */}

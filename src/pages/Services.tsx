@@ -150,13 +150,13 @@ const ServicesPage = () => {
     <div className="min-h-screen">
       <Header />
       
-      <section className="pt-32 lg:pt-36 py-20 bg-gradient-to-br from-secondary/5 to-primary/5">
+      <section className="pt-24 sm:pt-28 lg:pt-32 py-16 sm:py-20 bg-gradient-to-br from-secondary/5 to-primary/5">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h1 className="text-4xl sm:text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Our Services
             </h1>
-            <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
               Complete Production and Creative Solutions for Every Vision and Event.
             </p>
           </div>
