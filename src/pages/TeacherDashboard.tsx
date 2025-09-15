@@ -1648,12 +1648,18 @@ const TeacherDashboard = () => {
                       <span>Instant Meet</span>
                     </div>
                   </SelectItem>
+                  <SelectItem value="account">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      <span>Account</span>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Desktop horizontal tabs */}
-            <TabsList className="hidden lg:flex flex-wrap w-full bg-white/80 shadow-sm rounded-lg overflow-x-auto gap-1 justify-center p-1">
+            {/* Responsive tabs: scroll on small, wrap on larger screens */}
+            <TabsList className="flex w-full bg-white/80 shadow-sm rounded-lg gap-1 justify-start p-1 overflow-x-auto sm:justify-center sm:flex-wrap sm:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory">
               <TabsTrigger value="dashboard" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-md transition-all">
                 <Bell className="w-5 h-5" />
                 <span>Dashboard</span>
@@ -1703,6 +1709,10 @@ const TeacherDashboard = () => {
               <TabsTrigger value="instant-meetings" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all">
                 <Video className="w-5 h-5" />
                 <span>Instant Meet</span>
+              </TabsTrigger>
+              <TabsTrigger value="account" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-amber-700 data-[state=active]:bg-amber-100 data-[state=active]:shadow-md transition-all">
+                <User className="w-5 h-5" />
+                <span>Account</span>
               </TabsTrigger>
             </TabsList>
 
@@ -2610,6 +2620,18 @@ const TeacherDashboard = () => {
                 userRole={profile?.category === 'admin' ? 'admin' : 'teacher'}
                 className="space-y-6"
               />
+            </TabsContent>
+            {/* Account redirect tab */}
+            <TabsContent value="account" className="mt-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Account Settings</CardTitle>
+                  <CardDescription>Manage your profile picture, bio, and documents</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Link to="/teacher/account" className="inline-flex items-center px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700">Open Account</Link>
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         </div>

@@ -332,6 +332,9 @@ const StudentDashboard = () => {
 
   const [isBookingWithMakeupCredit, setIsBookingWithMakeupCredit] = useState(false);
   const [timeSlotConflicts, setTimeSlotConflicts] = useState<{[key: string]: boolean}>({});
+  // Pagination for available time slots
+  const [timeSlotsPage, setTimeSlotsPage] = useState(1);
+  const timeSlotsPerPage = 5;
 
   const [showAllInvoices, setShowAllInvoices] = useState(false);
 
@@ -801,8 +804,11 @@ const StudentDashboard = () => {
           next_available_date: slot.next_available_date
         }));
 
-        console.log('✅ Processed time slots:', transformedSlots);
-        setAvailableTimeSlots(transformedSlots);
+        // Sort by next available date/time ascending
+        const sorted = transformedSlots.sort((a, b) => new Date(a.next_available_date || `${a.day_of_week}`).getTime() - new Date(b.next_available_date || `${b.day_of_week}`).getTime());
+        console.log('✅ Processed time slots:', sorted);
+        setAvailableTimeSlots(sorted);
+        setTimeSlotsPage(1);
       } else {
         console.log('⚠️ No time slots found or data is empty');
         setAvailableTimeSlots([]);
@@ -855,8 +861,10 @@ const StudentDashboard = () => {
           next_available_date: slot.next_available_date
         }));
 
-        console.log('✅ Processed time slots:', transformedSlots);
-        setAvailableTimeSlots(transformedSlots);
+        const sorted = transformedSlots.sort((a, b) => new Date(a.next_available_date || `${a.day_of_week}`).getTime() - new Date(b.next_available_date || `${b.day_of_week}`).getTime());
+        console.log('✅ Processed time slots:', sorted);
+        setAvailableTimeSlots(sorted);
+        setTimeSlotsPage(1);
       } else {
         console.log('⚠️ No time slots found or data is empty');
         setAvailableTimeSlots([]);
@@ -996,16 +1004,25 @@ const StudentDashboard = () => {
     if (!studentProfile) return;
 
     try {
+      console.log('🚀 Fetching booking status with new function for:', studentProfile.id);
+      
+      // Use the updated function with booking_date_param for accurate current week calculation
       const { data, error } = await supabase
-        .rpc('get_student_booking_status', { student_id_param: studentProfile.id });
+        .rpc('get_student_booking_status', { 
+          student_id_param: studentProfile.id,
+          booking_date_param: new Date().toISOString().split('T')[0]
+        });
 
       if (error) {
         console.error('Error fetching booking status:', error);
         return;
       }
 
+      console.log('📊 Booking status response:', data);
+      
       if (data && data.length > 0) {
         setBookingStatus(data[0]);
+        console.log('✅ Updated booking status:', data[0]);
       }
     } catch (error) {
       console.error('Error fetching booking status:', error);
@@ -1275,8 +1292,8 @@ const StudentDashboard = () => {
     });
   };
 
-  // Get next available date as ISO string for booking
-  const getNextAvailableDateISO = (dayOfWeek: string): string => {
+  // Get next available date as ISO string for booking (allow same-day if >6h before start)
+  const getNextAvailableDateISO = (dayOfWeek: string, startTime?: string): string => {
     // Use database function for consistency
     const today = new Date();
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -1288,8 +1305,16 @@ const StudentDashboard = () => {
     let daysToAdd = targetDayIndex - currentDayIndex;
     
     // If the target day has passed this week, get next week's date
-    if (daysToAdd <= 0) {
+    if (daysToAdd < 0) {
       daysToAdd += 7;
+    } else if (daysToAdd === 0 && startTime) {
+      const [h, m] = startTime.split(':').map(Number);
+      const start = new Date(today);
+      start.setHours(h, m || 0, 0, 0);
+      const diffHours = (start.getTime() - today.getTime()) / (1000 * 60 * 60);
+      if (diffHours <= 6) {
+        daysToAdd = 7; // within 6 hours, push to next week
+      }
     }
     
     const nextDate = new Date(today);
@@ -1304,7 +1329,7 @@ const StudentDashboard = () => {
 
     try {
       // Automatically calculate the next available date for the selected day
-      const bookingDate = getNextAvailableDateISO(selectedTimeSlot.day_of_week);
+      const bookingDate = getNextAvailableDateISO(selectedTimeSlot.day_of_week, selectedTimeSlot.start_time);
       
       // Check for time conflicts before proceeding with booking
       const hasConflict = await checkTimeSlotConflict(selectedTimeSlot);
@@ -1318,11 +1343,23 @@ const StudentDashboard = () => {
       }
       
       // Check booking capacity with enhanced validation (includes makeup credits)
+      console.log('🚀 About to check booking capacity for:', {
+        student_id: studentProfile.id,
+        booking_date: bookingDate,
+        student_name: studentProfile.student_name,
+        sessions_per_week: studentProfile.sessions_per_week || 'not set'
+      });
+      
       const { data: bookingCapacity, error: capacityError } = await supabase
         .rpc('validate_student_booking_capacity', { 
           student_id_param: studentProfile.id,
           booking_date_param: bookingDate
         });
+
+      console.log('📦 Raw booking capacity response:', {
+        data: bookingCapacity,
+        error: capacityError
+      });
 
       if (capacityError) {
         console.error('Error checking booking capacity:', capacityError);
@@ -1344,10 +1381,18 @@ const StudentDashboard = () => {
       }
       
       console.log('📊 Booking capacity:', bookingCapacity);
+      console.log('📅 Booking date:', bookingDate);
+      console.log('📅 Week start:', bookingCapacity.week_start);
+      console.log('📅 Week end:', bookingCapacity.week_end);
       
       // If student can't book more sessions, check if they have make-up credits
       if (!bookingCapacity.can_book) {
         const availableCredits = bookingCapacity.available_makeup_credits || 0;
+        
+        console.log('🚫 Cannot book regular session - limit reached');
+        console.log('Current bookings this week:', bookingCapacity.current_bookings);
+        console.log('Total capacity:', bookingCapacity.total_capacity);
+        console.log('Available makeup credits:', availableCredits);
         
         if (availableCredits > 0) {
           // If booking with makeup credit is explicitly requested, proceed
@@ -1357,7 +1402,8 @@ const StudentDashboard = () => {
           } else {
             // Ask user if they want to use a make-up credit
             const useMakeupCredit = window.confirm(
-              `You have reached your enrollment limit of ${bookingCapacity.total_capacity} session${bookingCapacity.total_capacity !== 1 ? 's' : ''} per week (${bookingCapacity.current_bookings}/${bookingCapacity.total_capacity} used).\n\n` +
+              `You have reached your enrollment limit of ${bookingCapacity.regular_sessions} session${bookingCapacity.regular_sessions !== 1 ? 's' : ''} per week (${bookingCapacity.current_bookings}/${bookingCapacity.regular_sessions} used).\n\n` +
+              `Week period: ${bookingCapacity.week_start} to ${bookingCapacity.week_end}\n\n` +
               `You have ${availableCredits} make-up credit(s) available.\n\n` +
               `Would you like to use a make-up credit for this booking?`
             );
@@ -1365,7 +1411,7 @@ const StudentDashboard = () => {
             if (!useMakeupCredit) {
               toast({
                 title: "Booking Cancelled",
-                description: "You can book again next week or use a make-up credit.",
+                description: `You can book again next week (starting ${new Date(new Date(bookingCapacity.week_start).getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString()}) or use a make-up credit.`,
                 variant: "destructive",
               });
               return;
@@ -1386,13 +1432,20 @@ const StudentDashboard = () => {
             return;
           }
           
+          // Enhanced error message with week details
+          const nextWeekStart = new Date(new Date(bookingCapacity.week_start).getTime() + 7 * 24 * 60 * 60 * 1000);
+          
           toast({
-            title: "Enrollment Limit Reached",
-            description: `You have already booked ${bookingCapacity.current_bookings} out of ${bookingCapacity.total_capacity} session${bookingCapacity.total_capacity !== 1 ? 's' : ''} this week (based on your enrollment). Please wait until next week or contact your teacher to reschedule.`,
+            title: "Weekly Session Limit Reached",
+            description: `You have booked ${bookingCapacity.current_bookings} out of ${bookingCapacity.regular_sessions} session${bookingCapacity.regular_sessions !== 1 ? 's' : ''} for this week (${bookingCapacity.week_start} to ${bookingCapacity.week_end}). Next week starts on ${nextWeekStart.toLocaleDateString()}.`,
             variant: "destructive",
           });
           return;
         }
+      } else {
+        console.log('✅ Can book regular session');
+        console.log('Current bookings:', bookingCapacity.current_bookings);
+        console.log('Remaining slots:', bookingCapacity.remaining_slots);
       }
 
       const isOnline = studentProfile.learning_mode === 'online';
@@ -1803,7 +1856,7 @@ const StudentDashboard = () => {
     
     try {
       // Automatically calculate start and end dates
-      const startDate = getNextAvailableDateISO(selectedTimeSlot.day_of_week);
+      const startDate = getNextAvailableDateISO(selectedTimeSlot.day_of_week, selectedTimeSlot.start_time);
       const endDate = getRecurringEndDateISO(selectedTimeSlot.day_of_week, recurringBooking.frequency);
       
       // Check for overlapping bookings in the recurring period
@@ -2506,7 +2559,7 @@ const StudentDashboard = () => {
   const checkTimeSlotConflict = async (timeSlot: AvailableTimeSlot) => {
     if (!studentProfile) return false;
     
-    const bookingDate = getNextAvailableDateISO(timeSlot.day_of_week);
+    const bookingDate = getNextAvailableDateISO(timeSlot.day_of_week, timeSlot.start_time);
     
     try {
       // Check for overlapping bookings at the same time
@@ -2689,8 +2742,13 @@ const StudentDashboard = () => {
               </Select>
             </div>
 
-            {/* Desktop horizontal tabs */}
-            <TabsList className="hidden lg:flex flex-wrap w-full bg-white/80 shadow-sm rounded-lg overflow-x-auto gap-1 justify-center p-1">
+            {/* Responsive tabs: scroll on small, wrap on larger screens */}
+            {/* Horizontal scroll hint: shows gradient and arrow on overflow */}
+            <div className="relative">
+              <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-white to-transparent hidden md:block" />
+              <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hidden md:block select-none">→</div>
+            </div>
+            <TabsList className="flex w-full bg-white/80 shadow-sm rounded-lg gap-2 justify-start p-1 overflow-x-auto flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory mb-1">
               <TabsTrigger value="dashboard" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-md transition-all">
                 <BarChart3 className="w-5 h-5" />
                 <span>Dashboard</span>
@@ -2920,7 +2978,20 @@ const StudentDashboard = () => {
                     {/* Session Limit Display */}
                     {bookingStatus && (
                       <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <h4 className="font-semibold text-blue-800 mb-2">Your Enrollment Session Limits</h4>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold text-blue-800">Your Enrollment Session Limits</h4>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => {
+                              console.log('🔄 Refreshing booking status...');
+                              fetchBookingStatus();
+                            }}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                          </Button>
+                        </div>
                         <p className="text-sm text-blue-700 mb-3">
                           Based on your enrollment: {bookingStatus.sessions_per_week} session{bookingStatus.sessions_per_week !== 1 ? 's' : ''} per week
                         </p>
@@ -2986,6 +3057,7 @@ const StudentDashboard = () => {
                       {availableTimeSlots
                         .filter(slot => selectedTeacher === 'all' || slot.teacher_id === selectedTeacher)
                         .filter(slot => slot.current_bookings < slot.max_students)
+                        .slice((timeSlotsPage - 1) * timeSlotsPerPage, timeSlotsPage * timeSlotsPerPage)
                         .map(slot => (
                           <div key={slot.id} className={`p-4 border rounded-lg hover:shadow-md transition-shadow ${
                             slot.has_conflict ? 'border-red-300 bg-red-50' : 'border-gray-200'
@@ -3071,6 +3143,14 @@ const StudentDashboard = () => {
                         slot.current_bookings < slot.max_students
                       ).length === 0 && (
                         <p className="text-gray-500 text-center py-8">No available time slots found</p>
+                      )}
+                      {/* Pagination controls */}
+                      {availableTimeSlots.filter(slot => (selectedTeacher === 'all' || slot.teacher_id === selectedTeacher) && slot.current_bookings < slot.max_students).length > timeSlotsPerPage && (
+                        <div className="flex items-center justify-center gap-3 pt-4">
+                          <Button variant="outline" size="sm" disabled={timeSlotsPage === 1} onClick={() => setTimeSlotsPage(p => Math.max(1, p - 1))}>Previous</Button>
+                          <span className="text-sm text-gray-600">Page {timeSlotsPage} of {Math.ceil(availableTimeSlots.filter(slot => (selectedTeacher === 'all' || slot.teacher_id === selectedTeacher) && slot.current_bookings < slot.max_students).length / timeSlotsPerPage)}</span>
+                          <Button variant="outline" size="sm" disabled={timeSlotsPage >= Math.ceil(availableTimeSlots.filter(slot => (selectedTeacher === 'all' || slot.teacher_id === selectedTeacher) && slot.current_bookings < slot.max_students).length / timeSlotsPerPage)} onClick={() => setTimeSlotsPage(p => p + 1)}>Next</Button>
+                        </div>
                       )}
                     </div>
                   </CardContent>
@@ -4383,9 +4463,6 @@ const StudentDashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-
-
 
     </div>
   );

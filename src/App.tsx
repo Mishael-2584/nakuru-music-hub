@@ -23,6 +23,7 @@ import RegistrationPage from "./pages/Registration";
 import EmailDebug from "./pages/EmailDebug";
 import StudentDashboard from "./pages/StudentDashboard";
 import TeacherDashboard from "./pages/TeacherDashboard";
+import TeacherAccount from "./pages/TeacherAccount";
 import TeacherSignup from "./pages/TeacherSignup";
 import Shop from "./pages/Shop";
 import Team from "./pages/Team";
@@ -94,6 +95,7 @@ const App = () => (
             <Route path="/email-debug" element={<EmailDebug />} />
             <Route path="/student" element={<StudentDashboard />} />
             <Route path="/teacher" element={<TeacherDashboard />} />
+            <Route path="/teacher/account" element={<TeacherAccount />} />
             <Route path="/classrooms/:id" element={<ClassroomPage />} />
             <Route path="/teacher-signup" element={<TeacherSignup />} />
             <Route path="/pending-teacher" element={<PendingTeacherPage />} />

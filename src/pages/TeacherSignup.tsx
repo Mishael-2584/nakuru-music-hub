@@ -24,6 +24,10 @@ export default function TeacherSignup() {
     subjects: [],
   });
   const [cvFile, setCvFile] = useState<File | null>(null);
+  const [idFile, setIdFile] = useState<File | null>(null);
+  const [kraFile, setKraFile] = useState<File | null>(null);
+  const [certFiles, setCertFiles] = useState<FileList | null>(null);
+  const [transcriptFiles, setTranscriptFiles] = useState<FileList | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -50,20 +54,19 @@ export default function TeacherSignup() {
     e.preventDefault();
     setSubmitting(true);
     setError("");
-    if (!cvFile) {
-      setError("Please upload your CV (PDF, DOC, or DOCX).");
+    if (!cvFile || !idFile || !kraFile || !certFiles || certFiles.length === 0 || !transcriptFiles || transcriptFiles.length === 0) {
+      setError("Please attach CV, ID, KRA, transcripts and certificates.");
       setSubmitting(false);
       return;
     }
     try {
       // Upload CV to Supabase Storage
-      const fileExt = cvFile.name.split('.').pop();
-      const fileName = `${form.email.replace(/[^a-zA-Z0-9]/g, "_")}_${Date.now()}.${fileExt}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const cvName = `${form.email.replace(/[^a-zA-Z0-9]/g, "_")}_${Date.now()}_cv.${cvFile.name.split('.').pop()}`;
+      const { data: cvUp, error: cvErr } = await supabase.storage
         .from('teacher-cvs')
-        .upload(fileName, cvFile, { upsert: true, contentType: cvFile.type });
-      if (uploadError) throw uploadError;
-      const cvFilePath = uploadData?.path || fileName;
+        .upload(cvName, cvFile, { upsert: true, contentType: cvFile.type });
+      if (cvErr) throw cvErr;
+      const cvFilePath = cvUp?.path || cvName;
       // Insert teacher application with CV file path
       const { data, error } = await supabase.from("pending_teachers").insert([
         {
@@ -80,6 +83,23 @@ export default function TeacherSignup() {
         },
       ]);
       if (error) throw error;
+      const pendingId = data?.[0]?.id;
+
+      // Upload additional required docs
+      if (pendingId) {
+        const uploads: Promise<any>[] = [];
+        const uploadOne = async (file: File, type: string) => {
+          const fname = `${form.email.replace(/[^a-zA-Z0-9]/g, "_")}_${Date.now()}_${type}.${file.name.split('.').pop()}`;
+          const { data: up, error: upErr } = await supabase.storage.from('teacher-cvs').upload(fname, file, { upsert: true, contentType: file.type });
+          if (upErr) throw upErr;
+          await supabase.from('pending_teacher_documents').insert({ pending_teacher_id: pendingId, doc_type: type, file_path: up?.path || fname, file_name: file.name });
+        };
+        uploads.push(uploadOne(idFile, 'id'));
+        uploads.push(uploadOne(kraFile, 'kra'));
+        Array.from(certFiles).forEach(f => uploads.push(uploadOne(f, 'certificate')));
+        Array.from(transcriptFiles).forEach(f => uploads.push(uploadOne(f, 'transcript')));
+        await Promise.all(uploads);
+      }
       setSubmitted(true);
     } catch (err) {
       setError(err.message || "Submission failed. Please try again.");
@@ -162,7 +182,7 @@ export default function TeacherSignup() {
                 </div>
               </div>
             </div>
-            {/* CV Upload */}
+            {/* Required Uploads */}
             <div>
               <label className="block font-medium mb-1">Upload CV <span className="text-red-500">*</span></label>
               <input
@@ -174,6 +194,23 @@ export default function TeacherSignup() {
               />
               <span className="text-xs text-muted-foreground">Accepted formats: PDF, DOC, DOCX</span>
             </div>
+            <div>
+              <label className="block font-medium mb-1">National ID (soft copy) <span className="text-red-500">*</span></label>
+              <input type="file" accept="image/*,.pdf" required onChange={e => setIdFile(e.target.files?.[0] || null)} className="block w-full border rounded p-2 bg-white" />
+            </div>
+            <div>
+              <label className="block font-medium mb-1">KRA PIN <span className="text-red-500">*</span></label>
+              <input type="file" accept="image/*,.pdf" required onChange={e => setKraFile(e.target.files?.[0] || null)} className="block w-full border rounded p-2 bg-white" />
+            </div>
+            <div>
+              <label className="block font-medium mb-1">Transcripts (multiple) <span className="text-red-500">*</span></label>
+              <input type="file" multiple accept="image/*,.pdf" required onChange={e => setTranscriptFiles(e.target.files)} className="block w-full border rounded p-2 bg-white" />
+            </div>
+            <div>
+              <label className="block font-medium mb-1">Certificates (multiple) <span className="text-red-500">*</span></label>
+              <input type="file" multiple accept="image/*,.pdf" required onChange={e => setCertFiles(e.target.files)} className="block w-full border rounded p-2 bg-white" />
+            </div>
+            <p className="text-xs text-muted-foreground">Please attach all relevant academic certificates, transcripts, ID soft copy and KRA PIN. All are required to proceed.</p>
             {error && <div className="text-red-600 text-sm text-center">{error}</div>}
             <Button type="submit" disabled={submitting} className="w-full text-base font-semibold h-12 mt-2 shadow-lg">
               {submitting ? "Submitting..." : "Submit Application"}
