@@ -16,47 +16,69 @@ const Shop = () => {
     <>
       <Header />
       <main className="bg-gradient-to-br from-[#f8f6ff] via-[#f9f7fd] to-[#f6f8ff] py-0 px-0">
-        <div className="max-w-7xl mx-auto flex flex-col gap-8 pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20 px-2 md:px-8">
+        <div className="max-w-7xl mx-auto flex flex-col gap-8 pt-32 lg:pt-36 pb-20 px-4 md:px-8">
           {/* Header Section */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent mb-4">Shop</h1>
-            <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-6 px-4">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent mb-4">Shop</h1>
+            <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-6">
               Explore our curated selection of digital performance tracks, musical instruments, accessories, and official Damon Music Academy merchandise.
             </p>
-            <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4" />
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Globe className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span>Global Digital Products</span>
               </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4" />
+              <div className="flex items-center gap-1 sm:gap-2">
+                <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span>Kenya Physical Products</span>
               </div>
             </div>
-            <Badge variant="secondary" className="mt-4">
+            <Badge variant="secondary" className="mt-4 text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2">
               <span className="font-semibold text-primary">PC View Only</span> • Payment & Mobile Support Coming Soon
             </Badge>
           </div>
 
           {/* Main Tabs Navigation */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="w-full flex justify-between bg-white/90 shadow-lg rounded-full p-1 mb-8">
-              <TabsTrigger value="digital" className="flex-1 flex items-center justify-center gap-2 px-0 py-3 rounded-full font-semibold text-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-md transition-all">
-                <Music className="w-5 h-5" />
-                <span>Performance Tracks</span>
-                <Badge variant="outline" className="ml-1 text-xs">Global</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="instruments" className="flex-1 flex items-center justify-center gap-2 px-0 py-3 rounded-full font-semibold text-accent data-[state=active]:bg-accent/10 data-[state=active]:shadow-md transition-all">
-                <Headphones className="w-5 h-5" />
-                <span>Instruments & Accessories</span>
-                <Badge variant="outline" className="ml-1 text-xs">Kenya</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="merch" className="flex-1 flex items-center justify-center gap-2 px-0 py-3 rounded-full font-semibold text-secondary data-[state=active]:bg-secondary/10 data-[state=active]:shadow-md transition-all">
-                <Shirt className="w-5 h-5" />
-                <span>Merchandise</span>
-                <Badge variant="outline" className="ml-1 text-xs">Kenya</Badge>
-              </TabsTrigger>
-            </TabsList>
+            <div className="w-full mb-8">
+              {/* Desktop Navigation */}
+              <TabsList className="hidden sm:flex w-full gap-1 bg-white/90 shadow-lg rounded-lg p-1">
+                <TabsTrigger value="digital" className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md font-semibold text-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-md transition-all text-sm">
+                  <Music className="w-4 h-4" />
+                  <span>Performance Tracks</span>
+                  <Badge variant="outline" className="ml-1 text-xs">Global</Badge>
+                </TabsTrigger>
+                <TabsTrigger value="instruments" className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md font-semibold text-accent data-[state=active]:bg-accent/10 data-[state=active]:shadow-md transition-all text-sm">
+                  <Headphones className="w-4 h-4" />
+                  <span>Instruments & Accessories</span>
+                  <Badge variant="outline" className="ml-1 text-xs">Kenya</Badge>
+                </TabsTrigger>
+                <TabsTrigger value="merch" className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md font-semibold text-secondary data-[state=active]:bg-secondary/10 data-[state=active]:shadow-md transition-all text-sm">
+                  <Shirt className="w-4 h-4" />
+                  <span>Merchandise</span>
+                  <Badge variant="outline" className="ml-1 text-xs">Kenya</Badge>
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Mobile Dropdown Navigation */}
+              <div className="sm:hidden">
+                <select 
+                  value={activeTab} 
+                  onChange={(e) => setActiveTab(e.target.value)}
+                  className="w-full p-3 rounded-lg border border-gray-200 bg-white shadow-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                >
+                  <option value="digital">
+                    🎵 Performance Tracks (Global)
+                  </option>
+                  <option value="instruments">
+                    🎧 Instruments & Accessories (Kenya)
+                  </option>
+                  <option value="merch">
+                    👕 Merchandise (Kenya)
+                  </option>
+                </select>
+              </div>
+            </div>
 
             {/* Digital Products Tab */}
             <TabsContent value="digital" className="mt-8">
