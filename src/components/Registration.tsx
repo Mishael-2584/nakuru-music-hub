@@ -102,7 +102,8 @@ const Registration = () => {
 
   const musicInstruments = [
     "Piano", "Drums", "Violin", "Saxophone", "Bass Guitar", 
-    "Acoustic Guitar", "Flute", "Music Theory", "Trumpet", "Trombone", "Other"
+    "Acoustic Guitar", "Electric Guitar", "Flute", "Clarinet", "Cello", "Voice",
+    "Music Theory", "Trumpet", "Trombone", "Other"
   ];
 
   const productionTypes = [
