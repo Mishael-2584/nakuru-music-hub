@@ -309,6 +309,12 @@ const StudentDashboard = () => {
     { value: "online", label: "Online" }
   ];
 
+  const musicInstruments = [
+    "Piano", "Drums", "Violin", "Saxophone", "Bass Guitar", 
+    "Acoustic Guitar", "Electric Guitar", "Flute", "Clarinet", "Cello", "Voice",
+    "Music Theory", "Trumpet", "Trombone", "Other"
+  ];
+
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
@@ -2566,12 +2572,18 @@ const StudentDashboard = () => {
         location: pendingProfileUpdate.location
       };
 
-      // Check if learning mode is being changed
+      // Check if learning mode or instrument is being changed
       const learningModeChanged = pendingProfileUpdate.learning_mode !== studentProfile.learning_mode;
+      const instrumentChanged = pendingProfileUpdate.instrument !== studentProfile.instrument;
       
       // If learning mode is not changing, update it directly
       if (!learningModeChanged) {
         updateData.learning_mode = pendingProfileUpdate.learning_mode;
+      }
+      
+      // If instrument is not changing, update it directly
+      if (!instrumentChanged) {
+        updateData.instrument = pendingProfileUpdate.instrument;
       }
 
       const { data: updateResult, error: updateError } = await supabase
@@ -2588,6 +2600,9 @@ const StudentDashboard = () => {
         return;
       }
 
+      // Create approval requests for changes that require admin approval
+      const requestsCreated = [];
+      
       // If learning mode is changing, create a change request
       if (learningModeChanged) {
         const { error: requestError } = await supabase
@@ -2607,10 +2622,36 @@ const StudentDashboard = () => {
           toast({ title: 'Error', description: 'Failed to submit learning mode change request.', variant: 'destructive' });
           return;
         }
+        requestsCreated.push('learning mode');
+      }
+      
+      // If instrument is changing, create a change request
+      if (instrumentChanged) {
+        const { error: requestError } = await supabase
+          .from('approval_requests')
+          .insert({
+            student_id: studentProfile.id,
+            request_type: 'profile_update',
+            title: 'Instrument Change Request',
+            description: `Student requested to change instrument from ${studentProfile.instrument} to ${pendingProfileUpdate.instrument}`,
+            current_value: studentProfile.instrument,
+            requested_value: pendingProfileUpdate.instrument,
+            reason: 'Student requested instrument change through profile update'
+          });
 
+        if (requestError) {
+          console.error('❌ Instrument change request error:', requestError);
+          toast({ title: 'Error', description: 'Failed to submit instrument change request.', variant: 'destructive' });
+          return;
+        }
+        requestsCreated.push('instrument');
+      }
+
+      // Show appropriate success message
+      if (requestsCreated.length > 0) {
         toast({ 
           title: 'Success', 
-          description: 'Profile updated successfully. Your learning mode change request has been submitted for admin approval.' 
+          description: `Profile updated successfully. Your ${requestsCreated.join(' and ')} change request${requestsCreated.length > 1 ? 's have' : ' has'} been submitted for admin approval.` 
         });
       } else {
         toast({ title: 'Success', description: 'Profile updated successfully.' });
@@ -4179,7 +4220,35 @@ const StudentDashboard = () => {
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Instrument</label>
-                          <input type="text" value={studentProfile.instrument} className="w-full p-2 border rounded-md" readOnly />
+                          {editMode ? (
+                            <select 
+                              value={editProfile.instrument} 
+                              onChange={e => setEditProfile({ ...editProfile, instrument: e.target.value })}
+                              className="w-full p-2 border rounded-md"
+                            >
+                              <option value="">Select Instrument</option>
+                              {musicInstruments.map((instrument) => (
+                                <option key={instrument} value={instrument}>
+                                  {instrument}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input 
+                              type="text" 
+                              value={studentProfile.instrument} 
+                              className="w-full p-2 border rounded-md bg-gray-50" 
+                              readOnly 
+                            />
+                          )}
+                          {editMode && editProfile.instrument !== studentProfile.instrument && (
+                            <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                              <p className="text-sm text-yellow-800">
+                                <strong>Note:</strong> Changing your instrument requires admin approval. 
+                                Your request will be reviewed and you'll be notified of the decision.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -4218,6 +4287,21 @@ const StudentDashboard = () => {
                         </div>
                       )}
                       
+                      {/* Show pending instrument change requests */}
+                      {pendingRequests.filter(req => req.request_type === 'profile_update' && req.title.includes('Instrument')).length > 0 && (
+                        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                            <p className="text-sm font-medium text-green-800">
+                              Instrument Change Pending Approval
+                            </p>
+                          </div>
+                          <p className="text-xs text-green-600 mt-1">
+                            Your request to change instrument is being reviewed by admin.
+                          </p>
+                        </div>
+                      )}
+                      
                       <div className="space-y-3">
                         {learningModes.map((mode) => (
                           <div key={mode.value} className="flex items-center space-x-3">
@@ -4228,7 +4312,7 @@ const StudentDashboard = () => {
                               value={mode.value}
                               checked={editMode ? editProfile.learning_mode === mode.value : studentProfile.learning_mode === mode.value}
                               onChange={(e) => editMode && setEditProfile({ ...editProfile, learning_mode: e.target.value })}
-                              disabled={!editMode || pendingRequests.some(req => req.request_type === 'learning_mode_change')}
+                              disabled={!editMode || pendingRequests.some(req => req.request_type === 'learning_mode_change') || pendingRequests.some(req => req.request_type === 'profile_update' && req.title.includes('Instrument'))}
                               className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
                             />
                             <label htmlFor={mode.value} className="text-sm font-medium text-gray-700">
@@ -4247,10 +4331,10 @@ const StudentDashboard = () => {
                         </div>
                       )}
                       
-                      {pendingRequests.some(req => req.request_type === 'learning_mode_change') && (
+                      {(pendingRequests.some(req => req.request_type === 'learning_mode_change') || pendingRequests.some(req => req.request_type === 'profile_update' && req.title.includes('Instrument'))) && (
                         <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                           <p className="text-sm text-gray-600">
-                            <strong>Status:</strong> You have a pending learning mode change request. 
+                            <strong>Status:</strong> You have pending change request{pendingRequests.filter(req => req.request_type === 'learning_mode_change' || (req.request_type === 'profile_update' && req.title.includes('Instrument'))).length > 1 ? 's' : ''}. 
                             Please wait for admin approval before making another request.
                           </p>
                         </div>
