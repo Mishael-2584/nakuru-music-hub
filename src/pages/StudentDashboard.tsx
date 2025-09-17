@@ -245,6 +245,8 @@ const StudentDashboard = () => {
   const [adminProfiles, setAdminProfiles] = useState<any[]>([]);
   const [teacherAuthProfiles, setTeacherAuthProfiles] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
 
   const [selectedTeacher, setSelectedTeacher] = useState<string>('all');
@@ -584,6 +586,19 @@ const StudentDashboard = () => {
 
       if (!requestsError && requestsData) {
         setPendingRequests(requestsData);
+      }
+
+      // Fetch notifications
+      const { data: notificationsData, error: notificationsError } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false })
+        .limit(50); // Limit to last 50 notifications
+
+      if (!notificationsError && notificationsData) {
+        setNotifications(notificationsData);
+        setUnreadCount(notificationsData.filter(n => !n.is_read).length);
       }
 
     } catch (error) {
@@ -1989,6 +2004,44 @@ const StudentDashboard = () => {
     }
   };
 
+  const markNotificationAsRead = async (notificationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('id', notificationId)
+        .eq('user_id', user?.id);
+
+      if (!error) {
+        setNotifications(prev => 
+          prev.map(n => n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n)
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const markAllNotificationsAsRead = async () => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('user_id', user?.id)
+        .eq('is_read', false);
+
+      if (!error) {
+        setNotifications(prev => 
+          prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
+        );
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  };
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -2787,6 +2840,17 @@ const StudentDashboard = () => {
                       <span>Payments</span>
                     </div>
                   </SelectItem>
+                  <SelectItem value="notifications">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4" />
+                      <span>Notifications</span>
+                      {unreadCount > 0 && (
+                        <span className="ml-auto bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-bold">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                      )}
+                    </div>
+                  </SelectItem>
                   <SelectItem value="account">
                     <div className="flex items-center gap-2">
                 <User className="w-4 h-4" />
@@ -2862,6 +2926,15 @@ const StudentDashboard = () => {
               <TabsTrigger value="payments" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
                 <CreditCard className="w-5 h-5" />
                 <span>Payments</span>
+              </TabsTrigger>
+              <TabsTrigger value="notifications" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all relative">
+                <Bell className="w-5 h-5" />
+                <span>Notifications</span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </TabsTrigger>
               <TabsTrigger value="account" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-secondary data-[state=active]:bg-secondary/10 data-[state=active]:shadow-md transition-all">
                 <User className="w-5 h-5" />
@@ -3925,6 +3998,94 @@ const StudentDashboard = () => {
             </TabsContent>
 
             {/* Account Tab */}
+            <TabsContent value="notifications" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Notifications</CardTitle>
+                      <CardDescription>Stay updated with your latest notifications</CardDescription>
+                    </div>
+                    {unreadCount > 0 && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={markAllNotificationsAsRead}
+                        className="text-xs"
+                      >
+                        Mark All Read
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {notifications.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-600 mb-2">No Notifications</h3>
+                      <p className="text-gray-500">You don't have any notifications yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {notifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          className={`p-4 rounded-lg border transition-all cursor-pointer ${
+                            notification.is_read 
+                              ? 'bg-gray-50 border-gray-200' 
+                              : 'bg-blue-50 border-blue-200 shadow-sm'
+                          }`}
+                          onClick={() => !notification.is_read && markNotificationAsRead(notification.id)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className={`font-semibold ${notification.is_read ? 'text-gray-700' : 'text-blue-800'}`}>
+                                  {notification.title}
+                                </h4>
+                                {!notification.is_read && (
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                )}
+                              </div>
+                              <p className={`text-sm ${notification.is_read ? 'text-gray-600' : 'text-blue-700'}`}>
+                                {notification.message}
+                              </p>
+                              <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                                <span>{new Date(notification.created_at).toLocaleDateString()}</span>
+                                <span>{new Date(notification.created_at).toLocaleTimeString()}</span>
+                                <span className="capitalize">
+                                  {notification.notification_type.replace(/_/g, ' ')}
+                                </span>
+                              </div>
+                            </div>
+                            {notification.data && (
+                              <div className="ml-4">
+                                {notification.notification_type === 'approval_request_approved' && (
+                                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                    <span className="text-green-600 text-sm">✓</span>
+                                  </div>
+                                )}
+                                {notification.notification_type === 'approval_request_rejected' && (
+                                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                                    <span className="text-red-600 text-sm">✗</span>
+                                  </div>
+                                )}
+                                {notification.notification_type === 'approval_request_submitted' && (
+                                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <span className="text-blue-600 text-sm">⏳</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             <TabsContent value="account" className="space-y-6">
               <Card>
                 <CardHeader>
