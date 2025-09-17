@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Check, Star, Clock, Users, Award, Globe, Home } from "lucide-react";
+import { Check, Star, Clock, Users, Award, Globe, Home, Music } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Fees = () => {
@@ -175,6 +175,40 @@ const Fees = () => {
           icon: Award,
           level: "Final Term",
         },
+      ]
+    },
+    {
+      category: "🎵 Music Production (RSL Awards)",
+      subtitle: "RSL Awards Curriculum (Grades 1-8)",
+      courses: [
+        {
+          name: "Individual Lessons",
+          duration: "1 session/week - 1 hour each",
+          monthly: "KSh 6,000",
+          icon: Music,
+          features: [
+            "RSL Awards Curriculum (Grades 1-8)",
+            "One-on-one personalized instruction",
+            "Hybrid lessons (Online & In-person)",
+            "Practical DAW skills & techniques",
+            "Preparation for RSL grade examinations",
+            "Portfolio development support"
+          ]
+        },
+        {
+          name: "Group Sessions",
+          duration: "1 session/week - 2 hours each",
+          monthly: "KSh 4,000",
+          icon: Music,
+          features: [
+            "RSL Awards Curriculum (Grades 1-8)",
+            "Collaborative learning (Max 5 students)",
+            "Hybrid lessons (Online & In-person)",
+            "Practical DAW skills & techniques",
+            "Preparation for RSL grade examinations",
+            "Peer-to-peer feedback and projects"
+          ]
+        }
       ]
     },
     {
