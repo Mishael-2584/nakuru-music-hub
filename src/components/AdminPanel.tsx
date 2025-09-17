@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X, Image, MessageSquare } from "lucide-react";
+import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X, Image, MessageSquare, Settings } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -103,7 +103,7 @@ interface ClassSchedule {
 }
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes' | 'gallery' | 'finances' | 'debug'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes' | 'gallery' | 'finances' | 'requests' | 'debug'>('stats');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
 
@@ -147,6 +147,7 @@ const AdminPanel = () => {
   const [showExcuseModal, setShowExcuseModal] = useState(false);
   const [editInvoice, setEditInvoice] = useState<any>(null);
   const [excuseReason, setExcuseReason] = useState('');
+  const [approvalRequests, setApprovalRequests] = useState<any[]>([]);
   const [activeStudents, setActiveStudents] = useState<Registration[]>([]);
   const [expandedStudentIds, setExpandedStudentIds] = useState<Set<string>>(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -499,7 +500,32 @@ const AdminPanel = () => {
         setRegistrations(regData || []);
       }
 
+      console.log("AdminPanel: Fetching approval requests...");
+      const { data: approvalRequestsData, error: approvalRequestsError } = await supabase
+        .from('approval_requests')
+        .select(`
+          *,
+          students!inner(student_name, email)
+        `)
+        .order('created_at', { ascending: false });
 
+      if (approvalRequestsError) {
+        console.error("Error fetching approval requests:", approvalRequestsError);
+        toast({
+          title: "Error",
+          description: "Failed to load approval requests: " + approvalRequestsError.message,
+          variant: "destructive",
+        });
+      } else {
+        console.log("AdminPanel: Approval requests fetched successfully:", approvalRequestsData?.length || 0, "records");
+        // Flatten the data to include student info
+        const flattenedData = approvalRequestsData?.map(request => ({
+          ...request,
+          student_name: request.students?.student_name || 'Unknown',
+          email: request.students?.email || 'Unknown'
+        })) || [];
+        setApprovalRequests(flattenedData);
+      }
 
     console.log("AdminPanel: Fetching quotes...");
     const { data: quotesData, error: quotesError } = await supabase
@@ -619,6 +645,84 @@ const AdminPanel = () => {
     } finally {
       setIsLoading(false);
       console.log("AdminPanel: Data fetch completed");
+    }
+  };
+
+  const handleApproveRequest = async (requestId: string) => {
+    try {
+      const { error } = await supabase
+        .from('approval_requests')
+        .update({
+          status: 'approved',
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString(),
+          admin_notes: 'Request approved'
+        })
+        .eq('id', requestId);
+
+      if (error) {
+        console.error('Error approving request:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to approve request',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Request approved successfully',
+      });
+
+      // Refresh the data
+      await fetchData();
+    } catch (error) {
+      console.error('Error approving request:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to approve request',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRejectRequest = async (requestId: string) => {
+    try {
+      const { error } = await supabase
+        .from('approval_requests')
+        .update({
+          status: 'rejected',
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString(),
+          admin_notes: 'Request rejected'
+        })
+        .eq('id', requestId);
+
+      if (error) {
+        console.error('Error rejecting request:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to reject request',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Request rejected',
+      });
+
+      // Refresh the data
+      await fetchData();
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to reject request',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -1858,6 +1962,15 @@ const AdminPanel = () => {
                 Teachers
               </Button>
               <Button
+                variant={activeTab === 'requests' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('requests')}
+                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+                style={{ minWidth: 120 }}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Requests & Approvals ({approvalRequests.filter(req => req.status === 'pending').length})
+              </Button>
+              <Button
                 variant={activeTab === 'quotes' ? 'default' : 'ghost'}
                 onClick={() => setActiveTab('quotes')}
                 className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
@@ -2712,6 +2825,121 @@ const AdminPanel = () => {
                 </Card>
               </TabsContent>
             </Tabs>
+          </div>
+        )}
+
+        {/* Requests & Approvals Tab */}
+        {activeTab === 'requests' && (
+          <div className="mt-8">
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                  Requests & Approvals
+                </h3>
+              </div>
+              
+              <div className="grid gap-4">
+                {approvalRequests.length === 0 ? (
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-600 mb-2">No Pending Requests</h3>
+                      <p className="text-gray-500">No students have submitted approval requests yet.</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  approvalRequests.map((request) => (
+                    <Card key={request.id} className={`border-l-4 ${
+                      request.request_type === 'learning_mode_change' ? 'border-l-blue-500' :
+                      request.request_type === 'profile_update' ? 'border-l-green-500' :
+                      request.request_type === 'schedule_change' ? 'border-l-purple-500' :
+                      'border-l-orange-500'
+                    }`}>
+                      <CardContent className="p-6">
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <h4 className="font-semibold text-lg">{request.title}</h4>
+                            <p className="text-sm text-gray-600">{request.student_name} ({request.email})</p>
+                            <Badge variant="outline" className="mt-1">
+                              {request.request_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </Badge>
+                          </div>
+                          <Badge variant={request.status === 'pending' ? 'default' : request.status === 'approved' ? 'default' : 'destructive'}>
+                            {request.status}
+                          </Badge>
+                        </div>
+                        
+                        {request.description && (
+                          <div className="mb-4">
+                            <p className="text-sm font-medium text-gray-600">Description:</p>
+                            <p className="text-sm bg-gray-50 p-3 rounded-lg">{request.description}</p>
+                          </div>
+                        )}
+                        
+                        {(request.current_value || request.requested_value) && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            {request.current_value && (
+                              <div>
+                                <p className="text-sm font-medium text-gray-600">Current:</p>
+                                <p className="text-sm">{request.current_value}</p>
+                              </div>
+                            )}
+                            {request.requested_value && (
+                              <div>
+                                <p className="text-sm font-medium text-gray-600">Requested:</p>
+                                <p className="text-sm font-semibold text-primary">{request.requested_value}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        {request.reason && (
+                          <div className="mb-4">
+                            <p className="text-sm font-medium text-gray-600">Reason:</p>
+                            <p className="text-sm bg-gray-50 p-3 rounded-lg">{request.reason}</p>
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-between items-center text-sm text-gray-500">
+                          <span>Requested: {new Date(request.created_at).toLocaleDateString()}</span>
+                          {request.reviewed_at && (
+                            <span>Reviewed: {new Date(request.reviewed_at).toLocaleDateString()}</span>
+                          )}
+                        </div>
+                        
+                        {request.status === 'pending' && (
+                          <div className="flex gap-2 mt-4">
+                            <Button
+                              size="sm"
+                              onClick={() => handleApproveRequest(request.id)}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleRejectRequest(request.id)}
+                            >
+                              <X className="h-4 w-4 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
+                        )}
+                        
+                        {request.admin_notes && (
+                          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                            <p className="text-sm font-medium text-blue-800">Admin Notes:</p>
+                            <p className="text-sm text-blue-700">{request.admin_notes}</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         )}
 

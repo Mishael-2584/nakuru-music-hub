@@ -244,6 +244,7 @@ const StudentDashboard = () => {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [adminProfiles, setAdminProfiles] = useState<any[]>([]);
   const [teacherAuthProfiles, setTeacherAuthProfiles] = useState<any[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
 
 
   const [selectedTeacher, setSelectedTeacher] = useState<string>('all');
@@ -572,6 +573,18 @@ const StudentDashboard = () => {
       await fetchAvailableTimeSlotsWithData(studentProfileData);
       
       // Learning mode change requests functionality has been removed
+
+      // Fetch pending approval requests
+      const { data: requestsData, error: requestsError } = await supabase
+        .from('approval_requests')
+        .select('*')
+        .eq('student_id', student.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (!requestsError && requestsData) {
+        setPendingRequests(requestsData);
+      }
 
     } catch (error) {
       console.error('Error fetching student data:', error);
@@ -2491,31 +2504,67 @@ const StudentDashboard = () => {
     
     console.log('✅ Auth successful, processing profile update...');
     
-    // Update profile fields (including learning_mode directly)
+    // Update profile fields (excluding learning_mode which requires approval)
     try {
-      const { data: updateData, error: updateError } = await supabase
+      const updateData: any = {
+        phone: pendingProfileUpdate.phone,
+        proficiency_level: pendingProfileUpdate.proficiency_level,
+        experience: pendingProfileUpdate.experience,
+        location: pendingProfileUpdate.location
+      };
+
+      // Check if learning mode is being changed
+      const learningModeChanged = pendingProfileUpdate.learning_mode !== studentProfile.learning_mode;
+      
+      // If learning mode is not changing, update it directly
+      if (!learningModeChanged) {
+        updateData.learning_mode = pendingProfileUpdate.learning_mode;
+      }
+
+      const { data: updateResult, error: updateError } = await supabase
         .from('students')
-        .update({
-          phone: pendingProfileUpdate.phone,
-          proficiency_level: pendingProfileUpdate.proficiency_level,
-          experience: pendingProfileUpdate.experience,
-          location: pendingProfileUpdate.location,
-          learning_mode: pendingProfileUpdate.learning_mode // Update learning mode directly
-        })
+        .update(updateData)
         .eq('id', studentProfile.id)
         .select();
       
-      console.log('🔍 Debug: Profile update result:', { data: updateData, error: updateError });
+      console.log('🔍 Debug: Profile update result:', { data: updateResult, error: updateError });
       
       if (updateError) {
         console.error('❌ Profile update error:', updateError);
         toast({ title: 'Error', description: 'Failed to update profile fields.', variant: 'destructive' });
-      } else {
-        console.log('✅ Profile update successful:', updateData);
-        toast({ title: 'Success', description: 'Profile updated successfully.' });
-        setEditMode(false);
-        await fetchStudentData(); // Force refresh the data
+        return;
       }
+
+      // If learning mode is changing, create a change request
+      if (learningModeChanged) {
+        const { error: requestError } = await supabase
+          .from('approval_requests')
+          .insert({
+            student_id: studentProfile.id,
+            request_type: 'learning_mode_change',
+            title: 'Learning Mode Change Request',
+            description: `Student requested to change learning mode from ${studentProfile.learning_mode} to ${pendingProfileUpdate.learning_mode}`,
+            current_value: studentProfile.learning_mode,
+            requested_value: pendingProfileUpdate.learning_mode,
+            reason: 'Student requested learning mode change through profile update'
+          });
+
+        if (requestError) {
+          console.error('❌ Learning mode request error:', requestError);
+          toast({ title: 'Error', description: 'Failed to submit learning mode change request.', variant: 'destructive' });
+          return;
+        }
+
+        toast({ 
+          title: 'Success', 
+          description: 'Profile updated successfully. Your learning mode change request has been submitted for admin approval.' 
+        });
+      } else {
+        toast({ title: 'Success', description: 'Profile updated successfully.' });
+      }
+
+      setEditMode(false);
+      await fetchStudentData(); // Force refresh the data
     } catch (error) {
       console.error('❌ Error updating profile:', error);
       toast({ title: 'Error', description: 'Failed to update profile.', variant: 'destructive' });
@@ -2653,6 +2702,30 @@ const StudentDashboard = () => {
       <main className="w-full max-w-6xl px-2 sm:px-4 lg:px-8 py-4 sm:py-8 mx-auto">
         <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-3 sm:p-4 lg:p-8 shadow-xl border border-primary/10">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+            {/* Pending Requests Notification Banner */}
+            {pendingRequests.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                  <div>
+                    <h3 className="font-semibold text-blue-800">Pending Approval Requests</h3>
+                    <p className="text-sm text-blue-600">
+                      You have {pendingRequests.length} request{pendingRequests.length > 1 ? 's' : ''} pending admin approval:
+                    </p>
+                    <ul className="text-xs text-blue-600 mt-1 space-y-1">
+                      {pendingRequests.map((request) => (
+                        <li key={request.id} className="flex items-center gap-2">
+                          <span>•</span>
+                          <span>{request.title}</span>
+                          <span className="text-blue-500">({request.request_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())})</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {/* Mobile dropdown for tabs */}
             <div className="lg:hidden">
               <Select value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
@@ -3968,6 +4041,22 @@ const StudentDashboard = () => {
                     </div>
                     <div>
                       <h4 className="font-semibold mb-4">Learning Mode</h4>
+                      
+                      {/* Show pending learning mode requests */}
+                      {pendingRequests.filter(req => req.request_type === 'learning_mode_change').length > 0 && (
+                        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                            <p className="text-sm font-medium text-blue-800">
+                              Learning Mode Change Pending Approval
+                            </p>
+                          </div>
+                          <p className="text-xs text-blue-600 mt-1">
+                            Your request to change learning mode is being reviewed by admin.
+                          </p>
+                        </div>
+                      )}
+                      
                       <div className="space-y-3">
                         {learningModes.map((mode) => (
                           <div key={mode.value} className="flex items-center space-x-3">
@@ -3978,7 +4067,7 @@ const StudentDashboard = () => {
                               value={mode.value}
                               checked={editMode ? editProfile.learning_mode === mode.value : studentProfile.learning_mode === mode.value}
                               onChange={(e) => editMode && setEditProfile({ ...editProfile, learning_mode: e.target.value })}
-                              disabled={!editMode}
+                              disabled={!editMode || pendingRequests.some(req => req.request_type === 'learning_mode_change')}
                               className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
                             />
                             <label htmlFor={mode.value} className="text-sm font-medium text-gray-700">
@@ -3987,6 +4076,24 @@ const StudentDashboard = () => {
                           </div>
                         ))}
                       </div>
+                      
+                      {editMode && editProfile.learning_mode !== studentProfile.learning_mode && (
+                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <p className="text-sm text-yellow-800">
+                            <strong>Note:</strong> Changing your learning mode requires admin approval. 
+                            Your request will be reviewed and you'll be notified of the decision.
+                          </p>
+                        </div>
+                      )}
+                      
+                      {pendingRequests.some(req => req.request_type === 'learning_mode_change') && (
+                        <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                          <p className="text-sm text-gray-600">
+                            <strong>Status:</strong> You have a pending learning mode change request. 
+                            Please wait for admin approval before making another request.
+                          </p>
+                        </div>
+                      )}
                     </div>
                     <div className="flex space-x-4">
                       {!editMode ? (
