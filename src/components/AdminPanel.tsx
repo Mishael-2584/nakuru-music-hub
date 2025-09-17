@@ -2483,6 +2483,44 @@ const AdminPanel = () => {
                                       </SelectContent>
                                     </Select>
                                   </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-gray-600">Instrument:</span>
+                                    <Select
+                                      value={registration.instrument || ''}
+                                      onValueChange={async (value) => {
+                                        // Update in both registrations and students tables
+                                        await supabase.from('registrations').update({ instrument: value }).eq('id', registration.id);
+                                        await supabase.from('students').update({ instrument: value }).eq('registration_id', registration.id);
+                                        
+                                        // Update local state for both tables
+                                        setRegistrations((prev) => prev.map((r) => r.id === registration.id ? { ...r, instrument: value } : r));
+                                        setActiveStudents((prev) => prev.map((s) => s.registration_id === registration.id ? { ...s, instrument: value } : s));
+                                        
+                                        toast({ title: 'Updated', description: 'Instrument updated.' });
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-8 w-36 border-gray-300">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="Piano">Piano</SelectItem>
+                                        <SelectItem value="Drums">Drums</SelectItem>
+                                        <SelectItem value="Violin">Violin</SelectItem>
+                                        <SelectItem value="Saxophone">Saxophone</SelectItem>
+                                        <SelectItem value="Bass Guitar">Bass Guitar</SelectItem>
+                                        <SelectItem value="Acoustic Guitar">Acoustic Guitar</SelectItem>
+                                        <SelectItem value="Electric Guitar">Electric Guitar</SelectItem>
+                                        <SelectItem value="Flute">Flute</SelectItem>
+                                        <SelectItem value="Clarinet">Clarinet</SelectItem>
+                                        <SelectItem value="Cello">Cello</SelectItem>
+                                        <SelectItem value="Voice">Voice</SelectItem>
+                                        <SelectItem value="Music Theory">Music Theory</SelectItem>
+                                        <SelectItem value="Trumpet">Trumpet</SelectItem>
+                                        <SelectItem value="Trombone">Trombone</SelectItem>
+                                        <SelectItem value="Other">Other</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
                                 </div>
                               </div>
 
