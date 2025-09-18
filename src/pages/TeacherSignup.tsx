@@ -7,9 +7,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { GraduationCap, Mail, Phone, Lock, BookOpen, Layers, User } from "lucide-react";
 
 const CATEGORY_SUBJECTS = {
-  Music: ["Piano", "Guitar", "Voice", "Violin", "Drums", "Saxophone", "Other"],
-  Art: ["Drawing", "Painting", "Sculpture", "Digital Art", "Other"],
-  Production: ["Audio Engineering", "Music Production", "Photography", "Video Editing", "Other"],
+  Music: ["Piano", "Drums", "Violin", "Saxophone", "Bass Guitar", "Acoustic Guitar", "Electric Guitar", "Flute", "Clarinet", "Cello", "Voice", "Music Theory", "Trumpet", "Trombone", "Other"],
+  Production: ["Music Production", "Live Sound", "Videography", "Other"],
+  Art: ["Drawing", "Painting", "Sculpture", "Digital Art", "Other"]
 };
 
 export default function TeacherSignup() {

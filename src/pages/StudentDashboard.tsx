@@ -2926,68 +2926,68 @@ const StudentDashboard = () => {
               <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-white to-transparent hidden md:block" />
               <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hidden md:block select-none">→</div>
             </div>
-            <TabsList className="flex w-full bg-white/80 shadow-sm rounded-lg gap-2 justify-start p-1 overflow-x-auto flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory mb-1">
-              <TabsTrigger value="dashboard" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-md transition-all">
-                <BarChart3 className="w-5 h-5" />
-                <span>Dashboard</span>
+            <TabsList className="flex w-full bg-white/80 shadow-sm rounded-lg gap-1 justify-start p-1 overflow-x-auto scrollbar-thin scrollbar-thumb-primary/40 scrollbar-track-transparent snap-x snap-mandatory mb-1" style={{ WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory' }}>
+              <TabsTrigger value="dashboard" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+                <BarChart3 className="w-4 h-4" />
+                <span className="hidden sm:inline">Dashboard</span>
               </TabsTrigger>
-              <TabsTrigger value="bookings" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
-                <Calendar className="w-5 h-5" />
-                <span>Bookings</span>
+              <TabsTrigger value="bookings" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+                <Calendar className="w-4 h-4" />
+                <span className="hidden sm:inline">Bookings</span>
               </TabsTrigger>
-              <TabsTrigger value="schedule" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-blue-700 data-[state=active]:bg-blue-100 data-[state=active]:shadow-md transition-all">
-                <CalendarDays className="w-5 h-5" />
-                <span>Schedule</span>
+              <TabsTrigger value="schedule" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-blue-700 data-[state=active]:bg-blue-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+                <CalendarDays className="w-4 h-4" />
+                <span className="hidden sm:inline">Schedule</span>
               </TabsTrigger>
-              <TabsTrigger value="calendar" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-gray-700 data-[state=active]:bg-gray-100 data-[state=active]:shadow-md transition-all">
-                <CalendarIcon className="w-5 h-5" />
-                <span>Calendar</span>
+              <TabsTrigger value="calendar" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-gray-700 data-[state=active]:bg-gray-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+                <CalendarIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">Calendar</span>
               </TabsTrigger>
-              <TabsTrigger value="classroom" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
-                <BookOpen className="w-5 h-5" />
-                <span>Classroom</span>
+              <TabsTrigger value="classroom" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+                <BookOpen className="w-4 h-4" />
+                <span className="hidden sm:inline">Classroom</span>
               </TabsTrigger>
-              <TabsTrigger value="practice" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all">
-                <Clock className="w-5 h-5" />
-                <span>Practice</span>
+              <TabsTrigger value="practice" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+                <Clock className="w-4 h-4" />
+                <span className="hidden sm:inline">Practice</span>
               </TabsTrigger>
-              <TabsTrigger value="progress" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-orange-700 data-[state=active]:bg-orange-100 data-[state=active]:shadow-md transition-all">
-                <TrendingUp className="w-5 h-5" />
-                <span>Progress</span>
+              <TabsTrigger value="progress" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-orange-700 data-[state=active]:bg-orange-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+                <TrendingUp className="w-4 h-4" />
+                <span className="hidden sm:inline">Progress</span>
               </TabsTrigger>
-              <TabsTrigger value="messages" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-pink-600 data-[state=active]:bg-pink-100 data-[state=active]:shadow-md transition-all relative">
-                <MessageSquare className="w-5 h-5" />
-                <span>Messages</span>
+              <TabsTrigger value="messages" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-pink-600 data-[state=active]:bg-pink-100 data-[state=active]:shadow-md transition-all relative scroll-snap-align-start">
+                <MessageSquare className="w-4 h-4" />
+                <span className="hidden sm:inline">Messages</span>
                 {messages.filter(m => !m.is_read).length > 0 && (
                   <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">
                     {messages.filter(m => !m.is_read).length}
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="payments" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
-                <CreditCard className="w-5 h-5" />
-                <span>Payments</span>
+              <TabsTrigger value="payments" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+                <CreditCard className="w-4 h-4" />
+                <span className="hidden sm:inline">Payments</span>
               </TabsTrigger>
-              <TabsTrigger value="notifications" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all relative">
-                <Bell className="w-5 h-5" />
-                <span>Notifications</span>
+              <TabsTrigger value="notifications" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all relative">
+                <Bell className="w-4 h-4" />
+                <span className="hidden sm:inline">Notifications</span>
                 {unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="account" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-secondary data-[state=active]:bg-secondary/10 data-[state=active]:shadow-md transition-all">
-                <User className="w-5 h-5" />
-                <span>Account</span>
+              <TabsTrigger value="account" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-secondary data-[state=active]:bg-secondary/10 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+                <User className="w-4 h-4" />
+                <span className="hidden sm:inline">Account</span>
               </TabsTrigger>
-              <TabsTrigger value="invoices" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-gray-700 data-[state=active]:bg-gray-100 data-[state=active]:shadow-md transition-all">
-                <FileText className="w-5 h-5" />
-                <span>Invoices</span>
+              <TabsTrigger value="invoices" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-gray-700 data-[state=active]:bg-gray-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+                <FileText className="w-4 h-4" />
+                <span className="hidden sm:inline">Invoices</span>
               </TabsTrigger>
-              <TabsTrigger value="video-conferencing" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:shadow-md transition-all relative">
-                <Video className="w-5 h-5" />
-                <span>Video Conferencing</span>
+              <TabsTrigger value="video-conferencing" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:shadow-md transition-all relative scroll-snap-align-start">
+                <Video className="w-4 h-4" />
+                <span className="hidden sm:inline">Video Conferencing</span>
                 {/* Live Meeting Notification Badge */}
                 {invitedMeetings.filter(m => m.status === 'active').length > 0 && (
                   <Badge className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-1.5 py-0.5 min-w-[20px] h-5 rounded-full animate-pulse flex items-center justify-center">
@@ -3765,49 +3765,23 @@ const StudentDashboard = () => {
             {/* Progress Tab */}
             <TabsContent value="progress" className="space-y-6">
               <Card>
-                <CardHeader>
-                  <CardTitle>Progress & Attendance</CardTitle>
-                  <CardDescription>View your learning progress and attendance history</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <CardContent className="p-12 text-center">
+                  <div className="flex flex-col items-center space-y-4">
+                    <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
+                      <TrendingUp className="w-8 h-8 text-orange-600" />
+                    </div>
                     <div>
-                      <h4 className="font-semibold mb-4">Attendance Summary</h4>
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span>Total Lessons</span>
-                          <span className="font-semibold">{lessons.length}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Completed</span>
-                          <span className="font-semibold text-green-600">{lessons.filter(l => l.status === 'completed').length}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Attendance Rate</span>
-                          <span className="font-semibold text-blue-600">
-                            {lessons.length > 0 ? Math.round((lessons.filter(l => l.status === 'completed').length / lessons.length) * 100) : 0}%
-                          </span>
-                        </div>
+                      <h3 className="text-2xl font-bold text-gray-900 mb-2">Progress & Attendance</h3>
+                      <p className="text-gray-600 mb-4">Track your learning journey and attendance history</p>
+                      <div className="inline-flex items-center px-4 py-2 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">
+                        <Clock className="w-4 h-4 mr-2" />
+                        Coming Soon
                       </div>
                     </div>
-                    
-                    <div>
-                      <h4 className="font-semibold mb-4">Progress Overview</h4>
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span>Current Level</span>
-                          <span className="font-semibold">{studentProfile.proficiency_level}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Practice Sessions</span>
-                          <span className="font-semibold">{practiceLogs.length}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Total Practice Time</span>
-                          <span className="font-semibold">{practiceLogs.reduce((acc, log) => acc + log.duration_minutes, 0)} minutes</span>
-                        </div>
-                      </div>
-                    </div>
+                    <p className="text-sm text-gray-500 max-w-md">
+                      We're working on bringing you detailed progress tracking, attendance analytics, 
+                      and performance insights. This feature will be available in a future update.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
