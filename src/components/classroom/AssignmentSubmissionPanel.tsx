@@ -5,6 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { 
   CheckCircle, 
   Clock, 
@@ -48,6 +56,7 @@ export default function AssignmentSubmissionPanel({
   const [showSubmissions, setShowSubmissions] = useState(false);
   const [timerStarted, setTimerStarted] = useState(false);
   const [timerCompleted, setTimerCompleted] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const isOverdue = post.due_date && new Date(post.due_date) < new Date();
   const userSubmission = submissions.find(s => s.student_id === currentStudentId);
@@ -74,9 +83,15 @@ export default function AssignmentSubmissionPanel({
       return;
     }
 
+    // Show confirmation dialog instead of submitting directly
+    setShowConfirmDialog(true);
+  };
+
+  const confirmSubmission = () => {
     onSubmit?.(post.post_id, submissionText, submissionFiles);
     setSubmissionText('');
     setSubmissionFiles([]);
+    setShowConfirmDialog(false);
   };
 
   const handleGrading = (submissionId: string) => {
@@ -502,6 +517,62 @@ export default function AssignmentSubmissionPanel({
           )}
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Confirm Submission
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to submit this assignment? Once submitted, you cannot make changes unless the teacher allows resubmission.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <div className="space-y-2">
+              <div className="text-sm font-medium text-gray-700">Submission Preview:</div>
+              {submissionText && (
+                <div className="p-3 bg-gray-50 rounded-lg border">
+                  <div className="text-sm text-gray-600 mb-1">Text:</div>
+                  <div className="text-sm">{submissionText.length > 100 ? `${submissionText.substring(0, 100)}...` : submissionText}</div>
+                </div>
+              )}
+              {submissionFiles.length > 0 && (
+                <div className="p-3 bg-gray-50 rounded-lg border">
+                  <div className="text-sm text-gray-600 mb-1">Files ({submissionFiles.length}):</div>
+                  <div className="text-sm space-y-1">
+                    {submissionFiles.map((file, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-blue-500" />
+                        <span>{file.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirmDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmSubmission}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Submit Assignment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
