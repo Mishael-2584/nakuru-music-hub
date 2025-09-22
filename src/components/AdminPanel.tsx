@@ -148,6 +148,7 @@ const AdminPanel = () => {
   const [editInvoice, setEditInvoice] = useState<any>(null);
   const [excuseReason, setExcuseReason] = useState('');
   const [approvalRequests, setApprovalRequests] = useState<any[]>([]);
+  const [teacherChangeRequests, setTeacherChangeRequests] = useState<any[]>([]);
   const [activeStudents, setActiveStudents] = useState<Registration[]>([]);
   const [expandedStudentIds, setExpandedStudentIds] = useState<Set<string>>(new Set());
   const [expandedRequestIds, setExpandedRequestIds] = useState<Set<string>>(new Set());
@@ -549,6 +550,35 @@ const AdminPanel = () => {
         setApprovalRequests(flattenedData);
       }
 
+      // Fetch teacher profile change requests
+      console.log("AdminPanel: Fetching teacher change requests...");
+      const { data: teacherChangeRequestsData, error: teacherChangeRequestsError } = await supabase
+        .from('teacher_profile_change_requests')
+        .select(`
+          *,
+          teachers!inner(name, email)
+        `)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (teacherChangeRequestsError) {
+        console.error("Error fetching teacher change requests:", teacherChangeRequestsError);
+        toast({
+          title: "Error",
+          description: "Failed to load teacher change requests: " + teacherChangeRequestsError.message,
+          variant: "destructive",
+        });
+      } else {
+        console.log("AdminPanel: Teacher change requests fetched successfully:", teacherChangeRequestsData?.length || 0, "records");
+        // Flatten the data to include teacher info
+        const flattenedTeacherData = teacherChangeRequestsData?.map(request => ({
+          ...request,
+          teacher_name: request.teachers?.name || 'Unknown',
+          email: request.teachers?.email || 'Unknown'
+        })) || [];
+        setTeacherChangeRequests(flattenedTeacherData);
+    }
+
     console.log("AdminPanel: Fetching quotes...");
     const { data: quotesData, error: quotesError } = await supabase
       .from('quotes')
@@ -569,21 +599,21 @@ const AdminPanel = () => {
 
       // Fetch admin profiles for messaging (both admin and super_admin)
       console.log("AdminPanel: Fetching admin profiles for messaging...");
-      try {
-        const { data: adminData, error: adminError } = await supabase
-          .from('profiles')
-          .select('id, email, role, created_at')
-          .in('role', ['admin', 'super_admin'])
-          .order('created_at', { ascending: false });
+        try {
+          const { data: adminData, error: adminError } = await supabase
+            .from('profiles')
+            .select('id, email, role, created_at')
+            .in('role', ['admin', 'super_admin'])
+            .order('created_at', { ascending: false });
 
-        if (adminError) {
-          console.error("Error fetching admin profiles:", adminError);
-        } else {
-          console.log("AdminPanel: Admin profiles fetched successfully:", adminData?.length || 0, "records");
-          setAdminProfiles(adminData || []);
-        }
-      } catch (error) {
-        console.error("Error fetching admin profiles:", error);
+          if (adminError) {
+            console.error("Error fetching admin profiles:", adminError);
+          } else {
+            console.log("AdminPanel: Admin profiles fetched successfully:", adminData?.length || 0, "records");
+            setAdminProfiles(adminData || []);
+          }
+        } catch (error) {
+          console.error("Error fetching admin profiles:", error);
       }
 
       // Fetch students data
@@ -743,6 +773,123 @@ const AdminPanel = () => {
       await fetchData();
     } catch (error) {
       console.error('Error rejecting request:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to reject request',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleApproveTeacherChange = async (requestId: string) => {
+    try {
+      // Get the change request details
+      const { data: request, error: fetchError } = await supabase
+        .from('teacher_profile_change_requests')
+        .select('*')
+        .eq('id', requestId)
+        .single();
+
+      if (fetchError || !request) {
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch request details',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Update the teacher's profile with the proposed changes
+      const updateData: any = {};
+      if (request.proposed_name) updateData.name = request.proposed_name;
+      if (request.proposed_phone) updateData.phone = request.proposed_phone;
+      if (request.proposed_bio) updateData.bio = request.proposed_bio;
+      if (request.proposed_experience) updateData.experience = request.proposed_experience;
+
+      const { error: updateError } = await supabase
+        .from('teachers')
+        .update(updateData)
+        .eq('id', request.teacher_id);
+
+      if (updateError) {
+        console.error('Error updating teacher profile:', updateError);
+        toast({
+          title: 'Error',
+          description: 'Failed to update teacher profile',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Mark the request as approved
+      const { error: approveError } = await supabase
+        .from('teacher_profile_change_requests')
+        .update({
+          status: 'approved',
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString(),
+          review_notes: 'Profile changes approved'
+        })
+        .eq('id', requestId);
+
+      if (approveError) {
+        console.error('Error approving teacher change request:', approveError);
+        toast({
+          title: 'Error',
+          description: 'Failed to approve request',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Teacher profile changes approved and applied',
+      });
+
+      // Refresh the data
+      await fetchData();
+    } catch (error) {
+      console.error('Error approving teacher change request:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to approve request',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRejectTeacherChange = async (requestId: string) => {
+    try {
+      const { error } = await supabase
+        .from('teacher_profile_change_requests')
+        .update({
+          status: 'rejected',
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString(),
+          review_notes: 'Profile changes rejected'
+        })
+        .eq('id', requestId);
+
+      if (error) {
+        console.error('Error rejecting teacher change request:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to reject request',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Teacher profile change request rejected',
+      });
+
+      // Refresh the data
+      await fetchData();
+    } catch (error) {
+      console.error('Error rejecting teacher change request:', error);
       toast({
         title: 'Error',
         description: 'Failed to reject request',
@@ -1441,12 +1588,12 @@ const AdminPanel = () => {
           description: "Failed to mark invoice as paid",
           variant: "destructive",
         });
-        return;
-      }
-
+      return;
+    }
+    
       // Fetch invoice and student data for email
       const { data: invoice, error: invoiceError } = await supabase
-        .from('invoices')
+      .from('invoices')
         .select('*, students(*)')
         .eq('id', invoiceId)
         .single();
@@ -1464,7 +1611,7 @@ const AdminPanel = () => {
       // Fetch registration data for email
       const { data: registration, error: regError } = await supabase
         .from('registrations')
-        .select('*')
+      .select('*')
         .eq('id', invoice.students?.registration_id)
         .single();
 
@@ -1893,13 +2040,13 @@ const AdminPanel = () => {
               </div>
               
               {/* User Info */}
-              <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-primary/20">
-                <div className="w-6 h-6 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center">
-                  <UserCog className="w-3 h-3 text-white" />
-                </div>
-                <div className="text-right">
+            <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-primary/20">
+              <div className="w-6 h-6 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center">
+                <UserCog className="w-3 h-3 text-white" />
+              </div>
+              <div className="text-right">
                   <p className="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[120px] sm:max-w-none">{user?.email}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
+                <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
                 </div>
               </div>
             </div>
@@ -1999,50 +2146,50 @@ const AdminPanel = () => {
 
           {/* Desktop horizontal tabs */}
           <div className="hidden lg:flex justify-start overflow-x-auto scrollbar-thin scrollbar-thumb-primary/40 scrollbar-track-transparent" style={{ WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory' }}>
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-2 shadow-xl border border-primary/10 flex gap-2 min-w-max" style={{ minWidth: 'fit-content' }}>
-              <Button
-                variant={activeTab === 'stats' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('stats')}
-                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-                style={{ minWidth: 120 }}
-              >
-                <Piano className="h-4 w-4 mr-2" />
-                Overview
-              </Button>
-              <Button
-                variant={activeTab === 'students' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('students')}
-                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-                style={{ minWidth: 120 }}
-              >
-                <Users className="h-4 w-4 mr-2" />
-                Students ({activeStudents.length})
-              </Button>
-              <Button
-                variant={activeTab === 'registrations' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('registrations')}
-                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-                style={{ minWidth: 120 }}
-              >
-                <Guitar className="h-4 w-4 mr-2" />
-                Applications ({registrations.length})
-              </Button>
-              <Button
-                variant={activeTab === 'events' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('events')}
-                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-                style={{ minWidth: 120 }}
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                Events
-              </Button>
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-2 shadow-xl border border-primary/10 flex gap-2 min-w-max" style={{ minWidth: 'fit-content' }}>
+            <Button
+              variant={activeTab === 'stats' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('stats')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
+            >
+              <Piano className="h-4 w-4 mr-2" />
+              Overview
+            </Button>
+            <Button
+              variant={activeTab === 'students' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('students')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Students ({activeStudents.length})
+            </Button>
+            <Button
+              variant={activeTab === 'registrations' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('registrations')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
+            >
+              <Guitar className="h-4 w-4 mr-2" />
+              Applications ({registrations.length})
+            </Button>
+            <Button
+              variant={activeTab === 'events' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('events')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Events
+            </Button>
 
-              <Button
-                variant={activeTab === 'messages' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('messages')}
+            <Button
+              variant={activeTab === 'messages' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('messages')}
                 className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start relative"
-                style={{ minWidth: 120 }}
-              >
+              style={{ minWidth: 120 }}
+            >
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Messages
                 {portalMessages && portalMessages.filter(m => !m.is_read).length > 0 && (
@@ -2050,36 +2197,36 @@ const AdminPanel = () => {
                     {portalMessages.filter(m => !m.is_read).length}
                   </Badge>
                 )}
-              </Button>
+            </Button>
+            <Button
+              variant={activeTab === 'schedule' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('schedule')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
+            >
+              <Clock className="h-4 w-4 mr-2" />
+              Schedule
+            </Button>
+            {userRole === 'super_admin' && (
               <Button
-                variant={activeTab === 'schedule' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('schedule')}
+                variant={activeTab === 'admins' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('admins')}
                 className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
                 style={{ minWidth: 120 }}
               >
-                <Clock className="h-4 w-4 mr-2" />
-                Schedule
+                <Shield className="h-4 w-4 mr-2" />
+                Admins ({adminProfiles.length})
               </Button>
-              {userRole === 'super_admin' && (
-                <Button
-                  variant={activeTab === 'admins' ? 'default' : 'ghost'}
-                  onClick={() => setActiveTab('admins')}
-                  className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-                  style={{ minWidth: 120 }}
-                >
-                  <Shield className="h-4 w-4 mr-2" />
-                  Admins ({adminProfiles.length})
-                </Button>
-              )}
-              <Button
-                variant={activeTab === 'teachers' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('teachers')}
-                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-                style={{ minWidth: 120 }}
-              >
-                <UserCog className="h-4 w-4 mr-2" />
-                Teachers
-              </Button>
+            )}
+            <Button
+              variant={activeTab === 'teachers' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('teachers')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
+            >
+              <UserCog className="h-4 w-4 mr-2" />
+              Teachers
+            </Button>
               <Button
                 variant={activeTab === 'requests' ? 'default' : 'ghost'}
                 onClick={() => setActiveTab('requests')}
@@ -2087,7 +2234,7 @@ const AdminPanel = () => {
                 style={{ minWidth: 120 }}
               >
                 <Settings className="h-4 w-4 mr-2" />
-                Requests & Approvals ({approvalRequests.filter(req => req.status === 'pending').length})
+                Requests & Approvals ({approvalRequests.filter(req => req.status === 'pending').length + teacherChangeRequests.length})
               </Button>
               <Button
                 variant={activeTab === 'notifications' ? 'default' : 'ghost'}
@@ -2098,33 +2245,33 @@ const AdminPanel = () => {
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Notifications ({unreadNotificationCount})
               </Button>
-              <Button
-                variant={activeTab === 'quotes' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('quotes')}
-                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-                style={{ minWidth: 120 }}
-              >
-                <Quote className="h-4 w-4 mr-2" />
-                Quotes ({quotes.length})
-              </Button>
-              <Button
-                variant={activeTab === 'gallery' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('gallery')}
-                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-                style={{ minWidth: 120 }}
-              >
-                <Image className="h-4 w-4 mr-2" />
-                Gallery
-              </Button>
-              <Button
-                variant={activeTab === 'finances' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('finances')}
-                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
-                style={{ minWidth: 120 }}
-              >
-                <DollarSign className="h-4 w-4 mr-2" />
-                Finances
-              </Button>
+            <Button
+              variant={activeTab === 'quotes' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('quotes')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
+            >
+              <Quote className="h-4 w-4 mr-2" />
+              Quotes ({quotes.length})
+            </Button>
+            <Button
+              variant={activeTab === 'gallery' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('gallery')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
+            >
+              <Image className="h-4 w-4 mr-2" />
+              Gallery
+            </Button>
+            <Button
+              variant={activeTab === 'finances' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('finances')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
+            >
+              <DollarSign className="h-4 w-4 mr-2" />
+              Finances
+            </Button>
               {/* Learning Mode Requests Button - Removed */}
               <Button
                 variant={activeTab === 'debug' ? 'default' : 'ghost'}
@@ -2807,8 +2954,8 @@ const AdminPanel = () => {
                   currentUserName="Admin"
                   userType="admin"
                 />
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
           </div>
         </div>
 
@@ -3206,6 +3353,89 @@ const AdminPanel = () => {
                     );
                   })}
                   
+                  {/* Teacher Profile Change Requests */}
+                  {teacherChangeRequests.length > 0 && (
+                    <>
+                      <div className="mt-8 pt-6 border-t border-gray-200">
+                        <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                          <UserCog className="h-5 w-5" />
+                          Teacher Profile Changes ({teacherChangeRequests.length})
+                        </h4>
+                      </div>
+                      
+                      {teacherChangeRequests.map((request) => (
+                        <Card key={request.id} className="border-l-4 border-l-blue-500">
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <UserCog className="h-4 w-4 text-blue-600" />
+                                  <span className="font-medium text-gray-900">
+                                    {request.teacher_name}
+                                  </span>
+                                  <Badge variant="outline" className="text-xs">
+                                    Profile Update
+                                  </Badge>
+                                </div>
+                                
+                                <div className="text-sm text-gray-600 mb-3">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    {request.proposed_name && (
+                                      <div>
+                                        <span className="font-medium">Name:</span> {request.proposed_name}
+                                      </div>
+                                    )}
+                                    {request.proposed_phone && (
+                                      <div>
+                                        <span className="font-medium">Phone:</span> {request.proposed_phone}
+                                      </div>
+                                    )}
+                                    {request.proposed_bio && (
+                                      <div className="md:col-span-2">
+                                        <span className="font-medium">Bio:</span> {request.proposed_bio}
+                                      </div>
+                                    )}
+                                    {request.proposed_experience && (
+                                      <div className="md:col-span-2">
+                                        <span className="font-medium">Experience:</span> {request.proposed_experience}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                <div className="text-xs text-gray-500">
+                                  Requested: {new Date(request.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                              
+                              <div className="flex flex-col gap-2 ml-4">
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleApproveTeacherChange(request.id)}
+                                    className="h-8 px-3 bg-green-600 hover:bg-green-700 text-xs"
+                                  >
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => handleRejectTeacherChange(request.id)}
+                                    className="h-8 px-3 text-xs"
+                                  >
+                                    <X className="h-3 w-3 mr-1" />
+                                    Reject
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </>
+                  )}
+                  
                   {/* Pagination Controls */}
                   {getTotalPages() > 1 && (
                     <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
@@ -3472,15 +3702,15 @@ const AdminPanel = () => {
                 if (selectedQuote) {
                   try {
                     const { data: updatedQuote, error: updateError } = await supabase
-                      .from('quotes')
-                      .update({
-                        status: selectedQuote.status,
-                        quote_amount: quoteAmount ? parseFloat(quoteAmount) : null,
-                        admin_notes: adminNotes,
-                        updated_at: new Date().toISOString(),
-                      })
-                      .eq('id', selectedQuote.id)
-                      .select()
+                    .from('quotes')
+                    .update({
+                      status: selectedQuote.status,
+                      quote_amount: quoteAmount ? parseFloat(quoteAmount) : null,
+                      admin_notes: adminNotes,
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', selectedQuote.id)
+                    .select()
                       .single();
 
                     if (updateError) {
@@ -3492,44 +3722,44 @@ const AdminPanel = () => {
                       });
                     } else if (updatedQuote) {
                       setQuotes(prev => prev.map(q => q.id === selectedQuote.id ? updatedQuote : q));
-                      toast({
-                        title: "Quote Updated",
-                        description: `Quote status updated to ${selectedQuote.status}.`,
-                      });
-                      
-                      // Send email if quote amount is provided
-                      if (quoteAmount && parseFloat(quoteAmount) > 0) {
-                        try {
+                        toast({
+                          title: "Quote Updated",
+                          description: `Quote status updated to ${selectedQuote.status}.`,
+                        });
+                        
+                        // Send email if quote amount is provided
+                        if (quoteAmount && parseFloat(quoteAmount) > 0) {
+                          try {
                           const emailSent = await sendQuoteEmail(updatedQuote, parseFloat(quoteAmount), adminNotes);
-                          if (emailSent) {
-                            toast({
-                              title: "Quote Email Sent",
-                              description: "Quote has been sent to the customer via email.",
-                            });
-                          } else {
+                            if (emailSent) {
+                              toast({
+                                title: "Quote Email Sent",
+                                description: "Quote has been sent to the customer via email.",
+                              });
+                            } else {
+                              toast({
+                                title: "Email Error",
+                                description: "Quote updated but email could not be sent.",
+                                variant: "destructive",
+                              });
+                            }
+                          } catch (error) {
+                            console.error("Error sending quote email:", error);
                             toast({
                               title: "Email Error",
                               description: "Quote updated but email could not be sent.",
                               variant: "destructive",
                             });
                           }
-                        } catch (error) {
-                          console.error("Error sending quote email:", error);
-                          toast({
-                            title: "Email Error",
-                            description: "Quote updated but email could not be sent.",
-                            variant: "destructive",
-                          });
                         }
                       }
-                    }
                   } catch (err) {
-                    console.error("Error updating quote:", err);
-                    toast({
-                      title: "Error",
-                      description: "Failed to update quote status.",
-                      variant: "destructive",
-                    });
+                      console.error("Error updating quote:", err);
+                      toast({
+                        title: "Error",
+                        description: "Failed to update quote status.",
+                        variant: "destructive",
+                      });
                   }
                   setShowQuoteDialog(false);
                   setSelectedQuote(null);
@@ -3708,9 +3938,9 @@ const AdminPanel = () => {
                       studentId: '',
                     };
                     const pdfBlob = await generateQuotePDF(selectedQuote, Number(quoteAmount), adminNotes, invoiceDetails, invoiceMeta);
-                    const url = URL.createObjectURL(pdfBlob);
-                    setInvoicePDFUrl(url);
-                    // Send email with invoice PDF
+                  const url = URL.createObjectURL(pdfBlob);
+                  setInvoicePDFUrl(url);
+                  // Send email with invoice PDF
                     const emailSent = await sendQuoteEmail(selectedQuote, Number(quoteAmount), adminNotes, invoiceDetails);
                     if (emailSent) {
                       toast({
@@ -3811,7 +4041,7 @@ const AdminPanel = () => {
                                 </Button>
                               ) : (
                                 <>
-                                  <Button size="sm" variant="outline" onClick={() => handleViewInvoice(inv)}>View</Button>
+                                <Button size="sm" variant="outline" onClick={() => handleViewInvoice(inv)}>View</Button>
                                   <Button size="sm" variant="ghost" onClick={() => handleOpenInvoiceHistory(student)}>
                                     View All Invoices
                                   </Button>
@@ -3832,8 +4062,8 @@ const AdminPanel = () => {
                                   )}
                                 </>
                               )}
-                            </td>
-                          </tr>
+                          </td>
+                        </tr>
                         );
                       })}
                     </tbody>

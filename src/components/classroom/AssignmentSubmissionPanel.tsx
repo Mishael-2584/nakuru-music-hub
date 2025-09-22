@@ -386,7 +386,6 @@ export default function AssignmentSubmissionPanel({
                           </Avatar>
                           <div>
                             <div className="font-medium text-gray-900">{submission.author_name}</div>
-                            <div className="text-sm text-gray-500">{submission.author_email}</div>
                             <div className="text-xs text-gray-400">
                               Submitted {formatDistanceToNow(new Date(submission.submitted_at), { addSuffix: true })}
                             </div>

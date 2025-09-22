@@ -14,6 +14,7 @@ const TeacherAccount = () => {
   const { toast } = useToast();
   const [teacherId, setTeacherId] = useState<string>("");
   const [avatarUrl, setAvatarUrl] = useState<string>("");
+  const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [bio, setBio] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -25,11 +26,12 @@ const TeacherAccount = () => {
       if (!userData.user) return;
       const { data } = await supabase
         .from('teachers')
-        .select('id, phone, bio, avatar_url')
+        .select('id, name, phone, bio, avatar_url')
         .eq('user_id', userData.user.id)
         .single();
       if (data) {
         setTeacherId(data.id);
+        setName(data.name || "");
         setPhone(data.phone || "");
         setBio(data.bio || "");
         setAvatarUrl(data.avatar_url || "");
@@ -68,6 +70,7 @@ const TeacherAccount = () => {
       setSubmitting(true);
       const { error } = await supabase.from('teacher_profile_change_requests').insert({
         teacher_id: teacherId,
+        proposed_name: name,
         proposed_phone: phone,
         proposed_bio: bio,
       });
@@ -135,12 +138,16 @@ const TeacherAccount = () => {
 
             <div className="grid md:grid-cols-2 gap-4">
               <div>
+                <Label htmlFor="name">Full Name</Label>
+                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your full name" />
+              </div>
+              <div>
                 <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Enter your phone number" />
               </div>
               <div className="md:col-span-2">
                 <Label htmlFor="bio">Bio</Label>
-                <Textarea id="bio" rows={4} value={bio} onChange={(e) => setBio(e.target.value)} />
+                <Textarea id="bio" rows={4} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Tell us about yourself..." />
               </div>
               <div className="md:col-span-2">
                 <Button onClick={submitChanges} disabled={submitting}>{submitting ? 'Submitting...' : 'Submit Changes for Approval'}</Button>

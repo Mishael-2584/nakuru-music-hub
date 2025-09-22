@@ -1092,7 +1092,7 @@ export default function ClassroomPage() {
                         post={post}
                         isTeacher={isTeacherOfClass}
                         submissions={submissions[post.post_id] || []}
-                        currentStudentId={classroom.currentStudent?.id}
+                        currentStudentId={classroom.currentStudent?.user_id}
                         onSubmit={handleSubmitAssignment}
                         onGrade={handleGradeSubmission}
                         onLoadSubmissions={loadSubmissions}
