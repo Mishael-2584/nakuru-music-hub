@@ -22,6 +22,13 @@ export default function AssignmentTimer({
   const [timeLeft, setTimeLeft] = useState(timeLimitMinutes * 60); // Convert to seconds
   const [isRunning, setIsRunning] = useState(false);
 
+  // Auto-start timer when isStarted becomes true
+  useEffect(() => {
+    if (isStarted && !isRunning && !isCompleted) {
+      setIsRunning(true);
+    }
+  }, [isStarted, isRunning, isCompleted]);
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     

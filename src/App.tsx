@@ -25,6 +25,7 @@ import StudentDashboard from "./pages/StudentDashboard";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import TeacherAccount from "./pages/TeacherAccount";
 import TeacherSignup from "./pages/TeacherSignup";
+import QuizPage from "./pages/QuizPage";
 import Shop from "./pages/Shop";
 import Team from "./pages/Team";
 import SignOut from "./pages/SignOut";
@@ -97,6 +98,7 @@ const App = () => (
             <Route path="/teacher" element={<TeacherDashboard />} />
             <Route path="/teacher/account" element={<TeacherAccount />} />
             <Route path="/classrooms/:id" element={<ClassroomPage />} />
+            <Route path="/quiz/:postId" element={<QuizPage />} />
             <Route path="/teacher-signup" element={<TeacherSignup />} />
             <Route path="/pending-teacher" element={<PendingTeacherPage />} />
             <Route path="/signout" element={<SignOut />} />

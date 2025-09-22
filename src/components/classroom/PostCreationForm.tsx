@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { SimpleTextEditor } from "@/components/SimpleTextEditor";
 import { PostFileUpload } from "@/components/PostFileUpload";
+import QuizCreationForm from "@/components/quiz/QuizCreationForm";
+import { QuizFormData } from "@/types/quiz";
 
 interface PostCreationFormProps {
   onSubmit: (data: {
@@ -24,6 +26,7 @@ interface PostCreationFormProps {
     isTimed: boolean;
     timeLimitMinutes: number;
     attachments: any[];
+    quizData?: QuizFormData;
   }) => void;
   isSubmitting?: boolean;
 }
@@ -38,20 +41,27 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
   const [isTimed, setIsTimed] = useState(false);
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(60);
   const [attachments, setAttachments] = useState<any[]>([]);
+  const [isQuiz, setIsQuiz] = useState(false);
+  const [quizData, setQuizData] = useState<QuizFormData | undefined>(undefined);
 
   const handleSubmit = () => {
-    if (!content.trim()) return;
+    // For quizzes, content is not required
+    if (!isQuiz && !content.trim()) return;
     if (postType === 'assignment' && !assignmentTitle.trim()) return;
+    
+    // For quizzes, quizData is required
+    if (isQuiz && !quizData) return;
 
     onSubmit({
-      content: content.trim(),
+      content: isQuiz ? (quizData?.description || `Quiz: ${quizData?.title}`) : content.trim(),
       isAssignment: postType === 'assignment',
       assignmentTitle: assignmentTitle.trim(),
       dueDate,
       maxPoints,
       isTimed: postType === 'assignment' ? isTimed : false,
       timeLimitMinutes: postType === 'assignment' ? timeLimitMinutes : 0,
-      attachments
+      attachments,
+      quizData: isQuiz ? quizData : undefined
     });
 
     // Reset form after submission
@@ -62,6 +72,8 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
     setIsTimed(false);
     setTimeLimitMinutes(60);
     setAttachments([]);
+    setIsQuiz(false);
+    setQuizData(undefined);
     setPostType('general');
     setIsVisible(false);
   };
@@ -74,6 +86,8 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
     setIsTimed(false);
     setTimeLimitMinutes(60);
     setAttachments([]);
+    setIsQuiz(false);
+    setQuizData(undefined);
     setPostType('general');
     setIsVisible(false);
   };
@@ -257,64 +271,105 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
               </div>
             </div>
             
-            {/* Timed Assignment Options */}
-            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <input
-                  type="checkbox"
-                  id="isTimed"
-                  checked={isTimed}
-                  onChange={(e) => setIsTimed(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label htmlFor="isTimed" className="text-sm font-medium text-blue-800">
-                  Make this a timed assignment
-                </label>
-              </div>
-              
-              {isTimed && (
-                <div className="ml-6">
-                  <label className="block text-sm font-medium text-blue-700 mb-2">
-                    Time Limit (minutes)
+              {/* Quiz Options */}
+              <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <input
+                    type="checkbox"
+                    id="isQuiz"
+                    checked={isQuiz}
+                    onChange={(e) => setIsQuiz(e.target.checked)}
+                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="isQuiz" className="text-sm font-medium text-purple-800">
+                    Make this a quiz assignment
                   </label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      value={timeLimitMinutes}
-                      onChange={(e) => setTimeLimitMinutes(parseInt(e.target.value) || 60)}
-                      min="1"
-                      max="480"
-                      className="w-24 border-blue-200 focus:border-blue-500 bg-white"
-                    />
-                    <span className="text-sm text-blue-600">
-                      ({Math.floor(timeLimitMinutes / 60)}h {timeLimitMinutes % 60}m)
-                    </span>
-                  </div>
-                  <p className="text-xs text-blue-600 mt-1">
-                    Students will have a timer running during the assignment
-                  </p>
                 </div>
-              )}
-            </div>
+                
+                <p className="text-xs text-purple-600 mb-3">
+                  Create interactive quiz questions with automatic grading
+                </p>
+              </div>
+
+              {/* Timed Assignment Options */}
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <input
+                    type="checkbox"
+                    id="isTimed"
+                    checked={isTimed}
+                    onChange={(e) => setIsTimed(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="isTimed" className="text-sm font-medium text-blue-800">
+                    Make this a timed assignment
+                  </label>
+                </div>
+                
+                {isTimed && (
+                  <div className="ml-6">
+                    <label className="block text-sm font-medium text-blue-700 mb-2">
+                      Time Limit (minutes)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        value={timeLimitMinutes}
+                        onChange={(e) => setTimeLimitMinutes(parseInt(e.target.value) || 60)}
+                        min="1"
+                        max="480"
+                        className="w-24 border-blue-200 focus:border-blue-500 bg-white"
+                      />
+                      <span className="text-sm text-blue-600">
+                        ({Math.floor(timeLimitMinutes / 60)}h {timeLimitMinutes % 60}m)
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-1">
+                      Students will have a timer running during the assignment
+                    </p>
+                  </div>
+                )}
+              </div>
           </div>
         )}
 
-        {/* Content Editor */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-3">
-            {postType === 'assignment' ? 'Assignment Instructions' : 'Your Message'}
-          </label>
-          <SimpleTextEditor
-            content={content}
-            onChange={setContent}
-            placeholder={postType === 'assignment' 
-              ? "Provide clear instructions for your assignment..."
-              : "Share something with your class..."
-            }
-            className="min-h-[200px]"
-            showPreview={true}
-          />
-        </div>
+        {/* Quiz Creation Form */}
+        {isQuiz && postType === 'assignment' ? (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-semibold text-gray-700">
+                Quiz Questions
+              </label>
+              {quizData && (
+                <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
+                  ✓ Quiz Ready
+                </Badge>
+              )}
+            </div>
+            <QuizCreationForm
+              onSubmit={(quizFormData) => setQuizData(quizFormData)}
+              isSubmitting={isSubmitting}
+              hideSubmitButton={true}
+            />
+          </div>
+        ) : (
+          /* Content Editor */
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-3">
+              {postType === 'assignment' ? 'Assignment Instructions' : 'Your Message'}
+            </label>
+            <SimpleTextEditor
+              content={content}
+              onChange={setContent}
+              placeholder={postType === 'assignment' 
+                ? "Provide clear instructions for your assignment..."
+                : "Share something with your class..."
+              }
+              className="min-h-[200px]"
+              showPreview={true}
+            />
+          </div>
+        )}
 
         {/* File Attachments */}
         <div>
@@ -356,14 +411,28 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={!content.trim() || (postType === 'assignment' && !assignmentTitle.trim()) || isSubmitting}
+              disabled={
+                (!isQuiz && !content.trim()) || 
+                (postType === 'assignment' && !assignmentTitle.trim()) || 
+                (isQuiz && !quizData) ||
+                isSubmitting
+              }
               className={`${
-                postType === 'assignment'
+                isQuiz
+                  ? 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800'
+                  : postType === 'assignment'
                   ? 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800'
                   : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
               } text-white shadow-md`}
             >
-              {isSubmitting ? 'Creating...' : postType === 'assignment' ? 'Create Assignment' : 'Share Post'}
+              {isSubmitting 
+                ? (isQuiz ? 'Creating Quiz...' : 'Creating...') 
+                : isQuiz 
+                  ? 'Create Quiz' 
+                  : postType === 'assignment' 
+                    ? 'Create Assignment' 
+                    : 'Share Post'
+              }
             </Button>
           </div>
         </div>

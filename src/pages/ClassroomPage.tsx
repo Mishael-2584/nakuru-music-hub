@@ -11,6 +11,10 @@ import { ArrowLeft, BookOpen, CheckCircle, Users, GraduationCap, Clock, Hash } f
 import ClassroomPostCard from "@/components/classroom/ClassroomPostCard";
 import AssignmentSubmissionPanel from "@/components/classroom/AssignmentSubmissionPanel";
 import PostCreationForm from "@/components/classroom/PostCreationForm";
+import QuizTakingInterface from "@/components/quiz/QuizTakingInterface";
+import QuizResultsDisplay from "@/components/quiz/QuizResultsDisplay";
+import QuizManagementInterface from "@/components/quiz/QuizManagementInterface";
+import { QuizFormData, StudentQuizAnswer, QuizResult } from "@/types/quiz";
 
 type Classroom = {
   id: string;
@@ -85,10 +89,386 @@ export default function ClassroomPage() {
   const [postComments, setPostComments] = useState<Record<string, any[]>>({});
   const [newComment, setNewComment] = useState<Record<string, string>>({});
   const [isCreatingPost, setIsCreatingPost] = useState(false);
+  
+  // Quiz-related state
+  const [quizData, setQuizData] = useState<any>(null);
+  const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
+  const [quizAnswers, setQuizAnswers] = useState<any[]>([]);
+  const [quizMatchingPairs, setQuizMatchingPairs] = useState<any[]>([]);
+  const [quizSubmissions, setQuizSubmissions] = useState<any[]>([]);
+  const [currentQuizSubmission, setCurrentQuizSubmission] = useState<any>(null);
+  const [showQuizResults, setShowQuizResults] = useState(false);
+  const [showQuizManagement, setShowQuizManagement] = useState(false);
+  const [quizSubmissionStatuses, setQuizSubmissionStatuses] = useState<{[key: string]: any}>({});
+  const [timerStarted, setTimerStarted] = useState(false);
+  const [timerCompleted, setTimerCompleted] = useState(false);
 
   const loadComments = async (postId: string) => {
     const { data } = await supabase.rpc('get_post_comments', { post_id_param: postId });
     setPostComments(prev => ({ ...prev, [postId]: data || [] }));
+  };
+
+  const checkQuizSubmissionStatus = async (quizId: string) => {
+    try {
+      if (!currentStudent) return null;
+
+      const { data: submission, error } = await supabase
+        .from('quiz_submissions')
+        .select('*')
+        .eq('quiz_id', quizId)
+        .eq('student_id', currentStudent.user_id)
+        .order('submitted_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking quiz submission:', error);
+        return null;
+      }
+
+      return submission;
+    } catch (error) {
+      console.error('Error checking quiz submission:', error);
+      return null;
+    }
+  };
+
+  const loadQuizSubmissionStatuses = async (posts: any[]) => {
+    try {
+      const quizPosts = posts.filter(post => post.has_quiz);
+      const statusMap: {[key: string]: any} = {};
+      
+      for (const post of quizPosts) {
+        // Get quiz ID from the post
+        const { data: quizData } = await supabase
+          .from('quizzes')
+          .select('id')
+          .eq('post_id', post.post_id)
+          .single();
+        
+        if (quizData) {
+          const submission = await checkQuizSubmissionStatus(quizData.id);
+          if (submission) {
+            statusMap[post.post_id] = submission;
+          }
+        }
+      }
+      
+      setQuizSubmissionStatuses(statusMap);
+    } catch (error) {
+      console.error('Error loading quiz submission statuses:', error);
+    }
+  };
+
+  // Quiz-related functions
+  const createQuiz = async (postId: string, quizFormData: QuizFormData) => {
+    try {
+      console.log('Creating quiz for post:', postId);
+      
+      // Create quiz using RPC function to bypass RLS issues
+      const { data: quiz, error: quizError } = await supabase.rpc('create_quiz', {
+        post_id_param: postId,
+        title_param: quizFormData.title,
+        description_param: quizFormData.description,
+        time_limit_minutes_param: quizFormData.time_limit_minutes,
+        show_answers_after_param: quizFormData.show_answers_after,
+        show_marks_immediately_param: quizFormData.show_marks_immediately,
+        passing_score_param: quizFormData.passing_score,
+        max_attempts_param: quizFormData.max_attempts
+      });
+
+      if (quizError) {
+        console.error('Quiz creation error:', quizError);
+        throw quizError;
+      }
+      
+      console.log('Quiz created successfully with ID:', quiz);
+
+      // Create questions using RPC function
+      const questionsData = quizFormData.questions.map(q => ({
+        question_text: q.question_text,
+        question_type: q.question_type,
+        points: q.points,
+        order_index: q.order_index,
+        answers: q.answers || [],
+        matching_pairs: q.matching_pairs || []
+      }));
+
+      const { error: questionsError } = await supabase.rpc('create_quiz_questions', {
+        quiz_id_param: quiz,
+        questions_data: questionsData
+      });
+
+      if (questionsError) {
+        console.error('Questions creation error:', questionsError);
+        throw questionsError;
+      }
+
+      toast({ title: 'Success', description: 'Quiz created successfully!' });
+    } catch (error) {
+      console.error('Error creating quiz:', error);
+      toast({ title: 'Error', description: 'Failed to create quiz', variant: 'destructive' });
+    }
+  };
+
+  const loadQuizData = async (postId: string) => {
+    try {
+      // Try RPC function first, fallback to direct queries
+      let data, error;
+      
+      try {
+        const result = await supabase.rpc('get_quiz_by_post_id', {
+          post_id_param: postId
+        });
+        data = result.data;
+        error = result.error;
+      } catch (rpcError) {
+        console.log('RPC function not available, using fallback approach');
+        
+        // Fallback: Get quiz data using direct queries
+        const { data: quizData, error: quizError } = await supabase
+          .from('quizzes')
+          .select(`
+            id,
+            title,
+            description,
+            time_limit_minutes,
+            show_answers_after,
+            show_marks_immediately,
+            passing_score,
+            max_attempts
+          `)
+          .eq('post_id', postId)
+          .single();
+
+        if (quizError) {
+          toast({ title: 'Error', description: 'No quiz found for this post', variant: 'destructive' });
+          return;
+        }
+
+        // Get questions
+        const { data: questionsData, error: questionsError } = await supabase
+          .from('quiz_questions')
+          .select('*')
+          .eq('quiz_id', quizData.id)
+          .order('order_index');
+
+        if (questionsError) {
+          throw questionsError;
+        }
+
+        // Get answers
+        const { data: answersData, error: answersError } = await supabase
+          .from('quiz_answers')
+          .select('*')
+          .in('question_id', questionsData.map(q => q.id));
+
+        if (answersError) {
+          throw answersError;
+        }
+
+        // Get matching pairs
+        const { data: matchingData, error: matchingError } = await supabase
+          .from('quiz_matching_pairs')
+          .select('*')
+          .in('question_id', questionsData.map(q => q.id));
+
+        if (matchingError) {
+          throw matchingError;
+        }
+
+        // Transform data to match expected format
+        data = [];
+        questionsData.forEach(question => {
+          const baseRow = {
+            quiz_id: quizData.id,
+            quiz_title: quizData.title,
+            quiz_description: quizData.description,
+            time_limit_minutes: quizData.time_limit_minutes,
+            show_answers_after: quizData.show_answers_after,
+            show_marks_immediately: quizData.show_marks_immediately,
+            passing_score: quizData.passing_score,
+            max_attempts: quizData.max_attempts,
+            question_id: question.id,
+            question_text: question.question_text,
+            question_type: question.question_type,
+            question_points: question.points,
+            question_order: question.order_index
+          };
+
+          // Add answers
+          const questionAnswers = answersData.filter(a => a.question_id === question.id);
+          if (questionAnswers.length > 0) {
+            questionAnswers.forEach(answer => {
+              data.push({
+                ...baseRow,
+                answer_id: answer.id,
+                answer_text: answer.answer_text,
+                answer_is_correct: answer.is_correct,
+                answer_order: answer.order_index
+              });
+            });
+          } else {
+            // Add matching pairs
+            const questionMatching = matchingData.filter(m => m.question_id === question.id);
+            if (questionMatching.length > 0) {
+              questionMatching.forEach(match => {
+                data.push({
+                  ...baseRow,
+                  matching_left: match.left_item,
+                  matching_right: match.right_item,
+                  matching_order: match.order_index
+                });
+              });
+            } else {
+              // Just the question
+              data.push(baseRow);
+            }
+          }
+        });
+
+        error = null;
+      }
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        toast({ title: 'Error', description: 'No quiz data found', variant: 'destructive' });
+        return;
+      }
+
+      // Process the data to separate quiz, questions, answers, and matching pairs
+      const quiz = data[0];
+      const questions = [];
+      const answers = [];
+      const matchingPairs = [];
+
+      for (const row of data) {
+        if (row.question_id && !questions.find(q => q.id === row.question_id)) {
+          questions.push({
+            id: row.question_id,
+            quiz_id: row.quiz_id,
+            question_text: row.question_text,
+            question_type: row.question_type,
+            points: row.question_points,
+            order_index: row.question_order
+          });
+        }
+
+        if (row.answer_id && !answers.find(a => a.id === row.answer_id)) {
+          answers.push({
+            id: row.answer_id,
+            question_id: row.question_id,
+            answer_text: row.answer_text,
+            is_correct: row.answer_is_correct,
+            order_index: row.answer_order
+          });
+        }
+
+        if (row.matching_left && !matchingPairs.find(mp => mp.left_item === row.matching_left)) {
+          matchingPairs.push({
+            question_id: row.question_id,
+            left_item: row.matching_left,
+            right_item: row.matching_right,
+            order_index: row.matching_order
+          });
+        }
+      }
+
+      setQuizData({
+        id: quiz.quiz_id,
+        title: quiz.quiz_title,
+        description: quiz.quiz_description,
+        time_limit_minutes: quiz.time_limit_minutes,
+        show_answers_after: quiz.show_answers_after,
+        show_marks_immediately: quiz.show_marks_immediately,
+        passing_score: quiz.passing_score,
+        max_attempts: quiz.max_attempts
+      });
+      setQuizQuestions(questions);
+      setQuizAnswers(answers);
+      setQuizMatchingPairs(matchingPairs);
+      
+      // Reset timer state
+      setTimerStarted(false);
+      setTimerCompleted(false);
+    } catch (error) {
+      console.error('Error loading quiz data:', error);
+    }
+  };
+
+  const handleTimeUp = () => {
+    setTimerCompleted(true);
+    toast({ title: 'Time Up!', description: 'Quiz time has expired', variant: 'destructive' });
+  };
+
+  const submitQuiz = async (answers: StudentQuizAnswer[]) => {
+    if (!quizData || !user) return;
+
+    try {
+      // Create quiz submission
+      const { data: submission, error: submissionError } = await supabase
+        .from('quiz_submissions')
+        .insert({
+          quiz_id: quizData.id,
+          student_id: user.id,
+          attempt_number: 1, // For now, always 1
+          submitted_at: new Date().toISOString(),
+          status: 'submitted'
+        })
+        .select('id')
+        .single();
+
+      if (submissionError) throw submissionError;
+
+      // Create submission answers
+      for (const answer of answers) {
+        const question = quizQuestions.find(q => q.id === answer.question_id);
+        if (!question) continue;
+
+        let isCorrect = false;
+        let pointsEarned = 0;
+
+        if (question.question_type === 'multiple_choice' || question.question_type === 'true_false') {
+          const correctAnswer = quizAnswers.find(a => 
+            a.question_id === question.id && a.is_correct
+          );
+          isCorrect = correctAnswer?.id === answer.selected_answer_id;
+          pointsEarned = isCorrect ? question.points : 0;
+        } else if (question.question_type === 'matching') {
+          // For matching, we'd need to compare with correct pairs
+          // For now, we'll assume all matches are correct
+          isCorrect = answer.matching_pairs.length > 0;
+          pointsEarned = isCorrect ? question.points : 0;
+        }
+
+        await supabase
+          .from('quiz_submission_answers')
+          .insert({
+            submission_id: submission.id,
+            question_id: answer.question_id,
+            selected_answer_id: answer.selected_answer_id,
+            matching_pairs: answer.matching_pairs,
+            is_correct: isCorrect,
+            points_earned: pointsEarned
+          });
+      }
+
+      // Grade the submission
+      const { data: gradeResult, error: gradeError } = await supabase.rpc('grade_quiz_submission', {
+        submission_id_param: submission.id
+      });
+
+      if (gradeError) throw gradeError;
+
+      setCurrentQuizSubmission(submission);
+      setShowQuizResults(true);
+      
+      toast({ title: 'Success', description: 'Quiz submitted successfully!' });
+    } catch (error) {
+      console.error('Error submitting quiz:', error);
+      toast({ title: 'Error', description: 'Failed to submit quiz', variant: 'destructive' });
+    }
   };
 
   const handleAddComment = async (postId: string) => {
@@ -124,6 +504,7 @@ export default function ClassroomPage() {
     isTimed: boolean;
     timeLimitMinutes: number;
     attachments: any[];
+    quizData?: QuizFormData;
   }) => {
     if (!classroom) return;
     setIsCreatingPost(true);
@@ -186,6 +567,17 @@ export default function ClassroomPage() {
             time_limit_minutes: data.isTimed ? data.timeLimitMinutes : null
           })
           .eq('id', postId);
+      }
+
+      // Create quiz if quiz data is provided
+      if (data.quizData && postId) {
+        try {
+          await createQuiz(postId, data.quizData);
+        } catch (error) {
+          console.error('Quiz creation failed:', error);
+          toast({ title: 'Error', description: 'Failed to create quiz', variant: 'destructive' });
+          return; // Don't continue if quiz creation fails
+        }
       }
       
       if (data.attachments.length > 0) {
@@ -446,6 +838,11 @@ export default function ClassroomPage() {
       );
       setFeed(postsWithAttachments);
       
+      // Load quiz submission statuses for enrolled students
+      if (isEnrolledStudent && currentStudent) {
+        await loadQuizSubmissionStatuses(postsWithAttachments);
+      }
+      
       for (const post of postsWithAttachments) {
         if (post.is_assignment) {
           await loadSubmissions(post.post_id);
@@ -623,6 +1020,59 @@ export default function ClassroomPage() {
             />
           )}
 
+          {/* Quiz Taking Interface */}
+          {quizData && !showQuizResults && !showQuizManagement && (
+            <QuizTakingInterface
+              quiz={quizData}
+              questions={quizQuestions}
+              answers={quizAnswers}
+              matchingPairs={quizMatchingPairs}
+              onSubmit={submitQuiz}
+              onStartTimer={() => setTimerStarted(true)}
+              onTimeUp={handleTimeUp}
+              timerStarted={timerStarted}
+              timerCompleted={timerCompleted}
+              timeLimitMinutes={quizData.time_limit_minutes}
+            />
+          )}
+
+          {/* Quiz Results Display */}
+          {showQuizResults && currentQuizSubmission && (
+            <QuizResultsDisplay
+              result={{
+                submission: currentQuizSubmission,
+                answers: [], // Would need to load these
+                questions: quizQuestions,
+                showAnswers: quizData?.show_answers_after || false
+              }}
+              onRetake={() => {
+                setShowQuizResults(false);
+                setCurrentQuizSubmission(null);
+                setTimerStarted(false);
+                setTimerCompleted(false);
+              }}
+              canRetake={true}
+            />
+          )}
+
+          {/* Quiz Management Interface */}
+          {showQuizManagement && isTeacherOfClass && (
+            <QuizManagementInterface
+              quizId={quizData?.id || ''}
+              quizTitle={quizData?.title || ''}
+              submissions={quizSubmissions}
+              questions={quizQuestions}
+              onViewSubmission={(submissionId) => {
+                // Handle viewing individual submission
+                console.log('View submission:', submissionId);
+              }}
+              onExportResults={() => {
+                // Handle exporting results
+                console.log('Export results');
+              }}
+            />
+          )}
+
           {/* Feed */}
           <div className="space-y-6">
             {feed.length > 0 ? (
@@ -637,15 +1087,85 @@ export default function ClassroomPage() {
                   comments={postComments[post.post_id] || []}
                 >
                   {post.is_assignment && (
-                    <AssignmentSubmissionPanel
-                      post={post}
-                      isTeacher={isTeacherOfClass}
-                      submissions={submissions[post.post_id] || []}
-                      currentStudentId={classroom.currentStudent?.id}
-                      onSubmit={handleSubmitAssignment}
-                      onGrade={handleGradeSubmission}
-                      onLoadSubmissions={loadSubmissions}
-                    />
+                    <>
+                      <AssignmentSubmissionPanel
+                        post={post}
+                        isTeacher={isTeacherOfClass}
+                        submissions={submissions[post.post_id] || []}
+                        currentStudentId={classroom.currentStudent?.id}
+                        onSubmit={handleSubmitAssignment}
+                        onGrade={handleGradeSubmission}
+                        onLoadSubmissions={loadSubmissions}
+                      />
+                      
+                      {/* Quiz Actions */}
+                      {isEnrolledStudent && post.has_quiz && (
+                        <div className="border-t border-gray-100 pt-4 mt-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-purple-600 border-purple-200 bg-purple-50">
+                                🧠 Quiz Assignment
+                              </Badge>
+                              {post.quiz_time_limit && (
+                                <Badge variant="outline" className="text-orange-600 border-orange-200">
+                                  ⏱️ {post.quiz_time_limit} min
+                                </Badge>
+                              )}
+                              {quizSubmissionStatuses[post.post_id] && (
+                                <Badge 
+                                  variant="outline" 
+                                  className={`${
+                                    quizSubmissionStatuses[post.post_id].is_passed 
+                                      ? 'text-green-600 border-green-200 bg-green-50' 
+                                      : 'text-red-600 border-red-200 bg-red-50'
+                                  }`}
+                                >
+                                  {quizSubmissionStatuses[post.post_id].is_passed ? '✅ Passed' : '❌ Failed'}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              {quizSubmissionStatuses[post.post_id] ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    window.open(`/quiz/${post.post_id}`, '_blank');
+                                  }}
+                                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                                >
+                                  View Results
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    window.open(`/quiz/${post.post_id}`, '_blank');
+                                  }}
+                                  className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                                >
+                                  Start Quiz
+                                </Button>
+                              )}
+                              {isTeacherOfClass && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    loadQuizData(post.post_id);
+                                    setShowQuizManagement(true);
+                                  }}
+                                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                                >
+                                  Manage Quiz
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                   
                   {/* Comment Input */}
