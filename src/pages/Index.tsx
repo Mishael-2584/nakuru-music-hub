@@ -6,6 +6,7 @@ import Registration from "@/components/Registration";
 import Contact from "@/components/Contact";
 import Footer from "@/components/Footer";
 import SocialMedia from "@/components/SocialMedia";
+import SocialMediaFeed from "@/components/SocialMediaFeed";
 import WhatsAppChat from "@/components/WhatsAppChat";
 import NewsList from "@/components/NewsList";
 import { ServicesCarousel } from "@/components/Services";
@@ -30,6 +31,7 @@ const Index = () => {
         <ExamBodies />
         <Testimonials />
         <NewsList />
+        <SocialMediaFeed />
         <Registration />
         <SocialMedia />
       </main>
