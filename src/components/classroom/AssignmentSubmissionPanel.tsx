@@ -18,6 +18,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { PostFileUpload } from "@/components/PostFileUpload";
 import { useToast } from "@/hooks/use-toast";
+import AssignmentTimer from "./AssignmentTimer";
 
 interface AssignmentSubmissionPanelProps {
   post: any;
@@ -45,6 +46,8 @@ export default function AssignmentSubmissionPanel({
   const [gradePoints, setGradePoints] = useState<string>('');
   const [gradeFeedback, setGradeFeedback] = useState<string>('');
   const [showSubmissions, setShowSubmissions] = useState(false);
+  const [timerStarted, setTimerStarted] = useState(false);
+  const [timerCompleted, setTimerCompleted] = useState(false);
 
   const isOverdue = post.due_date && new Date(post.due_date) < new Date();
   const userSubmission = submissions.find(s => s.student_id === currentStudentId);
@@ -91,6 +94,23 @@ export default function AssignmentSubmissionPanel({
     setShowGradingForm(null);
     setGradePoints('');
     setGradeFeedback('');
+  };
+
+  const handleTimerStart = () => {
+    setTimerStarted(true);
+    toast({
+      title: 'Timer Started',
+      description: 'Your timed assignment has begun. Good luck!',
+    });
+  };
+
+  const handleTimeUp = () => {
+    setTimerCompleted(true);
+    toast({
+      title: 'Time\'s Up!',
+      description: 'The timer has expired. Please submit your work immediately.',
+      variant: 'destructive'
+    });
   };
 
   const getGradeColor = (points: number, maxPoints: number) => {
@@ -148,6 +168,19 @@ export default function AssignmentSubmissionPanel({
               )}
             </div>
           </div>
+
+          {/* Timer Component for Timed Assignments */}
+          {post.is_timed && !hasSubmitted && (
+            <div className="mb-4">
+              <AssignmentTimer
+                timeLimitMinutes={post.time_limit_minutes}
+                onTimeUp={handleTimeUp}
+                onStartTimer={handleTimerStart}
+                isStarted={timerStarted}
+                isCompleted={timerCompleted}
+              />
+            </div>
+          )}
 
           {hasSubmitted ? (
             /* Show Existing Submission */

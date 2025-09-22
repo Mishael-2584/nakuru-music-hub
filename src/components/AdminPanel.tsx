@@ -150,7 +150,10 @@ const AdminPanel = () => {
   const [approvalRequests, setApprovalRequests] = useState<any[]>([]);
   const [activeStudents, setActiveStudents] = useState<Registration[]>([]);
   const [expandedStudentIds, setExpandedStudentIds] = useState<Set<string>>(new Set());
+  const [expandedRequestIds, setExpandedRequestIds] = useState<Set<string>>(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [requestsPage, setRequestsPage] = useState(1);
+  const [requestsPerPage] = useState(10);
   const [studentToDelete, setStudentToDelete] = useState<any>(null);
   const [adminPassword, setAdminPassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
@@ -191,12 +194,13 @@ const AdminPanel = () => {
   const fetchPendingClassrooms = async () => {
     const { data, error } = await supabase
       .from('classrooms')
-      .select('id, name, created_at, teacher_id, teachers(name)')
+      .select('id, name, description, created_at, teacher_id, teachers(name)')
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
     if (!error) setPendingClassrooms((data || []).map((c: any) => ({
       id: c.id,
       name: c.name,
+      description: c.description,
       teacher_name: c.teachers?.name || 'Teacher'
     })));
   };
@@ -204,12 +208,13 @@ const AdminPanel = () => {
   const fetchApprovedClassrooms = async () => {
     const { data, error } = await supabase
       .from('classrooms')
-      .select('id, name, class_code, approved_at, teacher_id, teachers(name)')
+      .select('id, name, description, class_code, approved_at, teacher_id, teachers(name)')
       .eq('status', 'approved')
       .order('approved_at', { ascending: false });
     if (!error) setApprovedClassrooms((data || []).map((c: any) => ({
       id: c.id,
       name: c.name,
+      description: c.description,
       class_code: c.class_code,
       approved_at: c.approved_at,
       teacher_name: c.teachers?.name || 'Teacher'
@@ -256,6 +261,21 @@ const AdminPanel = () => {
       await fetchApprovedClassrooms();
     } else {
       toast({ title: 'Error', description: 'Failed to approve classroom.', variant: 'destructive' });
+    }
+  };
+
+  const handleRejectClassroom = async (classroomId: string, reason?: string) => {
+    const { data, error } = await supabase.rpc('reject_classroom', {
+      classroom_id_param: classroomId,
+      rejected_by_param: user?.id || null,
+      rejection_reason_param: reason || null
+    });
+    if (!error) {
+      toast({ title: 'Rejected', description: 'Classroom application has been rejected.' });
+      await fetchPendingClassrooms();
+      await fetchApprovedClassrooms();
+    } else {
+      toast({ title: 'Error', description: 'Failed to reject classroom.', variant: 'destructive' });
     }
   };
 
@@ -724,6 +744,33 @@ const AdminPanel = () => {
         variant: 'destructive',
       });
     }
+  };
+
+  const toggleRequestExpansion = (requestId: string) => {
+    const newExpanded = new Set(expandedRequestIds);
+    if (newExpanded.has(requestId)) {
+      newExpanded.delete(requestId);
+    } else {
+      newExpanded.add(requestId);
+    }
+    setExpandedRequestIds(newExpanded);
+  };
+
+  // Pagination logic for requests
+  const getPaginatedRequests = () => {
+    const startIndex = (requestsPage - 1) * requestsPerPage;
+    const endIndex = startIndex + requestsPerPage;
+    return approvalRequests.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = () => {
+    return Math.ceil(approvalRequests.length / requestsPerPage);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setRequestsPage(newPage);
+    // Collapse all expanded requests when changing pages
+    setExpandedRequestIds(new Set());
   };
 
   const handleSignOut = async () => {
@@ -2809,9 +2856,26 @@ const AdminPanel = () => {
                             <div>
                               <div className="font-semibold">{c.name}</div>
                               <div className="text-xs text-gray-500">Teacher: {c.teacher_name}</div>
+                              {c.description && (
+                                <div className="text-xs text-gray-600 mt-1 max-w-md truncate">
+                                  {c.description}
+                                </div>
+                              )}
                             </div>
                             <div className="flex gap-2">
                               <Button size="sm" onClick={() => handleApproveClassroom(c.id)}>Approve</Button>
+                              <Button 
+                                size="sm" 
+                                variant="destructive" 
+                                onClick={() => {
+                                  const reason = prompt('Enter rejection reason (optional):');
+                                  if (reason !== null) {
+                                    handleRejectClassroom(c.id, reason);
+                                  }
+                                }}
+                              >
+                                Reject
+                              </Button>
                             </div>
                           </div>
                         ))}
@@ -2837,6 +2901,11 @@ const AdminPanel = () => {
                             <div>
                               <div className="font-semibold">{c.name}</div>
                               <div className="text-xs text-gray-500">Teacher: {c.teacher_name}</div>
+                              {c.description && (
+                                <div className="text-xs text-gray-600 mt-1 max-w-md truncate">
+                                  {c.description}
+                                </div>
+                              )}
                               <div className="text-xs text-gray-500">Code: {c.class_code}</div>
                               <div className="text-xs text-gray-400">Approved: {c.approved_at ? new Date(c.approved_at).toLocaleString() : '-'}</div>
                             </div>
@@ -2874,9 +2943,22 @@ const AdminPanel = () => {
                 <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                   Requests & Approvals
                 </h3>
+                <div className="flex gap-2">
+                  <Badge variant="outline" className="px-3 py-1">
+                    Total: {approvalRequests.length}
+                  </Badge>
+                  <Badge variant="default" className="px-3 py-1 bg-orange-500">
+                    Pending: {approvalRequests.filter(req => req.status === 'pending').length}
+                  </Badge>
+                  {getTotalPages() > 1 && (
+                    <Badge variant="outline" className="px-3 py-1 text-blue-600">
+                      Page {requestsPage} of {getTotalPages()}
+                    </Badge>
+                  )}
+                </div>
               </div>
               
-              <div className="grid gap-4">
+              <div className="space-y-3">
                 {approvalRequests.length === 0 ? (
                   <Card>
                     <CardContent className="p-6 text-center">
@@ -2886,95 +2968,212 @@ const AdminPanel = () => {
                     </CardContent>
                   </Card>
                 ) : (
-                  approvalRequests.map((request) => (
-                    <Card key={request.id} className={`border-l-4 ${
-                      request.request_type === 'learning_mode_change' ? 'border-l-blue-500' :
-                      request.request_type === 'profile_update' ? 'border-l-green-500' :
-                      request.request_type === 'schedule_change' ? 'border-l-purple-500' :
-                      'border-l-orange-500'
-                    }`}>
-                      <CardContent className="p-6">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h4 className="font-semibold text-lg">{request.title}</h4>
-                            <p className="text-sm text-gray-600">{request.student_name} ({request.email})</p>
-                            <Badge variant="outline" className="mt-1">
-                              {request.request_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            </Badge>
-                          </div>
-                          <Badge variant={request.status === 'pending' ? 'default' : request.status === 'approved' ? 'default' : 'destructive'}>
-                            {request.status}
-                          </Badge>
-                        </div>
-                        
-                        {request.description && (
-                          <div className="mb-4">
-                            <p className="text-sm font-medium text-gray-600">Description:</p>
-                            <p className="text-sm bg-gray-50 p-3 rounded-lg">{request.description}</p>
-                          </div>
-                        )}
-                        
-                        {(request.current_value || request.requested_value) && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            {request.current_value && (
-                              <div>
-                                <p className="text-sm font-medium text-gray-600">Current:</p>
-                                <p className="text-sm">{request.current_value}</p>
+                  <>
+                    {getPaginatedRequests().map((request) => {
+                    const isExpanded = expandedRequestIds.has(request.id);
+                    const getTypeIcon = () => {
+                      switch (request.request_type) {
+                        case 'learning_mode_change': return <BookOpen className="h-4 w-4" />;
+                        case 'profile_update': return <UserCog className="h-4 w-4" />;
+                        case 'schedule_change': return <Calendar className="h-4 w-4" />;
+                        default: return <Settings className="h-4 w-4" />;
+                      }
+                    };
+                    
+                    const getTypeColor = () => {
+                      switch (request.request_type) {
+                        case 'learning_mode_change': return 'text-blue-600 bg-blue-50 border-blue-200';
+                        case 'profile_update': return 'text-green-600 bg-green-50 border-green-200';
+                        case 'schedule_change': return 'text-purple-600 bg-purple-50 border-purple-200';
+                        default: return 'text-orange-600 bg-orange-50 border-orange-200';
+                      }
+                    };
+
+                    return (
+                      <Card key={request.id} className={`transition-all duration-200 hover:shadow-md ${
+                        request.status === 'pending' ? 'border-l-4 border-l-orange-500' :
+                        request.status === 'approved' ? 'border-l-4 border-l-green-500' :
+                        'border-l-4 border-l-red-500'
+                      }`}>
+                        <CardContent className="p-4">
+                          {/* Compact Header */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className={`p-2 rounded-lg ${getTypeColor()}`}>
+                                {getTypeIcon()}
                               </div>
-                            )}
-                            {request.requested_value && (
-                              <div>
-                                <p className="text-sm font-medium text-gray-600">Requested:</p>
-                                <p className="text-sm font-semibold text-primary">{request.requested_value}</p>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h4 className="font-semibold text-gray-900 truncate">{request.title}</h4>
+                                  <Badge variant="outline" className={`text-xs ${getTypeColor()}`}>
+                                    {request.request_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-4 text-sm text-gray-600">
+                                  <span className="truncate">{request.student_name}</span>
+                                  <span>•</span>
+                                  <span>{new Date(request.created_at).toLocaleDateString()}</span>
+                                  {request.current_value && request.requested_value && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="text-primary font-medium">
+                                        {request.current_value} → {request.requested_value}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
                               </div>
-                            )}
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              <Badge variant={
+                                request.status === 'pending' ? 'default' : 
+                                request.status === 'approved' ? 'default' : 
+                                'destructive'
+                              } className="text-xs">
+                                {request.status}
+                              </Badge>
+                              
+                              {request.status === 'pending' && (
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleApproveRequest(request.id)}
+                                    className="h-8 px-3 bg-green-600 hover:bg-green-700 text-xs"
+                                  >
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => handleRejectRequest(request.id)}
+                                    className="h-8 px-3 text-xs"
+                                  >
+                                    <X className="h-3 w-3 mr-1" />
+                                    Reject
+                                  </Button>
+                                </div>
+                              )}
+                              
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleRequestExpansion(request.id)}
+                                className="h-8 w-8 p-0"
+                              >
+                                {isExpanded ? (
+                                  <ChevronUp className="h-4 w-4" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
                           </div>
-                        )}
-                        
-                        {request.reason && (
-                          <div className="mb-4">
-                            <p className="text-sm font-medium text-gray-600">Reason:</p>
-                            <p className="text-sm bg-gray-50 p-3 rounded-lg">{request.reason}</p>
-                          </div>
-                        )}
-                        
-                        <div className="flex justify-between items-center text-sm text-gray-500">
-                          <span>Requested: {new Date(request.created_at).toLocaleDateString()}</span>
-                          {request.reviewed_at && (
-                            <span>Reviewed: {new Date(request.reviewed_at).toLocaleDateString()}</span>
+
+                          {/* Expanded Details */}
+                          {isExpanded && (
+                            <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
+                              {request.description && (
+                                <div>
+                                  <p className="text-sm font-medium text-gray-600 mb-2">Description:</p>
+                                  <p className="text-sm bg-gray-50 p-3 rounded-lg">{request.description}</p>
+                                </div>
+                              )}
+                              
+                              {request.reason && (
+                                <div>
+                                  <p className="text-sm font-medium text-gray-600 mb-2">Reason:</p>
+                                  <p className="text-sm bg-gray-50 p-3 rounded-lg">{request.reason}</p>
+                                </div>
+                              )}
+                              
+                              {(request.current_value || request.requested_value) && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {request.current_value && (
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-600 mb-1">Current:</p>
+                                      <p className="text-sm bg-gray-50 p-2 rounded">{request.current_value}</p>
+                                    </div>
+                                  )}
+                                  {request.requested_value && (
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-600 mb-1">Requested:</p>
+                                      <p className="text-sm bg-blue-50 p-2 rounded font-semibold text-primary">{request.requested_value}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              
+                              <div className="flex justify-between items-center text-sm text-gray-500">
+                                <span>Requested: {new Date(request.created_at).toLocaleString()}</span>
+                                {request.reviewed_at && (
+                                  <span>Reviewed: {new Date(request.reviewed_at).toLocaleString()}</span>
+                                )}
+                              </div>
+                              
+                              {request.admin_notes && (
+                                <div className="p-3 bg-blue-50 rounded-lg">
+                                  <p className="text-sm font-medium text-blue-800 mb-1">Admin Notes:</p>
+                                  <p className="text-sm text-blue-700">{request.admin_notes}</p>
+                                </div>
+                              )}
+                            </div>
                           )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                  
+                  {/* Pagination Controls */}
+                  {getTotalPages() > 1 && (
+                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <span>
+                          Showing {((requestsPage - 1) * requestsPerPage) + 1} to {Math.min(requestsPage * requestsPerPage, approvalRequests.length)} of {approvalRequests.length} requests
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(requestsPage - 1)}
+                          disabled={requestsPage === 1}
+                          className="flex items-center gap-1"
+                        >
+                          <ArrowLeft className="h-3 w-3" />
+                          Previous
+                        </Button>
+                        
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: getTotalPages() }, (_, i) => i + 1).map((page) => (
+                            <Button
+                              key={page}
+                              variant={page === requestsPage ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handlePageChange(page)}
+                              className="w-8 h-8 p-0 text-xs"
+                            >
+                              {page}
+                            </Button>
+                          ))}
                         </div>
                         
-                        {request.status === 'pending' && (
-                          <div className="flex gap-2 mt-4">
-                            <Button
-                              size="sm"
-                              onClick={() => handleApproveRequest(request.id)}
-                              className="bg-green-600 hover:bg-green-700"
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleRejectRequest(request.id)}
-                            >
-                              <X className="h-4 w-4 mr-1" />
-                              Reject
-                            </Button>
-                          </div>
-                        )}
-                        
-                        {request.admin_notes && (
-                          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                            <p className="text-sm font-medium text-blue-800">Admin Notes:</p>
-                            <p className="text-sm text-blue-700">{request.admin_notes}</p>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(requestsPage + 1)}
+                          disabled={requestsPage === getTotalPages()}
+                          className="flex items-center gap-1"
+                        >
+                          Next
+                          <ArrowRight className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  </>
                 )}
               </div>
             </div>

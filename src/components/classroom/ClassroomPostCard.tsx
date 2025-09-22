@@ -144,7 +144,15 @@ export default function ClassroomPostCard({
                 </div>
                 <div>
                   <h4 className="font-semibold text-blue-900">{post.assignment_title}</h4>
-                  <p className="text-sm text-blue-700">Max Points: {post.max_points || 100}</p>
+                  <div className="flex items-center gap-4 text-sm text-blue-700">
+                    <span>Max Points: {post.max_points || 100}</span>
+                    {post.is_timed && (
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        <span>Timed: {Math.floor(post.time_limit_minutes / 60)}h {post.time_limit_minutes % 60}m</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               {post.due_date && (

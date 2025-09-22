@@ -1198,6 +1198,7 @@ const StudentDashboard = () => {
           classrooms!inner(
             id,
             name,
+            description,
             status,
             class_code,
             teacher_id,
@@ -1214,6 +1215,7 @@ const StudentDashboard = () => {
       const classrooms = (data || []).map((enrollment: any) => ({
         id: enrollment.classrooms.id,
         name: enrollment.classrooms.name,
+        description: enrollment.classrooms.description,
         status: enrollment.classrooms.status,
         class_code: enrollment.classrooms.class_code,
         teacher_id: enrollment.classrooms.teacher_id,
@@ -3604,11 +3606,16 @@ const StudentDashboard = () => {
                           {studentClassrooms.map(c => (
                             <Card key={c.id} className="cursor-pointer" onClick={() => navigate(`/classrooms/${c.id}`)}>
                               <CardContent className="p-4 flex items-center justify-between">
-                                <div>
+                                <div className="flex-1 min-w-0">
                                   <div className="font-semibold">{c.name}</div>
                                   <div className="text-xs text-gray-500">Teacher: {c.teacher_name}</div>
+                                  {c.description && (
+                                    <div className="text-xs text-gray-600 mt-1 truncate">
+                                      {c.description}
+                                    </div>
+                                  )}
                                 </div>
-                                <Badge variant="secondary">{c.status}</Badge>
+                                <Badge variant="secondary" className="ml-2 flex-shrink-0">{c.status}</Badge>
                           </CardContent>
                         </Card>
                           ))}

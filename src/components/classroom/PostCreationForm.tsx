@@ -21,6 +21,8 @@ interface PostCreationFormProps {
     assignmentTitle: string;
     dueDate: string;
     maxPoints: number;
+    isTimed: boolean;
+    timeLimitMinutes: number;
     attachments: any[];
   }) => void;
   isSubmitting?: boolean;
@@ -33,6 +35,8 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
   const [assignmentTitle, setAssignmentTitle] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [maxPoints, setMaxPoints] = useState(100);
+  const [isTimed, setIsTimed] = useState(false);
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState(60);
   const [attachments, setAttachments] = useState<any[]>([]);
 
   const handleSubmit = () => {
@@ -45,6 +49,8 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
       assignmentTitle: assignmentTitle.trim(),
       dueDate,
       maxPoints,
+      isTimed: postType === 'assignment' ? isTimed : false,
+      timeLimitMinutes: postType === 'assignment' ? timeLimitMinutes : 0,
       attachments
     });
 
@@ -53,6 +59,8 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
     setAssignmentTitle('');
     setDueDate('');
     setMaxPoints(100);
+    setIsTimed(false);
+    setTimeLimitMinutes(60);
     setAttachments([]);
     setPostType('general');
     setIsVisible(false);
@@ -63,6 +71,8 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
     setAssignmentTitle('');
     setDueDate('');
     setMaxPoints(100);
+    setIsTimed(false);
+    setTimeLimitMinutes(60);
     setAttachments([]);
     setPostType('general');
     setIsVisible(false);
@@ -245,6 +255,46 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
                   />
                 </div>
               </div>
+            </div>
+            
+            {/* Timed Assignment Options */}
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <input
+                  type="checkbox"
+                  id="isTimed"
+                  checked={isTimed}
+                  onChange={(e) => setIsTimed(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="isTimed" className="text-sm font-medium text-blue-800">
+                  Make this a timed assignment
+                </label>
+              </div>
+              
+              {isTimed && (
+                <div className="ml-6">
+                  <label className="block text-sm font-medium text-blue-700 mb-2">
+                    Time Limit (minutes)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      value={timeLimitMinutes}
+                      onChange={(e) => setTimeLimitMinutes(parseInt(e.target.value) || 60)}
+                      min="1"
+                      max="480"
+                      className="w-24 border-blue-200 focus:border-blue-500 bg-white"
+                    />
+                    <span className="text-sm text-blue-600">
+                      ({Math.floor(timeLimitMinutes / 60)}h {timeLimitMinutes % 60}m)
+                    </span>
+                  </div>
+                  <p className="text-xs text-blue-600 mt-1">
+                    Students will have a timer running during the assignment
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}

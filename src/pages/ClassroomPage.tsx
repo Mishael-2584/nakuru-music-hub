@@ -121,6 +121,8 @@ export default function ClassroomPage() {
     assignmentTitle: string;
     dueDate: string;
     maxPoints: number;
+    isTimed: boolean;
+    timeLimitMinutes: number;
     attachments: any[];
   }) => {
     if (!classroom) return;
@@ -161,7 +163,9 @@ export default function ClassroomPage() {
             is_assignment: data.isAssignment,
             assignment_title: data.isAssignment ? data.assignmentTitle : null,
             due_date: data.isAssignment && data.dueDate ? data.dueDate : null,
-            max_points: data.isAssignment ? data.maxPoints : null
+            max_points: data.isAssignment ? data.maxPoints : null,
+            is_timed: data.isAssignment ? data.isTimed : false,
+            time_limit_minutes: data.isAssignment && data.isTimed ? data.timeLimitMinutes : null
           })
           .select('id')
           .single();
@@ -177,7 +181,9 @@ export default function ClassroomPage() {
             is_assignment: true,
             assignment_title: data.assignmentTitle,
             due_date: data.dueDate || null,
-            max_points: data.maxPoints || null
+            max_points: data.maxPoints || null,
+            is_timed: data.isTimed,
+            time_limit_minutes: data.isTimed ? data.timeLimitMinutes : null
           })
           .eq('id', postId);
       }
@@ -558,6 +564,11 @@ export default function ClassroomPage() {
                     <p className="text-blue-100 text-lg">
                       {classroom.teacher_name}
                     </p>
+                    {classroom.description && (
+                      <p className="text-blue-200 text-sm mt-2 max-w-2xl">
+                        {classroom.description}
+                      </p>
+                    )}
                   </div>
                 </div>
                 

@@ -1405,7 +1405,7 @@ const TeacherDashboard = () => {
     if (!profile) return;
     const { data, error } = await supabase
       .from('classrooms')
-      .select('id, name, status, class_code')
+      .select('id, name, description, status, class_code')
       .eq('teacher_id', profile.id)
       .order('created_at', { ascending: false });
     if (!error) setTeacherClassrooms(data || []);
@@ -2074,6 +2074,11 @@ const TeacherDashboard = () => {
                                 <div className="flex items-start justify-between mb-3">
                                   <div className="flex-1">
                                     <div className="font-semibold text-lg text-gray-800 mb-1">{c.name}</div>
+                                    {c.description && (
+                                      <div className="text-sm text-gray-600 mb-2 max-w-md">
+                                        {c.description}
+                                      </div>
+                                    )}
                                     <div className="text-sm text-gray-600 mb-2">
                                       Status: <Badge className={`ml-1 ${c.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
                                         {c.status}
