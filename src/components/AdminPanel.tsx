@@ -103,7 +103,7 @@ interface ClassSchedule {
 }
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes' | 'gallery' | 'finances' | 'requests' | 'debug'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes' | 'gallery' | 'finances' | 'requests' | 'notifications' | 'debug'>('stats');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
 
@@ -155,6 +155,8 @@ const AdminPanel = () => {
   const [requestsPage, setRequestsPage] = useState(1);
   const [requestsPerPage] = useState(10);
   const [studentToDelete, setStudentToDelete] = useState<any>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [adminPassword, setAdminPassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
   // 1. Add state for tracking invoice sending/loading
@@ -666,6 +668,9 @@ const AdminPanel = () => {
       setIsLoading(false);
       console.log("AdminPanel: Data fetch completed");
     }
+    
+    // Fetch notifications after main data is loaded
+    await fetchNotifications();
   };
 
   const handleApproveRequest = async (requestId: string) => {
@@ -771,6 +776,50 @@ const AdminPanel = () => {
     setRequestsPage(newPage);
     // Collapse all expanded requests when changing pages
     setExpandedRequestIds(new Set());
+  };
+
+  // Fetch notifications for admin
+  const fetchNotifications = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error('Error fetching notifications:', error);
+        return;
+      }
+
+      setNotifications(data || []);
+      setUnreadNotificationCount((data || []).filter(n => !n.is_read).length);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
+
+  // Mark notification as read
+  const markNotificationAsRead = async (notificationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('id', notificationId);
+
+      if (!error) {
+        // Update local state
+        setNotifications(prev => 
+          prev.map(n => n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n)
+        );
+        setUnreadNotificationCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
   };
 
   const handleSignOut = async () => {
@@ -1822,13 +1871,36 @@ const AdminPanel = () => {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row lg:flex-col items-center sm:justify-center lg:items-end gap-2">
-            <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-primary/20">
-              <div className="w-6 h-6 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center">
-                <UserCog className="w-3 h-3 text-white" />
+            <div className="flex items-center gap-2">
+              {/* Notifications Bell */}
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0 bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10"
+                  onClick={() => setActiveTab('notifications')}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  {unreadNotificationCount > 0 && (
+                    <Badge 
+                      variant="destructive" 
+                      className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                    >
+                      {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                    </Badge>
+                  )}
+                </Button>
               </div>
-              <div className="text-right">
-                <p className="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[120px] sm:max-w-none">{user?.email}</p>
-                <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
+              
+              {/* User Info */}
+              <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-primary/20">
+                <div className="w-6 h-6 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center">
+                  <UserCog className="w-3 h-3 text-white" />
+                </div>
+                <div className="text-right">
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[120px] sm:max-w-none">{user?.email}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
+                </div>
               </div>
             </div>
             <Button
@@ -2016,6 +2088,15 @@ const AdminPanel = () => {
               >
                 <Settings className="h-4 w-4 mr-2" />
                 Requests & Approvals ({approvalRequests.filter(req => req.status === 'pending').length})
+              </Button>
+              <Button
+                variant={activeTab === 'notifications' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('notifications')}
+                className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+                style={{ minWidth: 120 }}
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Notifications ({unreadNotificationCount})
               </Button>
               <Button
                 variant={activeTab === 'quotes' ? 'default' : 'ghost'}
@@ -3174,6 +3255,99 @@ const AdminPanel = () => {
                     </div>
                   )}
                   </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Notifications Tab */}
+        {activeTab === 'notifications' && (
+          <div className="mt-8">
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                  Notifications
+                </h3>
+                <div className="flex gap-2">
+                  <Badge variant="outline" className="px-3 py-1">
+                    Total: {notifications.length}
+                  </Badge>
+                  <Badge variant="default" className="px-3 py-1 bg-orange-500">
+                    Unread: {unreadNotificationCount}
+                  </Badge>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                {notifications.length === 0 ? (
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-600 mb-2">No Notifications</h3>
+                      <p className="text-gray-500">You don't have any notifications yet.</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  notifications.map((notification) => (
+                    <Card key={notification.id} className={`transition-all duration-200 hover:shadow-md ${
+                      !notification.is_read ? 'border-l-4 border-l-blue-500 bg-blue-50/50' : 'border-l-4 border-l-gray-200'
+                    }`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h4 className={`font-semibold ${!notification.is_read ? 'text-gray-900' : 'text-gray-700'}`}>
+                                {notification.title}
+                              </h4>
+                              {!notification.is_read && (
+                                <Badge variant="default" className="text-xs bg-blue-500">
+                                  New
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600 mb-2">{notification.message}</p>
+                            <div className="flex items-center gap-4 text-xs text-gray-500">
+                              <span>{new Date(notification.created_at).toLocaleString()}</span>
+                              {notification.type === 'classroom_approval_request' && (
+                                <Badge variant="outline" className="text-xs">
+                                  Classroom Request
+                                </Badge>
+                              )}
+                              {notification.type === 'classroom_rejected' && (
+                                <Badge variant="outline" className="text-xs">
+                                  Classroom Rejected
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 ml-4">
+                            {!notification.is_read && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => markNotificationAsRead(notification.id)}
+                                className="text-xs"
+                              >
+                                Mark Read
+                              </Button>
+                            )}
+                            {notification.type === 'classroom_approval_request' && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => setActiveTab('requests')}
+                                className="text-xs"
+                              >
+                                View Requests
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
                 )}
               </div>
             </div>
