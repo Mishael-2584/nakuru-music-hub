@@ -58,6 +58,46 @@ export const SimpleTextEditor: React.FC<SimpleTextEditorProps> = ({
     }, 0);
   };
 
+  const insertList = (type: 'bullet' | 'numbered') => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = content.substring(start, end);
+    
+    // If text is selected, wrap each line as a list item
+    if (selectedText.trim()) {
+      const lines = selectedText.split('\n');
+      const listItems = lines.map((line, index) => {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) return '';
+        
+        if (type === 'bullet') {
+          return `- ${trimmedLine}`;
+        } else {
+          return `${index + 1}. ${trimmedLine}`;
+        }
+      }).filter(item => item !== '');
+      
+      const newContent = 
+        content.substring(0, start) + 
+        listItems.join('\n') + 
+        content.substring(end);
+      
+      onChange(newContent);
+    } else {
+      // No selection, just insert a single list item
+      const prefix = type === 'bullet' ? '- ' : '1. ';
+      insertText(prefix, '', 'list item');
+    }
+    
+    // Set cursor position
+    setTimeout(() => {
+      textarea.focus();
+    }, 0);
+  };
+
   const insertLink = () => {
     if (linkUrl.trim()) {
       const displayText = linkText.trim() || linkUrl;
@@ -69,28 +109,109 @@ export const SimpleTextEditor: React.FC<SimpleTextEditorProps> = ({
   };
 
   const renderPreview = (text: string) => {
-    // Simple markdown-like rendering
-    let html = text
-      // Bold
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      // Italic
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      // Code
-      .replace(/`(.*?)`/g, '<code style="background-color: #f3f4f6; padding: 2px 4px; border-radius: 3px; font-family: monospace;">$1</code>')
-      // Links
-      .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline;">$1</a>')
-      // Line breaks
-      .replace(/\n/g, '<br>');
+    // Split into lines for better processing
+    const lines = text.split('\n');
+    let html = '';
+    let inBulletList = false;
+    let inNumberedList = false;
+    let inQuote = false;
 
-    // Handle lists
-    html = html.replace(/^- (.*$)/gim, '<li>$1</li>');
-    html = html.replace(/(<li>.*<\/li>)/s, '<ul style="margin: 8px 0; padding-left: 20px;">$1</ul>');
-    
-    html = html.replace(/^\d+\. (.*$)/gim, '<li>$1</li>');
-    html = html.replace(/(<li>.*<\/li>)/s, '<ol style="margin: 8px 0; padding-left: 20px;">$1</ol>');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmedLine = line.trim();
 
-    // Handle quotes
-    html = html.replace(/^> (.*$)/gim, '<blockquote style="border-left: 4px solid #e5e7eb; padding-left: 12px; margin: 8px 0; color: #6b7280; font-style: italic;">$1</blockquote>');
+      // Check for bullet list
+      if (trimmedLine.startsWith('- ')) {
+        if (!inBulletList) {
+          if (inNumberedList) {
+            html += '</ol>';
+            inNumberedList = false;
+          }
+          if (inQuote) {
+            html += '</blockquote>';
+            inQuote = false;
+          }
+          html += '<ul style="margin: 8px 0; padding-left: 20px; list-style-type: disc;">';
+          inBulletList = true;
+        }
+        html += `<li>${trimmedLine.substring(2)}</li>`;
+        continue;
+      }
+
+      // Check for numbered list
+      if (/^\d+\. /.test(trimmedLine)) {
+        if (!inNumberedList) {
+          if (inBulletList) {
+            html += '</ul>';
+            inBulletList = false;
+          }
+          if (inQuote) {
+            html += '</blockquote>';
+            inQuote = false;
+          }
+          html += '<ol style="margin: 8px 0; padding-left: 20px;">';
+          inNumberedList = true;
+        }
+        html += `<li>${trimmedLine.replace(/^\d+\. /, '')}</li>`;
+        continue;
+      }
+
+      // Check for quote
+      if (trimmedLine.startsWith('> ')) {
+        if (!inQuote) {
+          if (inBulletList) {
+            html += '</ul>';
+            inBulletList = false;
+          }
+          if (inNumberedList) {
+            html += '</ol>';
+            inNumberedList = false;
+          }
+          html += '<blockquote style="border-left: 4px solid #e5e7eb; padding-left: 12px; margin: 8px 0; color: #6b7280; font-style: italic;">';
+          inQuote = true;
+        }
+        html += `${trimmedLine.substring(2)}<br>`;
+        continue;
+      }
+
+      // Close any open lists/quotes
+      if (inBulletList) {
+        html += '</ul>';
+        inBulletList = false;
+      }
+      if (inNumberedList) {
+        html += '</ol>';
+        inNumberedList = false;
+      }
+      if (inQuote) {
+        html += '</blockquote>';
+        inQuote = false;
+      }
+
+      // Handle empty lines
+      if (trimmedLine === '') {
+        html += '<br>';
+        continue;
+      }
+
+      // Process regular text with formatting
+      let processedLine = line
+        // Bold
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        // Italic
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        // Code
+        .replace(/`(.*?)`/g, '<code style="background-color: #f3f4f6; padding: 2px 4px; border-radius: 3px; font-family: monospace;">$1</code>')
+        // Links
+        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline;">$1</a>');
+
+      html += processedLine + '<br>';
+    }
+
+    // Close any remaining open tags
+    if (inBulletList) html += '</ul>';
+    if (inNumberedList) html += '</ol>';
+    if (inQuote) html += '</blockquote>';
 
     return html;
   };
@@ -148,7 +269,7 @@ export const SimpleTextEditor: React.FC<SimpleTextEditorProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => insertText('- ', '', 'list item')}
+                onClick={() => insertList('bullet')}
                 title="Bullet List"
               >
                 <List className="h-4 w-4" />
@@ -156,7 +277,7 @@ export const SimpleTextEditor: React.FC<SimpleTextEditorProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => insertText('1. ', '', 'list item')}
+                onClick={() => insertList('numbered')}
                 title="Numbered List"
               >
                 <ListOrdered className="h-4 w-4" />
@@ -209,17 +330,23 @@ export const SimpleTextEditor: React.FC<SimpleTextEditorProps> = ({
           }}
         />
       ) : (
-        <Textarea
-          ref={textareaRef}
-          value={content}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="min-h-[200px] border-0 resize-none focus:ring-0 focus:border-0 rounded-none"
-          style={{
-            direction: 'ltr',
-            textAlign: 'left'
-          }}
-        />
+        <div>
+          <Textarea
+            ref={textareaRef}
+            value={content}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="min-h-[200px] border-0 resize-none focus:ring-0 focus:border-0 rounded-none"
+            style={{
+              direction: 'ltr',
+              textAlign: 'left'
+            }}
+          />
+          {/* Help text */}
+          <div className="px-4 py-2 bg-gray-50 text-xs text-gray-600 border-t">
+            <strong>Formatting tips:</strong> Use **bold**, *italic*, `code`, [link text](url), - for bullet lists, 1. for numbered lists, &gt; for quotes
+          </div>
+        </div>
       )}
 
       {/* Link Dialog */}
