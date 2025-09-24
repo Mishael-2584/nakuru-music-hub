@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, BookOpen, CheckCircle, Users, GraduationCap, Clock, Hash } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle, Users, GraduationCap, Clock, Hash, Edit3, Save, X } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import ClassroomPostCard from "@/components/classroom/ClassroomPostCard";
 import AssignmentSubmissionPanel from "@/components/classroom/AssignmentSubmissionPanel";
 import PostCreationForm from "@/components/classroom/PostCreationForm";
@@ -102,6 +104,11 @@ export default function ClassroomPage() {
   const [quizSubmissionStatuses, setQuizSubmissionStatuses] = useState<{[key: string]: any}>({});
   const [timerStarted, setTimerStarted] = useState(false);
   const [timerCompleted, setTimerCompleted] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedDescription, setEditedDescription] = useState("");
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingPost, setEditingPost] = useState<{id: string, content: string, title?: string} | null>(null);
+  const [editContent, setEditContent] = useState("");
 
   const loadComments = async (postId: string) => {
     const { data } = await supabase.rpc('get_post_comments', { post_id_param: postId });
@@ -400,6 +407,38 @@ export default function ClassroomPage() {
   const handleTimeUp = () => {
     setTimerCompleted(true);
     toast({ title: 'Time Up!', description: 'Quiz time has expired', variant: 'destructive' });
+  };
+
+  const handleEditDescription = () => {
+    setEditedDescription(classroom?.description || "");
+    setIsEditingDescription(true);
+  };
+
+  const handleSaveDescription = async () => {
+    if (!classroom) return;
+    
+    try {
+      const { error } = await supabase
+        .from('classrooms')
+        .update({ description: editedDescription })
+        .eq('id', classroom.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setClassroom(prev => prev ? { ...prev, description: editedDescription } : null);
+      setIsEditingDescription(false);
+      
+      toast({ title: 'Success', description: 'Classroom description updated successfully!' });
+    } catch (error) {
+      console.error('Error updating description:', error);
+      toast({ title: 'Error', description: 'Failed to update description', variant: 'destructive' });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingDescription(false);
+    setEditedDescription("");
   };
 
   const submitQuiz = async (answers: StudentQuizAnswer[]) => {
@@ -741,8 +780,52 @@ export default function ClassroomPage() {
   };
 
   const handleEditPost = (postId: string, content: string) => {
-    // Implementation for editing posts - would need edit modal
-    console.log('Edit post:', postId, content);
+    // Find the post to get its title
+    const post = feed.find(p => p.post_id === postId);
+    console.log('Setting up edit modal:', { postId, content, post });
+    setEditingPost({
+      id: postId,
+      content: content,
+      title: post?.assignment_title || post?.title
+    });
+    setEditContent(content);
+    setShowEditModal(true);
+    console.log('Modal should be open now');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingPost || !classroom) return;
+
+    try {
+      const { error } = await supabase
+        .from('classroom_posts')
+        .update({ content: editContent })
+        .eq('post_id', editingPost.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setFeed(prev => prev.map(post => 
+        post.post_id === editingPost.id 
+          ? { ...post, content: editContent }
+          : post
+      ));
+
+      setShowEditModal(false);
+      setEditingPost(null);
+      setEditContent("");
+      
+      toast({ title: 'Success', description: 'Post updated successfully!' });
+    } catch (error) {
+      console.error('Error updating post:', error);
+      toast({ title: 'Error', description: 'Failed to update post', variant: 'destructive' });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setShowEditModal(false);
+    setEditingPost(null);
+    setEditContent("");
   };
 
   const handleDeletePost = async (postId: string) => {
@@ -961,11 +1044,55 @@ export default function ClassroomPage() {
                     <p className="text-blue-100 text-lg">
                       {classroom.teacher_name}
                     </p>
-                    {classroom.description && (
-                      <p className="text-blue-200 text-sm mt-2 max-w-2xl">
-                        {classroom.description}
-                      </p>
-                    )}
+                    <div className="mt-2 max-w-2xl">
+                      {isEditingDescription ? (
+                        <div className="space-y-2">
+                          <Input
+                            value={editedDescription}
+                            onChange={(e) => setEditedDescription(e.target.value)}
+                            placeholder="Enter classroom description..."
+                            className="bg-white/10 border-white/20 text-white placeholder:text-white/70"
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={handleSaveDescription}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              <Save className="h-3 w-3 mr-1" />
+                              Save
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleCancelEdit}
+                              className="border-white/20 text-white hover:bg-white/10"
+                            >
+                              <X className="h-3 w-3 mr-1" />
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start gap-2">
+                          {classroom.description && (
+                            <p className="text-blue-200 text-sm flex-1">
+                              {classroom.description}
+                            </p>
+                          )}
+                          {isTeacherOfClass && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={handleEditDescription}
+                              className="text-white/70 hover:text-white hover:bg-white/10 p-1 h-auto"
+                            >
+                              <Edit3 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 
@@ -1233,6 +1360,45 @@ export default function ClassroomPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Post Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Edit {editingPost?.title ? 'Assignment' : 'Post'}</h2>
+              <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              {editingPost?.title && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Assignment Title</label>
+                  <p className="text-sm text-gray-600 mt-1">{editingPost.title}</p>
+                </div>
+              )}
+              <div>
+                <label className="text-sm font-medium text-gray-700">Content</label>
+                <Textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  placeholder="Enter your content here..."
+                  className="mt-1 min-h-[200px]"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <Button variant="outline" onClick={handleCancelEdit}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdit}>
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

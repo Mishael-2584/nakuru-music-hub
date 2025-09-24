@@ -2261,6 +2261,12 @@ const AdminPanel = () => {
                     <span>Gallery</span>
                   </div>
                 </SelectItem>
+                <SelectItem value="requests">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    <span>Requests & Approvals ({approvalRequests.filter(req => req.status === 'pending').length + teacherChangeRequests.filter(req => req.status === 'pending').length})</span>
+                  </div>
+                </SelectItem>
                 <SelectItem value="finances">
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />

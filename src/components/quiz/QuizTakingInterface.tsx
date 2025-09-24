@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
   Clock, 
   CheckCircle, 
@@ -44,6 +45,7 @@ export default function QuizTakingInterface({
   const [studentAnswers, setStudentAnswers] = useState<StudentQuizAnswer[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   // Initialize student answers
   useEffect(() => {
@@ -104,13 +106,17 @@ export default function QuizTakingInterface({
     updateAnswer(currentQuestion.id, { matching_pairs: updatedMatching });
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (isSubmitting) return; // Prevent multiple submissions
-    
+    setShowConfirmDialog(true);
+  };
+
+  const confirmSubmit = async () => {
     setIsSubmitting(true);
     try {
       console.log('Submitting quiz with answers:', studentAnswers);
       await onSubmit(studentAnswers);
+      setShowConfirmDialog(false);
     } catch (error) {
       console.error('Error submitting quiz:', error);
     } finally {
@@ -431,6 +437,63 @@ export default function QuizTakingInterface({
           {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
         </Button>
       </div>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              Confirm Quiz Submission
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to submit your quiz? Once submitted, you cannot make any changes.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3">
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <h4 className="font-medium text-sm text-gray-700 mb-2">Quiz Summary:</h4>
+              <div className="text-sm text-gray-600 space-y-1">
+                <div>• Total Questions: {questions.length}</div>
+                <div>• Answered Questions: {studentAnswers.filter(answer => 
+                  answer.selected_answer_id || (answer.matching_pairs && answer.matching_pairs.length > 0)
+                ).length}</div>
+                <div>• Unanswered Questions: {questions.length - studentAnswers.filter(answer => 
+                  answer.selected_answer_id || (answer.matching_pairs && answer.matching_pairs.length > 0)
+                ).length}</div>
+              </div>
+            </div>
+            
+            {questions.length - studentAnswers.filter(answer => 
+              answer.selected_answer_id || (answer.matching_pairs && answer.matching_pairs.length > 0)
+            ).length > 0 && (
+              <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg">
+                <div className="flex items-center gap-2 text-orange-700">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="text-sm font-medium">You have unanswered questions!</span>
+                </div>
+                <p className="text-sm text-orange-600 mt-1">
+                  Consider reviewing your answers before submitting.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={confirmSubmit} 
+              disabled={isSubmitting}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {isSubmitting ? 'Submitting...' : 'Yes, Submit Quiz'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
