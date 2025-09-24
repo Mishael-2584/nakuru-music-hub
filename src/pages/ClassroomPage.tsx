@@ -1128,14 +1128,14 @@ export default function ClassroomPage() {
                                 </Button>
                               ) : (
                                 <Button
-                                  variant="outline"
+                                  variant="default"
                                   size="sm"
                                   onClick={() => {
                                     window.open(`/quiz/${post.post_id}`, '_blank');
                                   }}
-                                  className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
                                 >
-                                  Start Quiz
+                                  🧠 Start Quiz
                                 </Button>
                               )}
                               {isTeacherOfClass && (
