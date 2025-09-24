@@ -782,7 +782,6 @@ export default function ClassroomPage() {
   const handleEditPost = (postId: string, content: string) => {
     // Find the post to get its title
     const post = feed.find(p => p.post_id === postId);
-    console.log('Setting up edit modal:', { postId, content, post });
     setEditingPost({
       id: postId,
       content: content,
@@ -790,7 +789,6 @@ export default function ClassroomPage() {
     });
     setEditContent(content);
     setShowEditModal(true);
-    console.log('Modal should be open now');
   };
 
   const handleSaveEdit = async () => {
@@ -820,12 +818,6 @@ export default function ClassroomPage() {
       console.error('Error updating post:', error);
       toast({ title: 'Error', description: 'Failed to update post', variant: 'destructive' });
     }
-  };
-
-  const handleCancelEdit = () => {
-    setShowEditModal(false);
-    setEditingPost(null);
-    setEditContent("");
   };
 
   const handleDeletePost = async (postId: string) => {

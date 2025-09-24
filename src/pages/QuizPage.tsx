@@ -544,6 +544,7 @@ export default function QuizPage() {
               setTimerCompleted(false);
             }}
             canRetake={quizData.max_attempts > 1}
+            onBack={() => navigate(-1)}
           />
         )}
       </div>

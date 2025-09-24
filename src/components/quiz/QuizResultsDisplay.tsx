@@ -11,7 +11,8 @@ import {
   Eye,
   EyeOff,
   Circle,
-  ArrowRight
+  ArrowRight,
+  ArrowLeft
 } from "lucide-react";
 import { QuizResult, QuizQuestion, QuizSubmissionAnswer } from '@/types/quiz';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,12 +21,14 @@ interface QuizResultsDisplayProps {
   result: QuizResult;
   onRetake?: () => void;
   canRetake?: boolean;
+  onBack?: () => void;
 }
 
 export default function QuizResultsDisplay({ 
   result, 
   onRetake, 
-  canRetake = false 
+  canRetake = false,
+  onBack
 }: QuizResultsDisplayProps) {
   const [showAnswers, setShowAnswers] = useState(result.showAnswers);
   const [answerDetails, setAnswerDetails] = useState<{[key: string]: any}>({});
@@ -206,6 +209,17 @@ export default function QuizResultsDisplay({
             </Badge>
             
             <div className="flex items-center gap-2">
+              {onBack && (
+                <Button
+                  variant="outline"
+                  onClick={onBack}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Classroom
+                </Button>
+              )}
+              
               {canRetake && onRetake && (
                 <Button
                   variant="outline"
