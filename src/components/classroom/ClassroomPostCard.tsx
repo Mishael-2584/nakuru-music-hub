@@ -42,6 +42,7 @@ export default function ClassroomPostCard({
   const [expanded, setExpanded] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showFullDetails, setShowFullDetails] = useState(false);
+  const [showFullPost, setShowFullPost] = useState(false);
 
   const getDisplayFileName = (storedName: string) => {
     const timestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z_/;
@@ -89,7 +90,9 @@ export default function ClassroomPostCard({
               <h4 className="font-semibold text-gray-900 truncate text-sm">
                 {post.is_assignment ? post.assignment_title : 'Post'}
               </h4>
-              <span className="text-xs font-medium text-blue-600">{post.max_points || 100} pts</span>
+              {post.is_assignment && post.max_points && (
+                <span className="text-xs font-medium text-blue-600">{post.max_points} pts</span>
+              )}
               {post.due_date && (
                 <span className={`text-xs font-medium ${
                   isOverdue ? 'text-red-600' : isDueSoon ? 'text-orange-600' : 'text-green-600'
@@ -116,27 +119,27 @@ export default function ClassroomPostCard({
               )}
             </div>
             
-            {/* Brief Content Preview */}
-            <div className="flex items-center justify-between">
-              <div 
-                className={`text-xs text-gray-600 flex-1 min-w-0 ${
-                  !expanded && post.content.length > 80 ? 'line-clamp-1' : ''
-                }`}
-                dangerouslySetInnerHTML={{ 
-                  __html: renderContent(expanded ? post.content : post.content.slice(0, 80)) 
-                }}
-              />
-              {post.content.length > 80 && (
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setExpanded(!expanded)}
-                  className="ml-2 text-blue-600 hover:text-blue-700 p-0 h-auto font-normal text-xs"
-                >
-                  {expanded ? 'Less' : 'More'}
-                </Button>
-              )}
-            </div>
+            {/* Content for Regular Posts (Not Assignments) */}
+            {!post.is_assignment && (
+              <div className="mt-2">
+                <div 
+                  className="prose prose-sm max-w-none text-gray-700"
+                  dangerouslySetInnerHTML={{ 
+                    __html: renderContent(showFullPost ? post.content : post.content.slice(0, 200) + (post.content.length > 200 ? '...' : '')) 
+                  }} 
+                />
+                {post.content.length > 200 && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setShowFullPost(!showFullPost)}
+                    className="mt-2 text-blue-600 hover:text-blue-700 p-0 h-auto font-normal text-xs"
+                  >
+                    {showFullPost ? 'Show Less' : 'Read More'}
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
           
           {/* Action Buttons */}
@@ -149,6 +152,22 @@ export default function ClassroomPostCard({
                 className="h-6 px-2 text-xs bg-white hover:bg-gray-50"
               >
                 {showFullDetails ? 'Hide' : 'View'}
+              </Button>
+            )}
+            {!post.is_assignment && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowComments(!showComments);
+                  if (!showComments && onLoadComments) {
+                    onLoadComments(post.post_id);
+                  }
+                }}
+                className="text-gray-500 hover:text-gray-700 p-0 h-auto text-xs"
+              >
+                <MessageCircle className="h-3 w-3 mr-1" />
+                {comments.length > 0 ? comments.length : 'Comment'}
               </Button>
             )}
             {isTeacher && (
@@ -286,6 +305,13 @@ export default function ClassroomPostCard({
                 </div>
               </div>
             )}
+
+            {/* Full Formatted Content */}
+            <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="prose prose-sm max-w-none text-gray-700" dangerouslySetInnerHTML={{ 
+                __html: renderContent(post.content) 
+              }} />
+            </div>
 
             {/* Assignment/Submission Section */}
             {children}
