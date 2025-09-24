@@ -69,17 +69,6 @@ interface Lesson {
   meeting_link?: string;
 }
 
-interface PracticeLog {
-  id: string;
-  practice_date: string;
-  duration_minutes: number;
-  practice_type: string;
-  notes?: string;
-  pieces_practiced?: string[];
-  difficulty_rating?: number;
-  mood_rating?: number;
-  created_at: string;
-}
 
 interface Message {
   id: string;
@@ -220,7 +209,6 @@ const StudentDashboard = () => {
   const navigate = useNavigate();
   const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [practiceLogs, setPracticeLogs] = useState<PracticeLog[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -264,17 +252,6 @@ const StudentDashboard = () => {
   const [isUsingMakeupCredit, setIsUsingMakeupCredit] = useState(false);
   const [bookingStatus, setBookingStatus] = useState<any>(null);
   
-  // Practice log modal state
-  const [showPracticeModal, setShowPracticeModal] = useState(false);
-  const [newPracticeLog, setNewPracticeLog] = useState({
-    practice_date: new Date().toISOString().split('T')[0],
-    duration_minutes: 30,
-    practice_type: 'regular',
-    notes: '',
-    pieces_practiced: [''],
-    difficulty_rating: 3,
-    mood_rating: 3
-  });
 
   // Message modal state
   const [showMessageModal, setShowMessageModal] = useState(false);
@@ -513,16 +490,6 @@ const StudentDashboard = () => {
         setLessons(lessonsData);
       }
 
-      // Fetch practice logs
-      const { data: practiceData, error: practiceError } = await supabase
-        .from('practice_logs')
-        .select('*')
-        .eq('student_id', student.id)
-        .order('practice_date', { ascending: false });
-
-      if (!practiceError && practiceData) {
-        setPracticeLogs(practiceData);
-      }
 
       // Fetch portal messages
       const { data: messagesData, error: messagesError } = await supabase
@@ -2063,54 +2030,6 @@ const StudentDashboard = () => {
     }
   };
 
-  const handleAddPracticeLog = async () => {
-    if (!studentProfile) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('practice_logs')
-        .insert({
-          student_id: studentProfile.id,
-          practice_date: newPracticeLog.practice_date,
-          duration_minutes: newPracticeLog.duration_minutes,
-          practice_type: newPracticeLog.practice_type,
-          notes: newPracticeLog.notes,
-          pieces_practiced: newPracticeLog.pieces_practiced.filter(p => p.trim()),
-          difficulty_rating: newPracticeLog.difficulty_rating,
-          mood_rating: newPracticeLog.mood_rating
-        })
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      setPracticeLogs([data, ...practiceLogs]);
-      setShowPracticeModal(false);
-      setNewPracticeLog({
-        practice_date: new Date().toISOString().split('T')[0],
-        duration_minutes: 30,
-        practice_type: 'regular',
-        notes: '',
-        pieces_practiced: [''],
-        difficulty_rating: 3,
-        mood_rating: 3
-      });
-
-      toast({
-        title: "Success",
-        description: "Practice session logged successfully!",
-      });
-    } catch (error) {
-      console.error('Error adding practice log:', error);
-      toast({
-        title: "Error",
-        description: "Failed to log practice session",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleSendMessage = async () => {
     if (!user) return;
@@ -3018,7 +2937,7 @@ const StudentDashboard = () => {
                     <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold">{practiceLogs.reduce((acc, log) => acc + log.duration_minutes, 0)}</div>
+                    <div className="text-xl sm:text-2xl font-bold">0</div>
                     <p className="text-xs text-muted-foreground">Minutes this month</p>
                   </CardContent>
                 </Card>
@@ -3115,22 +3034,7 @@ const StudentDashboard = () => {
                     <CardDescription>Your latest practice sessions</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {practiceLogs.length > 0 ? (
-                      <div className="space-y-4">
-                        {practiceLogs.slice(0, 3).map(log => (
-                          <div key={log.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                            <div>
-                              <h4 className="font-semibold">{log.pieces_practiced?.join(', ') || 'Practice Session'}</h4>
-                              <p className="text-sm text-gray-600">{log.duration_minutes} minutes</p>
-                              <p className="text-sm text-gray-600">{formatDate(log.practice_date)}</p>
-                            </div>
-                            <Clock className="w-4 h-4 text-green-600" />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-gray-500">No practice sessions recorded</p>
-                    )}
+                    <p className="text-gray-500 text-center py-4">Practice tracking coming soon</p>
                   </CardContent>
                 </Card>
               </div>
@@ -3672,98 +3576,23 @@ const StudentDashboard = () => {
             {/* Practice Tab */}
             <TabsContent value="practice" className="space-y-6">
               <Card>
-                <CardHeader>
-                  <CardTitle>Practice Log</CardTitle>
-                  <CardDescription>Track your practice sessions and progress</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <Dialog open={showPracticeModal} onOpenChange={setShowPracticeModal}>
-                      <Button className="w-full">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Log New Practice Session
-                      </Button>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>Log Practice Session</DialogTitle>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="practice_date" className="text-right">Date</Label>
-                            <Input
-                              id="practice_date"
-                              type="date"
-                              value={newPracticeLog.practice_date}
-                              onChange={(e) => setNewPracticeLog({...newPracticeLog, practice_date: e.target.value})}
-                              className="col-span-3"
-                            />
-                          </div>
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="duration" className="text-right">Duration (min)</Label>
-                            <Input
-                              id="duration"
-                              type="number"
-                              value={newPracticeLog.duration_minutes}
-                              onChange={(e) => setNewPracticeLog({...newPracticeLog, duration_minutes: parseInt(e.target.value)})}
-                              className="col-span-3"
-                            />
-                          </div>
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="practice_type" className="text-right">Type</Label>
-                            <Select value={newPracticeLog.practice_type} onValueChange={(value) => setNewPracticeLog({...newPracticeLog, practice_type: value})}>
-                              <SelectTrigger className="col-span-3">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="regular">Regular Practice</SelectItem>
-                                <SelectItem value="assignment">Assignment</SelectItem>
-                                <SelectItem value="performance_prep">Performance Prep</SelectItem>
-                                <SelectItem value="technique">Technique</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="notes" className="text-right">Notes</Label>
-                            <Textarea
-                              id="notes"
-                              value={newPracticeLog.notes}
-                              onChange={(e) => setNewPracticeLog({...newPracticeLog, notes: e.target.value})}
-                              className="col-span-3"
-                              placeholder="What did you practice today?"
-                            />
-                          </div>
-                        </div>
-                        <div className="flex justify-end space-x-2">
-                          <Button variant="outline" onClick={() => setShowPracticeModal(false)}>
-                            Cancel
-                          </Button>
-                          <Button onClick={handleAddPracticeLog}>
-                            Log Session
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                    
-                    <div className="space-y-4">
-                      {practiceLogs.length > 0 ? (
-                        practiceLogs.map(log => (
-                          <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
-                            <div>
-                              <h4 className="font-semibold">{log.pieces_practiced?.join(', ') || 'Practice Session'}</h4>
-                              <p className="text-sm text-gray-600">{log.duration_minutes} minutes</p>
-                              <p className="text-sm text-gray-600">{formatDate(log.practice_date)}</p>
-                              {log.notes && <p className="text-sm text-gray-600">{log.notes}</p>}
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Badge variant="secondary">{log.practice_type}</Badge>
-                              <Clock className="w-5 h-5 text-green-600" />
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-gray-500 text-center py-8">No practice sessions recorded yet</p>
-                      )}
+                <CardContent className="p-8">
+                  <div className="flex flex-col items-center text-center space-y-6">
+                    <div className="w-16 h-16 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center">
+                      <Music className="w-8 h-8 text-purple-600" />
                     </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-900 mb-2">Practice Log</h3>
+                      <p className="text-gray-600 mb-4">Track your practice sessions and musical progress</p>
+                      <div className="inline-flex items-center px-4 py-2 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
+                        <Clock className="w-4 h-4 mr-2" />
+                        Coming Soon
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-500 max-w-md">
+                      We're developing a comprehensive practice tracking system that will help you log practice sessions, 
+                      track your progress, set goals, and analyze your musical development over time.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
