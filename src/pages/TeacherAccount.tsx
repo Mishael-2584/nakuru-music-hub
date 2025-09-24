@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Home } from "lucide-react";
+import { ArrowLeft, Home, CheckCircle } from "lucide-react";
 
 const TeacherAccount = () => {
   const { toast } = useToast();
@@ -19,6 +19,7 @@ const TeacherAccount = () => {
   const [bio, setBio] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -38,6 +39,52 @@ const TeacherAccount = () => {
       }
     };
     load();
+
+    // Fetch notifications
+    const fetchNotifications = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+      
+      const { data: notificationsData } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .eq('notification_type', 'approval_request_approved')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      setNotifications(notificationsData || []);
+    };
+    fetchNotifications();
+  }, []);
+
+  // Refresh data when component becomes visible (user navigates back to this page)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Page became visible, refresh the data
+        const load = async () => {
+          const { data: userData } = await supabase.auth.getUser();
+          if (!userData.user) return;
+          const { data } = await supabase
+            .from('teachers')
+            .select('id, name, phone, bio, avatar_url')
+            .eq('user_id', userData.user.id)
+            .single();
+          if (data) {
+            setTeacherId(data.id);
+            setName(data.name || "");
+            setPhone(data.phone || "");
+            setBio(data.bio || "");
+            setAvatarUrl(data.avatar_url || "");
+          }
+        };
+        load();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
   const sanitizeFilename = (name: string) => {
@@ -119,6 +166,28 @@ const TeacherAccount = () => {
             </Link>
           </div>
         </div>
+
+        {/* Notifications */}
+        {notifications.length > 0 && (
+          <Card className="mb-6 border-green-200 bg-green-50">
+            <CardHeader>
+              <CardTitle className="text-green-800">Recent Approvals</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {notifications.map((notification) => (
+                  <div key={notification.id} className="flex items-center gap-2 text-sm text-green-700">
+                    <CheckCircle className="h-4 w-4" />
+                    <span>{notification.message}</span>
+                    <span className="text-xs text-green-600">
+                      {new Date(notification.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
         
         <Card>
           <CardHeader>

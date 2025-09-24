@@ -547,7 +547,18 @@ const AdminPanel = () => {
           student_name: request.students?.student_name || 'Unknown',
           email: request.students?.email || 'Unknown'
         })) || [];
-        setApprovalRequests(flattenedData);
+        
+        // Sort by status (pending first), then by created_at (newest first)
+        const sortedData = flattenedData.sort((a, b) => {
+          // First sort by status: pending comes first
+          if (a.status === 'pending' && b.status !== 'pending') return -1;
+          if (a.status !== 'pending' && b.status === 'pending') return 1;
+          
+          // If both have same status, sort by created_at (newest first)
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+        
+        setApprovalRequests(sortedData);
       }
 
       // Fetch teacher profile change requests
@@ -558,7 +569,6 @@ const AdminPanel = () => {
           *,
           teachers!inner(name, email)
         `)
-        .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
       if (teacherChangeRequestsError) {
@@ -576,7 +586,18 @@ const AdminPanel = () => {
           teacher_name: request.teachers?.name || 'Unknown',
           email: request.teachers?.email || 'Unknown'
         })) || [];
-        setTeacherChangeRequests(flattenedTeacherData);
+        
+        // Sort by status (pending first), then by created_at (newest first)
+        const sortedTeacherData = flattenedTeacherData.sort((a, b) => {
+          // First sort by status: pending comes first
+          if (a.status === 'pending' && b.status !== 'pending') return -1;
+          if (a.status !== 'pending' && b.status === 'pending') return 1;
+          
+          // If both have same status, sort by created_at (newest first)
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+        
+        setTeacherChangeRequests(sortedTeacherData);
     }
 
     console.log("AdminPanel: Fetching quotes...");
@@ -705,6 +726,78 @@ const AdminPanel = () => {
 
   const handleApproveRequest = async (requestId: string) => {
     try {
+      // First, get the request details to see what type of request it is
+      const { data: request, error: fetchError } = await supabase
+        .from('approval_requests')
+        .select('*')
+        .eq('id', requestId)
+        .single();
+
+      if (fetchError || !request) {
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch request details',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Handle different request types
+      if (request.request_type === 'profile_update') {
+        // Update the student's profile with the requested changes
+        const updateData: any = {};
+        if (request.requested_value) {
+          // Parse the requested value (it might be JSON for complex updates)
+          try {
+            const requestedValue = JSON.parse(request.requested_value);
+            if (requestedValue.instrument) updateData.instrument = requestedValue.instrument;
+            if (requestedValue.name) updateData.student_name = requestedValue.name;
+            // Add other fields as needed
+          } catch (e) {
+            // If it's not JSON, treat it as a simple string value
+            if (request.title.includes('instrument')) {
+              updateData.instrument = request.requested_value;
+            } else if (request.title.includes('name')) {
+              updateData.student_name = request.requested_value;
+            }
+          }
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          const { error: updateError } = await supabase
+            .from('students')
+            .update(updateData)
+            .eq('id', request.student_id);
+
+          if (updateError) {
+            console.error('Error updating student profile:', updateError);
+            toast({
+              title: 'Error',
+              description: 'Failed to update student profile',
+              variant: 'destructive',
+            });
+            return;
+          }
+        }
+      } else if (request.request_type === 'learning_mode_change') {
+        // Update the student's learning mode
+        const { error: updateError } = await supabase
+          .from('students')
+          .update({ learning_mode: request.requested_value })
+          .eq('id', request.student_id);
+
+        if (updateError) {
+          console.error('Error updating learning mode:', updateError);
+          toast({
+            title: 'Error',
+            description: 'Failed to update learning mode',
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
+
+      // Mark the request as approved
       const { error } = await supabase
         .from('approval_requests')
         .update({
@@ -727,7 +820,7 @@ const AdminPanel = () => {
 
       toast({
         title: 'Success',
-        description: 'Request approved successfully',
+        description: 'Request approved and changes applied successfully',
       });
 
       // Refresh the data
@@ -805,6 +898,9 @@ const AdminPanel = () => {
       if (request.proposed_phone) updateData.phone = request.proposed_phone;
       if (request.proposed_bio) updateData.bio = request.proposed_bio;
       if (request.proposed_experience) updateData.experience = request.proposed_experience;
+
+      console.log('Updating teacher profile with data:', updateData);
+      console.log('Teacher ID:', request.teacher_id);
 
       const { error: updateError } = await supabase
         .from('teachers')
@@ -909,14 +1005,46 @@ const AdminPanel = () => {
   };
 
   // Pagination logic for requests
+  const getAllRequests = () => {
+    // Combine student approval requests and teacher change requests
+    const studentRequests = approvalRequests.map(req => ({
+      ...req,
+      request_source: 'student',
+      requester_name: req.student_name,
+      requester_email: req.email
+    }));
+    
+    const teacherRequests = teacherChangeRequests.map(req => ({
+      ...req,
+      request_source: 'teacher',
+      requester_name: req.teacher_name,
+      requester_email: req.email,
+      request_type: 'profile_update',
+      title: 'Teacher Profile Update',
+      description: 'Profile information change request'
+    }));
+    
+    // Combine and sort by status (pending first), then by created_at (newest first)
+    const allRequests = [...studentRequests, ...teacherRequests].sort((a, b) => {
+      // First sort by status: pending comes first
+      if (a.status === 'pending' && b.status !== 'pending') return -1;
+      if (a.status !== 'pending' && b.status === 'pending') return 1;
+      
+      // If both have same status, sort by created_at (newest first)
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+    
+    return allRequests;
+  };
+
   const getPaginatedRequests = () => {
     const startIndex = (requestsPage - 1) * requestsPerPage;
     const endIndex = startIndex + requestsPerPage;
-    return approvalRequests.slice(startIndex, endIndex);
+    return getAllRequests().slice(startIndex, endIndex);
   };
 
   const getTotalPages = () => {
-    return Math.ceil(approvalRequests.length / requestsPerPage);
+    return Math.ceil(getAllRequests().length / requestsPerPage);
   };
 
   const handlePageChange = (newPage: number) => {
@@ -2234,7 +2362,7 @@ const AdminPanel = () => {
                 style={{ minWidth: 120 }}
               >
                 <Settings className="h-4 w-4 mr-2" />
-                Requests & Approvals ({approvalRequests.filter(req => req.status === 'pending').length + teacherChangeRequests.length})
+                Requests & Approvals ({approvalRequests.filter(req => req.status === 'pending').length + teacherChangeRequests.filter(req => req.status === 'pending').length})
               </Button>
               <Button
                 variant={activeTab === 'notifications' ? 'default' : 'ghost'}
@@ -3173,10 +3301,10 @@ const AdminPanel = () => {
                 </h3>
                 <div className="flex gap-2">
                   <Badge variant="outline" className="px-3 py-1">
-                    Total: {approvalRequests.length}
+                    Total: {approvalRequests.length + teacherChangeRequests.length}
                   </Badge>
                   <Badge variant="default" className="px-3 py-1 bg-orange-500">
-                    Pending: {approvalRequests.filter(req => req.status === 'pending').length}
+                    Pending: {approvalRequests.filter(req => req.status === 'pending').length + teacherChangeRequests.filter(req => req.status === 'pending').length}
                   </Badge>
                   {getTotalPages() > 1 && (
                     <Badge variant="outline" className="px-3 py-1 text-blue-600">
@@ -3187,12 +3315,12 @@ const AdminPanel = () => {
               </div>
               
               <div className="space-y-3">
-                {approvalRequests.length === 0 ? (
+                {getAllRequests().length === 0 ? (
                   <Card>
                     <CardContent className="p-6 text-center">
                       <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold text-gray-600 mb-2">No Pending Requests</h3>
-                      <p className="text-gray-500">No students have submitted approval requests yet.</p>
+                      <h3 className="text-lg font-semibold text-gray-600 mb-2">No Requests</h3>
+                      <p className="text-gray-500">No approval requests have been submitted yet.</p>
                     </CardContent>
                   </Card>
                 ) : (
@@ -3238,9 +3366,17 @@ const AdminPanel = () => {
                                   </Badge>
                                 </div>
                                 <div className="flex items-center gap-4 text-sm text-gray-600">
-                                  <span className="truncate">{request.student_name}</span>
+                                  <span className="truncate">{request.requester_name}</span>
                                   <span>•</span>
                                   <span>{new Date(request.created_at).toLocaleDateString()}</span>
+                                  {request.request_source === 'teacher' && request.proposed_name && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="text-primary font-medium">
+                                        Name: {request.proposed_name}
+                                      </span>
+                                    </>
+                                  )}
                                   {request.current_value && request.requested_value && (
                                     <>
                                       <span>•</span>
@@ -3266,7 +3402,13 @@ const AdminPanel = () => {
                                 <div className="flex gap-1">
                                   <Button
                                     size="sm"
-                                    onClick={() => handleApproveRequest(request.id)}
+                                    onClick={() => {
+                                      if (request.request_source === 'teacher') {
+                                        handleApproveTeacherChange(request.id);
+                                      } else {
+                                        handleApproveRequest(request.id);
+                                      }
+                                    }}
                                     className="h-8 px-3 bg-green-600 hover:bg-green-700 text-xs"
                                   >
                                     <CheckCircle className="h-3 w-3 mr-1" />
@@ -3275,7 +3417,13 @@ const AdminPanel = () => {
                                   <Button
                                     size="sm"
                                     variant="destructive"
-                                    onClick={() => handleRejectRequest(request.id)}
+                                    onClick={() => {
+                                      if (request.request_source === 'teacher') {
+                                        handleRejectTeacherChange(request.id);
+                                      } else {
+                                        handleRejectRequest(request.id);
+                                      }
+                                    }}
                                     className="h-8 px-3 text-xs"
                                   >
                                     <X className="h-3 w-3 mr-1" />
@@ -3316,7 +3464,38 @@ const AdminPanel = () => {
                                 </div>
                               )}
                               
-                              {(request.current_value || request.requested_value) && (
+                              {/* Teacher Profile Changes */}
+                              {request.request_source === 'teacher' && (
+                                <div className="space-y-3">
+                                  {request.proposed_name && (
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-600 mb-1">Proposed Name:</p>
+                                      <p className="text-sm bg-blue-50 p-2 rounded font-semibold text-primary">{request.proposed_name}</p>
+                                    </div>
+                                  )}
+                                  {request.proposed_phone && (
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-600 mb-1">Proposed Phone:</p>
+                                      <p className="text-sm bg-blue-50 p-2 rounded font-semibold text-primary">{request.proposed_phone}</p>
+                                    </div>
+                                  )}
+                                  {request.proposed_bio && (
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-600 mb-1">Proposed Bio:</p>
+                                      <p className="text-sm bg-blue-50 p-2 rounded font-semibold text-primary">{request.proposed_bio}</p>
+                                    </div>
+                                  )}
+                                  {request.proposed_experience && (
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-600 mb-1">Proposed Experience:</p>
+                                      <p className="text-sm bg-blue-50 p-2 rounded font-semibold text-primary">{request.proposed_experience}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* Student Requests */}
+                              {(request.current_value || request.requested_value) && request.request_source === 'student' && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   {request.current_value && (
                                     <div>
@@ -3353,95 +3532,13 @@ const AdminPanel = () => {
                     );
                   })}
                   
-                  {/* Teacher Profile Change Requests */}
-                  {teacherChangeRequests.length > 0 && (
-                    <>
-                      <div className="mt-8 pt-6 border-t border-gray-200">
-                        <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                          <UserCog className="h-5 w-5" />
-                          Teacher Profile Changes ({teacherChangeRequests.length})
-                        </h4>
-                      </div>
-                      
-                      {teacherChangeRequests.map((request) => (
-                        <Card key={request.id} className="border-l-4 border-l-blue-500">
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <UserCog className="h-4 w-4 text-blue-600" />
-                                  <span className="font-medium text-gray-900">
-                                    {request.teacher_name}
-                                  </span>
-                                  <Badge variant="outline" className="text-xs">
-                                    Profile Update
-                                  </Badge>
-                                </div>
-                                
-                                <div className="text-sm text-gray-600 mb-3">
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                    {request.proposed_name && (
-                                      <div>
-                                        <span className="font-medium">Name:</span> {request.proposed_name}
-                                      </div>
-                                    )}
-                                    {request.proposed_phone && (
-                                      <div>
-                                        <span className="font-medium">Phone:</span> {request.proposed_phone}
-                                      </div>
-                                    )}
-                                    {request.proposed_bio && (
-                                      <div className="md:col-span-2">
-                                        <span className="font-medium">Bio:</span> {request.proposed_bio}
-                                      </div>
-                                    )}
-                                    {request.proposed_experience && (
-                                      <div className="md:col-span-2">
-                                        <span className="font-medium">Experience:</span> {request.proposed_experience}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                <div className="text-xs text-gray-500">
-                                  Requested: {new Date(request.created_at).toLocaleDateString()}
-                                </div>
-                              </div>
-                              
-                              <div className="flex flex-col gap-2 ml-4">
-                                <div className="flex gap-1">
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleApproveTeacherChange(request.id)}
-                                    className="h-8 px-3 bg-green-600 hover:bg-green-700 text-xs"
-                                  >
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    Approve
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => handleRejectTeacherChange(request.id)}
-                                    className="h-8 px-3 text-xs"
-                                  >
-                                    <X className="h-3 w-3 mr-1" />
-                                    Reject
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </>
-                  )}
                   
                   {/* Pagination Controls */}
                   {getTotalPages() > 1 && (
                     <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <span>
-                          Showing {((requestsPage - 1) * requestsPerPage) + 1} to {Math.min(requestsPage * requestsPerPage, approvalRequests.length)} of {approvalRequests.length} requests
+                          Showing {((requestsPage - 1) * requestsPerPage) + 1} to {Math.min(requestsPage * requestsPerPage, getAllRequests().length)} of {getAllRequests().length} requests
                         </span>
                       </div>
                       
