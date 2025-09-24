@@ -208,6 +208,7 @@ export default function QuizPage() {
       setQuizMatchingPairs(matchingPairs);
       
       // Check for existing submission
+      console.log('Checking for existing submission for quiz:', quiz.quiz_id);
       const existingSubmission = await checkExistingSubmission(quiz.quiz_id);
       if (existingSubmission) {
         console.log('Found existing submission:', existingSubmission);
@@ -218,6 +219,7 @@ export default function QuizPage() {
         // Fetch submission answers
         await fetchQuizSubmissionAnswers(existingSubmission.id);
       } else {
+        console.log('No existing submission found, starting quiz');
         // Auto-start timer when quiz loads only if no existing submission
         setTimerStarted(true);
         setTimerCompleted(false);
@@ -259,22 +261,21 @@ export default function QuizPage() {
 
       if (!student) return null;
 
-      // Check for existing submission
-      const { data: submission, error } = await supabase
-        .from('quiz_submissions')
-        .select('*')
-        .eq('quiz_id', quizId)
-        .eq('student_id', student.user_id)
-        .order('submitted_at', { ascending: false })
-        .limit(1)
-        .single();
+      // Use RPC function to efficiently check for existing submissions
+      console.log('Checking submissions for quiz:', quizId, 'student:', student.user_id);
+      const { data: submissions, error } = await supabase.rpc('check_existing_quiz_submission', {
+        quiz_id_param: quizId,
+        student_id_param: student.user_id
+      });
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error('Error checking existing submission:', error);
         return null;
       }
 
-      return submission;
+      console.log('Found submissions:', submissions);
+      // Return the most recent submission if any exist
+      return submissions && submissions.length > 0 ? submissions[0] : null;
     } catch (error) {
       console.error('Error checking existing submission:', error);
       return null;
@@ -419,8 +420,30 @@ export default function QuizPage() {
       
       toast({ title: 'Success', description: 'Quiz submitted successfully!' });
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting quiz:', error);
+      
+      // Handle duplicate key constraint error (student already submitted)
+      if (error.code === '23505' && error.message.includes('duplicate key value violates unique constraint')) {
+        console.log('Student has already submitted this quiz, redirecting to results...');
+        
+        // Check for existing submission and show results
+        const existingSubmission = await checkExistingSubmission(quizData.id);
+        if (existingSubmission) {
+          setCurrentQuizSubmission(existingSubmission);
+          setHasExistingSubmission(true);
+          setShowQuizResults(true);
+          await fetchQuizSubmissionAnswers(existingSubmission.id);
+          
+          toast({ 
+            title: 'Already Submitted', 
+            description: 'You have already submitted this quiz. Showing your results.', 
+            variant: 'default' 
+          });
+          return;
+        }
+      }
+      
       toast({ title: 'Error', description: 'Failed to submit quiz', variant: 'destructive' });
     }
   };

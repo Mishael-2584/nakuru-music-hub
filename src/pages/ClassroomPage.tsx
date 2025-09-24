@@ -1088,19 +1088,9 @@ export default function ClassroomPage() {
                 >
                   {post.is_assignment && (
                     <>
-                      <AssignmentSubmissionPanel
-                        post={post}
-                        isTeacher={isTeacherOfClass}
-                        submissions={submissions[post.post_id] || []}
-                        currentStudentId={classroom.currentStudent?.user_id}
-                        onSubmit={handleSubmitAssignment}
-                        onGrade={handleGradeSubmission}
-                        onLoadSubmissions={loadSubmissions}
-                      />
-                      
-                      {/* Quiz Actions */}
+                      {/* Quiz Actions - Moved to top for better visibility */}
                       {isEnrolledStudent && post.has_quiz && (
-                        <div className="border-t border-gray-100 pt-4 mt-4">
+                        <div className="border-t border-gray-100 pt-4 mt-4 mb-4">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="text-purple-600 border-purple-200 bg-purple-50">
@@ -1165,6 +1155,16 @@ export default function ClassroomPage() {
                           </div>
                         </div>
                       )}
+                      
+                      <AssignmentSubmissionPanel
+                        post={post}
+                        isTeacher={isTeacherOfClass}
+                        submissions={submissions[post.post_id] || []}
+                        currentStudentId={classroom.currentStudent?.user_id}
+                        onSubmit={handleSubmitAssignment}
+                        onGrade={handleGradeSubmission}
+                        onLoadSubmissions={loadSubmissions}
+                      />
                     </>
                   )}
                   
