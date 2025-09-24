@@ -41,6 +41,7 @@ export default function ClassroomPostCard({
 }: ClassroomPostCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [showFullDetails, setShowFullDetails] = useState(false);
 
   const getDisplayFileName = (storedName: string) => {
     const timestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z_/;
@@ -76,222 +77,270 @@ export default function ClassroomPostCard({
   const isDueSoon = post.due_date && new Date(post.due_date).getTime() - new Date().getTime() < 24 * 60 * 60 * 1000;
 
   return (
-    <Card className="shadow-md hover:shadow-lg transition-all duration-200 border-0 bg-white">
-      {/* Assignment Banner */}
-      {post.is_assignment && (
-        <div className={`h-2 ${isOverdue ? 'bg-red-500' : isDueSoon ? 'bg-orange-500' : 'bg-blue-500'}`} />
-      )}
-      
-      {/* Post Header */}
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10">
-              <AvatarFallback className="bg-gradient-to-br from-purple-500 to-blue-500 text-white font-semibold">
-                {post.author_name.charAt(0)}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-gray-900">{post.author_name}</h3>
-                {isTeacher && (
-                  <CheckCircle className="h-4 w-4 text-blue-600" title="Verified Teacher" />
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
-                {post.is_assignment && (
-                  <>
-                    <span>•</span>
-                    <BookOpen className="h-3 w-3" />
-                    <span>Assignment</span>
-                  </>
-                )}
-              </div>
+    <Card className={`shadow-sm hover:shadow-md transition-all duration-200 border-0 bg-white ${
+      post.is_assignment ? 'border-l-4 border-l-blue-600' : ''
+    }`}>
+      {/* Ultra-Compact Single Row */}
+      <CardContent className="p-3">
+        <div className="flex items-center justify-between">
+          <div className="flex-1 min-w-0">
+            {/* Title and Key Info in One Line */}
+            <div className="flex items-center gap-3 mb-1">
+              <h4 className="font-semibold text-gray-900 truncate text-sm">
+                {post.is_assignment ? post.assignment_title : 'Post'}
+              </h4>
+              <span className="text-xs font-medium text-blue-600">{post.max_points || 100} pts</span>
+              {post.due_date && (
+                <span className={`text-xs font-medium ${
+                  isOverdue ? 'text-red-600' : isDueSoon ? 'text-orange-600' : 'text-green-600'
+                }`}>
+                  Due {formatDistanceToNow(new Date(post.due_date), { addSuffix: true })}
+                </span>
+              )}
+              {post.is_assignment && post.is_timed && (
+                <span className="text-xs text-gray-600 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {Math.floor(post.time_limit_minutes / 60)}h {post.time_limit_minutes % 60}m
+                </span>
+              )}
+              {post.attachments && post.attachments.length > 0 && (
+                <span className="text-xs text-gray-600 flex items-center gap-1">
+                  <FileText className="h-3 w-3" />
+                  {post.attachments.length} file{post.attachments.length > 1 ? 's' : ''}
+                </span>
+              )}
+              {post.has_quiz && (
+                <Badge variant="outline" className="text-xs px-2 py-0 bg-purple-100 text-purple-700 border-purple-200">
+                  🧠 Quiz
+                </Badge>
+              )}
+            </div>
+            
+            {/* Brief Content Preview */}
+            <div className="flex items-center justify-between">
+              <div 
+                className={`text-xs text-gray-600 flex-1 min-w-0 ${
+                  !expanded && post.content.length > 80 ? 'line-clamp-1' : ''
+                }`}
+                dangerouslySetInnerHTML={{ 
+                  __html: renderContent(expanded ? post.content : post.content.slice(0, 80)) 
+                }}
+              />
+              {post.content.length > 80 && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setExpanded(!expanded)}
+                  className="ml-2 text-blue-600 hover:text-blue-700 p-0 h-auto font-normal text-xs"
+                >
+                  {expanded ? 'Less' : 'More'}
+                </Button>
+              )}
             </div>
           </div>
           
-          {/* Post Actions */}
-          {isTeacher && (
-            <div className="flex items-center gap-1">
-              <Button 
-                variant="ghost" 
+          {/* Action Buttons */}
+          <div className="flex items-center gap-1 ml-3">
+            {post.is_assignment && (
+              <Button
+                variant="outline"
                 size="sm"
-                onClick={() => onEdit?.(post.post_id, post.content)}
-                className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+                onClick={() => setShowFullDetails(!showFullDetails)}
+                className="h-6 px-2 text-xs bg-white hover:bg-gray-50"
               >
-                <Edit3 className="h-3 w-3" />
+                {showFullDetails ? 'Hide' : 'View'}
               </Button>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => onDelete?.(post.post_id)}
-                className="h-8 w-8 p-0 text-gray-400 hover:text-red-600"
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
+            )}
+            {isTeacher && (
+              <>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => onEdit?.(post.post_id, post.content)}
+                  className="h-6 w-6 p-0 text-gray-400 hover:text-gray-600"
+                >
+                  <Edit3 className="h-3 w-3" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => onDelete?.(post.post_id)}
+                  className="h-6 w-6 p-0 text-gray-400 hover:text-red-600"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </>
+            )}
+          </div>
         </div>
+        
+        {/* Overdue Badge */}
+        {isOverdue && (
+          <div className="mt-2">
+            <Badge variant="destructive" className="text-xs px-2 py-0">
+              <AlertCircle className="h-3 w-3 mr-1" />
+              Overdue
+            </Badge>
+          </div>
+        )}
 
-        {/* Assignment Header Info */}
-        {post.is_assignment && (
-          <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-full">
-                  <BookOpen className="h-4 w-4 text-blue-600" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-blue-900">{post.assignment_title}</h4>
-                  <div className="flex items-center gap-4 text-sm text-blue-700">
-                    <span>Max Points: {post.max_points || 100}</span>
-                    {post.is_timed && (
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        <span>Timed: {Math.floor(post.time_limit_minutes / 60)}h {post.time_limit_minutes % 60}m</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              {post.due_date && (
-                <div className="text-right">
-                  <div className="flex items-center gap-1 text-sm">
-                    <Calendar className="h-3 w-3" />
-                    <span className={`font-medium ${
-                      isOverdue ? 'text-red-600' : isDueSoon ? 'text-orange-600' : 'text-green-600'
-                    }`}>
-                      Due {formatDistanceToNow(new Date(post.due_date), { addSuffix: true })}
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-600 mt-1">
-                    {new Date(post.due_date).toLocaleDateString()} at {new Date(post.due_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                  </div>
-                  {isOverdue && (
-                    <Badge variant="destructive" className="mt-1 text-xs">
-                      <AlertCircle className="h-3 w-3 mr-1" />
-                      Overdue
-                    </Badge>
+        {/* Expanded Details (Assignment Only) */}
+        {showFullDetails && post.is_assignment && (
+          <div className="border-t border-gray-100 pt-3 mt-3">
+            {/* Author Info */}
+            <div className="flex items-center gap-3 mb-3 p-2 bg-gray-50 rounded-lg">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-gradient-to-br from-purple-500 to-blue-500 text-white text-sm font-semibold">
+                  {post.author_name.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-900">{post.author_name}</span>
+                  {isTeacher && (
+                    <CheckCircle className="h-3 w-3 text-blue-600" title="Verified Teacher" />
                   )}
                 </div>
-              )}
-            </div>
-          </div>
-        )}
-      </CardHeader>
-
-      {/* Post Content */}
-      <CardContent className="pt-0">
-        {/* Content Preview/Full */}
-        <div className="mb-4">
-          <div 
-            className={`prose prose-sm max-w-none text-gray-700 ${
-              !expanded && post.content.length > 300 ? 'line-clamp-3' : ''
-            }`}
-            dangerouslySetInnerHTML={{ 
-              __html: renderContent(expanded ? post.content : post.content.slice(0, 300)) 
-            }}
-          />
-          {post.content.length > 300 && (
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => setExpanded(!expanded)}
-              className="mt-2 text-blue-600 hover:text-blue-700 p-0 h-auto font-normal"
-            >
-              {expanded ? (
-                <>Show less <ChevronUp className="h-3 w-3 ml-1" /></>
-              ) : (
-                <>Show more <ChevronDown className="h-3 w-3 ml-1" /></>
-              )}
-            </Button>
-          )}
-        </div>
-
-        {/* File Attachments */}
-        {post.attachments && post.attachments.length > 0 && (
-          <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="flex items-center gap-2 mb-2">
-              <FileText className="h-4 w-4 text-gray-600" />
-              <span className="text-sm font-medium text-gray-700">
-                {post.attachments.length} attachment{post.attachments.length > 1 ? 's' : ''}
-              </span>
-            </div>
-            <div className="grid gap-2">
-              {post.attachments.map((attachment: any, index: number) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-white rounded border border-gray-100 hover:border-gray-200 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-blue-600" />
-                    <div>
-                      <div className="font-medium text-gray-800 text-sm">
-                        {getDisplayFileName(attachment.file_name)}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {attachment.file_size ? `${(attachment.file_size / 1024).toFixed(1)} KB` : '0 KB'}
-                      </div>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(attachment.file_url, '_blank')}
-                    className="h-7 px-2 text-xs"
-                  >
-                    <Download className="h-3 w-3 mr-1" />
-                    Download
-                  </Button>
+                <div className="text-xs text-gray-500">
+                  Posted {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* Assignment/Submission Section */}
-        {children}
-
-        {/* Comments Section */}
-        <div className="border-t border-gray-100 pt-4 mt-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setShowComments(!showComments);
-              if (!showComments && onLoadComments) {
-                onLoadComments(post.post_id);
-              }
-            }}
-            className="text-gray-600 hover:text-gray-800 p-0 h-auto"
-          >
-            <MessageCircle className="h-4 w-4 mr-2" />
-            {comments.length > 0 ? `${comments.length} comment${comments.length > 1 ? 's' : ''}` : 'Add comment'}
-            {showComments ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}
-          </Button>
-
-          {showComments && (
-            <div className="mt-3 space-y-2">
-              {comments.map((comment: any) => (
-                <div key={comment.id} className="p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Avatar className="h-6 w-6">
-                      <AvatarFallback className="bg-gray-400 text-white text-xs">
-                        {comment.author_name.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="font-medium text-sm text-gray-800">{comment.author_name}</span>
-                    <Badge variant="outline" className="text-xs px-1 py-0">
-                      {comment.author_role}
-                    </Badge>
-                    <span className="text-xs text-gray-500">
-                      {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+            {/* Assignment Details */}
+            <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+              <div className="flex items-center gap-2 mb-2">
+                <BookOpen className="h-4 w-4 text-blue-600" />
+                <span className="font-medium text-blue-900">Assignment Details</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-gray-600">Max Points:</span>
+                  <span className="ml-2 font-medium">{post.max_points || 100}</span>
+                </div>
+                {post.due_date && (
+                  <div>
+                    <span className="text-gray-600">Due Date:</span>
+                    <span className={`ml-2 font-medium ${
+                      isOverdue ? 'text-red-600' : isDueSoon ? 'text-orange-600' : 'text-green-600'
+                    }`}>
+                      {new Date(post.due_date).toLocaleDateString()} at {new Date(post.due_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </span>
                   </div>
-                  <div className="text-sm text-gray-700 ml-8">{comment.content}</div>
-                </div>
-              ))}
+                )}
+                {post.is_timed && (
+                  <div>
+                    <span className="text-gray-600">Time Limit:</span>
+                    <span className="ml-2 font-medium">{Math.floor(post.time_limit_minutes / 60)}h {post.time_limit_minutes % 60}m</span>
+                  </div>
+                )}
+                {post.has_quiz && (
+                  <div>
+                    <span className="text-gray-600">Quiz Time:</span>
+                    <span className="ml-2 font-medium">{post.quiz_time_limit} min</span>
+                  </div>
+                )}
+              </div>
+              {isOverdue && (
+                <Badge variant="destructive" className="mt-2 text-xs">
+                  <AlertCircle className="h-3 w-3 mr-1" />
+                  Overdue
+                </Badge>
+              )}
             </div>
-          )}
-        </div>
+
+            {/* File Attachments */}
+            {post.attachments && post.attachments.length > 0 && (
+              <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="h-4 w-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-700">
+                    {post.attachments.length} attachment{post.attachments.length > 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {post.attachments.map((attachment: any, index: number) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-white rounded border border-gray-100 hover:border-gray-200 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                        <div>
+                          <div className="font-medium text-gray-800 text-sm">
+                            {getDisplayFileName(attachment.file_name)}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {attachment.file_size ? `${(attachment.file_size / 1024).toFixed(1)} KB` : '0 KB'}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(attachment.file_url, '_blank')}
+                        className="h-7 px-2 text-xs"
+                      >
+                        <Download className="h-3 w-3 mr-1" />
+                        Download
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Assignment/Submission Section */}
+            {children}
+
+            {/* Comments Section */}
+            {showComments && (
+              <div className="mt-3 space-y-2">
+                {comments.map((comment: any) => (
+                  <div key={comment.id} className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="bg-gray-400 text-white text-xs">
+                          {comment.author_name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="font-medium text-sm text-gray-800">{comment.author_name}</span>
+                      <Badge variant="outline" className="text-xs px-1 py-0">
+                        {comment.author_role}
+                      </Badge>
+                      <span className="text-xs text-gray-500">
+                        {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-700 ml-8">{comment.content}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Comments Section (Non-Assignment Posts) */}
+        {!post.is_assignment && showComments && (
+          <div className="border-t border-gray-100 pt-3 mt-3 space-y-2">
+            {comments.map((comment: any) => (
+              <div key={comment.id} className="p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <Avatar className="h-6 w-6">
+                    <AvatarFallback className="bg-gray-400 text-white text-xs">
+                      {comment.author_name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="font-medium text-sm text-gray-800">{comment.author_name}</span>
+                  <Badge variant="outline" className="text-xs px-1 py-0">
+                    {comment.author_role}
+                  </Badge>
+                  <span className="text-xs text-gray-500">
+                    {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                  </span>
+                </div>
+                <div className="text-sm text-gray-700 ml-8">{comment.content}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
