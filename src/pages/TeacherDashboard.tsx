@@ -32,7 +32,7 @@ interface TeacherProfile {
   status: string;
   created_at: string;
   user_id?: string; // Add user_id field
-  profile_photo_url?: string;
+  avatar_url?: string;
   notFound?: boolean;
 }
 
@@ -1540,12 +1540,12 @@ const TeacherDashboard = () => {
             Damon Music Academy
           </h1>
           <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
-            Teacher Panel
+            Teacher Portal
           </h2>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-2">
             <Avatar className="h-12 w-12 sm:h-14 sm:w-14 border-2 border-white/80 shadow-lg">
               <AvatarImage 
-                src={profile?.profile_photo_url} 
+                src={profile?.avatar_url} 
                 alt={profile?.name || 'Teacher'} 
                 className="object-cover"
               />
