@@ -441,6 +441,12 @@ export default function ClassroomPage() {
     setEditedDescription("");
   };
 
+  const handleCancelPostEdit = () => {
+    setShowEditModal(false);
+    setEditingPost(null);
+    setEditContent("");
+  };
+
   const submitQuiz = async (answers: StudentQuizAnswer[]) => {
     if (!quizData || !user) return;
 
@@ -798,7 +804,7 @@ export default function ClassroomPage() {
       const { error } = await supabase
         .from('classroom_posts')
         .update({ content: editContent })
-        .eq('post_id', editingPost.id);
+        .eq('id', editingPost.id);
 
       if (error) throw error;
 
@@ -1359,7 +1365,7 @@ export default function ClassroomPage() {
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Edit {editingPost?.title ? 'Assignment' : 'Post'}</h2>
-              <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+              <Button variant="ghost" size="sm" onClick={handleCancelPostEdit}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -1381,7 +1387,7 @@ export default function ClassroomPage() {
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" onClick={handleCancelEdit}>
+              <Button variant="outline" onClick={handleCancelPostEdit}>
                 Cancel
               </Button>
               <Button onClick={handleSaveEdit}>
