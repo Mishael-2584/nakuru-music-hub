@@ -87,6 +87,28 @@ const Fees = () => {
       ]
     },
     {
+      category: "🎸 Kids Band",
+      subtitle: "Collaborative group learning for young musicians",
+      courses: [
+        {
+          name: "Kids Band",
+          duration: "10 sessions per term (3 months)",
+          termly: "KSh 5,000",
+          perSession: "KSh 800",
+          icon: Users,
+          features: [
+            "A collaborative space for all young players",
+            "Team-based learning with experienced instructors", 
+            "Fun and creative sessions designed to build confidence",
+            "Exciting performance opportunities at showcases",
+            "10 sessions per term (3 months)"
+          ],
+          popular: true,
+          savings: "Save KSh 3,000!"
+        }
+      ]
+    },
+    {
       category: "🎧 Music Production & Sound Engineering",
       subtitle: "3 sessions/week · 1 hour each",
       courses: [
@@ -305,7 +327,34 @@ const Fees = () => {
                     {course.duration && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Clock className="w-4 h-4" /><span>{course.duration}</span></div>}
                   </CardHeader>
                   <CardContent className="flex-grow flex flex-col pt-0">
-                    <div className="text-center my-4"><div className="text-2xl font-bold text-primary">{course.monthly || course.perClass || course.termly}</div><div className="text-sm text-muted-foreground mt-1">{course.monthly ? "per month" : course.perClass ? "per class" : "per term"}</div></div>
+                    <div className="text-center my-4">
+                      {course.perSession && course.termly ? (
+                        // Special display for Kids Band with both prices
+                        <div className="space-y-2">
+                          <div className="text-2xl font-bold text-primary">{course.termly}</div>
+                          <div className="text-sm text-muted-foreground">per term</div>
+                          <div className="text-lg font-semibold text-gray-700">{course.perSession}</div>
+                          <div className="text-sm text-muted-foreground">per session</div>
+                          {course.savings && (
+                            <div className="text-sm text-green-600 font-semibold mt-1 bg-green-50 px-2 py-1 rounded-full">{course.savings}</div>
+                          )}
+                        </div>
+                      ) : (
+                        // Standard display for other courses
+                        <div>
+                          <div className="text-2xl font-bold text-primary">{course.monthly || course.perClass || course.perSession || course.termly}</div>
+                          <div className="text-sm text-muted-foreground mt-1">
+                            {course.monthly ? "per month" : 
+                             course.perClass ? "per class" : 
+                             course.perSession ? "per session" : 
+                             "per term"}
+                          </div>
+                          {course.savings && (
+                            <div className="text-sm text-green-600 font-semibold mt-1">{course.savings}</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     <div className="space-y-2 flex-grow">
                       {course.features.map((feature, featureIndex) => (
                         <div key={featureIndex} className="flex items-center gap-2 text-sm"><Check className="w-4 h-4 text-green-500 flex-shrink-0" /><span>{feature}</span></div>
