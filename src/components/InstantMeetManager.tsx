@@ -103,10 +103,22 @@ const InstantMeetManager = ({
 
   const fetchMeetings = async () => {
     try {
+      console.log('Fetching meetings for user:', userId);
+      console.log('User role:', userRole);
+      
       // First cleanup expired meetings
       await cleanupExpiredMeetings();
       
       const allMeetings = await getUserInstantMeetings(userId);
+      console.log('Fetched meetings:', allMeetings);
+      console.log('Meeting details:', allMeetings.map(m => ({
+        id: m.id,
+        title: m.title,
+        hostId: m.hostId,
+        participants: m.participants,
+        status: m.status,
+        meetingUrl: m.meetingUrl
+      })));
       setMeetings(allMeetings);
     } catch (error) {
       console.error('Error fetching meetings:', error);
@@ -122,17 +134,39 @@ const InstantMeetManager = ({
 
   const applyFilters = () => {
     let filtered = meetings;
+    console.log('Applying filters to meetings:', { 
+      totalMeetings: meetings.length, 
+      activeTab, 
+      statusFilter, 
+      searchTerm,
+      userId,
+      userRole
+    });
 
     // Filter by tab (hosted vs invited)
     if (activeTab === 'my-meetings') {
+      console.log('Filtering for hosted meetings. User ID:', userId);
+      console.log('Meetings before host filter:', meetings.map(m => ({ id: m.id, title: m.title, hostId: m.hostId })));
       filtered = filtered.filter(m => m.hostId === userId);
+      console.log('Filtered by hosted meetings:', filtered.length);
+      console.log('Hosted meetings:', filtered.map(m => ({ id: m.id, title: m.title, hostId: m.hostId })));
     } else {
+      console.log('Filtering for invited meetings. User ID:', userId);
+      console.log('Meetings before participant filter:', meetings.map(m => ({ 
+        id: m.id, 
+        title: m.title, 
+        hostId: m.hostId, 
+        participants: m.participants 
+      })));
       filtered = filtered.filter(m => m.hostId !== userId && m.participants.includes(userId));
+      console.log('Filtered by invited meetings:', filtered.length);
+      console.log('Invited meetings:', filtered.map(m => ({ id: m.id, title: m.title, hostId: m.hostId, participants: m.participants })));
     }
 
     // Filter by status
     if (statusFilter !== 'all') {
       filtered = filtered.filter(m => m.status === statusFilter);
+      console.log('Filtered by status:', statusFilter, filtered.length);
     }
 
     // Filter by search term
@@ -142,8 +176,10 @@ const InstantMeetManager = ({
         m.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         m.hostName.toLowerCase().includes(searchTerm.toLowerCase())
       );
+      console.log('Filtered by search term:', searchTerm, filtered.length);
     }
 
+    console.log('Final filtered meetings:', filtered);
     setFilteredMeetings(filtered);
   };
 

@@ -198,6 +198,7 @@ const TeacherDashboard = () => {
   const [newPostContent, setNewPostContent] = useState('');
   const [teacherClassroomFeed, setTeacherClassroomFeed] = useState<any[]>([]);
   const [copiedCodes, setCopiedCodes] = useState<Set<string>>(new Set());
+  const [recentAssignments, setRecentAssignments] = useState<any[]>([]);
   
   // Students pagination and details
   const [studentsPage, setStudentsPage] = useState(1);
@@ -624,6 +625,9 @@ const TeacherDashboard = () => {
         console.log('[TeacherDashboard] Messages loaded:', messagesData?.length || 0);
       }
 
+      // Fetch recent assignments from teacher's classrooms
+      await fetchRecentAssignments();
+
       // Fetch students for messaging
       await fetchStudents();
       
@@ -638,6 +642,72 @@ const TeacherDashboard = () => {
 
     } catch (error) {
       console.error('Error fetching teacher data:', error);
+    }
+  };
+
+  // Fetch recent assignments from teacher's classrooms
+  const fetchRecentAssignments = async () => {
+    if (!profile?.id) return;
+    
+    try {
+      // Get teacher's classrooms
+      const { data: classroomsData, error: classroomsError } = await supabase
+        .from('classrooms')
+        .select('id, name')
+        .eq('teacher_id', profile.id)
+        .eq('status', 'approved');
+
+      if (classroomsError || !classroomsData?.length) {
+        console.log('[TeacherDashboard] No classrooms found for teacher');
+        setRecentAssignments([]);
+        return;
+      }
+
+      const classroomIds = classroomsData.map(c => c.id);
+
+      // Get recent assignments from these classrooms
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from('classroom_posts')
+        .select(`
+          post_id,
+          content,
+          assignment_title,
+          due_date,
+          max_points,
+          is_timed,
+          time_limit_minutes,
+          created_at,
+          classrooms!inner(name)
+        `)
+        .in('classroom_id', classroomIds)
+        .eq('is_assignment', true)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (assignmentsError) {
+        console.error('[TeacherDashboard] Error fetching assignments:', assignmentsError);
+        setRecentAssignments([]);
+        return;
+      }
+
+      // Transform the data for display
+      const transformedAssignments = assignmentsData?.map(assignment => ({
+        id: assignment.post_id,
+        title: assignment.assignment_title || 'Untitled Assignment',
+        content: assignment.content,
+        dueDate: assignment.due_date,
+        maxPoints: assignment.max_points,
+        isTimed: assignment.is_timed,
+        timeLimit: assignment.time_limit_minutes,
+        classroomName: assignment.classrooms?.name || 'Unknown Classroom',
+        createdAt: assignment.created_at
+      })) || [];
+
+      setRecentAssignments(transformedAssignments);
+      console.log('[TeacherDashboard] Recent assignments loaded:', transformedAssignments.length);
+    } catch (error) {
+      console.error('[TeacherDashboard] Error in fetchRecentAssignments:', error);
+      setRecentAssignments([]);
     }
   };
 
@@ -1764,25 +1834,60 @@ const TeacherDashboard = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 <Card className="shadow-lg border-0 bg-white/95">
                   <CardHeader>
-                    <CardTitle className="text-base sm:text-lg">Next Lesson</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">Your upcoming lesson details</CardDescription>
+                    <CardTitle className="text-base sm:text-lg">Recent Assignments</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Latest classroom work and assignments</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {lessons.filter(l => l.status === 'scheduled').length > 0 ? (
-                      <div className="space-y-4">
-                        {lessons.filter(l => l.status === 'scheduled').slice(0, 1).map(lesson => (
-                          <div key={lesson.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-blue-50 rounded-lg gap-2">
-                            <div>
-                              <h4 className="font-semibold text-sm sm:text-base">{lesson.title}</h4>
-                              <p className="text-xs sm:text-sm text-gray-600">{formatDate(lesson.lesson_date)} at {formatTime(lesson.start_time)}</p>
-                              <p className="text-xs sm:text-sm text-gray-600">Student: {lesson.student_name}</p>
+                    {recentAssignments.length > 0 ? (
+                      <div className="space-y-3">
+                        {recentAssignments.slice(0, 3).map(assignment => (
+                          <div key={assignment.id} className="flex flex-col p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <h4 className="font-semibold text-sm text-gray-900 line-clamp-1">{assignment.title}</h4>
+                              <Badge variant="outline" className="text-xs bg-blue-100 text-blue-700 border-blue-200">
+                                {assignment.classroomName}
+                              </Badge>
                             </div>
-                            <Badge className={getStatusColor(lesson.status)}>{lesson.status}</Badge>
+                            <p className="text-xs text-gray-600 line-clamp-2 mb-2">{assignment.content}</p>
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                              <div className="flex items-center gap-3">
+                                {assignment.dueDate && (
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                                  </span>
+                                )}
+                                {assignment.maxPoints && (
+                                  <span className="flex items-center gap-1">
+                                    <Target className="h-3 w-3" />
+                                    {assignment.maxPoints} pts
+                                  </span>
+                                )}
+                                {assignment.isTimed && (
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {assignment.timeLimit} min
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-xs">
+                                {new Date(assignment.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
                           </div>
                         ))}
+                        {recentAssignments.length > 3 && (
+                          <p className="text-xs text-gray-500 text-center pt-2">
+                            +{recentAssignments.length - 3} more assignments
+                          </p>
+                        )}
                       </div>
                     ) : (
-                      <p className="text-gray-500 text-sm">No upcoming lessons scheduled</p>
+                      <div className="text-center py-6">
+                        <BookOpen className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-500 text-sm">No assignments posted yet</p>
+                        <p className="text-xs text-gray-400 mt-1">Create assignments in your classrooms to see them here</p>
+                      </div>
                     )}
                   </CardContent>
                 </Card>

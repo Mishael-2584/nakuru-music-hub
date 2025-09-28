@@ -631,6 +631,8 @@ export const getUserInstantMeetings = async (
 ): Promise<InstantMeeting[]> => {
   const { supabase } = await import('../integrations/supabase/client');
   
+  console.log('[getUserInstantMeetings] Fetching meetings for user:', userId, 'status filter:', status);
+  
   let query = supabase
     .from('instant_meetings')
     .select('*')
@@ -643,12 +645,15 @@ export const getUserInstantMeetings = async (
   query = query.order('created_at', { ascending: false });
 
   const { data, error } = await query;
+  
+  console.log('[getUserInstantMeetings] Query result:', { data, error });
 
   if (error) {
+    console.error('[getUserInstantMeetings] Error:', error);
     throw new Error(`Failed to get user instant meetings: ${error.message}`);
   }
 
-  return (data || []).map(meeting => ({
+  const meetings = (data || []).map(meeting => ({
     id: meeting.id,
     title: meeting.title,
     description: meeting.description,
@@ -671,25 +676,33 @@ export const getUserInstantMeetings = async (
     createdAt: meeting.created_at,
     updatedAt: meeting.updated_at
   }));
+
+  console.log('[getUserInstantMeetings] Mapped meetings:', meetings);
+  return meetings;
 };
 
 // Get meetings where user is invited (for student dashboard)
 export const getUserInvitedMeetings = async (userId: string): Promise<InstantMeeting[]> => {
   const { supabase } = await import('../integrations/supabase/client');
   
+  console.log('[getUserInvitedMeetings] Fetching invited meetings for user:', userId);
+  
   const { data, error } = await supabase
     .from('instant_meetings')
     .select('*')
-    .contains('participants', [userId])
+    .or(`participants.cs.{"${userId}"},is_public.eq.true`)
     .neq('host_id', userId)
     .in('status', ['scheduled', 'pending', 'active'])
     .order('created_at', { ascending: false });
 
+  console.log('[getUserInvitedMeetings] Query result:', { data, error });
+
   if (error) {
+    console.error('[getUserInvitedMeetings] Error:', error);
     throw new Error(`Failed to get invited meetings: ${error.message}`);
   }
 
-  return (data || []).map(meeting => ({
+  const meetings = (data || []).map(meeting => ({
     id: meeting.id,
     title: meeting.title,
     description: meeting.description,
@@ -712,6 +725,9 @@ export const getUserInvitedMeetings = async (userId: string): Promise<InstantMee
     createdAt: meeting.created_at,
     updatedAt: meeting.updated_at
   }));
+
+  console.log('[getUserInvitedMeetings] Mapped meetings:', meetings);
+  return meetings;
 };
 
 // Check if user can join instant meeting

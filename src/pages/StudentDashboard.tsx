@@ -989,11 +989,26 @@ const StudentDashboard = () => {
     if (!studentProfile) return;
 
     try {
+      console.log('[StudentDashboard] Fetching meeting rooms for student:', {
+        studentId: studentProfile.id,
+        userId: studentProfile.user_id
+      });
+      
       const rooms = await getUserMeetingRooms(studentProfile.id, 'student');
       setMeetingRooms(rooms);
       
       // Also fetch invited meetings
+      console.log('[StudentDashboard] Fetching invited meetings for user:', studentProfile.user_id);
       const invited = await getUserInvitedMeetings(studentProfile.user_id);
+      console.log('[StudentDashboard] Fetched invited meetings:', invited);
+      console.log('[StudentDashboard] Invited meeting details:', invited.map(m => ({
+        id: m.id,
+        title: m.title,
+        hostId: m.hostId,
+        participants: m.participants,
+        status: m.status,
+        meetingUrl: m.meetingUrl
+      })));
       setInvitedMeetings(invited);
     } catch (error) {
       console.error('Error fetching meeting rooms:', error);
