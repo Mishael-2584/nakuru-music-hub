@@ -3,6 +3,9 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   BookOpen, 
   Calendar, 
@@ -16,7 +19,8 @@ import {
   Trash2,
   CheckCircle,
   AlertCircle,
-  Users
+  Users,
+  CalendarPlus
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -26,6 +30,7 @@ interface ClassroomPostCardProps {
   onEdit?: (postId: string, content: string) => void;
   onDelete?: (postId: string) => void;
   onLoadComments?: (postId: string) => void;
+  onExtendDeadline?: (postId: string, newDueDate: string) => void;
   comments?: any[];
   children?: React.ReactNode; // For submission/grading sections
 }
@@ -36,6 +41,7 @@ export default function ClassroomPostCard({
   onEdit, 
   onDelete, 
   onLoadComments,
+  onExtendDeadline,
   comments = [],
   children 
 }: ClassroomPostCardProps) {
@@ -43,6 +49,8 @@ export default function ClassroomPostCard({
   const [showComments, setShowComments] = useState(false);
   const [showFullDetails, setShowFullDetails] = useState(false);
   const [showFullPost, setShowFullPost] = useState(false);
+  const [showExtendDeadline, setShowExtendDeadline] = useState(false);
+  const [newDueDate, setNewDueDate] = useState('');
 
   const getDisplayFileName = (storedName: string) => {
     const timestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z_/;
@@ -76,6 +84,18 @@ export default function ClassroomPostCard({
 
   const isOverdue = post.due_date && new Date(post.due_date) < new Date();
   const isDueSoon = post.due_date && new Date(post.due_date).getTime() - new Date().getTime() < 24 * 60 * 60 * 1000;
+
+  const handleExtendDeadline = () => {
+    if (!newDueDate) return;
+    onExtendDeadline?.(post.post_id, newDueDate);
+    setShowExtendDeadline(false);
+    setNewDueDate('');
+  };
+
+  const handleCancelExtendDeadline = () => {
+    setShowExtendDeadline(false);
+    setNewDueDate('');
+  };
 
   return (
     <Card className={`shadow-sm hover:shadow-md transition-all duration-200 border-0 bg-white ${
@@ -238,13 +258,26 @@ export default function ClassroomPostCard({
                   <span className="ml-2 font-medium">{post.max_points || 100}</span>
                 </div>
                 {post.due_date && (
-                  <div>
-                    <span className="text-gray-600">Due Date:</span>
-                    <span className={`ml-2 font-medium ${
-                      isOverdue ? 'text-red-600' : isDueSoon ? 'text-orange-600' : 'text-green-600'
-                    }`}>
-                      {new Date(post.due_date).toLocaleDateString()} at {new Date(post.due_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-gray-600">Due Date:</span>
+                      <span className={`ml-2 font-medium ${
+                        isOverdue ? 'text-red-600' : isDueSoon ? 'text-orange-600' : 'text-green-600'
+                      }`}>
+                        {new Date(post.due_date).toLocaleDateString()} at {new Date(post.due_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </span>
+                    </div>
+                    {isTeacher && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowExtendDeadline(true)}
+                        className="h-6 px-2 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                      >
+                        <CalendarPlus className="h-3 w-3 mr-1" />
+                        Extend
+                      </Button>
+                    )}
                   </div>
                 )}
                 {post.is_timed && (
@@ -368,6 +401,46 @@ export default function ClassroomPostCard({
           </div>
         )}
       </CardContent>
+
+      {/* Extend Deadline Dialog */}
+      <Dialog open={showExtendDeadline} onOpenChange={setShowExtendDeadline}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Extend Assignment Deadline</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="current-due-date" className="text-right">
+                Current Due Date
+              </Label>
+              <div className="col-span-3 text-sm text-gray-600">
+                {post.due_date ? new Date(post.due_date).toLocaleString() : 'No due date set'}
+              </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="new-due-date" className="text-right">
+                New Due Date
+              </Label>
+              <Input
+                id="new-due-date"
+                type="datetime-local"
+                value={newDueDate}
+                onChange={(e) => setNewDueDate(e.target.value)}
+                className="col-span-3"
+                min={new Date().toISOString().slice(0, 16)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelExtendDeadline}>
+              Cancel
+            </Button>
+            <Button onClick={handleExtendDeadline} disabled={!newDueDate}>
+              Extend Deadline
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

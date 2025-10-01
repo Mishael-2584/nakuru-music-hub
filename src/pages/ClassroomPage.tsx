@@ -106,6 +106,8 @@ export default function ClassroomPage() {
   const [timerCompleted, setTimerCompleted] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState("");
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState("");
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingPost, setEditingPost] = useState<{id: string, content: string, title?: string} | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -439,6 +441,61 @@ export default function ClassroomPage() {
   const handleCancelEdit = () => {
     setIsEditingDescription(false);
     setEditedDescription("");
+  };
+
+  const handleEditName = () => {
+    setEditedName(classroom?.name || "");
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!classroom || !editedName.trim()) return;
+    
+    try {
+      const { error } = await supabase
+        .from('classrooms')
+        .update({ name: editedName.trim() })
+        .eq('id', classroom.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setClassroom(prev => prev ? { ...prev, name: editedName.trim() } : null);
+      setIsEditingName(false);
+      
+      toast({ title: 'Success', description: 'Classroom name updated successfully!' });
+    } catch (error) {
+      console.error('Error updating name:', error);
+      toast({ title: 'Error', description: 'Failed to update classroom name', variant: 'destructive' });
+    }
+  };
+
+  const handleCancelNameEdit = () => {
+    setIsEditingName(false);
+    setEditedName("");
+  };
+
+  const handleExtendDeadline = async (postId: string, newDueDate: string) => {
+    try {
+      const { error } = await supabase
+        .from('classroom_posts')
+        .update({ due_date: newDueDate })
+        .eq('id', postId);
+
+      if (error) throw error;
+
+      // Update local state
+      setFeed(prev => prev.map(post => 
+        post.post_id === postId 
+          ? { ...post, due_date: newDueDate }
+          : post
+      ));
+      
+      toast({ title: 'Success', description: 'Assignment deadline extended successfully!' });
+    } catch (error) {
+      console.error('Error extending deadline:', error);
+      toast({ title: 'Error', description: 'Failed to extend deadline', variant: 'destructive' });
+    }
   };
 
   const handleCancelPostEdit = () => {
@@ -1036,9 +1093,51 @@ export default function ClassroomPage() {
                     <BookOpen className="h-8 w-8 text-white" />
                   </div>
                   <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-white">
-                      {classroom.name}
-                    </h1>
+                    {isEditingName ? (
+                      <div className="space-y-2 mb-3">
+                        <Input
+                          value={editedName}
+                          onChange={(e) => setEditedName(e.target.value)}
+                          placeholder="Enter classroom name..."
+                          className="bg-white/10 border-white/20 text-white placeholder:text-white/70 text-2xl sm:text-3xl font-bold"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={handleSaveName}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            <Save className="h-3 w-3 mr-1" />
+                            Save
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCancelNameEdit}
+                            className="border-white/20 text-white hover:bg-white/10"
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 mb-3">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-white">
+                          {classroom.name}
+                        </h1>
+                        {isTeacherOfClass && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={handleEditName}
+                            className="text-white/70 hover:text-white hover:bg-white/10 p-1 h-auto"
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
                     <p className="text-blue-100 text-lg">
                       {classroom.teacher_name}
                     </p>
@@ -1209,6 +1308,7 @@ export default function ClassroomPage() {
                   onEdit={handleEditPost}
                   onDelete={handleDeletePost}
                   onLoadComments={loadComments}
+                  onExtendDeadline={handleExtendDeadline}
                   comments={postComments[post.post_id] || []}
                 >
                   {post.is_assignment && (

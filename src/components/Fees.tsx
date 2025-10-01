@@ -1,10 +1,15 @@
+import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Check, Star, Clock, Users, Award, Globe, Home, Music, Code } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Check, Star, Clock, Users, Award, Globe, Home, Music, Code, Search, Filter } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Fees = () => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  
   const feeStructure = [
     {
       category: "🎶 Instrumental & Music Theory Lessons",
@@ -326,6 +331,66 @@ const Fees = () => {
     }
   ];
 
+  // Create category options for filter
+  const categoryOptions = [
+    { value: "all", label: "All Categories" },
+    { value: "instrumental", label: "🎶 Instrumental & Music Theory" },
+    { value: "pay-per-class", label: "Pay Per Class" },
+    { value: "kids-band", label: "🎸 Kids Band" },
+    { value: "music-production", label: "🎧 Music Production & Sound Engineering" },
+    { value: "rsl-awards", label: "🎵 Music Production (RSL Awards)" },
+    { value: "photography", label: "📸 Photography & Videography" },
+    { value: "art", label: "🎨 Art Classes" },
+    { value: "programming", label: "💻 Web Design & Programming" }
+  ];
+
+  // Filter and search logic
+  const filteredFeeStructure = useMemo(() => {
+    return feeStructure.filter(category => {
+      // Category filter
+      const categoryMatch = selectedCategory === "all" || 
+        (selectedCategory === "instrumental" && category.category.includes("Instrumental")) ||
+        (selectedCategory === "pay-per-class" && category.category.includes("Pay Per Class")) ||
+        (selectedCategory === "kids-band" && category.category.includes("Kids Band")) ||
+        (selectedCategory === "music-production" && category.category.includes("Music Production & Sound Engineering")) ||
+        (selectedCategory === "rsl-awards" && category.category.includes("RSL Awards")) ||
+        (selectedCategory === "photography" && category.category.includes("Photography")) ||
+        (selectedCategory === "art" && category.category.includes("Art Classes")) ||
+        (selectedCategory === "programming" && category.category.includes("Web Design"));
+
+      if (!categoryMatch) return false;
+
+      // Search filter
+      if (!searchTerm) return true;
+
+      const searchLower = searchTerm.toLowerCase();
+      const categoryMatches = category.category.toLowerCase().includes(searchLower) ||
+                            category.subtitle?.toLowerCase().includes(searchLower) ||
+                            category.note?.toLowerCase().includes(searchLower);
+
+      const courseMatches = category.courses.some(course => 
+        course.name.toLowerCase().includes(searchLower) ||
+        ((course as any).location && (course as any).location.toLowerCase().includes(searchLower)) ||
+        ((course as any).duration && (course as any).duration.toLowerCase().includes(searchLower)) ||
+        ((course as any).level && (course as any).level.toLowerCase().includes(searchLower)) ||
+        course.features.some(feature => feature.toLowerCase().includes(searchLower))
+      );
+
+      return categoryMatches || courseMatches;
+    }).map(category => ({
+      ...category,
+      courses: category.courses.filter(course => {
+        if (!searchTerm) return true;
+        const searchLower = searchTerm.toLowerCase();
+        return course.name.toLowerCase().includes(searchLower) ||
+               ((course as any).location && (course as any).location.toLowerCase().includes(searchLower)) ||
+               ((course as any).duration && (course as any).duration.toLowerCase().includes(searchLower)) ||
+               ((course as any).level && (course as any).level.toLowerCase().includes(searchLower)) ||
+               course.features.some(feature => feature.toLowerCase().includes(searchLower));
+      })
+    }));
+  }, [searchTerm, selectedCategory]);
+
   const additionalInfo = [
     "All classes are one-on-one unless otherwise indicated",
     "Term and monthly payments are made upfront", 
@@ -350,14 +415,75 @@ const Fees = () => {
             <Link to="/cancellation-policy" className="text-primary underline" target="_blank">Cancellation Policy</Link>.
           </p>
         </div>
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Damon Music Academy – Fee Structure</h2>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
+          <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
             Transparent, affordable pricing for world-class music and creative arts education.
           </p>
+          
+          {/* Search and Filter Section */}
+          <div className="max-w-4xl mx-auto mb-8">
+            <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
+              {/* Search Input */}
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Search courses, instruments, or features..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 border-gray-300 focus:border-primary focus:ring-primary"
+                />
+              </div>
+              
+              {/* Category Filter */}
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-gray-500" />
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-white"
+                >
+                  {categoryOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            {/* Results Counter */}
+            {filteredFeeStructure.length > 0 && (
+              <div className="mt-4 text-sm text-gray-600">
+                Showing {filteredFeeStructure.reduce((total, category) => total + category.courses.length, 0)} courses
+                {searchTerm && ` matching "${searchTerm}"`}
+                {selectedCategory !== "all" && ` in ${categoryOptions.find(opt => opt.value === selectedCategory)?.label}`}
+              </div>
+            )}
+            
+            {/* No Results Message */}
+            {filteredFeeStructure.length === 0 && (
+              <div className="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-gray-600 text-center">
+                  No courses found matching your search criteria.
+                  <br />
+                  <button 
+                    onClick={() => {
+                      setSearchTerm("");
+                      setSelectedCategory("all");
+                    }}
+                    className="text-primary hover:underline mt-2"
+                  >
+                    Clear filters to see all courses
+                  </button>
+                </p>
+              </div>
+            )}
+          </div>
         </div>
         
-        {feeStructure.map((category, categoryIndex) => (
+        {filteredFeeStructure.map((category, categoryIndex) => (
           <div key={categoryIndex} className="mb-12">
             <div className="text-center mb-8">
               <h3 className="text-2xl md:text-3xl font-bold mb-2 text-primary">{category.category}</h3>
@@ -367,50 +493,50 @@ const Fees = () => {
             
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {category.courses.map((course, courseIndex) => (
-                <Card key={courseIndex} className={`relative flex flex-col shadow-lg border-0 bg-white hover:shadow-xl transition-all duration-300 ${course.popular ? 'ring-2 ring-blue-500' : ''}`}>
-                  {course.popular && (
+                <Card key={courseIndex} className={`relative flex flex-col shadow-lg border-0 bg-white hover:shadow-xl transition-all duration-300 ${(course as any).popular ? 'ring-2 ring-blue-500' : ''}`}>
+                  {(course as any).popular && (
                     <div className="absolute -top-3 left-1/2 transform -translate-x-1/2"><Badge className="bg-blue-500 text-white px-3 py-1 text-sm"><Star className="w-3 h-3 mr-1" />Popular</Badge></div>
                   )}
                   <CardHeader className="pb-4">
                     <div className="flex items-center gap-3 mb-3">
-                       {course.icon && <div className={`p-2 bg-gradient-to-r ${getIconColor(category.category)} rounded-lg`}><course.icon className="w-5 h-5 text-white" /></div>}
+                       {(course as any).icon && <div className={`p-2 bg-gradient-to-r ${getIconColor(category.category)} rounded-lg`}>{(course as any).icon && React.createElement((course as any).icon, { className: "w-5 h-5 text-white" })}</div>}
                        <div className="flex-1">
                          <CardTitle className="text-lg">{course.name}</CardTitle>
-                         {course.level && (
-                           <div className={`inline-block mt-1 mb-2 px-3 py-1 rounded-full text-xs font-semibold ${course.level === '1st Term' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{course.level}</div>
+                         {(course as any).level && (
+                           <div className={`inline-block mt-1 mb-2 px-3 py-1 rounded-full text-xs font-semibold ${(course as any).level === '1st Term' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{(course as any).level}</div>
                          )}
-                         {course.location && (
-                           <p className="text-sm text-muted-foreground mt-1">{course.location}</p>
+                         {(course as any).location && (
+                           <p className="text-sm text-muted-foreground mt-1">{(course as any).location}</p>
                          )}
                        </div>
                     </div>
-                    {course.duration && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Clock className="w-4 h-4" /><span>{course.duration}</span></div>}
+                    {(course as any).duration && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Clock className="w-4 h-4" /><span>{(course as any).duration}</span></div>}
                   </CardHeader>
                   <CardContent className="flex-grow flex flex-col pt-0">
                     <div className="text-center my-4">
-                      {course.perSession && course.termly ? (
+                      {(course as any).perSession && (course as any).termly ? (
                         // Special display for Kids Band with both prices
                         <div className="space-y-2">
-                          <div className="text-2xl font-bold text-primary">{course.termly}</div>
+                          <div className="text-2xl font-bold text-primary">{(course as any).termly}</div>
                           <div className="text-sm text-muted-foreground">per term</div>
-                          <div className="text-lg font-semibold text-gray-700">{course.perSession}</div>
+                          <div className="text-lg font-semibold text-gray-700">{(course as any).perSession}</div>
                           <div className="text-sm text-muted-foreground">per session</div>
-                          {course.savings && (
-                            <div className="text-sm text-green-600 font-semibold mt-1 bg-green-50 px-2 py-1 rounded-full">{course.savings}</div>
+                          {(course as any).savings && (
+                            <div className="text-sm text-green-600 font-semibold mt-1 bg-green-50 px-2 py-1 rounded-full">{(course as any).savings}</div>
                           )}
                         </div>
                       ) : (
                         // Standard display for other courses
                         <div>
-                          <div className="text-2xl font-bold text-primary">{course.monthly || course.perClass || course.perSession || course.termly}</div>
+                          <div className="text-2xl font-bold text-primary">{(course as any).monthly || (course as any).perClass || (course as any).perSession || (course as any).termly}</div>
                           <div className="text-sm text-muted-foreground mt-1">
-                            {course.monthly ? "per month" : 
-                             course.perClass ? "per class" : 
-                             course.perSession ? "per session" : 
+                            {(course as any).monthly ? "per month" : 
+                             (course as any).perClass ? "per class" : 
+                             (course as any).perSession ? "per session" : 
                              "per term"}
                           </div>
-                          {course.savings && (
-                            <div className="text-sm text-green-600 font-semibold mt-1">{course.savings}</div>
+                          {(course as any).savings && (
+                            <div className="text-sm text-green-600 font-semibold mt-1">{(course as any).savings}</div>
                           )}
                         </div>
                       )}
