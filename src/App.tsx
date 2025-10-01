@@ -38,6 +38,7 @@ import CancellationPolicy from "./pages/CancellationPolicy";
 import PasswordChangePrompt from "./components/PasswordChangePrompt";
 import ClassroomPage from "./pages/ClassroomPage";
 import FAQ from "./pages/FAQ";
+import TrialClassesPage from "./pages/TrialClassesPage";
 
 const queryClient = new QueryClient();
 
@@ -109,6 +110,7 @@ const App = () => (
             <Route path="/media-release-policy" element={<MediaReleasePolicy />} />
             <Route path="/cancellation-policy" element={<CancellationPolicy />} />
             <Route path="/faq" element={<FAQ />} />
+            <Route path="/trial-classes" element={<TrialClassesPage />} />
             <Route path="/reset-password" element={<PasswordChangePrompt onPasswordChanged={() => window.location.href = '/auth'} />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

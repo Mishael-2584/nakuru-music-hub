@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X, Image, MessageSquare, Settings } from "lucide-react";
+import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X, Image, MessageSquare, Settings, Gift } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -103,7 +103,7 @@ interface ClassSchedule {
 }
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes' | 'gallery' | 'finances' | 'requests' | 'notifications' | 'debug'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes' | 'gallery' | 'finances' | 'requests' | 'notifications' | 'debug' | 'trials'>('stats');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
 
@@ -158,8 +158,21 @@ const AdminPanel = () => {
   const [studentToDelete, setStudentToDelete] = useState<any>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [trialBookings, setTrialBookings] = useState<any[]>([]);
   const [adminPassword, setAdminPassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
+  
+  // Trial booking management state
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [selectedTrialBooking, setSelectedTrialBooking] = useState<any>(null);
+  const [scheduleData, setScheduleData] = useState({
+    teacherId: '',
+    scheduledDate: '',
+    scheduledTime: '',
+    notes: ''
+  });
+  const [availableTeachers, setAvailableTeachers] = useState<any[]>([]);
   // 1. Add state for tracking invoice sending/loading
   const [sendingInvoiceIds, setSendingInvoiceIds] = useState<string[]>([]);
   const [studentsNeedingInvoice, setStudentsNeedingInvoice] = useState<string[]>([]);
@@ -720,8 +733,10 @@ const AdminPanel = () => {
       console.log("AdminPanel: Data fetch completed");
     }
     
-    // Fetch notifications after main data is loaded
+    // Fetch notifications, trial bookings, and teachers after main data is loaded
     await fetchNotifications();
+    await fetchTrialBookings();
+    await fetchAvailableTeachers();
   };
 
   const handleApproveRequest = async (requestId: string) => {
@@ -1074,6 +1089,459 @@ const AdminPanel = () => {
       setUnreadNotificationCount((data || []).filter(n => !n.is_read).length);
     } catch (error) {
       console.error('Error fetching notifications:', error);
+    }
+  };
+
+  // Fetch trial bookings
+  const fetchTrialBookings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('trial_bookings')
+        .select(`
+          *,
+          teachers:assigned_teacher_id (
+            id,
+            name,
+            email
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching trial bookings:', error);
+        return;
+      }
+
+      setTrialBookings(data || []);
+    } catch (error) {
+      console.error('Error fetching trial bookings:', error);
+    }
+  };
+
+  // Fetch available teachers for trial booking assignment
+  const fetchAvailableTeachers = async () => {
+    try {
+      console.log('🔍 Fetching available teachers for trial booking...');
+      
+      // First try to get approved teachers
+      let { data, error } = await supabase
+        .from('teachers')
+        .select('id, name, email, subjects, user_id, status')
+        .eq('status', 'approved')
+        .order('name');
+
+      // If no approved teachers found, get all teachers for debugging
+      if (!error && (!data || data.length === 0)) {
+        console.log('⚠️ No approved teachers found, fetching all teachers...');
+        const { data: allTeachers, error: allError } = await supabase
+          .from('teachers')
+          .select('id, name, email, subjects, user_id, status')
+          .order('name');
+        
+        if (!allError) {
+          data = allTeachers;
+          console.log('📊 All teachers found:', data);
+        }
+      }
+
+      if (error) {
+        console.error('❌ Error fetching teachers:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load teachers for trial booking.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('✅ Fetched teachers for trial booking:', data);
+      console.log('📊 Number of teachers found:', data?.length || 0);
+      setAvailableTeachers(data || []);
+    } catch (error) {
+      console.error('❌ Exception fetching teachers:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load teachers for trial booking.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Schedule trial booking with teacher
+  const scheduleTrialBooking = async () => {
+    if (!selectedTrialBooking || !scheduleData.teacherId || !scheduleData.scheduledDate || !scheduleData.scheduledTime) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const scheduledDateTime = new Date(`${scheduleData.scheduledDate}T${scheduleData.scheduledTime}`);
+      const teacher = availableTeachers.find(t => t.id === scheduleData.teacherId);
+      
+      if (!teacher) {
+        toast({
+          title: "Teacher Not Found",
+          description: "Selected teacher not found.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create public instant meeting for the trial class
+      console.log('🎥 Creating instant meeting for trial class...');
+      console.log('👨‍🏫 Teacher details:', { id: teacher.id, name: teacher.name, user_id: teacher.user_id });
+      
+      const { createInstantMeeting } = await import('@/lib/videoConferencing');
+      
+      const meetingData = {
+        title: `Trial Class: ${selectedTrialBooking.instrument} with ${teacher.name}`,
+        description: `Trial class for ${selectedTrialBooking.student_name} - ${selectedTrialBooking.instrument}`,
+        hostId: teacher.user_id,
+        hostName: teacher.name,
+        hostRole: 'teacher' as const,
+        participants: [], // No specific participants for public meeting
+        duration: 60, // 1 hour trial class
+        maxParticipants: 5, // Allow some flexibility
+        isPublic: true, // Public meeting so student can join without login
+        allowRecording: false,
+        scheduledStartTime: scheduledDateTime.toISOString()
+      };
+      
+      console.log('📋 Meeting data:', meetingData);
+      
+      const meeting = await createInstantMeeting(meetingData);
+      console.log('✅ Meeting created successfully:', meeting);
+
+      // Update trial booking with meeting details
+      const { error: updateError } = await supabase
+        .from('trial_bookings')
+        .update({
+          assigned_teacher_id: scheduleData.teacherId,
+          scheduled_datetime: scheduledDateTime.toISOString(),
+          notes: scheduleData.notes,
+          status: 'scheduled',
+          meeting_url: meeting.meetingUrl,
+          meeting_code: meeting.meetingCode
+        })
+        .eq('id', selectedTrialBooking.id);
+
+      if (updateError) {
+        console.error('Error updating trial booking:', updateError);
+        throw updateError;
+      }
+
+      // Send notification to assigned teacher
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: teacher.user_id,
+          title: 'New Trial Class Assignment',
+          message: `You have been assigned a trial class with ${selectedTrialBooking.student_name} for ${selectedTrialBooking.instrument} on ${scheduledDateTime.toLocaleDateString()} at ${scheduledDateTime.toLocaleTimeString()}`,
+          notification_type: 'trial_assignment',
+          data: {
+            trial_booking_id: selectedTrialBooking.id,
+            student_name: selectedTrialBooking.student_name,
+            instrument: selectedTrialBooking.instrument,
+            scheduled_datetime: scheduledDateTime.toISOString(),
+            meeting_url: meeting.meetingUrl,
+            meeting_code: meeting.meetingCode
+          },
+          is_read: false
+        });
+
+      if (notificationError) {
+        console.error('Error creating teacher notification:', notificationError);
+      }
+
+      // Send email to student with meeting details
+      await sendTrialClassEmail(selectedTrialBooking, teacher, scheduledDateTime, meeting);
+
+      toast({
+        title: "Trial Class Scheduled Successfully! 🎉",
+        description: `Trial class scheduled with ${teacher.name} for ${scheduledDateTime.toLocaleDateString()}. Meeting link sent to student.`,
+        duration: 5000,
+      });
+
+      // Reset form and close modal
+      setScheduleData({
+        teacherId: '',
+        scheduledDate: '',
+        scheduledTime: '',
+        notes: ''
+      });
+      setShowScheduleModal(false);
+      setSelectedTrialBooking(null);
+
+      // Refresh trial bookings
+      await fetchTrialBookings();
+
+    } catch (error) {
+      console.error('Error scheduling trial booking:', error);
+      toast({
+        title: "Scheduling Failed",
+        description: "Please try again or contact support.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Update trial booking status
+  const updateTrialBookingStatus = async (bookingId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('trial_bookings')
+        .update({ status: newStatus })
+        .eq('id', bookingId);
+
+      if (error) {
+        console.error('Error updating trial booking status:', error);
+        throw error;
+      }
+
+      toast({
+        title: "Status Updated",
+        description: `Trial booking status updated to ${newStatus}`,
+      });
+
+      // Refresh trial bookings
+      await fetchTrialBookings();
+
+    } catch (error) {
+      console.error('Error updating trial booking status:', error);
+      toast({
+        title: "Update Failed",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Add notes to trial booking
+  const addNotesToTrialBooking = async () => {
+    if (!selectedTrialBooking || !scheduleData.notes) {
+      toast({
+        title: "Missing Notes",
+        description: "Please enter some notes.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('trial_bookings')
+        .update({ notes: scheduleData.notes })
+        .eq('id', selectedTrialBooking.id);
+
+      if (error) {
+        console.error('Error adding notes:', error);
+        throw error;
+      }
+
+      toast({
+        title: "Notes Added",
+        description: "Notes have been added to the trial booking.",
+      });
+
+      // Reset form and close modal
+      setScheduleData(prev => ({ ...prev, notes: '' }));
+      setShowNotesModal(false);
+      setSelectedTrialBooking(null);
+
+      // Refresh trial bookings
+      await fetchTrialBookings();
+
+    } catch (error) {
+      console.error('Error adding notes:', error);
+      toast({
+        title: "Failed to Add Notes",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Send trial class email to student
+  const sendTrialClassEmail = async (booking: any, teacher: any, scheduledDateTime: Date, meeting: any) => {
+    try {
+      const siteUrl = 'https://damonmusicacademy.co.ke';
+      const logoUrl = `${siteUrl}/damon-logo.png`;
+
+      const emailHTML = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Trial Class Scheduled - Damon Music Academy</title>
+          <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+              background-color: #f8f9fa;
+            }
+            .header {
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              padding: 30px;
+              text-align: center;
+              border-radius: 10px 10px 0 0;
+            }
+            .content {
+              background: white;
+              padding: 30px;
+              border-radius: 0 0 10px 10px;
+              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            .meeting-card {
+              background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+              padding: 25px;
+              border-radius: 10px;
+              margin: 25px 0;
+              border-left: 4px solid #28a745;
+            }
+            .meeting-link {
+              background: #007bff;
+              color: white;
+              padding: 15px 30px;
+              border-radius: 8px;
+              text-decoration: none;
+              display: inline-block;
+              margin: 15px 0;
+              font-weight: bold;
+              font-size: 16px;
+            }
+            .meeting-code {
+              background: #f8f9fa;
+              padding: 15px;
+              border-radius: 8px;
+              border: 2px dashed #007bff;
+              text-align: center;
+              margin: 15px 0;
+            }
+            .teacher-info {
+              background: #e3f2fd;
+              padding: 20px;
+              border-radius: 8px;
+              margin: 20px 0;
+              border-left: 4px solid #2196f3;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #e9ecef;
+              color: #6c757d;
+              font-size: 14px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <img src="${logoUrl}" alt="Damon Music Academy Logo" style="height: 70px; margin-bottom: 20px;">
+            <h1>🎵 Damon Music Academy</h1>
+            <h2>Your Trial Class is Scheduled!</h2>
+          </div>
+          
+          <div class="content">
+            <h3>Hello ${booking.student_name}!</h3>
+            <p>Great news! Your trial class has been scheduled and we're excited to meet you.</p>
+            
+            <div class="meeting-card">
+              <h3>📅 Trial Class Details</h3>
+              <p><strong>Subject:</strong> ${booking.instrument}</p>
+              <p><strong>Date:</strong> ${scheduledDateTime.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}</p>
+              <p><strong>Time:</strong> ${scheduledDateTime.toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}</p>
+              <p><strong>Duration:</strong> 60 minutes</p>
+            </div>
+
+            <div class="teacher-info">
+              <h3>👨‍🏫 Your Teacher</h3>
+              <p><strong>Name:</strong> ${teacher.name}</p>
+              <p><strong>Email:</strong> ${teacher.email}</p>
+            </div>
+
+            <div class="meeting-card">
+              <h3>🎥 Join Your Trial Class</h3>
+              <p>Click the button below to join your trial class. No login required!</p>
+              <a href="${meeting.meetingUrl}" class="meeting-link">
+                🚀 Join Trial Class Now
+              </a>
+              
+              <div class="meeting-code">
+                <p><strong>Meeting Code:</strong></p>
+                <p style="font-size: 24px; font-weight: bold; color: #007bff; margin: 10px 0;">${meeting.meetingCode}</p>
+                <p style="font-size: 12px; color: #666;">Use this code if you have trouble with the link above</p>
+              </div>
+            </div>
+
+            <div style="background: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+              <h3>📋 What to Expect</h3>
+              <ul>
+                <li>Introduction to your chosen instrument/subject</li>
+                <li>Assessment of your current skill level</li>
+                <li>Discussion of your learning goals</li>
+                <li>Overview of our teaching methods</li>
+                <li>Q&A about our programs and pricing</li>
+              </ul>
+            </div>
+
+            <div style="background: #f8d7da; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc3545;">
+              <h3>⚠️ Important Notes</h3>
+              <ul>
+                <li>Please join 5 minutes before the scheduled time</li>
+                <li>Ensure you have a stable internet connection</li>
+                <li>Use headphones for better audio quality</li>
+                <li>Have your instrument ready if applicable</li>
+                <li>If you need to reschedule, contact us at least 24 hours in advance</li>
+              </ul>
+            </div>
+
+            <div class="footer">
+              <p>We're excited to help you start your musical journey!</p>
+              <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
+              <p>📱 +254 701 195 460 | 📧 info@damonmusicacademy.com</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
+        body: {
+          to: booking.email,
+          subject: `Your Trial Class is Scheduled - ${booking.instrument} | Damon Music Academy`,
+          html: emailHTML
+        }
+      });
+
+      if (error) {
+        console.error('Error sending trial class email:', error);
+        throw error;
+      }
+
+      console.log('Trial class email sent successfully');
+      return true;
+
+    } catch (error) {
+      console.error('Error sending trial class email:', error);
+      return false;
     }
   };
 
@@ -2217,6 +2685,12 @@ const AdminPanel = () => {
                     <span>Applications ({registrations.length})</span>
                   </div>
                 </SelectItem>
+                <SelectItem value="trials">
+                  <div className="flex items-center gap-2">
+                    <Gift className="h-4 w-4" />
+                    <span>Trial Classes ({trialBookings.length})</span>
+                  </div>
+                </SelectItem>
                 <SelectItem value="events">
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
@@ -2307,6 +2781,20 @@ const AdminPanel = () => {
             >
               <Guitar className="h-4 w-4 mr-2" />
               Applications ({registrations.length})
+            </Button>
+            <Button
+              variant={activeTab === 'trials' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('trials')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start relative"
+              style={{ minWidth: 120 }}
+            >
+              <Gift className="h-4 w-4 mr-2" />
+              Trial Classes ({trialBookings.length})
+              {trialBookings.filter(t => t.status === 'pending').length > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">
+                  {trialBookings.filter(t => t.status === 'pending').length}
+                </Badge>
+              )}
             </Button>
             <Button
               variant={activeTab === 'events' ? 'default' : 'ghost'}
@@ -2576,6 +3064,173 @@ const AdminPanel = () => {
                 </Card>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* Trial Bookings Tab */}
+        <div style={{ display: activeTab === 'trials' ? 'block' : 'none' }}>
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Trial Class Bookings
+              </h3>
+              <div className="flex gap-2">
+                <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                  Pending: {trialBookings.filter(t => t.status === 'pending').length}
+                </Badge>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                  Scheduled: {trialBookings.filter(t => t.status === 'scheduled').length}
+                </Badge>
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                  Completed: {trialBookings.filter(t => t.status === 'completed').length}
+                </Badge>
+                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                  Converted: {trialBookings.filter(t => t.status === 'converted').length}
+                </Badge>
+              </div>
+            </div>
+            
+            {trialBookings.length === 0 ? (
+              <div className="text-center text-muted-foreground py-12 text-lg">
+                No trial bookings yet. They will appear here when students book trial classes.
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {trialBookings.map((booking) => (
+                  <Card key={booking.id} className="shadow-xl border-0 bg-white/95 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-4">
+                          <div className="p-3 bg-gradient-to-r from-primary/20 to-accent/20 rounded-full">
+                            <Gift className="h-6 w-6 text-primary" />
+                          </div>
+                          <div>
+                            <h4 className="text-xl font-bold text-primary">{booking.student_name}</h4>
+                            <p className="text-muted-foreground flex items-center gap-2">
+                              Age: {booking.student_age} • {booking.instrument} • {booking.preferred_location}
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Parent: {booking.parent_name} • {booking.email} • {booking.phone}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Badge className={`${
+                            booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            booking.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
+                            booking.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            booking.status === 'converted' ? 'bg-purple-100 text-purple-800' :
+                            'bg-gray-100 text-gray-800'
+                          } text-white font-semibold px-3 py-1`}>
+                            {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <h5 className="font-semibold text-sm text-gray-700 mb-2">Student Details</h5>
+                          <div className="space-y-1 text-sm">
+                            <p><span className="font-medium">Skill Level:</span> {booking.skill_level}</p>
+                            <p><span className="font-medium">Experience:</span> {booking.previous_experience || 'None'}</p>
+                            <p><span className="font-medium">Goals:</span> {booking.learning_goals || 'Not specified'}</p>
+                          </div>
+                        </div>
+                     <div>
+                       <h5 className="font-semibold text-sm text-gray-700 mb-2">Scheduling</h5>
+                       <div className="space-y-1 text-sm">
+                         <p><span className="font-medium">Preferred Time:</span> {booking.preferred_time}</p>
+                         <p><span className="font-medium">Preferred Date:</span> {booking.preferred_date ? new Date(booking.preferred_date).toLocaleDateString() : 'Not specified'}</p>
+                         {booking.scheduled_datetime && (
+                           <p><span className="font-medium">Scheduled:</span> {new Date(booking.scheduled_datetime).toLocaleString()}</p>
+                         )}
+                         {booking.meeting_url && (
+                           <div className="mt-2">
+                             <p><span className="font-medium">Meeting Link:</span></p>
+                             <a 
+                               href={booking.meeting_url} 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               className="text-blue-600 hover:text-blue-800 underline text-xs break-all"
+                             >
+                               {booking.meeting_url}
+                             </a>
+                             {booking.meeting_code && (
+                               <p className="mt-1"><span className="font-medium">Meeting Code:</span> <span className="font-mono bg-gray-100 px-2 py-1 rounded">{booking.meeting_code}</span></p>
+                             )}
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                      </div>
+                      
+                      {booking.special_requirements && (
+                        <div className="mb-4">
+                          <h5 className="font-semibold text-sm text-gray-700 mb-2">Special Requirements</h5>
+                          <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{booking.special_requirements}</p>
+                        </div>
+                      )}
+                      
+                      {booking.notes && (
+                        <div className="mb-4">
+                          <h5 className="font-semibold text-sm text-gray-700 mb-2">Notes</h5>
+                          <p className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">{booking.notes}</p>
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-between items-center pt-4 border-t">
+                        <div className="text-xs text-gray-500">
+                          Created: {new Date(booking.created_at).toLocaleString()}
+                        </div>
+                       <div className="flex gap-2">
+                         {booking.status === 'pending' && (
+                           <Button 
+                             size="sm" 
+                             variant="outline" 
+                             onClick={async () => {
+                               setSelectedTrialBooking(booking);
+                               // Fetch teachers when opening the modal
+                               await fetchAvailableTeachers();
+                               setShowScheduleModal(true);
+                             }}
+                           >
+                             <Calendar className="h-4 w-4 mr-1" />
+                             Schedule
+                           </Button>
+                         )}
+                         <Button 
+                           size="sm" 
+                           variant="outline" 
+                           onClick={() => {
+                             setSelectedTrialBooking(booking);
+                             setShowNotesModal(true);
+                           }}
+                         >
+                           <FileText className="h-4 w-4 mr-1" />
+                           Add Notes
+                         </Button>
+                         <Select 
+                           value={booking.status} 
+                           onValueChange={(value) => updateTrialBookingStatus(booking.id, value)}
+                         >
+                           <SelectTrigger className="w-32">
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="pending">Pending</SelectItem>
+                             <SelectItem value="scheduled">Scheduled</SelectItem>
+                             <SelectItem value="completed">Completed</SelectItem>
+                             <SelectItem value="cancelled">Cancelled</SelectItem>
+                             <SelectItem value="converted">Converted</SelectItem>
+                           </SelectContent>
+                         </Select>
+                       </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -3642,14 +4297,24 @@ const AdminPanel = () => {
                             <p className="text-sm text-gray-600 mb-2">{notification.message}</p>
                             <div className="flex items-center gap-4 text-xs text-gray-500">
                               <span>{new Date(notification.created_at).toLocaleString()}</span>
-                              {notification.type === 'classroom_approval_request' && (
+                              {notification.notification_type === 'classroom_approval_request' && (
                                 <Badge variant="outline" className="text-xs">
                                   Classroom Request
                                 </Badge>
                               )}
-                              {notification.type === 'classroom_rejected' && (
+                              {notification.notification_type === 'classroom_rejected' && (
                                 <Badge variant="outline" className="text-xs">
                                   Classroom Rejected
+                                </Badge>
+                              )}
+                              {notification.notification_type === 'trial_booking' && (
+                                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                  Trial Booking
+                                </Badge>
+                              )}
+                              {notification.notification_type === 'trial_assignment' && (
+                                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                  Trial Assignment
                                 </Badge>
                               )}
                             </div>
@@ -3666,7 +4331,7 @@ const AdminPanel = () => {
                                 Mark Read
                               </Button>
                             )}
-                            {notification.type === 'classroom_approval_request' && (
+                            {notification.notification_type === 'classroom_approval_request' && (
                               <Button
                                 variant="default"
                                 size="sm"
@@ -3674,6 +4339,26 @@ const AdminPanel = () => {
                                 className="text-xs"
                               >
                                 View Requests
+                              </Button>
+                            )}
+                            {notification.notification_type === 'trial_booking' && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => setActiveTab('trials')}
+                                className="text-xs bg-green-600 hover:bg-green-700"
+                              >
+                                View Trial Bookings
+                              </Button>
+                            )}
+                            {notification.notification_type === 'trial_assignment' && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => setActiveTab('trials')}
+                                className="text-xs bg-blue-600 hover:bg-blue-700"
+                              >
+                                View Trial Bookings
                               </Button>
                             )}
                           </div>
@@ -4388,6 +5073,128 @@ const AdminPanel = () => {
                 setDeleteClassroomPassword('');
                 setDeleteClassroomError('');
               }}>Cancel</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Schedule Trial Booking Modal */}
+        <Dialog open={showScheduleModal} onOpenChange={setShowScheduleModal}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Schedule Trial Class</DialogTitle>
+              <DialogDescription>
+                Schedule a trial class for {selectedTrialBooking?.student_name}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label htmlFor="teacher">Select Teacher *</Label>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={fetchAvailableTeachers}
+                    className="text-xs"
+                  >
+                    Refresh Teachers
+                  </Button>
+                </div>
+                <Select value={scheduleData.teacherId} onValueChange={(value) => setScheduleData(prev => ({ ...prev, teacherId: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a teacher" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTeachers.length > 0 ? (
+                      availableTeachers.map((teacher) => (
+                        <SelectItem key={teacher.id} value={teacher.id}>
+                          {teacher.name} - {teacher.email} ({teacher.status || 'no-status'})
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-teachers" disabled>
+                        No teachers available ({availableTeachers.length})
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="date">Scheduled Date *</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={scheduleData.scheduledDate}
+                  onChange={(e) => setScheduleData(prev => ({ ...prev, scheduledDate: e.target.value }))}
+                  min={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="time">Scheduled Time *</Label>
+                <Input
+                  id="time"
+                  type="time"
+                  value={scheduleData.scheduledTime}
+                  onChange={(e) => setScheduleData(prev => ({ ...prev, scheduledTime: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="notes">Notes (Optional)</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Add any special instructions or notes..."
+                  value={scheduleData.notes}
+                  onChange={(e) => setScheduleData(prev => ({ ...prev, notes: e.target.value }))}
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowScheduleModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={scheduleTrialBooking}>
+                Schedule Trial Class
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Notes Modal */}
+        <Dialog open={showNotesModal} onOpenChange={setShowNotesModal}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Notes</DialogTitle>
+              <DialogDescription>
+                Add notes for {selectedTrialBooking?.student_name}'s trial booking
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Add notes about this trial booking..."
+                  value={scheduleData.notes}
+                  onChange={(e) => setScheduleData(prev => ({ ...prev, notes: e.target.value }))}
+                  rows={4}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowNotesModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={addNotesToTrialBooking}>
+                Add Notes
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

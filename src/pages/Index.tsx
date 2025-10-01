@@ -11,9 +11,13 @@ import WhatsAppChat from "@/components/WhatsAppChat";
 import NewsList from "@/components/NewsList";
 import { ServicesCarousel } from "@/components/Services";
 import ExamBodies from "@/components/ExamBodies";
+import TrialClassPopup from "@/components/TrialClassPopup";
 import { Phone, Mail, MapPin, MessageCircle } from "lucide-react";
+import { useState } from "react";
 
 const Index = () => {
+  const [showTrialPopup, setShowTrialPopup] = useState(true);
+
   return (
     <div className="min-h-screen">
       <Header />
@@ -37,6 +41,7 @@ const Index = () => {
       </main>
       <Footer />
       <WhatsAppChat />
+      <TrialClassPopup isOpen={showTrialPopup} onClose={() => setShowTrialPopup(false)} />
     </div>
   );
 };

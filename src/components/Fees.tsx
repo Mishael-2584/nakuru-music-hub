@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Check, Star, Clock, Users, Award, Globe, Home, Music } from "lucide-react";
+import { Check, Star, Clock, Users, Award, Globe, Home, Music, Code } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Fees = () => {
@@ -264,6 +264,65 @@ const Fees = () => {
           duration: "2-3 hours/week"
         }
       ]
+    },
+    {
+      category: "💻 Web Design & Programming",
+      subtitle: "Flexible class sizes with competitive pricing",
+      courses: [
+        {
+          name: "1-on-1 Classes",
+          duration: "1 hour per session",
+          perClass: "KSh 2,200",
+          icon: Code,
+          features: [
+            "Personalized instruction",
+            "Individual attention",
+            "Customized learning pace",
+            "Direct feedback and support",
+            "Flexible scheduling"
+          ],
+          popular: true
+        },
+        {
+          name: "2 Students",
+          duration: "1 hour per session",
+          perClass: "KSh 1,500",
+          icon: Users,
+          features: [
+            "Small group learning",
+            "Peer collaboration",
+            "Cost-effective option",
+            "Interactive sessions",
+            "Shared resources"
+          ]
+        },
+        {
+          name: "3-5 Students",
+          duration: "1 hour per session",
+          perClass: "KSh 1,200",
+          icon: Users,
+          features: [
+            "Group dynamics",
+            "Team projects",
+            "Affordable pricing",
+            "Diverse perspectives",
+            "Collaborative learning"
+          ]
+        },
+        {
+          name: "6-10 Students",
+          duration: "1 hour per session",
+          perClass: "KSh 1,000",
+          icon: Users,
+          features: [
+            "Large group sessions",
+            "Most economical option",
+            "Classroom environment",
+            "Structured curriculum",
+            "Peer learning opportunities"
+          ]
+        }
+      ]
     }
   ];
 
@@ -278,6 +337,7 @@ const Fees = () => {
 
   const getIconColor = (category: string) => {
     if (category.includes("Production") || category.includes("Photography")) return "from-purple-500 to-pink-500";
+    if (category.includes("Web Design") || category.includes("Programming")) return "from-blue-500 to-cyan-500";
     return "from-primary to-accent";
   };
 
