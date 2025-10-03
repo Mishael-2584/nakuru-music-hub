@@ -1860,10 +1860,6 @@ const TeacherDashboard = () => {
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="instant-meetings" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all">
-                <Video className="w-5 h-5" />
-                <span>Instant Meet</span>
-              </TabsTrigger>
               <TabsTrigger value="notifications" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-blue-700 data-[state=active]:bg-blue-100 data-[state=active]:shadow-md transition-all relative">
                 <Bell className="w-5 h-5" />
                 <span>Notifications</span>
@@ -2904,16 +2900,6 @@ const TeacherDashboard = () => {
               </Card>
             </TabsContent>
 
-            {/* Instant Meetings Tab */}
-            <TabsContent value="instant-meetings" className="mt-8">
-              <InstantMeetManager 
-                userId={profile?.user_id || user?.id || ''}
-                userName={profile?.name || user?.email || ''}
-                userRole={profile?.category === 'admin' ? 'admin' : 'teacher'}
-                className="space-y-6"
-                onMeetingCreated={refreshInstantMeetings}
-              />
-            </TabsContent>
 
             {/* Notifications Tab */}
             <TabsContent value="notifications" className="mt-8">
