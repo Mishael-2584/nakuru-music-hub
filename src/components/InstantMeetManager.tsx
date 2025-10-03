@@ -45,13 +45,15 @@ interface InstantMeetManagerProps {
   userName: string;
   userRole: 'teacher' | 'admin';
   className?: string;
+  onMeetingCreated?: () => void;
 }
 
 const InstantMeetManager = ({
   userId,
   userName,
   userRole,
-  className = ''
+  className = '',
+  onMeetingCreated
 }) => {
   const { toast } = useToast();
 
@@ -189,6 +191,11 @@ const InstantMeetManager = ({
       title: "Success",
       description: `Meeting "${meeting.title}" created successfully!`
     });
+    
+    // Call the callback to refresh instant meetings in video conferencing tab
+    if (onMeetingCreated) {
+      onMeetingCreated();
+    }
   };
 
   const handleJoinMeeting = async (meeting: InstantMeeting) => {

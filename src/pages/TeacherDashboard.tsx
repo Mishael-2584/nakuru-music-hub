@@ -4,7 +4,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video, Copy, Check, ChevronLeft, ChevronRight, Phone, Mail, Award } from "lucide-react";
+import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video, Copy, Check, ChevronLeft, ChevronRight, Phone, Mail, Award, RefreshCw, ExternalLink } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
 import VideoConferenceModal from '../components/VideoConferenceModal';
-import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getUserInvitedMeetings, InstantMeeting } from '../lib/videoConferencing';
+import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getUserInvitedMeetings, getUserInstantMeetings, InstantMeeting } from '../lib/videoConferencing';
 import MessagingUI from '../components/MessagingUI';
 import InstantMeetManager from '../components/InstantMeetManager';
 
@@ -238,6 +238,7 @@ const TeacherDashboard = () => {
   const [selectedMeetingRoom, setSelectedMeetingRoom] = useState<MeetingRoom | null>(null);
   const [meetingRooms, setMeetingRooms] = useState<MeetingRoom[]>([]);
   const [invitedMeetings, setInvitedMeetings] = useState<InstantMeeting[]>([]);
+  const [teacherInstantMeetings, setTeacherInstantMeetings] = useState<InstantMeeting[]>([]);
   // Filter state
   const [calendarStudent, setCalendarStudent] = useState('all');
   const [calendarLessonType, setCalendarLessonType] = useState('all');
@@ -652,6 +653,19 @@ const TeacherDashboard = () => {
     }
   };
 
+  // Refresh instant meetings (called when a new meeting is created)
+  const refreshInstantMeetings = async () => {
+    if (!profile?.user_id) return;
+    
+    try {
+      const instantMeetings = await getUserInstantMeetings(profile.user_id);
+      const hostedMeetings = instantMeetings.filter(meeting => meeting.hostId === profile.user_id);
+      setTeacherInstantMeetings(hostedMeetings);
+    } catch (error) {
+      console.error('Error refreshing instant meetings:', error);
+    }
+  };
+
   // Fetch notifications for teacher
   const fetchNotifications = async () => {
     if (!user?.id) return;
@@ -836,6 +850,12 @@ const TeacherDashboard = () => {
       if (profile.user_id) {
         const invited = await getUserInvitedMeetings(profile.user_id);
         setInvitedMeetings(invited);
+        
+        // Fetch teacher's own instant meetings
+        const instantMeetings = await getUserInstantMeetings(profile.user_id);
+        // Filter to only show meetings where teacher is the host
+        const hostedMeetings = instantMeetings.filter(meeting => meeting.hostId === profile.user_id);
+        setTeacherInstantMeetings(hostedMeetings);
       }
     } catch (error) {
       console.error('Error fetching meeting rooms:', error);
@@ -2693,9 +2713,98 @@ const TeacherDashboard = () => {
                     <CardTitle className="text-xl font-bold">Video Conferencing</CardTitle>
                     <CardDescription>Manage your video conference rooms and bookings.</CardDescription>
                   </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={refreshInstantMeetings}
+                    className="flex items-center gap-2"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Refresh
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
+                    {/* Teacher's Instant Meetings Section */}
+                    {teacherInstantMeetings.length > 0 && (
+                      <div className="mb-6">
+                        <h3 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
+                          <Video className="w-4 h-4" />
+                          My Instant Meetings ({teacherInstantMeetings.length})
+                        </h3>
+                        <div className="grid gap-3">
+                          {teacherInstantMeetings.map(meeting => (
+                            <div key={meeting.id} className="p-4 border border-green-200 rounded-lg bg-green-50 hover:shadow-md transition-shadow">
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="font-semibold text-green-900">{meeting.title}</h4>
+                                <div className="flex items-center gap-2">
+                                  <Badge className={meeting.status === 'active' ? 'bg-red-500 text-white animate-pulse' : meeting.status === 'pending' ? 'bg-yellow-500 text-white' : 'bg-green-500 text-white'}>
+                                    {meeting.status === 'active' ? '🔴 LIVE' : meeting.status === 'pending' ? '⏳ Ready' : '📅 Scheduled'}
+                                  </Badge>
+                                  <Badge variant="outline" className="font-mono text-xs">
+                                    {meeting.meetingCode}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4 text-sm text-green-700 mb-3">
+                                <div>
+                                  <span className="font-medium">Host:</span> {meeting.hostName} (You)
+                                </div>
+                                <div>
+                                  <span className="font-medium">Duration:</span> {meeting.duration} min
+                                </div>
+                                <div>
+                                  <span className="font-medium">Participants:</span> {meeting.participants.length}/{meeting.maxParticipants}
+                                </div>
+                                <div>
+                                  <span className="font-medium">Created:</span> {new Date(meeting.createdAt).toLocaleDateString()}
+                                </div>
+                              </div>
+                              {meeting.description && (
+                                <p className="text-sm text-green-600 mb-3 italic">"{meeting.description}"</p>
+                              )}
+                              <div className="flex gap-2">
+                                <Button 
+                                  onClick={() => window.open(meeting.meetingUrl, '_blank')}
+                                  className={`flex items-center gap-1 ${
+                                    meeting.status === 'active' 
+                                      ? 'bg-red-600 hover:bg-red-700 animate-pulse' 
+                                      : 'bg-green-600 hover:bg-green-700'
+                                  }`}
+                                  size="sm"
+                                >
+                                  <Video className="w-4 h-4" />
+                                  {meeting.status === 'active' ? '🚀 Join as Moderator' : 'Start Meeting'}
+                                </Button>
+                                <Button 
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(meeting.meetingCode);
+                                    toast({ title: "Copied", description: "Meeting code copied to clipboard" });
+                                  }}
+                                >
+                                  <Copy className="w-3 h-3 mr-1" />
+                                  Copy Code
+                                </Button>
+                                <Button 
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(meeting.meetingUrl);
+                                    toast({ title: "Copied", description: "Meeting URL copied to clipboard" });
+                                  }}
+                                >
+                                  <ExternalLink className="w-3 h-3 mr-1" />
+                                  Copy URL
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Invited Meetings Section */}
                     {invitedMeetings.length > 0 && (
                       <div className="mb-6">
@@ -2802,6 +2911,7 @@ const TeacherDashboard = () => {
                 userName={profile?.name || user?.email || ''}
                 userRole={profile?.category === 'admin' ? 'admin' : 'teacher'}
                 className="space-y-6"
+                onMeetingCreated={refreshInstantMeetings}
               />
             </TabsContent>
 
