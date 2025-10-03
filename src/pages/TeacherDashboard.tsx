@@ -200,6 +200,10 @@ const TeacherDashboard = () => {
   const [copiedCodes, setCopiedCodes] = useState<Set<string>>(new Set());
   const [recentAssignments, setRecentAssignments] = useState<any[]>([]);
   
+  // Notifications state
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  
   // Students pagination and details
   const [studentsPage, setStudentsPage] = useState(1);
   const [studentsPerPage] = useState(10);
@@ -640,8 +644,58 @@ const TeacherDashboard = () => {
       // Fetch teacher bookings
       await fetchTeacherBookings();
 
+      // Fetch notifications
+      await fetchNotifications();
+
     } catch (error) {
       console.error('Error fetching teacher data:', error);
+    }
+  };
+
+  // Fetch notifications for teacher
+  const fetchNotifications = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        console.error('Error fetching notifications:', error);
+        return;
+      }
+
+      setNotifications(data || []);
+      setUnreadNotificationCount((data || []).filter(n => !n.is_read).length);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
+
+  // Mark notification as read
+  const markNotificationAsRead = async (notificationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+
+      if (error) {
+        console.error('Error marking notification as read:', error);
+        return;
+      }
+
+      // Update local state
+      setNotifications(prev => 
+        prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+      );
+      setUnreadNotificationCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
     }
   };
 
@@ -1632,10 +1686,20 @@ const TeacherDashboard = () => {
           </div>
           <p className="text-white/90 text-sm sm:text-base lg:text-lg mb-4 px-4">Empowering music education and managing your teaching journey</p>
           <div className="flex flex-col sm:flex-row justify-center w-full max-w-4xl mx-auto mt-2 gap-2">
-            <Button variant="outline" size="sm" className="bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10 text-xs sm:text-sm">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10 text-xs sm:text-sm relative"
+              onClick={() => setActiveTab('notifications')}
+            >
               <Bell className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-blue-700" />
               <span className="hidden sm:inline">Notifications</span>
               <span className="sm:hidden">Notifications</span>
+              {unreadNotificationCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                </span>
+              )}
             </Button>
             <Button variant="outline" size="sm" onClick={handleSignOut} className="bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10 text-xs sm:text-sm">
               <LogOut className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-blue-700" />
@@ -1779,6 +1843,15 @@ const TeacherDashboard = () => {
               <TabsTrigger value="instant-meetings" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all">
                 <Video className="w-5 h-5" />
                 <span>Instant Meet</span>
+              </TabsTrigger>
+              <TabsTrigger value="notifications" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-blue-700 data-[state=active]:bg-blue-100 data-[state=active]:shadow-md transition-all relative">
+                <Bell className="w-5 h-5" />
+                <span>Notifications</span>
+                {unreadNotificationCount > 0 && (
+                  <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">
+                    {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                  </Badge>
+                )}
               </TabsTrigger>
               <TabsTrigger value="account" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-amber-700 data-[state=active]:bg-amber-100 data-[state=active]:shadow-md transition-all">
                 <User className="w-5 h-5" />
@@ -2731,6 +2804,73 @@ const TeacherDashboard = () => {
                 className="space-y-6"
               />
             </TabsContent>
+
+            {/* Notifications Tab */}
+            <TabsContent value="notifications" className="mt-8">
+              <Card className="shadow-lg border-0 bg-white/95">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Bell className="w-5 h-5" />
+                    Notifications
+                  </CardTitle>
+                  {unreadNotificationCount > 0 && (
+                    <Badge variant="destructive">
+                      {unreadNotificationCount} unread
+                    </Badge>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {notifications.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-600 mb-2">No Notifications</h3>
+                      <p className="text-gray-500">You don't have any notifications yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {notifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          className={`p-4 rounded-lg border transition-all cursor-pointer ${
+                            notification.is_read 
+                              ? 'bg-gray-50 border-gray-200' 
+                              : 'bg-blue-50 border-blue-200 shadow-sm'
+                          }`}
+                          onClick={() => !notification.is_read && markNotificationAsRead(notification.id)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-semibold text-sm">{notification.title}</h4>
+                                {!notification.is_read && (
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-600 mb-2">{notification.message}</p>
+                              <p className="text-xs text-gray-400">
+                                {new Date(notification.created_at).toLocaleDateString()} at{' '}
+                                {new Date(notification.created_at).toLocaleTimeString()}
+                              </p>
+                              {notification.notification_type === 'trial_assignment' && notification.data && (
+                                <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                                  <p><strong>Student:</strong> {notification.data.student_name}</p>
+                                  <p><strong>Instrument:</strong> {notification.data.instrument}</p>
+                                  <p><strong>Skill Level:</strong> {notification.data.skill_level}</p>
+                                  {notification.data.scheduled_datetime && (
+                                    <p><strong>Scheduled:</strong> {new Date(notification.data.scheduled_datetime).toLocaleString()}</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             {/* Account redirect tab */}
             <TabsContent value="account" className="mt-8">
               <Card>

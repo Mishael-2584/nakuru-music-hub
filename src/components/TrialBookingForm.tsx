@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,9 @@ import {
   Gift,
   Users,
   Award,
-  BookOpen
+  BookOpen,
+  Loader2,
+  UserCheck
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -45,12 +47,35 @@ interface TrialFormData {
   experience: string;
   goals: string;
   specialRequirements: string;
+  selectedTimeSlotId: string;
+  selectedTeacherId: string;
+}
+
+interface AvailableTimeSlot {
+  id: string;
+  teacher_id: string;
+  teacher_name: string;
+  teacher_email: string;
+  teacher_phone: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  is_available: boolean;
+  slot_type: string;
+  max_students: number;
+  description: string;
+  next_available_date: string;
+  has_conflict: boolean;
+  teacher_subjects: string[];
 }
 
 const TrialBookingForm = ({ className }: TrialBookingFormProps) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<AvailableTimeSlot[]>([]);
+  const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
+  const [showTimeSlotSelection, setShowTimeSlotSelection] = useState(false);
   const [formData, setFormData] = useState<TrialFormData>({
     studentName: '',
     parentName: '',
@@ -64,7 +89,9 @@ const TrialBookingForm = ({ className }: TrialBookingFormProps) => {
     preferredDate: undefined,
     experience: '',
     goals: '',
-    specialRequirements: ''
+    specialRequirements: '',
+    selectedTimeSlotId: '',
+    selectedTeacherId: ''
   });
 
   const instruments = [
@@ -94,6 +121,78 @@ const TrialBookingForm = ({ className }: TrialBookingFormProps) => {
       ...prev,
       [field]: value
     }));
+
+    // If instrument changes, fetch available time slots
+    if (field === 'instrument' && typeof value === 'string') {
+      fetchAvailableTimeSlots(value);
+    }
+  };
+
+  // Fetch available time slots for the selected instrument
+  const fetchAvailableTimeSlots = async (instrument: string) => {
+    if (!instrument) {
+      setAvailableTimeSlots([]);
+      return;
+    }
+
+    setLoadingTimeSlots(true);
+    try {
+      const { data, error } = await supabase.rpc('get_available_trial_time_slots', {
+        p_instrument: instrument,
+        p_preferred_location: formData.preferredLocation || null
+      });
+
+      if (error) {
+        console.error('Error fetching time slots:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch available time slots. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setAvailableTimeSlots(data || []);
+      if (data && data.length > 0) {
+        setShowTimeSlotSelection(true);
+        toast({
+          title: "Available Time Slots Found!",
+          description: `Found ${data.length} available time slots for ${instrument}. You can now select a specific time.`,
+          duration: 3000,
+        });
+      } else {
+        setShowTimeSlotSelection(false);
+        toast({
+          title: "No Available Slots",
+          description: `No available time slots found for ${instrument}. You can still submit your request and we'll contact you.`,
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching time slots:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch available time slots. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingTimeSlots(false);
+    }
+  };
+
+  // Handle time slot selection
+  const handleTimeSlotSelection = (timeSlot: AvailableTimeSlot) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedTimeSlotId: timeSlot.id,
+      selectedTeacherId: timeSlot.teacher_id
+    }));
+    
+    toast({
+      title: "Time Slot Selected!",
+      description: `Selected ${timeSlot.day_of_week} ${timeSlot.start_time} with ${timeSlot.teacher_name}`,
+      duration: 3000,
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,7 +214,9 @@ const TrialBookingForm = ({ className }: TrialBookingFormProps) => {
         p_previous_experience: formData.experience || null,
         p_learning_goals: formData.goals || null,
         p_preferred_date: formData.preferredDate ? format(formData.preferredDate, 'yyyy-MM-dd') : null,
-        p_special_requirements: formData.specialRequirements || null
+        p_special_requirements: formData.specialRequirements || null,
+        p_selected_time_slot_id: formData.selectedTimeSlotId || null,
+        p_selected_teacher_id: formData.selectedTeacherId || null
       });
 
       if (error) {
@@ -125,11 +226,21 @@ const TrialBookingForm = ({ className }: TrialBookingFormProps) => {
 
       console.log('Trial booking saved successfully:', data);
       
-      toast({
-        title: "Trial Class Booked Successfully! 🎉",
-        description: "Our team will contact you within 24 hours to confirm your trial class details.",
-        duration: 5000,
-      });
+      // Show different success messages based on whether a time slot was selected
+      if (formData.selectedTimeSlotId) {
+        const selectedSlot = availableTimeSlots.find(slot => slot.id === formData.selectedTimeSlotId);
+        toast({
+          title: "Trial Class Scheduled Successfully! 🎉",
+          description: `Your trial class has been scheduled with ${selectedSlot?.teacher_name} for ${selectedSlot?.day_of_week} at ${selectedSlot?.start_time}. You will receive a confirmation email shortly.`,
+          duration: 8000,
+        });
+      } else {
+        toast({
+          title: "Trial Class Request Submitted! 🎉",
+          description: "Your trial class request has been submitted. Our team will contact you within 24 hours to schedule your trial class.",
+          duration: 5000,
+        });
+      }
 
       // Reset form
       setFormData({
@@ -145,8 +256,14 @@ const TrialBookingForm = ({ className }: TrialBookingFormProps) => {
         preferredDate: undefined,
         experience: '',
         goals: '',
-        specialRequirements: ''
+        specialRequirements: '',
+        selectedTimeSlotId: '',
+        selectedTeacherId: ''
       });
+      
+      // Reset time slots
+      setAvailableTimeSlots([]);
+      setShowTimeSlotSelection(false);
 
     } catch (error) {
       console.error('Error saving trial booking:', error);
@@ -422,6 +539,81 @@ const TrialBookingForm = ({ className }: TrialBookingFormProps) => {
                   </Dialog>
                 </div>
               </div>
+
+              {/* Available Time Slots Section */}
+              {showTimeSlotSelection && (
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <UserCheck className="w-4 h-4" />
+                    Available Time Slots
+                  </h3>
+                  
+                  {loadingTimeSlots ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                      <span>Loading available time slots...</span>
+                    </div>
+                  ) : availableTimeSlots.length > 0 ? (
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Select a specific time slot to schedule your trial class immediately, or leave unselected to have our team contact you.
+                      </p>
+                      
+                      <div className="grid gap-3 max-h-60 overflow-y-auto">
+                        {availableTimeSlots.map((slot) => (
+                          <div
+                            key={slot.id}
+                            className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                              formData.selectedTimeSlotId === slot.id
+                                ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                                : 'border-gray-200 hover:border-primary/50 hover:bg-gray-50'
+                            }`}
+                            onClick={() => handleTimeSlotSelection(slot)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Badge variant="outline" className="text-xs">
+                                    {slot.day_of_week}
+                                  </Badge>
+                                  <span className="font-medium">
+                                    {slot.start_time} - {slot.end_time}
+                                  </span>
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  <p className="font-medium">{slot.teacher_name}</p>
+                                  <p>Available: {new Date(slot.next_available_date).toLocaleDateString()}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center">
+                                {formData.selectedTimeSlotId === slot.id && (
+                                  <CheckCircle className="w-5 h-5 text-primary" />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {formData.selectedTimeSlotId && (
+                        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <p className="text-sm text-green-800">
+                            <CheckCircle className="w-4 h-4 inline mr-1" />
+                            Time slot selected! Your trial class will be scheduled automatically.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        No available time slots found for {formData.instrument}. 
+                        You can still submit your request and our team will contact you to schedule your trial class.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Special Requirements */}
               <div>
