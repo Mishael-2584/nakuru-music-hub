@@ -2864,6 +2864,21 @@ const TeacherDashboard = () => {
                       </div>
                     )}
 
+                    {/* Create Instant Meeting Section */}
+                    <div className="mb-6">
+                      <h3 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                        <Plus className="w-4 h-4" />
+                        Create Instant Meeting
+                      </h3>
+                      <InstantMeetManager 
+                        userId={profile?.user_id || user?.id || ''}
+                        userName={profile?.name || user?.email || ''}
+                        userRole={profile?.category === 'admin' ? 'admin' : 'teacher'}
+                        className="space-y-6"
+                        onMeetingCreated={refreshInstantMeetings}
+                      />
+                    </div>
+
                     {/* Regular Meeting Rooms Section */}
                     <div>
                       <h3 className="font-semibold text-indigo-800 mb-3 flex items-center gap-2">
