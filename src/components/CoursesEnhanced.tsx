@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Piano, Guitar, Mic, Drum, Music, Brain, Wind, Volume2, Camera, Video, MonitorPlay, Code, Palette, Search, Filter, Headphones, BookOpen } from "lucide-react";
+import { Piano, Guitar, Mic, Drum, Music, Brain, Wind, Volume2, Camera, Video, MonitorPlay, Code, Palette, Search, Filter, Headphones, BookOpen, Users, Award, Smartphone } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
@@ -263,6 +263,125 @@ const CoursesEnhanced = () => {
         instruments: "Professional studio equipment and software provided (Logic Pro, Ableton Live, Pro Tools).",
         schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
       }
+    },
+    {
+      icon: Users,
+      title: "Kids Band",
+      description: "Collaborative group learning for young musicians.",
+      category: "Music",
+      color: "primary",
+      details: {
+        availability: "In-person only (Nakuru & Nairobi campuses)",
+        duration: "10 sessions per term (3 months)",
+        levels: "Open to young musicians of all skill levels.",
+        features: [
+          "A collaborative space for all young players",
+          "Team-based learning with experienced instructors",
+          "Fun and creative sessions designed to build confidence",
+          "Exciting performance opportunities at showcases",
+          "10 sessions per term (3 months)",
+          "Save KSh 3,000 with termly payment!"
+        ],
+        instruments: "All instruments provided for group sessions.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
+      }
+    },
+    {
+      icon: Award,
+      title: "Live Sound Engineering",
+      description: "Comprehensive live sound engineering course with hands-on training.",
+      category: "Production",
+      color: "accent",
+      details: {
+        availability: "In-person only (Nakuru & Nairobi campuses)",
+        duration: "2 sessions/week - 2 hours each",
+        levels: "Open to all, from complete beginners to advanced students.",
+        features: [
+          "Sound physics & fundamentals",
+          "Advanced mixing techniques",
+          "Microphone types & placement",
+          "In-depth signal processing (FX)",
+          "Analog & digital mixing consoles",
+          "Front of House (FOH) & monitor mixing",
+          "Signal flow & gain staging",
+          "System setup & troubleshooting",
+          "Intro to EQ, compression & gates",
+          "Final project: Mix a live band"
+        ],
+        instruments: "Professional live sound equipment and mixing consoles provided.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
+      }
+    },
+    {
+      icon: Music,
+      title: "Music Production (RSL Awards)",
+      description: "RSL Awards Curriculum for Music Production (Grades 1-8).",
+      category: "Production",
+      color: "accent",
+      details: {
+        availability: "Available online and in-person (Nakuru & Nairobi)",
+        duration: "Individual: 1 session/week - 1 hour each | Group: 1 session/week - 2 hours each",
+        levels: "RSL Awards Curriculum (Grades 1-8).",
+        features: [
+          "RSL Awards Curriculum (Grades 1-8)",
+          "One-on-one personalized instruction OR collaborative learning (Max 5 students)",
+          "Hybrid lessons (Online & In-person)",
+          "Practical DAW skills & techniques",
+          "Preparation for RSL grade examinations",
+          "Portfolio development support",
+          "Peer-to-peer feedback and projects (Group sessions)"
+        ],
+        instruments: "Professional studio equipment and software provided (Logic Pro, Ableton Live, Pro Tools).",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
+      }
+    },
+    {
+      icon: Code,
+      title: "Web Design",
+      description: "Learn modern web design and development with HTML5, CSS3, and JavaScript.",
+      category: "Technology",
+      color: "secondary",
+      details: {
+        availability: "Available online and in-person (Nakuru & Nairobi)",
+        duration: "2 sessions/week - 1.5 hours each",
+        levels: "Open to all, from complete beginners to advanced students.",
+        features: [
+          "HTML5 & CSS3 fundamentals",
+          "Responsive web design",
+          "JavaScript basics",
+          "UI/UX design principles",
+          "Portfolio development",
+          "Modern frameworks (React/Vue)",
+          "Project-based learning",
+          "Industry best practices"
+        ],
+        instruments: "All necessary software and development tools provided.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
+      }
+    },
+    {
+      icon: Smartphone,
+      title: "App Development",
+      description: "Mobile app development for iOS and Android platforms.",
+      category: "Technology",
+      color: "secondary",
+      details: {
+        availability: "Available online and in-person (Nakuru & Nairobi)",
+        duration: "2 sessions/week - 1.5 hours each",
+        levels: "Open to all, from complete beginners to advanced students.",
+        features: [
+          "Mobile app development",
+          "React Native & Flutter",
+          "iOS & Android platforms",
+          "Backend integration",
+          "App store deployment",
+          "Real-world projects",
+          "Cross-platform development",
+          "Industry certification preparation"
+        ],
+        instruments: "All necessary development tools and software provided.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
+      }
     }
   ];
 
@@ -270,7 +389,8 @@ const CoursesEnhanced = () => {
     { id: "all", name: "All Courses", count: courses.length },
     { id: "Music", name: "Music", count: courses.filter(c => c.category === "Music").length },
     { id: "Art", name: "Art", count: courses.filter(c => c.category === "Art").length },
-    { id: "Production", name: "Production", count: courses.filter(c => c.category === "Production").length }
+    { id: "Production", name: "Production", count: courses.filter(c => c.category === "Production").length },
+    { id: "Technology", name: "Technology", count: courses.filter(c => c.category === "Technology").length }
   ];
 
   const filteredCourses = courses.filter(course => {
@@ -302,6 +422,8 @@ const CoursesEnhanced = () => {
         return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'Production':
         return 'bg-green-100 text-green-800 border-green-200';
+      case 'Technology':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }
