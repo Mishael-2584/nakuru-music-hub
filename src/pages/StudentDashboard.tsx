@@ -347,6 +347,35 @@ const StudentDashboard = () => {
   }, [activeTab, studentProfile?.id]);
 
   // Check all time slot conflicts and update state
+  // Check if a time slot conflicts with existing bookings for the current student
+  const checkTimeSlotConflict = async (timeSlot: AvailableTimeSlot) => {
+    if (!studentProfile) return false;
+    
+    const bookingDate = getNextAvailableDateISO(timeSlot.day_of_week, timeSlot.start_time);
+    
+    try {
+      // Check for overlapping bookings at the same time
+      const { data: overlappingBookings, error: overlapError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('student_id', studentProfile.id)
+        .eq('booking_date', bookingDate)
+        .eq('start_time', timeSlot.start_time)
+        .eq('end_time', timeSlot.end_time)
+        .eq('status', 'confirmed');
+
+      if (overlapError) {
+        console.error('Error checking time slot conflicts:', overlapError);
+        return false;
+      }
+
+      return overlappingBookings && overlappingBookings.length > 0;
+    } catch (error) {
+      console.error('Error checking time slot conflicts:', error);
+      return false;
+    }
+  };
+
   const checkAllTimeSlotConflicts = async () => {
     if (!studentProfile || availableTimeSlots.length === 0) return;
     
@@ -2631,54 +2660,6 @@ const StudentDashboard = () => {
         status: `Partially Booked (${bookingCount}/${maxStudents})`, 
         color: 'bg-orange-100 text-orange-800' 
       };
-    }
-  };
-
-  // Check if a time slot conflicts with existing bookings for the current student
-  const checkTimeSlotConflict = async (timeSlot: AvailableTimeSlot) => {
-    if (!studentProfile) return false;
-    
-    const bookingDate = getNextAvailableDateISO(timeSlot.day_of_week, timeSlot.start_time);
-    
-    try {
-      // Check for overlapping bookings at the same time
-      const { data: overlappingBookings, error: overlapError } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('student_id', studentProfile.id)
-        .eq('booking_date', bookingDate)
-        .eq('start_time', timeSlot.start_time)
-        .eq('end_time', timeSlot.end_time)
-        .eq('status', 'confirmed');
-
-      if (overlapError) {
-        console.error('Error checking for overlapping bookings:', overlapError);
-        return false;
-      }
-
-      if (overlappingBookings && overlappingBookings.length > 0) {
-        return true;
-      }
-
-      // Additional check for any overlapping time ranges on the same date
-      const { data: timeOverlapBookings, error: timeOverlapError } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('student_id', studentProfile.id)
-        .eq('booking_date', bookingDate)
-        .eq('status', 'confirmed')
-        .lt('start_time', timeSlot.end_time)
-        .gt('end_time', timeSlot.start_time);
-
-      if (timeOverlapError) {
-        console.error('Error checking for time overlaps:', timeOverlapError);
-        return false;
-      }
-
-      return timeOverlapBookings && timeOverlapBookings.length > 0;
-    } catch (error) {
-      console.error('Error checking time slot conflict:', error);
-      return false;
     }
   };
 

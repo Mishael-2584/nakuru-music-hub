@@ -6,8 +6,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, BookOpen, CheckCircle, Users, GraduationCap, Clock, Hash, Edit3, Save, X } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle, Users, GraduationCap, Clock, Hash, Edit3, Save, X, User, Mail, Phone } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import ClassroomPostCard from "@/components/classroom/ClassroomPostCard";
@@ -111,6 +112,8 @@ export default function ClassroomPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingPost, setEditingPost] = useState<{id: string, content: string, title?: string} | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [enrolledStudents, setEnrolledStudents] = useState<any[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
 
   const loadComments = async (postId: string) => {
     const { data } = await supabase.rpc('get_post_comments', { post_id_param: postId });
@@ -949,6 +952,7 @@ export default function ClassroomPage() {
         }
 
         await loadFeed(id);
+        await loadEnrolledStudents(id);
       } catch (err: any) {
         console.error("Failed to load classroom:", err);
         toast({ title: "Error", description: "Unable to load classroom", variant: "destructive" });
@@ -1046,6 +1050,47 @@ export default function ClassroomPage() {
     } catch (err) {
       console.error('Failed to load submissions:', err);
       toast({ title: 'Error', description: 'Failed to load submissions', variant: 'destructive' });
+    }
+  };
+
+  const loadEnrolledStudents = async (classroomId: string) => {
+    try {
+      setLoadingStudents(true);
+      const { data, error } = await supabase
+        .from('classroom_enrollments')
+        .select(`
+          id,
+          joined_at,
+          created_at,
+          students!inner(
+            id,
+            student_name,
+            email,
+            phone,
+            age,
+            instrument,
+            proficiency_level,
+            learning_mode,
+            user_id
+          )
+        `)
+        .eq('classroom_id', classroomId)
+        .order('joined_at', { ascending: true });
+
+      if (error) throw error;
+      
+      const studentsData = data?.map(enrollment => ({
+        ...enrollment.students,
+        enrollment_id: enrollment.id,
+        enrolled_at: enrollment.joined_at || enrollment.created_at
+      })) || [];
+      
+      setEnrolledStudents(studentsData);
+    } catch (error) {
+      console.error('Error loading enrolled students:', error);
+      toast({ title: "Error", description: "Failed to load enrolled students", variant: "destructive" });
+    } finally {
+      setLoadingStudents(false);
     }
   };
 
@@ -1235,7 +1280,20 @@ export default function ClassroomPage() {
         </div>
 
         {/* Main Content */}
-        <div className="space-y-6">
+        <Tabs defaultValue="feed" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="feed" className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              Class Feed
+            </TabsTrigger>
+            <TabsTrigger value="students" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Students ({enrolledStudents.length})
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Feed Tab */}
+          <TabsContent value="feed" className="space-y-6">
           {/* Post Creation Form for Teachers */}
           {isTeacherOfClass && (
             <PostCreationForm 
@@ -1456,7 +1514,197 @@ export default function ClassroomPage() {
               </Card>
             )}
           </div>
-        </div>
+          </TabsContent>
+
+          {/* Students Tab */}
+          <TabsContent value="students" className="space-y-6">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Enrolled Students</h3>
+                    <p className="text-sm text-gray-500">
+                      {enrolledStudents.length} student{enrolledStudents.length !== 1 ? 's' : ''} enrolled
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-blue-600 border-blue-200">
+                    <Users className="h-3 w-3 mr-1" />
+                    {enrolledStudents.length}
+                  </Badge>
+                </div>
+
+                {loadingStudents ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-gray-500">Loading students...</p>
+                  </div>
+                ) : enrolledStudents.length > 0 ? (
+                  <div className="space-y-4">
+                    {/* Mobile Layout */}
+                    <div className="lg:hidden space-y-3">
+                      {enrolledStudents.map((student) => (
+                        <div key={student.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-lg">
+                              {student.student_name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-gray-900 text-lg">{student.student_name}</h3>
+                              <p className="text-sm text-gray-500">Enrolled {new Date(student.enrolled_at).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-3">
+                                <Mail className="h-4 w-4 text-blue-500" />
+                                <div>
+                                  <p className="text-xs text-gray-500 uppercase tracking-wide">Email</p>
+                                  <p className="text-sm text-gray-900 break-all">{student.email}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <Phone className="h-4 w-4 text-green-500" />
+                                <div>
+                                  <p className="text-xs text-gray-500 uppercase tracking-wide">Phone</p>
+                                  <p className="text-sm text-gray-900">{student.phone || 'Not provided'}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <User className="h-4 w-4 text-purple-500" />
+                                <div>
+                                  <p className="text-xs text-gray-500 uppercase tracking-wide">Age</p>
+                                  <p className="text-sm text-gray-900">{student.age || 'Not specified'}</p>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-3">
+                                <GraduationCap className="h-4 w-4 text-orange-500" />
+                                <div>
+                                  <p className="text-xs text-gray-500 uppercase tracking-wide">Instrument</p>
+                                  <p className="text-sm text-gray-900">{student.instrument || 'Not specified'}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <Clock className="h-4 w-4 text-red-500" />
+                                <div>
+                                  <p className="text-xs text-gray-500 uppercase tracking-wide">Level</p>
+                                  <p className="text-sm text-gray-900">{student.proficiency_level || 'Beginner'}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <BookOpen className="h-4 w-4 text-indigo-500" />
+                                <div>
+                                  <p className="text-xs text-gray-500 uppercase tracking-wide">Mode</p>
+                                  <p className="text-sm text-gray-900">{student.learning_mode || 'Not specified'}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Desktop Layout */}
+                    <div className="hidden lg:block">
+                      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                        {/* Table Header */}
+                        <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                          <div className="grid grid-cols-12 gap-6">
+                            <div className="col-span-3">
+                              <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Student</h3>
+                            </div>
+                            <div className="col-span-3">
+                              <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Email</h3>
+                            </div>
+                            <div className="col-span-2">
+                              <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Phone</h3>
+                            </div>
+                            <div className="col-span-1">
+                              <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide text-center">Age</h3>
+                            </div>
+                            <div className="col-span-2">
+                              <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Instrument</h3>
+                            </div>
+                            <div className="col-span-1">
+                              <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide text-center">Level</h3>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Student Rows */}
+                        <div className="divide-y divide-gray-100">
+                          {enrolledStudents.map((student, index) => (
+                            <div key={student.id} className="px-6 py-5 hover:bg-gray-50 transition-colors">
+                              <div className="grid grid-cols-12 gap-6 items-center">
+                                <div className="col-span-3 flex items-center gap-4">
+                                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-lg">
+                                    {student.student_name.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <p className="font-semibold text-gray-900 text-base">{student.student_name}</p>
+                                    <p className="text-xs text-gray-500">Enrolled {new Date(student.enrolled_at).toLocaleDateString()}</p>
+                                  </div>
+                                </div>
+                                <div className="col-span-3">
+                                  <p className="text-sm text-gray-900 break-all">{student.email}</p>
+                                </div>
+                                <div className="col-span-2">
+                                  <p className="text-sm text-gray-900">{student.phone || 'Not provided'}</p>
+                                </div>
+                                <div className="col-span-1 text-center">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    {student.age || 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="col-span-2">
+                                  <div className="flex items-center gap-2">
+                                    <GraduationCap className="h-4 w-4 text-orange-500" />
+                                    <span className="text-sm text-gray-900">{student.instrument || 'Not specified'}</span>
+                                  </div>
+                                </div>
+                                <div className="col-span-1 text-center">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    student.proficiency_level === 'Advanced' ? 'bg-green-100 text-green-800' :
+                                    student.proficiency_level === 'Intermediate' ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {student.proficiency_level || 'Beginner'}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              {/* Additional Info Row */}
+                              <div className="mt-3 pt-3 border-t border-gray-100">
+                                <div className="flex items-center gap-6">
+                                  <div className="flex items-center gap-2">
+                                    <BookOpen className="h-4 w-4 text-indigo-500" />
+                                    <span className="text-xs text-gray-500 uppercase tracking-wide">Learning Mode:</span>
+                                    <span className="text-sm text-gray-900">{student.learning_mode || 'Not specified'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No students enrolled</h3>
+                    <div className="text-gray-500">
+                      Students can join this classroom using the class code: <Badge variant="outline" className="mx-1">{classroom?.class_code}</Badge>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Edit Post Modal */}
