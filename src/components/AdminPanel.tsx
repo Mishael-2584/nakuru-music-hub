@@ -104,6 +104,7 @@ interface ClassSchedule {
 
 const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes' | 'gallery' | 'finances' | 'requests' | 'notifications' | 'debug' | 'trials'>('stats');
+  const [teachersSubTab, setTeachersSubTab] = useState<'pending' | 'approved' | 'classrooms' | 'approved-classrooms'>('pending');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
 
@@ -3751,7 +3752,7 @@ const AdminPanel = () => {
         {/* Teachers Tab */}
         {activeTab === 'teachers' && (
           <div className="mt-8">
-            <Tabs defaultValue="pending" className="w-full">
+            <Tabs value={teachersSubTab} onValueChange={(value) => setTeachersSubTab(value as 'pending' | 'approved' | 'classrooms' | 'approved-classrooms')} className="w-full">
               <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 gap-2">
                 <TabsTrigger value="pending" className="text-xs sm:text-sm px-2 sm:px-3">Pending Teachers</TabsTrigger>
                 <TabsTrigger value="approved" className="text-xs sm:text-sm px-2 sm:px-3">Approved Teachers</TabsTrigger>
@@ -4331,14 +4332,19 @@ const AdminPanel = () => {
                                 Mark Read
                               </Button>
                             )}
-                            {notification.notification_type === 'classroom_approval_request' && (
+                            {(notification.notification_type === 'classroom_approval_request' || 
+                              (notification.notification_type === 'announcement' && 
+                               notification.title?.includes('Classroom Approval Request'))) && (
                               <Button
                                 variant="default"
                                 size="sm"
-                                onClick={() => setActiveTab('requests')}
+                                onClick={() => {
+                                  setActiveTab('teachers');
+                                  setTeachersSubTab('classrooms');
+                                }}
                                 className="text-xs"
                               >
-                                View Requests
+                                View Classroom Requests
                               </Button>
                             )}
                             {notification.notification_type === 'trial_booking' && (

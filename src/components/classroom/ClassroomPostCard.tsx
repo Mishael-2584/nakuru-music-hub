@@ -301,6 +301,13 @@ export default function ClassroomPostCard({
               )}
             </div>
 
+            {/* Full Formatted Content */}
+            <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="prose prose-sm max-w-none text-gray-700" dangerouslySetInnerHTML={{ 
+                __html: renderContent(post.content) 
+              }} />
+            </div>
+
             {/* File Attachments */}
             {post.attachments && post.attachments.length > 0 && (
               <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -338,13 +345,6 @@ export default function ClassroomPostCard({
                 </div>
               </div>
             )}
-
-            {/* Full Formatted Content */}
-            <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="prose prose-sm max-w-none text-gray-700" dangerouslySetInnerHTML={{ 
-                __html: renderContent(post.content) 
-              }} />
-            </div>
 
             {/* Assignment/Submission Section */}
             {children}

@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { sendApplicationConfirmationEmail } from '@/lib/emailService';
-import { Music, Users, Award, Star, ArrowRight, ArrowLeft, CheckCircle, MapPin, Phone, Mail, User, Calendar, Guitar, Mic, Palette, Video, Speaker } from "lucide-react";
+import { Music, Users, Award, Star, ArrowRight, ArrowLeft, CheckCircle, MapPin, Phone, Mail, User, Calendar, Guitar, Mic, Palette, Video, Speaker, Music2, Users2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Registration = () => {
@@ -24,6 +24,7 @@ const Registration = () => {
     parent_name: "",
     parent_phone: "",
     course_category: "",
+    music_subcategory: "",
     instrument: "",
     custom_instrument: "",
     production_type: "",
@@ -238,13 +239,20 @@ const Registration = () => {
         }
         break;
       
-      case 'instrument':
-        if (formData.course_category === 'Music' && (!value || value.trim().length === 0)) {
-          return { isValid: false, error: 'Please select an instrument for music courses' };
+      case 'music_subcategory':
+        if (formData.course_category === 'Music' && (!value || !['Individual Lessons', 'DMA Kids Band', 'DMA Children\'s Choir'].includes(value))) {
+          return { isValid: false, error: 'Please select a music program' };
         }
-        if (formData.course_category === 'Music' && value === 'Other' && (!formData.custom_instrument || formData.custom_instrument.trim().length === 0)) {
+        break;
+      
+      case 'instrument':
+        if (formData.course_category === 'Music' && formData.music_subcategory === 'Individual Lessons' && (!value || value.trim().length === 0)) {
+          return { isValid: false, error: 'Please select an instrument for individual lessons' };
+        }
+        if (formData.course_category === 'Music' && formData.music_subcategory === 'Individual Lessons' && value === 'Other' && (!formData.custom_instrument || formData.custom_instrument.trim().length === 0)) {
           return { isValid: false, error: 'Please specify your instrument' };
         }
+        // For DMA Kids Band and DMA Children's Choir, instrument is optional
         break;
       
       case 'production_type':
@@ -441,6 +449,7 @@ const Registration = () => {
         parent_name: formData.parent_name?.trim() || null,
         parent_phone: formData.parent_phone?.trim() || null,
         course_category: formData.course_category,
+        music_subcategory: formData.music_subcategory?.trim() || null,
         instrument: instrumentValue === "Other" ? formData.custom_instrument?.trim() : (instrumentValue?.trim() || "Not specified"),
         production_type: formData.production_type?.trim() || null,
         experience: formData.proficiency_level || "beginner",
@@ -918,7 +927,7 @@ const Registration = () => {
           <Label className="text-sm font-medium text-gray-700">Course Category *</Label>
           <RadioGroup 
             value={formData.course_category} 
-            onValueChange={(value) => setFormData({...formData, course_category: value, instrument: "", production_type: ""})}
+            onValueChange={(value) => setFormData({...formData, course_category: value, music_subcategory: "", instrument: "", production_type: ""})}
             className="grid md:grid-cols-3 gap-4"
           >
             <div className="relative">
@@ -986,10 +995,107 @@ const Registration = () => {
 
         {formData.course_category === "Music" && (
           <div className="space-y-4">
+            <Label className="text-sm font-medium text-gray-700">Music Program *</Label>
+            <RadioGroup 
+              value={formData.music_subcategory} 
+              onValueChange={(value) => setFormData({...formData, music_subcategory: value, instrument: ""})}
+              className="grid grid-cols-1 md:grid-cols-3 gap-4"
+            >
+              <div className="relative">
+                <RadioGroupItem value="Individual Lessons" id="individual" className="sr-only" />
+                <Label htmlFor="individual" className={`flex flex-col items-center p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                  formData.music_subcategory === "Individual Lessons" 
+                    ? "border-primary bg-primary/5 shadow-lg" 
+                    : "border-gray-200 hover:border-primary"
+                }`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all duration-200 ${
+                    formData.music_subcategory === "Individual Lessons" 
+                      ? "bg-gradient-to-r from-primary to-accent scale-110" 
+                      : "bg-gradient-to-r from-primary to-accent"
+                  }`}>
+                    <Guitar className="w-5 h-5 text-white" />
+                  </div>
+                  <span className={`font-medium transition-colors duration-200 text-sm ${
+                    formData.music_subcategory === "Individual Lessons" ? "text-primary" : "text-gray-800"
+                  }`}>Individual Lessons</span>
+                  <span className="text-xs text-gray-500 text-center mt-1">1-on-1 instruction</span>
+                </Label>
+              </div>
+              <div className="relative">
+                <RadioGroupItem value="DMA Kids Band" id="kids-band" className="sr-only" />
+                <Label htmlFor="kids-band" className={`flex flex-col items-center p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                  formData.music_subcategory === "DMA Kids Band" 
+                    ? "border-primary bg-primary/5 shadow-lg" 
+                    : "border-gray-200 hover:border-primary"
+                }`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all duration-200 ${
+                    formData.music_subcategory === "DMA Kids Band" 
+                      ? "bg-gradient-to-r from-green-500 to-emerald-500 scale-110" 
+                      : "bg-gradient-to-r from-green-500 to-emerald-500"
+                  }`}>
+                    <Music2 className="w-5 h-5 text-white" />
+                  </div>
+                  <span className={`font-medium transition-colors duration-200 text-sm ${
+                    formData.music_subcategory === "DMA Kids Band" ? "text-primary" : "text-gray-800"
+                  }`}>DMA Kids Band</span>
+                  <span className="text-xs text-gray-500 text-center mt-1">Group learning</span>
+                </Label>
+              </div>
+              <div className="relative">
+                <RadioGroupItem value="DMA Children's Choir" id="childrens-choir" className="sr-only" />
+                <Label htmlFor="childrens-choir" className={`flex flex-col items-center p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                  formData.music_subcategory === "DMA Children's Choir" 
+                    ? "border-primary bg-primary/5 shadow-lg" 
+                    : "border-gray-200 hover:border-primary"
+                }`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all duration-200 ${
+                    formData.music_subcategory === "DMA Children's Choir" 
+                      ? "bg-gradient-to-r from-purple-500 to-pink-500 scale-110" 
+                      : "bg-gradient-to-r from-purple-500 to-pink-500"
+                  }`}>
+                    <Users2 className="w-5 h-5 text-white" />
+                  </div>
+                  <span className={`font-medium transition-colors duration-200 text-sm ${
+                    formData.music_subcategory === "DMA Children's Choir" ? "text-primary" : "text-gray-800"
+                  }`}>DMA Children's Choir</span>
+                  <span className="text-xs text-gray-500 text-center mt-1">Vocal ensemble</span>
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+        )}
+
+        {(formData.course_category === "Music" && formData.music_subcategory === "Individual Lessons") && (
+          <div className="space-y-4">
             <Label className="text-sm font-medium text-gray-700">Instrument *</Label>
             <Select value={formData.instrument} onValueChange={(value) => setFormData({...formData, instrument: value})}>
               <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
                 <SelectValue placeholder="Select your instrument" />
+              </SelectTrigger>
+              <SelectContent>
+                {musicInstruments.map((instrument) => (
+                  <SelectItem key={instrument} value={instrument}>
+                    {instrument}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {formData.instrument === "Other" && (
+              <Input
+                placeholder="Please specify your instrument"
+                className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
+                onChange={(e) => setFormData({...formData, custom_instrument: e.target.value})}
+              />
+            )}
+          </div>
+        )}
+
+        {(formData.course_category === "Music" && (formData.music_subcategory === "DMA Kids Band" || formData.music_subcategory === "DMA Children's Choir")) && (
+          <div className="space-y-4">
+            <Label className="text-sm font-medium text-gray-700">Instrument (Optional)</Label>
+            <Select value={formData.instrument} onValueChange={(value) => setFormData({...formData, instrument: value})}>
+              <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
+                <SelectValue placeholder="Select your instrument (optional)" />
               </SelectTrigger>
               <SelectContent>
                 {musicInstruments.map((instrument) => (
