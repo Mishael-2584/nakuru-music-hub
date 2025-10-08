@@ -1,7 +1,9 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
-import { BookOpen, UserCheck, Video, School, Film, FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { BookOpen, UserCheck, Video, School, Film, FileText, Gift, Home } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import WhatsAppChat from '@/components/WhatsAppChat';
@@ -63,6 +65,20 @@ const faqData = [
     ]
   },
   {
+    category: 'Free Trial Classes',
+    icon: <Gift className="w-6 h-6 text-pink-500 mr-2" />, 
+    questions: [
+      { q: 'How long is the trial class?', a: 'Our trial classes are typically 30-45 minutes long, giving you enough time to experience our teaching style and get a feel for the instrument.' },
+      { q: 'What should I bring to the trial class?', a: 'Just bring yourself and a positive attitude! We provide all instruments and materials. If you have your own instrument, feel free to bring it.' },
+      { q: 'Is there any obligation after the trial?', a: 'Absolutely not! The trial class is completely free with no strings attached. We want you to make an informed decision about your musical education.' },
+      { q: 'Can I try multiple instruments?', a: 'Yes! If you\'re unsure about which instrument to choose, we can arrange trial classes for multiple instruments to help you decide.' },
+      { q: 'How soon can I schedule my trial class?', a: 'We typically contact you within 24 hours to schedule your trial class. We\'ll work with your schedule to find the best time.' },
+      { q: 'Do I need to have any musical experience for the trial?', a: 'Not at all! Our trial classes are designed for complete beginners. Our instructors will guide you through the basics and help you discover your musical potential.' },
+      { q: 'Can parents observe the trial class?', a: 'Yes, parents are welcome to observe the trial class. This helps you see our teaching methods and ensures you\'re comfortable with the learning environment.' },
+      { q: 'What happens after the trial class?', a: 'After your trial class, we\'ll discuss your experience and answer any questions you may have. If you decide to continue, we\'ll help you choose the right program and schedule regular lessons.' }
+    ]
+  },
+  {
     category: 'Curriculum & Examinations',
     icon: <FileText className="w-6 h-6 text-cyan-500 mr-2" />, 
     questions: [
@@ -77,6 +93,16 @@ const FAQ = () => (
   <div className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-pink-100 relative flex flex-col">
     <Header />
     <div className="flex-1 pt-32 lg:pt-36 pb-16 px-4 sm:px-8 lg:px-32">
+      {/* Back to Home Button */}
+      <div className="max-w-4xl mx-auto mb-6">
+        <Button asChild variant="outline" className="flex items-center gap-2">
+          <Link to="/">
+            <Home className="w-4 h-4" />
+            Back to Home
+          </Link>
+        </Button>
+      </div>
+      
       <Card className="max-w-4xl mx-auto shadow-2xl border-0 border-l-8 border-primary bg-white/90">
         <CardHeader className="text-center">
           <CardTitle className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-primary mb-2 tracking-tight drop-shadow">Frequently Asked Questions</CardTitle>
