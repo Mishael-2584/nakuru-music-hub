@@ -740,9 +740,19 @@ const Registration = () => {
               <Select 
                 value={formData.date_of_birth ? new Date(formData.date_of_birth).getDate().toString() : ""}
                 onValueChange={(day) => {
-                  const currentDate = formData.date_of_birth ? new Date(formData.date_of_birth) : new Date();
-                  const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), parseInt(day));
-                  setFormData({ ...formData, date_of_birth: newDate.toISOString().split('T')[0] });
+                  const currentDate = formData.date_of_birth ? new Date(formData.date_of_birth) : new Date(2000, 0, 1); // Default to Jan 1, 2000
+                  const year = currentDate.getFullYear();
+                  const month = currentDate.getMonth();
+                  const dayNum = parseInt(day);
+                  
+                  // Validate date and prevent rollover
+                  const daysInMonth = new Date(year, month + 1, 0).getDate();
+                  const validDay = Math.min(dayNum, daysInMonth);
+                  
+                  const newDate = new Date(year, month, validDay);
+                  // Format date as YYYY-MM-DD without timezone conversion
+                  const formattedDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(validDay).padStart(2, '0')}`;
+                  setFormData({ ...formData, date_of_birth: formattedDate });
                 }}
               >
                 <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
@@ -764,9 +774,19 @@ const Registration = () => {
               <Select 
                 value={formData.date_of_birth ? (new Date(formData.date_of_birth).getMonth() + 1).toString() : ""}
                 onValueChange={(month) => {
-                  const currentDate = formData.date_of_birth ? new Date(formData.date_of_birth) : new Date();
-                  const newDate = new Date(currentDate.getFullYear(), parseInt(month) - 1, currentDate.getDate());
-                  setFormData({ ...formData, date_of_birth: newDate.toISOString().split('T')[0] });
+                  const currentDate = formData.date_of_birth ? new Date(formData.date_of_birth) : new Date(2000, 0, 1); // Default to Jan 1, 2000
+                  const year = currentDate.getFullYear();
+                  const monthNum = parseInt(month) - 1; // Convert to 0-based
+                  const currentDay = currentDate.getDate();
+                  
+                  // Validate date and prevent rollover
+                  const daysInMonth = new Date(year, monthNum + 1, 0).getDate();
+                  const validDay = Math.min(currentDay, daysInMonth);
+                  
+                  const newDate = new Date(year, monthNum, validDay);
+                  // Format date as YYYY-MM-DD without timezone conversion
+                  const formattedDate = `${year}-${String(monthNum + 1).padStart(2, '0')}-${String(validDay).padStart(2, '0')}`;
+                  setFormData({ ...formData, date_of_birth: formattedDate });
                 }}
               >
                 <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
@@ -801,9 +821,19 @@ const Registration = () => {
               <Select 
                 value={formData.date_of_birth ? new Date(formData.date_of_birth).getFullYear().toString() : ""}
                 onValueChange={(year) => {
-                  const currentDate = formData.date_of_birth ? new Date(formData.date_of_birth) : new Date();
-                  const newDate = new Date(parseInt(year), currentDate.getMonth(), currentDate.getDate());
-                  setFormData({ ...formData, date_of_birth: newDate.toISOString().split('T')[0] });
+                  const currentDate = formData.date_of_birth ? new Date(formData.date_of_birth) : new Date(2000, 0, 1); // Default to Jan 1, 2000
+                  const yearNum = parseInt(year);
+                  const month = currentDate.getMonth();
+                  const currentDay = currentDate.getDate();
+                  
+                  // Validate date and prevent rollover (especially for leap years)
+                  const daysInMonth = new Date(yearNum, month + 1, 0).getDate();
+                  const validDay = Math.min(currentDay, daysInMonth);
+                  
+                  const newDate = new Date(yearNum, month, validDay);
+                  // Format date as YYYY-MM-DD without timezone conversion
+                  const formattedDate = `${yearNum}-${String(month + 1).padStart(2, '0')}-${String(validDay).padStart(2, '0')}`;
+                  setFormData({ ...formData, date_of_birth: formattedDate });
                 }}
               >
                 <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
