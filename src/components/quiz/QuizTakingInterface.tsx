@@ -13,7 +13,10 @@ import {
   Pause,
   RotateCcw,
   Eye,
-  EyeOff
+  EyeOff,
+  Upload,
+  Image,
+  X
 } from "lucide-react";
 import { Quiz, QuizQuestion, QuizAnswer, QuizMatchingPair, StudentQuizAnswer } from '@/types/quiz';
 import AssignmentTimer from '../classroom/AssignmentTimer';
@@ -46,6 +49,8 @@ export default function QuizTakingInterface({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [imageFiles, setImageFiles] = useState<Record<string, File>>({});
+  const [imagePreviews, setImagePreviews] = useState<Record<string, string>>({});
 
   // Initialize student answers
   useEffect(() => {
@@ -106,6 +111,40 @@ export default function QuizTakingInterface({
     updateAnswer(currentQuestion.id, { matching_pairs: updatedMatching });
   };
 
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setImageFiles(prev => ({ ...prev, [currentQuestion.id]: file }));
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        setImagePreviews(prev => ({ ...prev, [currentQuestion.id]: result }));
+        updateAnswer(currentQuestion.id, { 
+          image_attachment: result,
+          image_filename: file.name
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFiles(prev => {
+      const updated = { ...prev };
+      delete updated[currentQuestion.id];
+      return updated;
+    });
+    setImagePreviews(prev => {
+      const updated = { ...prev };
+      delete updated[currentQuestion.id];
+      return updated;
+    });
+    updateAnswer(currentQuestion.id, { 
+      image_attachment: undefined,
+      image_filename: undefined
+    });
+  };
+
   const handleSubmit = () => {
     if (isSubmitting) return; // Prevent multiple submissions
     setShowConfirmDialog(true);
@@ -144,9 +183,18 @@ export default function QuizTakingInterface({
 
   const getAnsweredCount = () => {
     return studentAnswers.filter(answer => {
-      if (currentQuestion.question_type === 'matching') {
+      const question = questions.find(q => q.id === answer.question_id);
+      if (!question) return false;
+      
+      if (question.question_type === 'matching') {
         return answer.matching_pairs.length > 0;
       }
+      
+      // Check if question requires image attachment
+      if (question.has_image_attachment) {
+        return answer.selected_answer_id !== undefined && answer.image_attachment !== undefined;
+      }
+      
       return answer.selected_answer_id !== undefined;
     }).length;
   };
@@ -161,6 +209,12 @@ export default function QuizTakingInterface({
     if (question.question_type === 'matching') {
       return answer.matching_pairs.length > 0;
     }
+    
+    // Check if question requires image attachment
+    if (question.has_image_attachment) {
+      return answer.selected_answer_id !== undefined && answer.image_attachment !== undefined;
+    }
+    
     return answer.selected_answer_id !== undefined;
   };
 
@@ -289,6 +343,73 @@ export default function QuizTakingInterface({
         
         <CardContent className="space-y-4">
           <h3 className="text-lg font-semibold">{currentQuestion.question_text}</h3>
+
+          {/* Reference Image (if teacher uploaded one) */}
+          {currentQuestion.image_url && (
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Reference Image:</h4>
+              <img
+                src={currentQuestion.image_url}
+                alt="Reference"
+                className="max-w-full max-h-64 object-contain border rounded"
+              />
+            </div>
+          )}
+
+          {/* Image Attachment Requirement */}
+          {currentQuestion.has_image_attachment && (
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <Image className="h-5 w-5 text-blue-600" />
+                <h4 className="text-sm font-medium text-blue-800">Image Upload Required</h4>
+              </div>
+              <p className="text-sm text-blue-700 mb-3">
+                This question requires you to upload an image as part of your answer.
+              </p>
+              
+              <div className="space-y-3">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  id={`image-upload-${currentQuestion.id}`}
+                />
+                <label
+                  htmlFor={`image-upload-${currentQuestion.id}`}
+                  className="flex items-center gap-2 px-4 py-2 border border-blue-300 rounded-lg cursor-pointer hover:bg-blue-100 text-blue-700"
+                >
+                  <Upload className="h-4 w-4" />
+                  {currentAnswer?.image_attachment ? 'Change Image' : 'Upload Image'}
+                </label>
+                
+                {currentAnswer?.image_attachment && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-green-700 font-medium">✓ Image uploaded</span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={removeImage}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <X className="h-4 w-4" />
+                        Remove
+                      </Button>
+                    </div>
+                    {imagePreviews[currentQuestion.id] && (
+                      <img
+                        src={imagePreviews[currentQuestion.id]}
+                        alt="Your upload"
+                        className="max-w-full max-h-48 object-contain border rounded"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Multiple Choice */}
           {currentQuestion.question_type === 'multiple_choice' && (

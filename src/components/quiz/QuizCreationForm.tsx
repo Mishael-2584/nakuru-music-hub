@@ -13,7 +13,11 @@ import {
   CheckCircle,
   Circle,
   ArrowRight,
-  Hash
+  Hash,
+  Calendar,
+  Save,
+  Upload,
+  Image
 } from "lucide-react";
 import { QuizFormData, QuizQuestionFormData } from '@/types/quiz';
 import QuizQuestionEditor from './QuizQuestionEditor';
@@ -33,6 +37,9 @@ export default function QuizCreationForm({ onSubmit, isSubmitting = false, hideS
     show_marks_immediately: true,
     passing_score: 60,
     max_attempts: 1,
+    scheduled_open_at: undefined,
+    status: 'draft',
+    is_draft: true,
     questions: []
   });
 
@@ -55,7 +62,8 @@ export default function QuizCreationForm({ onSubmit, isSubmitting = false, hideS
       question_text: '',
       question_type: type,
       points: 1,
-      order_index: quizData.questions.length,
+      order_index: 0, // New questions go to top
+      has_image_attachment: false,
       answers: type === 'true_false' ? [
         { answer_text: 'True', is_correct: false, order_index: 0 },
         { answer_text: 'False', is_correct: false, order_index: 1 }
@@ -63,9 +71,15 @@ export default function QuizCreationForm({ onSubmit, isSubmitting = false, hideS
       matching_pairs: []
     };
 
+    // Move new question to top, reorder existing questions
+    const updatedQuestions = [newQuestion, ...quizData.questions.map((q, i) => ({
+      ...q,
+      order_index: i + 1
+    }))];
+
     setQuizData({
       ...quizData,
-      questions: [...quizData.questions, newQuestion]
+      questions: updatedQuestions
     });
   };
 
@@ -283,6 +297,44 @@ export default function QuizCreationForm({ onSubmit, isSubmitting = false, hideS
               Show marks immediately after submission
             </label>
           </div>
+
+          {/* Schedule Quiz Opening */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <Calendar className="h-4 w-4 inline mr-1" />
+              Schedule Quiz Opening (Optional)
+            </label>
+            <Input
+              type="datetime-local"
+              value={quizData.scheduled_open_at ? new Date(quizData.scheduled_open_at).toISOString().slice(0, 16) : ''}
+              onChange={(e) => setQuizData({ 
+                ...quizData, 
+                scheduled_open_at: e.target.value ? new Date(e.target.value).toISOString() : undefined 
+              })}
+              placeholder="Leave empty to publish immediately"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              If set, the quiz will only be available to students after this date and time.
+            </p>
+          </div>
+
+          {/* Draft Status */}
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="is_draft"
+              checked={quizData.is_draft}
+              onChange={(e) => setQuizData({ 
+                ...quizData, 
+                is_draft: e.target.checked,
+                status: e.target.checked ? 'draft' : 'published'
+              })}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="is_draft" className="text-sm font-medium text-gray-700">
+              Save as draft (students won't see this quiz yet)
+            </label>
+          </div>
         </CardContent>
       </Card>
 
@@ -351,9 +403,18 @@ export default function QuizCreationForm({ onSubmit, isSubmitting = false, hideS
         </div>
       )}
 
-      {/* Submit Button */}
+      {/* Submit Buttons */}
       {!hideSubmitButton && (
-        <div className="flex justify-end pt-4 border-t">
+        <div className="flex justify-end gap-3 pt-4 border-t">
+          <Button
+            onClick={() => onSubmit({ ...quizData, is_draft: true, status: 'draft' })}
+            disabled={isSubmitting}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Save className="h-4 w-4" />
+            Save as Draft
+          </Button>
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || quizData.questions.length === 0}
@@ -365,15 +426,26 @@ export default function QuizCreationForm({ onSubmit, isSubmitting = false, hideS
       )}
 
       {/* Save Quiz Button (when embedded in PostCreationForm) */}
-      {hideSubmitButton && isQuizReady() && (
-        <div className="flex justify-end pt-4 border-t">
+      {hideSubmitButton && (
+        <div className="flex justify-end gap-3 pt-4 border-t">
           <Button
-            onClick={() => onSubmit(quizData)}
+            onClick={() => onSubmit({ ...quizData, is_draft: true, status: 'draft' })}
             disabled={isSubmitting}
-            className="bg-purple-600 hover:bg-purple-700"
+            variant="outline"
+            className="flex items-center gap-2"
           >
-            {isSubmitting ? 'Saving Quiz...' : 'Save Quiz'}
+            <Save className="h-4 w-4" />
+            Save as Draft
           </Button>
+          {isQuizReady() && (
+            <Button
+              onClick={() => onSubmit({ ...quizData, is_draft: false, status: 'published' })}
+              disabled={isSubmitting}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {isSubmitting ? 'Publishing Quiz...' : 'Publish Quiz'}
+            </Button>
+          )}
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
--- Create RPC functions for quiz creation to bypass RLS issues
--- Date: 2025-07-02
+-- Update RPC functions to support image attachments and scheduling
+-- Date: 2025-01-09
 
--- Function to create a quiz
+-- Function to create a quiz (updated with scheduling and draft fields)
 CREATE OR REPLACE FUNCTION create_quiz(
   post_id_param UUID,
   title_param TEXT,
@@ -63,7 +63,7 @@ BEGIN
 END;
 $$;
 
--- Function to create quiz questions
+-- Function to create quiz questions (updated with image fields)
 CREATE OR REPLACE FUNCTION create_quiz_questions(
   quiz_id_param UUID,
   questions_data JSONB

@@ -186,7 +186,10 @@ export default function ClassroomPage() {
         show_answers_after_param: quizFormData.show_answers_after,
         show_marks_immediately_param: quizFormData.show_marks_immediately,
         passing_score_param: quizFormData.passing_score,
-        max_attempts_param: quizFormData.max_attempts
+        max_attempts_param: quizFormData.max_attempts,
+        scheduled_open_at_param: quizFormData.scheduled_open_at,
+        status_param: quizFormData.status,
+        is_draft_param: quizFormData.is_draft
       });
 
       if (quizError) {
@@ -202,6 +205,9 @@ export default function ClassroomPage() {
         question_type: q.question_type,
         points: q.points,
         order_index: q.order_index,
+        has_image_attachment: q.has_image_attachment,
+        image_url: q.image_url,
+        image_filename: q.image_filename,
         answers: q.answers || [],
         matching_pairs: q.matching_pairs || []
       }));

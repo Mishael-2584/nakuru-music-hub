@@ -11,7 +11,10 @@ import {
   CheckCircle, 
   Circle,
   ArrowRight,
-  Hash
+  Hash,
+  Image,
+  Upload,
+  X
 } from "lucide-react";
 import { QuizQuestionFormData, QuizAnswerFormData, QuizMatchingPairFormData } from '@/types/quiz';
 
@@ -35,9 +38,39 @@ export default function QuizQuestionEditor({
   const [newAnswer, setNewAnswer] = useState('');
   const [newMatchingLeft, setNewMatchingLeft] = useState('');
   const [newMatchingRight, setNewMatchingRight] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const updateQuestion = (updates: Partial<QuizQuestionFormData>) => {
     onChange({ ...question, ...updates });
+  };
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        setImagePreview(result);
+        updateQuestion({
+          has_image_attachment: true,
+          image_url: result,
+          image_filename: file.name
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    updateQuestion({
+      has_image_attachment: false,
+      image_url: undefined,
+      image_filename: undefined
+    });
   };
 
   const addAnswer = () => {
@@ -184,6 +217,85 @@ export default function QuizQuestionEditor({
             max="100"
             className="w-24"
           />
+        </div>
+
+        {/* Image Attachment Option */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <input
+              type="checkbox"
+              id={`image-attachment-${index}`}
+              checked={question.has_image_attachment}
+              onChange={(e) => updateQuestion({ has_image_attachment: e.target.checked })}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor={`image-attachment-${index}`} className="text-sm font-medium text-gray-700 flex items-center gap-1">
+              <Image className="h-4 w-4" />
+              Require image attachment from students
+            </label>
+          </div>
+          
+          {question.has_image_attachment && (
+            <div className="space-y-3">
+              <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
+                <p className="font-medium">Image Attachment Instructions:</p>
+                <p>Students will be required to upload an image when answering this question. This is useful for questions like:</p>
+                <ul className="list-disc list-inside mt-1 text-xs">
+                  <li>"Looking at the images provided, name two different DAW software applications"</li>
+                  <li>"Upload a screenshot of your music production setup"</li>
+                  <li>"Show your completed assignment"</li>
+                </ul>
+              </div>
+              
+              {/* Optional: Teacher can upload reference image */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Reference Image (Optional)
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id={`image-upload-${index}`}
+                  />
+                  <label
+                    htmlFor={`image-upload-${index}`}
+                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload Reference Image
+                  </label>
+                  {imagePreview && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={removeImage}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <X className="h-4 w-4" />
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                
+                {imagePreview && (
+                  <div className="mt-3">
+                    <img
+                      src={imagePreview}
+                      alt="Reference"
+                      className="max-w-xs max-h-48 object-contain border rounded-lg"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Reference image for this question
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Multiple Choice Answers */}

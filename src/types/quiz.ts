@@ -10,6 +10,9 @@ export interface Quiz {
   show_marks_immediately: boolean;
   passing_score: number;
   max_attempts: number;
+  scheduled_open_at?: string;
+  status: 'draft' | 'published' | 'closed';
+  is_draft: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -21,6 +24,9 @@ export interface QuizQuestion {
   question_type: 'multiple_choice' | 'true_false' | 'matching';
   points: number;
   order_index: number;
+  has_image_attachment: boolean;
+  image_url?: string;
+  image_filename?: string;
   created_at: string;
 }
 
@@ -78,6 +84,9 @@ export interface QuizFormData {
   show_marks_immediately: boolean;
   passing_score: number;
   max_attempts: number;
+  scheduled_open_at?: string;
+  status: 'draft' | 'published' | 'closed';
+  is_draft: boolean;
   questions: QuizQuestionFormData[];
 }
 
@@ -87,6 +96,9 @@ export interface QuizQuestionFormData {
   question_type: 'multiple_choice' | 'true_false' | 'matching';
   points: number;
   order_index: number;
+  has_image_attachment: boolean;
+  image_url?: string;
+  image_filename?: string;
   answers: QuizAnswerFormData[];
   matching_pairs: QuizMatchingPairFormData[];
 }
@@ -110,6 +122,8 @@ export interface StudentQuizAnswer {
   question_id: string;
   selected_answer_id?: string;
   matching_pairs: Array<{left: string; right: string}>;
+  image_attachment?: string;
+  image_filename?: string;
 }
 
 export interface QuizResult {
