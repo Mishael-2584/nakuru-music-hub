@@ -57,6 +57,23 @@ export default function QuizCreationForm({ onSubmit, isSubmitting = false, hideS
     });
   };
 
+  // Get validation message for why quiz can't be submitted
+  const getValidationMessage = () => {
+    if (!quizData.title.trim()) return "Please enter a quiz title";
+    if (quizData.questions.length === 0) return "Please add at least one question";
+    
+    for (let i = 0; i < quizData.questions.length; i++) {
+      const q = quizData.questions[i];
+      if (q.question_type === 'multiple_choice' || q.question_type === 'true_false') {
+        if (q.answers.length < 2) return `Question ${i + 1}: Please add at least 2 answer options`;
+        if (!q.answers.some(a => a.is_correct)) return `Question ${i + 1}: Please select at least one correct answer`;
+      } else if (q.question_type === 'matching') {
+        if (q.matching_pairs.length < 2) return `Question ${i + 1}: Please add at least 2 matching pairs`;
+      }
+    }
+    return "";
+  };
+
   const addQuestion = (type: 'multiple_choice' | 'true_false' | 'matching') => {
     const newQuestion: QuizQuestionFormData = {
       question_text: '',
@@ -405,47 +422,61 @@ export default function QuizCreationForm({ onSubmit, isSubmitting = false, hideS
 
       {/* Submit Buttons */}
       {!hideSubmitButton && (
-        <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button
-            onClick={() => onSubmit({ ...quizData, is_draft: true, status: 'draft' })}
-            disabled={isSubmitting}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            <Save className="h-4 w-4" />
-            Save as Draft
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting || quizData.questions.length === 0}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {isSubmitting ? 'Creating Quiz...' : 'Create Quiz'}
-          </Button>
+        <div className="pt-4 border-t">
+          {!isQuizReady() && getValidationMessage() && (
+            <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800 font-medium">⚠️ {getValidationMessage()}</p>
+            </div>
+          )}
+          <div className="flex justify-end gap-3">
+            <Button
+              onClick={() => onSubmit({ ...quizData, is_draft: true, status: 'draft' })}
+              disabled={isSubmitting}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Save className="h-4 w-4" />
+              Save as Draft
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting || !isQuizReady()}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {isSubmitting ? 'Creating Quiz...' : 'Create Quiz'}
+            </Button>
+          </div>
         </div>
       )}
 
       {/* Save Quiz Button (when embedded in PostCreationForm) */}
       {hideSubmitButton && (
-        <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button
-            onClick={() => onSubmit({ ...quizData, is_draft: true, status: 'draft' })}
-            disabled={isSubmitting}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            <Save className="h-4 w-4" />
-            Save as Draft
-          </Button>
-          {isQuizReady() && (
-            <Button
-              onClick={() => onSubmit({ ...quizData, is_draft: false, status: 'published' })}
-              disabled={isSubmitting}
-              className="bg-purple-600 hover:bg-purple-700"
-            >
-              {isSubmitting ? 'Publishing Quiz...' : 'Publish Quiz'}
-            </Button>
+        <div className="pt-4 border-t">
+          {!isQuizReady() && getValidationMessage() && (
+            <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800 font-medium">⚠️ {getValidationMessage()}</p>
+            </div>
           )}
+          <div className="flex justify-end gap-3">
+            <Button
+              onClick={() => onSubmit({ ...quizData, is_draft: true, status: 'draft' })}
+              disabled={isSubmitting}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Save className="h-4 w-4" />
+              Save as Draft
+            </Button>
+            {isQuizReady() && (
+              <Button
+                onClick={() => onSubmit({ ...quizData, is_draft: false, status: 'published' })}
+                disabled={isSubmitting}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                {isSubmitting ? 'Publishing Quiz...' : 'Publish Quiz'}
+              </Button>
+            )}
+          </div>
         </div>
       )}
     </div>

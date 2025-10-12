@@ -73,7 +73,7 @@ const TrialClassPopup = ({ isOpen, onClose }: TrialClassPopupProps) => {
   return (
     <Dialog open={isOpen && showPopup} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg sm:max-w-xl md:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto mx-4 sm:mx-auto">
-        <DialogHeader>
+        <DialogHeader className="pr-8 sm:pr-0">
           <DialogTitle className="text-center">
             <div className="flex items-center justify-center gap-1 sm:gap-2 mb-2">
               <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-500" />
@@ -170,6 +170,14 @@ const TrialClassPopup = ({ isOpen, onClose }: TrialClassPopupProps) => {
                 <BookOpen className="w-4 h-4 mr-2" />
                 View Pricing
               </Link>
+            </Button>
+            <Button 
+              variant="ghost" 
+              onClick={handleClose} 
+              className="w-full py-2 sm:py-3 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-4 h-4 mr-2" />
+              Maybe Later
             </Button>
           </div>
 
