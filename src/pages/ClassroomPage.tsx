@@ -41,6 +41,11 @@ type FeedPost = {
   due_date?: string;
   max_points?: number;
   attachments?: PostAttachment[];
+  has_quiz?: boolean;
+  quiz_time_limit?: number;
+  quiz_is_draft?: boolean;
+  quiz_scheduled_open_at?: string;
+  quiz_status?: 'draft' | 'published' | 'closed';
 };
 
 type PostAttachment = {

@@ -133,9 +133,22 @@ export default function ClassroomPostCard({
                 </span>
               )}
               {post.has_quiz && (
-                <Badge variant="outline" className="text-xs px-2 py-0 bg-purple-100 text-purple-700 border-purple-200">
-                  🧠 Quiz
-                </Badge>
+                <>
+                  <Badge variant="outline" className="text-xs px-2 py-0 bg-purple-100 text-purple-700 border-purple-200">
+                    🧠 Quiz
+                  </Badge>
+                  {/* Show draft/scheduled status to teachers */}
+                  {isTeacher && post.quiz_is_draft && (
+                    <Badge variant="outline" className="text-xs px-2 py-0 bg-yellow-100 text-yellow-700 border-yellow-200">
+                      📝 Draft
+                    </Badge>
+                  )}
+                  {isTeacher && !post.quiz_is_draft && post.quiz_scheduled_open_at && new Date(post.quiz_scheduled_open_at) > new Date() && (
+                    <Badge variant="outline" className="text-xs px-2 py-0 bg-blue-100 text-blue-700 border-blue-200">
+                      🕐 Scheduled
+                    </Badge>
+                  )}
+                </>
               )}
             </div>
             
@@ -287,10 +300,28 @@ export default function ClassroomPostCard({
                   </div>
                 )}
                 {post.has_quiz && (
-                  <div>
-                    <span className="text-gray-600">Quiz Time:</span>
-                    <span className="ml-2 font-medium">{post.quiz_time_limit} min</span>
-                  </div>
+                  <>
+                    <div>
+                      <span className="text-gray-600">Quiz Time:</span>
+                      <span className="ml-2 font-medium">{post.quiz_time_limit} min</span>
+                    </div>
+                    {/* Show quiz availability info */}
+                    {isTeacher && post.quiz_is_draft && (
+                      <div className="text-yellow-700 bg-yellow-50 p-2 rounded text-sm mt-2">
+                        📝 This quiz is in draft mode and not visible to students
+                      </div>
+                    )}
+                    {isTeacher && !post.quiz_is_draft && post.quiz_scheduled_open_at && new Date(post.quiz_scheduled_open_at) > new Date() && (
+                      <div className="text-blue-700 bg-blue-50 p-2 rounded text-sm mt-2">
+                        🕐 Quiz scheduled to open: {new Date(post.quiz_scheduled_open_at).toLocaleString()}
+                      </div>
+                    )}
+                    {!isTeacher && post.quiz_scheduled_open_at && new Date(post.quiz_scheduled_open_at) > new Date() && (
+                      <div className="text-gray-700 bg-gray-50 p-2 rounded text-sm mt-2">
+                        🕐 This quiz will be available on: {new Date(post.quiz_scheduled_open_at).toLocaleString()}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               {isOverdue && (
