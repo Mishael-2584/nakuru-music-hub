@@ -110,6 +110,10 @@ export default function ClassroomPage() {
   const [quizSubmissionStatuses, setQuizSubmissionStatuses] = useState<{[key: string]: any}>({});
   const [timerStarted, setTimerStarted] = useState(false);
   const [timerCompleted, setTimerCompleted] = useState(false);
+  const [isEditingQuiz, setIsEditingQuiz] = useState(false);
+  const [editingQuizData, setEditingQuizData] = useState<QuizFormData | null>(null);
+  const [editingQuizId, setEditingQuizId] = useState<string | null>(null);
+  const [showTeacherPreview, setShowTeacherPreview] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -231,6 +235,78 @@ export default function ClassroomPage() {
     } catch (error) {
       console.error('Error creating quiz:', error);
       toast({ title: 'Error', description: 'Failed to create quiz', variant: 'destructive' });
+    }
+  };
+
+  // Update quiz function
+  const updateQuiz = async (quizId: string, quizFormData: QuizFormData) => {
+    try {
+      console.log('Updating quiz:', quizId);
+      
+      // Update quiz using RPC function
+      const { data: updateResult, error: updateError } = await supabase.rpc('update_quiz', {
+        quiz_id_param: quizId,
+        title_param: quizFormData.title,
+        description_param: quizFormData.description,
+        time_limit_minutes_param: quizFormData.time_limit_minutes,
+        show_answers_after_param: quizFormData.show_answers_after,
+        show_marks_immediately_param: quizFormData.show_marks_immediately,
+        passing_score_param: quizFormData.passing_score,
+        max_attempts_param: quizFormData.max_attempts,
+        scheduled_open_at_param: quizFormData.scheduled_open_at,
+        status_param: quizFormData.status,
+        is_draft_param: quizFormData.is_draft
+      });
+
+      if (updateError) {
+        console.error('Quiz update error:', updateError);
+        throw updateError;
+      }
+      
+      console.log('Quiz updated successfully');
+
+      // Delete existing questions
+      const { error: deleteError } = await supabase.rpc('delete_quiz_questions', {
+        quiz_id_param: quizId
+      });
+
+      if (deleteError) {
+        console.error('Questions deletion error:', deleteError);
+        throw deleteError;
+      }
+
+      // Create new questions
+      const questionsData = quizFormData.questions.map(q => ({
+        question_text: q.question_text,
+        question_type: q.question_type,
+        points: q.points,
+        order_index: q.order_index,
+        has_image_attachment: q.has_image_attachment,
+        image_url: q.image_url,
+        image_filename: q.image_filename,
+        answers: q.answers || [],
+        matching_pairs: q.matching_pairs || []
+      }));
+
+      const { error: questionsError } = await supabase.rpc('create_quiz_questions', {
+        quiz_id_param: quizId,
+        questions_data: questionsData
+      });
+
+      if (questionsError) {
+        console.error('Questions creation error:', questionsError);
+        throw questionsError;
+      }
+
+      toast({ title: 'Success', description: 'Quiz updated successfully!' });
+      
+      // Reload feed to show updated quiz
+      await loadFeed();
+    } catch (error: any) {
+      console.error('Error updating quiz:', error);
+      const errorMessage = error?.message || 'Failed to update quiz';
+      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+      throw error;
     }
   };
 
@@ -406,7 +482,10 @@ export default function ClassroomPage() {
         show_answers_after: quiz.show_answers_after,
         show_marks_immediately: quiz.show_marks_immediately,
         passing_score: quiz.passing_score,
-        max_attempts: quiz.max_attempts
+        max_attempts: quiz.max_attempts,
+        scheduled_open_at: quiz.scheduled_open_at,
+        status: quiz.status,
+        is_draft: quiz.is_draft
       });
       setQuizQuestions(questions);
       setQuizAnswers(answers);
@@ -417,6 +496,102 @@ export default function ClassroomPage() {
       setTimerCompleted(false);
     } catch (error) {
       console.error('Error loading quiz data:', error);
+    }
+  };
+
+  // Load quiz data for editing
+  const loadQuizForEdit = async (postId: string) => {
+    try {
+      // Get quiz data with all fields needed for editing
+      const { data: quizData, error: quizError } = await supabase
+        .from('quizzes')
+        .select('*')
+        .eq('post_id', postId)
+        .single();
+
+      if (quizError || !quizData) {
+        toast({ title: 'Error', description: 'Quiz not found', variant: 'destructive' });
+        return null;
+      }
+
+      // Get questions
+      const { data: questionsData, error: questionsError } = await supabase
+        .from('quiz_questions')
+        .select('*')
+        .eq('quiz_id', quizData.id)
+        .order('order_index');
+
+      if (questionsError) {
+        throw questionsError;
+      }
+
+      // Get answers
+      const { data: answersData, error: answersError } = await supabase
+        .from('quiz_answers')
+        .select('*')
+        .in('question_id', questionsData?.map(q => q.id) || []);
+
+      if (answersError) {
+        throw answersError;
+      }
+
+      // Get matching pairs
+      const { data: matchingData, error: matchingError } = await supabase
+        .from('quiz_matching_pairs')
+        .select('*')
+        .in('question_id', questionsData?.map(q => q.id) || []);
+
+      if (matchingError) {
+        throw matchingError;
+      }
+
+      // Transform to QuizFormData format
+      const formattedQuestions: QuizQuestionFormData[] = questionsData?.map(q => {
+        const questionAnswers = answersData?.filter(a => a.question_id === q.id) || [];
+        const questionMatching = matchingData?.filter(m => m.question_id === q.id) || [];
+
+        return {
+          id: q.id,
+          question_text: q.question_text,
+          question_type: q.question_type,
+          points: q.points,
+          order_index: q.order_index,
+          has_image_attachment: q.has_image_attachment || false,
+          image_url: q.image_url,
+          image_filename: q.image_filename,
+          answers: questionAnswers.map(a => ({
+            id: a.id,
+            answer_text: a.answer_text,
+            is_correct: a.is_correct,
+            order_index: a.order_index
+          })),
+          matching_pairs: questionMatching.map(m => ({
+            left: m.left_item,
+            right: m.right_item,
+            order_index: m.order_index
+          }))
+        };
+      }) || [];
+
+      const quizFormData: QuizFormData = {
+        title: quizData.title,
+        description: quizData.description,
+        time_limit_minutes: quizData.time_limit_minutes,
+        show_answers_after: quizData.show_answers_after,
+        show_marks_immediately: quizData.show_marks_immediately,
+        passing_score: quizData.passing_score,
+        max_attempts: quizData.max_attempts,
+        scheduled_open_at: quizData.scheduled_open_at,
+        status: quizData.status || 'draft',
+        is_draft: quizData.is_draft !== false,
+        questions: formattedQuestions
+      };
+
+      return { quizFormData, quizId: quizData.id };
+    } catch (error) {
+      console.error('Error loading quiz for edit:', error);
+      toast({ title: 'Error', description: 'Failed to load quiz for editing', variant: 'destructive' });
+      return null;
     }
   };
 
@@ -914,6 +1089,33 @@ export default function ClassroomPage() {
     }
   };
 
+  const handleEditQuiz = async (postId: string) => {
+    const quizEditData = await loadQuizForEdit(postId);
+    if (quizEditData) {
+      setEditingQuizData(quizEditData.quizFormData);
+      setEditingQuizId(quizEditData.quizId);
+      setIsEditingQuiz(true);
+    }
+  };
+
+  const handleSubmitQuizEdit = async (quizData: QuizFormData) => {
+    if (!editingQuizId) return;
+    
+    try {
+      await updateQuiz(editingQuizId, quizData);
+      setIsEditingQuiz(false);
+      setEditingQuizData(null);
+      setEditingQuizId(null);
+    } catch (error) {
+      // Error already handled in updateQuiz
+    }
+  };
+
+  const handlePreviewQuiz = async (postId: string) => {
+    await loadQuizData(postId);
+    setShowTeacherPreview(true);
+  };
+
   useEffect(() => {
     if (!id) return;
     (async () => {
@@ -1368,6 +1570,53 @@ export default function ClassroomPage() {
             />
           )}
 
+          {/* Quiz Edit Modal */}
+          {isEditingQuiz && editingQuizData && (
+            <Dialog open={isEditingQuiz} onOpenChange={setIsEditingQuiz}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Edit Quiz</DialogTitle>
+                  <DialogDescription>
+                    Make changes to your quiz. Changes will be saved immediately.
+                  </DialogDescription>
+                </DialogHeader>
+                <QuizCreationForm
+                  initialData={editingQuizData}
+                  isEditMode={true}
+                  onSubmit={handleSubmitQuizEdit}
+                  isSubmitting={false}
+                  hideSubmitButton={false}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {/* Teacher Quiz Preview */}
+          {showTeacherPreview && quizData && quizQuestions.length > 0 && (
+            <Dialog open={showTeacherPreview} onOpenChange={setShowTeacherPreview}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Quiz Preview - {quizData.title}</DialogTitle>
+                  <DialogDescription>
+                    Teacher preview with answers visible. No timer.
+                  </DialogDescription>
+                </DialogHeader>
+                <QuizTakingInterface
+                  quiz={quizData}
+                  questions={quizQuestions}
+                  answers={quizAnswers}
+                  matchingPairs={quizMatchingPairs}
+                  onSubmit={(answers) => {
+                    // Teacher preview - no submission
+                    toast({ title: 'Preview Mode', description: 'This is a preview. No answers will be submitted.' });
+                  }}
+                  onTimeUp={() => {}}
+                  isTeacherPreview={true}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
+
           {/* Feed */}
           <div className="space-y-6">
             {feed.length > 0 ? (
@@ -1380,6 +1629,8 @@ export default function ClassroomPage() {
                   onDelete={handleDeletePost}
                   onLoadComments={loadComments}
                   onExtendDeadline={handleExtendDeadline}
+                  onEditQuiz={handleEditQuiz}
+                  onPreviewQuiz={handlePreviewQuiz}
                   comments={postComments[post.post_id] || []}
                 >
                   {post.is_assignment && (

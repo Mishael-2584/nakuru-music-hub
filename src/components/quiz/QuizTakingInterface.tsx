@@ -27,10 +27,12 @@ interface QuizTakingInterfaceProps {
   answers: QuizAnswer[];
   matchingPairs: QuizMatchingPair[];
   onSubmit: (answers: StudentQuizAnswer[]) => void;
-  onStartTimer: () => void;
-  timerStarted: boolean;
-  timerCompleted: boolean;
+  onStartTimer?: () => void;
+  timerStarted?: boolean;
+  timerCompleted?: boolean;
   timeLimitMinutes?: number;
+  onTimeUp?: () => void;
+  isTeacherPreview?: boolean;
 }
 
 export default function QuizTakingInterface({
@@ -40,9 +42,11 @@ export default function QuizTakingInterface({
   matchingPairs,
   onSubmit,
   onStartTimer,
-  timerStarted,
-  timerCompleted,
-  timeLimitMinutes
+  timerStarted = false,
+  timerCompleted = false,
+  timeLimitMinutes,
+  onTimeUp,
+  isTeacherPreview = false
 }: QuizTakingInterfaceProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [studentAnswers, setStudentAnswers] = useState<StudentQuizAnswer[]>([]);
@@ -250,7 +254,7 @@ export default function QuizTakingInterface({
       </Card>
 
       {/* Timer */}
-      {timeLimitMinutes && (
+      {timeLimitMinutes && !isTeacherPreview && (
         <div className="mb-4">
           <AssignmentTimer
             timeLimitMinutes={timeLimitMinutes}
@@ -417,20 +421,33 @@ export default function QuizTakingInterface({
               {questionAnswers.map((answer) => (
                 <div
                   key={answer.id}
-                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                    currentAnswer?.selected_answer_id === answer.id
+                  className={`p-3 border rounded-lg ${
+                    isTeacherPreview 
+                      ? answer.is_correct 
+                        ? 'border-green-500 bg-green-50' 
+                        : 'border-gray-200'
+                      : currentAnswer?.selected_answer_id === answer.id
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                  onClick={() => handleMultipleChoiceAnswer(answer.id)}
+                  } ${isTeacherPreview ? '' : 'cursor-pointer'} transition-colors`}
+                  onClick={() => !isTeacherPreview && handleMultipleChoiceAnswer(answer.id)}
                 >
                   <div className="flex items-center gap-3">
                     <div className={`w-4 h-4 rounded-full border-2 ${
-                      currentAnswer?.selected_answer_id === answer.id
+                      isTeacherPreview
+                        ? answer.is_correct
+                          ? 'border-green-500 bg-green-500'
+                          : 'border-gray-300'
+                        : currentAnswer?.selected_answer_id === answer.id
                         ? 'border-blue-500 bg-blue-500'
                         : 'border-gray-300'
                     }`} />
-                    <span>{answer.answer_text}</span>
+                    <span className="flex-1">{answer.answer_text}</span>
+                    {isTeacherPreview && answer.is_correct && (
+                      <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                        ✓ Correct Answer
+                      </Badge>
+                    )}
                   </div>
                 </div>
               ))}
@@ -441,20 +458,52 @@ export default function QuizTakingInterface({
           {currentQuestion.question_type === 'true_false' && (
             <div className="flex gap-4">
               <Button
-                variant={currentAnswer?.selected_answer_id === questionAnswers.find(a => a.answer_text === 'True')?.id ? "default" : "outline"}
-                onClick={() => handleTrueFalseAnswer(true)}
-                className="flex items-center gap-2"
+                variant={
+                  isTeacherPreview
+                    ? questionAnswers.find(a => a.answer_text === 'True')?.is_correct
+                      ? "default"
+                      : "outline"
+                    : currentAnswer?.selected_answer_id === questionAnswers.find(a => a.answer_text === 'True')?.id
+                    ? "default"
+                    : "outline"
+                }
+                onClick={() => !isTeacherPreview && handleTrueFalseAnswer(true)}
+                disabled={isTeacherPreview}
+                className={`flex items-center gap-2 ${
+                  isTeacherPreview && questionAnswers.find(a => a.answer_text === 'True')?.is_correct
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : ''
+                }`}
               >
                 <CheckCircle className="h-4 w-4" />
                 True
+                {isTeacherPreview && questionAnswers.find(a => a.answer_text === 'True')?.is_correct && (
+                  <span className="text-xs">✓</span>
+                )}
               </Button>
               <Button
-                variant={currentAnswer?.selected_answer_id === questionAnswers.find(a => a.answer_text === 'False')?.id ? "default" : "outline"}
-                onClick={() => handleTrueFalseAnswer(false)}
-                className="flex items-center gap-2"
+                variant={
+                  isTeacherPreview
+                    ? questionAnswers.find(a => a.answer_text === 'False')?.is_correct
+                      ? "default"
+                      : "outline"
+                    : currentAnswer?.selected_answer_id === questionAnswers.find(a => a.answer_text === 'False')?.id
+                    ? "default"
+                    : "outline"
+                }
+                onClick={() => !isTeacherPreview && handleTrueFalseAnswer(false)}
+                disabled={isTeacherPreview}
+                className={`flex items-center gap-2 ${
+                  isTeacherPreview && questionAnswers.find(a => a.answer_text === 'False')?.is_correct
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : ''
+                }`}
               >
                 <CheckCircle className="h-4 w-4" />
                 False
+                {isTeacherPreview && questionAnswers.find(a => a.answer_text === 'False')?.is_correct && (
+                  <span className="text-xs">✓</span>
+                )}
               </Button>
             </div>
           )}
@@ -549,15 +598,25 @@ export default function QuizTakingInterface({
       </Card>
 
       {/* Submit Button */}
-      <div className="flex justify-center pt-4">
-        <Button
-          onClick={handleSubmit}
-          disabled={isSubmitting || timerCompleted}
-          className="bg-purple-600 hover:bg-purple-700 px-8"
-        >
-          {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
-        </Button>
-      </div>
+      {!isTeacherPreview && (
+        <div className="flex justify-center pt-4">
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting || timerCompleted}
+            className="bg-purple-600 hover:bg-purple-700 px-8"
+          >
+            {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
+          </Button>
+        </div>
+      )}
+      
+      {isTeacherPreview && (
+        <div className="flex justify-center pt-4">
+          <Badge variant="outline" className="bg-blue-100 text-blue-700 px-4 py-2 text-sm">
+            👁️ Teacher Preview Mode - No submission required
+          </Badge>
+        </div>
+      )}
 
       {/* Confirmation Dialog */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>

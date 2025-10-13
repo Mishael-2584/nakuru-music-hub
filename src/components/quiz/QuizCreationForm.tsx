@@ -26,10 +26,18 @@ interface QuizCreationFormProps {
   onSubmit: (quizData: QuizFormData) => void;
   isSubmitting?: boolean;
   hideSubmitButton?: boolean;
+  initialData?: QuizFormData;  // For editing existing quizzes
+  isEditMode?: boolean;
 }
 
-export default function QuizCreationForm({ onSubmit, isSubmitting = false, hideSubmitButton = false }: QuizCreationFormProps) {
-  const [quizData, setQuizData] = useState<QuizFormData>({
+export default function QuizCreationForm({ 
+  onSubmit, 
+  isSubmitting = false, 
+  hideSubmitButton = false,
+  initialData,
+  isEditMode = false
+}: QuizCreationFormProps) {
+  const [quizData, setQuizData] = useState<QuizFormData>(initialData || {
     title: '',
     description: '',
     time_limit_minutes: undefined,
@@ -42,6 +50,13 @@ export default function QuizCreationForm({ onSubmit, isSubmitting = false, hideS
     is_draft: true,
     questions: []
   });
+  
+  // Update quiz data when initialData changes (for edit mode)
+  useEffect(() => {
+    if (initialData && isEditMode) {
+      setQuizData(initialData);
+    }
+  }, [initialData, isEditMode]);
 
   // Check if quiz is ready for submission
   const isQuizReady = () => {
@@ -443,7 +458,7 @@ export default function QuizCreationForm({ onSubmit, isSubmitting = false, hideS
               disabled={isSubmitting || !isQuizReady()}
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {isSubmitting ? 'Creating Quiz...' : 'Create Quiz'}
+              {isSubmitting ? (isEditMode ? 'Updating Quiz...' : 'Creating Quiz...') : (isEditMode ? 'Update Quiz' : 'Create Quiz')}
             </Button>
           </div>
         </div>
@@ -473,7 +488,7 @@ export default function QuizCreationForm({ onSubmit, isSubmitting = false, hideS
                 disabled={isSubmitting}
                 className="bg-purple-600 hover:bg-purple-700"
               >
-                {isSubmitting ? 'Publishing Quiz...' : 'Publish Quiz'}
+                {isSubmitting ? (isEditMode ? 'Updating Quiz...' : 'Publishing Quiz...') : (isEditMode ? 'Update Quiz' : 'Publish Quiz')}
               </Button>
             )}
           </div>

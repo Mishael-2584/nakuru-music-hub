@@ -20,7 +20,8 @@ import {
   CheckCircle,
   AlertCircle,
   Users,
-  CalendarPlus
+  CalendarPlus,
+  Eye
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -31,6 +32,8 @@ interface ClassroomPostCardProps {
   onDelete?: (postId: string) => void;
   onLoadComments?: (postId: string) => void;
   onExtendDeadline?: (postId: string, newDueDate: string) => void;
+  onEditQuiz?: (postId: string) => void;
+  onPreviewQuiz?: (postId: string) => void;
   comments?: any[];
   children?: React.ReactNode; // For submission/grading sections
 }
@@ -42,6 +45,8 @@ export default function ClassroomPostCard({
   onDelete, 
   onLoadComments,
   onExtendDeadline,
+  onEditQuiz,
+  onPreviewQuiz,
   comments = [],
   children 
 }: ClassroomPostCardProps) {
@@ -146,6 +151,17 @@ export default function ClassroomPostCard({
                   {isTeacher && !post.quiz_is_draft && post.quiz_scheduled_open_at && new Date(post.quiz_scheduled_open_at) > new Date() && (
                     <Badge variant="outline" className="text-xs px-2 py-0 bg-blue-100 text-blue-700 border-blue-200">
                       🕐 Scheduled
+                    </Badge>
+                  )}
+                  {/* Show restriction status to students for draft quizzes with scheduled time */}
+                  {!isTeacher && post.quiz_is_draft && post.quiz_scheduled_open_at && (
+                    <Badge variant="outline" className="text-xs px-2 py-0 bg-orange-100 text-orange-700 border-orange-200">
+                      🔒 Restricted
+                    </Badge>
+                  )}
+                  {!isTeacher && !post.quiz_is_draft && post.quiz_scheduled_open_at && new Date(post.quiz_scheduled_open_at) > new Date() && (
+                    <Badge variant="outline" className="text-xs px-2 py-0 bg-gray-100 text-gray-700 border-gray-200">
+                      🕐 Upcoming
                     </Badge>
                   )}
                 </>
@@ -306,9 +322,15 @@ export default function ClassroomPostCard({
                       <span className="ml-2 font-medium">{post.quiz_time_limit} min</span>
                     </div>
                     {/* Show quiz availability info */}
-                    {isTeacher && post.quiz_is_draft && (
+                    {isTeacher && post.quiz_is_draft && !post.quiz_scheduled_open_at && (
                       <div className="text-yellow-700 bg-yellow-50 p-2 rounded text-sm mt-2">
-                        📝 This quiz is in draft mode and not visible to students
+                        📝 This quiz is in draft mode and not visible to students (no scheduled time set)
+                      </div>
+                    )}
+                    {isTeacher && post.quiz_is_draft && post.quiz_scheduled_open_at && (
+                      <div className="text-yellow-700 bg-yellow-50 p-2 rounded text-sm mt-2">
+                        📝 Draft quiz scheduled to open: {new Date(post.quiz_scheduled_open_at).toLocaleString()}
+                        <br /><span className="text-xs">Students can see this but cannot access it until the scheduled time</span>
                       </div>
                     )}
                     {isTeacher && !post.quiz_is_draft && post.quiz_scheduled_open_at && new Date(post.quiz_scheduled_open_at) > new Date() && (
@@ -316,9 +338,39 @@ export default function ClassroomPostCard({
                         🕐 Quiz scheduled to open: {new Date(post.quiz_scheduled_open_at).toLocaleString()}
                       </div>
                     )}
-                    {!isTeacher && post.quiz_scheduled_open_at && new Date(post.quiz_scheduled_open_at) > new Date() && (
+                    {!isTeacher && post.quiz_is_draft && post.quiz_scheduled_open_at && (
+                      <div className="text-orange-700 bg-orange-50 p-2 rounded text-sm mt-2 border border-orange-200">
+                        🔒 This quiz is restricted until: {new Date(post.quiz_scheduled_open_at).toLocaleString()}
+                        <br /><span className="text-xs">You will be able to access it after this time</span>
+                      </div>
+                    )}
+                    {!isTeacher && !post.quiz_is_draft && post.quiz_scheduled_open_at && new Date(post.quiz_scheduled_open_at) > new Date() && (
                       <div className="text-gray-700 bg-gray-50 p-2 rounded text-sm mt-2">
                         🕐 This quiz will be available on: {new Date(post.quiz_scheduled_open_at).toLocaleString()}
+                      </div>
+                    )}
+                    
+                    {/* Teacher Quiz Actions */}
+                    {isTeacher && post.has_quiz && (
+                      <div className="flex gap-2 mt-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onEditQuiz?.(post.post_id)}
+                          className="flex items-center gap-2"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                          Edit Quiz
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onPreviewQuiz?.(post.post_id)}
+                          className="flex items-center gap-2"
+                        >
+                          <Eye className="h-4 w-4" />
+                          Preview Quiz
+                        </Button>
                       </div>
                     )}
                   </>
