@@ -127,13 +127,13 @@ export default function ClassroomPage() {
 
   const checkQuizSubmissionStatus = async (quizId: string) => {
     try {
-      if (!currentStudent) return null;
+      if (!classroom?.currentStudent) return null;
 
       const { data: submission, error } = await supabase
         .from('quiz_submissions')
         .select('*')
         .eq('quiz_id', quizId)
-        .eq('student_id', currentStudent.user_id)
+        .eq('student_id', classroom.currentStudent.user_id)
         .order('submitted_at', { ascending: false })
         .limit(1)
         .single();
@@ -724,13 +724,15 @@ export default function ClassroomPage() {
     if (!user) return;
     
     try {
-      const { data: student } = await supabase
+      const { data: student, error: studentError } = await supabase
         .from('students')
         .select('id')
         .eq('user_id', user.id)
         .single();
       
-      if (!student) throw new Error('Student not found');
+      if (studentError || !student) {
+        throw new Error('Student not found');
+      }
       
       const { data: existingSubmission } = await supabase
         .from('assignment_submissions')
@@ -992,7 +994,7 @@ export default function ClassroomPage() {
       setFeed(postsWithAttachments);
       
       // Load quiz submission statuses for enrolled students
-      if (isEnrolledStudent && currentStudent) {
+      if (isEnrolledStudent && classroom?.currentStudent) {
         await loadQuizSubmissionStatuses(postsWithAttachments);
       }
       
