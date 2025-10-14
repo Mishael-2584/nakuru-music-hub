@@ -254,8 +254,7 @@ export default function QuizTakingInterface({
               <Button
                 onClick={handleSubmit}
                 disabled={isSubmitting || timerCompleted}
-                variant="outline"
-                className="border-gray-300 hover:bg-gray-50"
+                className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 shadow-lg"
               >
                 {isSubmitting ? 'Submitting...' : 'End Test'}
               </Button>
