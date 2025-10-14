@@ -52,7 +52,7 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
           // Fetch the user's actual role from their profile
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('role, name, id')
+            .select('role, id')
             .eq('id', data.user.id)
             .single();
 
@@ -69,9 +69,9 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
             });
           } else {
             // Use the actual role from the profile
-            const actualRole = profileData?.role || 'user';
+            const actualRole = (profileData && 'role' in profileData && (profileData as any).role) ? (profileData as any).role : 'user';
             console.log('Actual role from profile:', actualRole);
-            console.log('Profile ID:', profileData?.id);
+            console.log('Profile ID:', profileData && 'id' in profileData ? (profileData as any).id : undefined);
             
             const panelName = actualRole === 'admin' ? 'admin panel' : actualRole === 'student' ? 'student panel' : actualRole === 'teacher' ? 'teacher panel' : 'portal';
             console.log('Panel name for toast:', panelName);

@@ -33,58 +33,54 @@ export default function QuizResultsDisplay({
   const [showAnswers, setShowAnswers] = useState(result.showAnswers);
   const [answerDetails, setAnswerDetails] = useState<{[key: string]: any}>({});
   const [correctAnswers, setCorrectAnswers] = useState<{[key: string]: any}>({});
+  const [localAnswers, setLocalAnswers] = useState(result.answers || []);
 
-  const { submission, answers, questions } = result;
+  const { submission, questions } = result;
   
-  // Fetch answer details when component mounts
+  // If answers were not provided, fetch them by submission id
+  useEffect(() => {
+    const loadSubmissionAnswers = async () => {
+      if (localAnswers && localAnswers.length > 0) return;
+      if (!submission?.id) return;
+      const { data, error } = await supabase
+        .from('quiz_submission_answers')
+        .select('question_id, selected_answer_id, matching_pairs, is_correct, points_earned')
+        .eq('submission_id', submission.id);
+      if (!error && data) {
+        setLocalAnswers(data as any);
+      }
+    };
+    loadSubmissionAnswers();
+  }, [submission?.id]);
+
+  // Fetch answer details when answers or questions change
   useEffect(() => {
     const fetchAnswerDetails = async () => {
-      if (!answers || answers.length === 0) return;
-      
+      if (!localAnswers || localAnswers.length === 0) return;
+
       try {
-        // Get all answer IDs from submissions
-        const answerIds = answers
-          .map(answer => answer.selected_answer_id)
-          .filter(id => id !== null);
-        
-        if (answerIds.length > 0) {
-          // Fetch answer details
-          const { data: answerDetailsData, error: answerError } = await supabase
-            .from('quiz_answers')
-            .select('id, answer_text, is_correct')
-            .in('id', answerIds);
-          
-          if (!answerError && answerDetailsData) {
-            const answerMap: {[key: string]: any} = {};
-            answerDetailsData.forEach(answer => {
-              answerMap[answer.id] = answer;
-            });
-            setAnswerDetails(answerMap);
-          }
-        }
-        
-        // Fetch correct answers for all questions
+        // Fetch ALL answers for these questions once, then derive both maps.
         const questionIds = questions.map(q => q.id);
-        const { data: correctAnswersData, error: correctError } = await supabase
-          .from('quiz_answers')
-          .select('id, question_id, answer_text, is_correct')
-          .in('question_id', questionIds)
-          .eq('is_correct', true);
-        
-        if (!correctError && correctAnswersData) {
+        const { data: allAnswers, error } = await supabase
+          .rpc('get_answers_for_questions', { question_ids_param: questionIds });
+
+        if (!error && allAnswers) {
+          const byId: {[key: string]: any} = {};
           const correctMap: {[key: string]: any} = {};
-          correctAnswersData.forEach(answer => {
-            correctMap[answer.question_id] = answer;
+          (allAnswers as any[]).forEach((a) => {
+            byId[a.id] = a;
+            if (a.is_correct) correctMap[a.question_id] = a;
           });
-          setCorrectAnswers(correctMap);
+          setAnswerDetails(byId);        // lets us show the student's selected answer text immediately
+          setCorrectAnswers(correctMap); // used for the correct answer text
         }
-      } catch (error) {
-        console.error('Error fetching answer details:', error);
+      } catch (err) {
+        console.error('Error fetching answer details:', err);
       }
     };
     
     fetchAnswerDetails();
-  }, [answers, questions]);
+  }, [localAnswers, questions]);
   
   const getScoreColor = (percentage: number) => {
     if (percentage >= 80) return 'text-green-600';
@@ -127,7 +123,7 @@ export default function QuizResultsDisplay({
   };
 
   const getAnswerForQuestion = (questionId: string) => {
-    return answers.find(answer => answer.question_id === questionId);
+    return localAnswers.find(answer => answer.question_id === questionId);
   };
 
   const getCorrectAnswerForQuestion = (question: QuizQuestion) => {
@@ -363,7 +359,7 @@ export default function QuizResultsDisplay({
             <div className="flex items-center justify-between">
               <span>Questions Answered Correctly</span>
               <span className="font-semibold">
-                {answers.filter(a => a.is_correct).length} / {questions.length}
+                {localAnswers.filter(a => a.is_correct).length} / {questions.length}
               </span>
             </div>
             <div className="flex items-center justify-between">

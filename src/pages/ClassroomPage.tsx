@@ -17,7 +17,8 @@ import PostCreationForm from "@/components/classroom/PostCreationForm";
 import QuizTakingInterface from "@/components/quiz/QuizTakingInterface";
 import QuizResultsDisplay from "@/components/quiz/QuizResultsDisplay";
 import QuizManagementInterface from "@/components/quiz/QuizManagementInterface";
-import { QuizFormData, StudentQuizAnswer, QuizResult } from "@/types/quiz";
+import QuizCreationForm from "@/components/quiz/QuizCreationForm";
+import { QuizFormData, QuizQuestionFormData, StudentQuizAnswer, QuizResult } from "@/types/quiz";
 
 type Classroom = {
   id: string;
@@ -241,7 +242,15 @@ export default function ClassroomPage() {
         throw questionsError;
       }
 
-      toast({ title: 'Success', description: 'Quiz created successfully!' });
+      // Show appropriate success message based on draft status
+      const successMessage = quizFormData.is_draft 
+        ? 'Quiz saved as draft successfully!' 
+        : 'Quiz created and published successfully!';
+      
+      toast({ 
+        title: 'Success', 
+        description: successMessage 
+      });
     } catch (error) {
       console.error('Error creating quiz:', error);
       toast({ title: 'Error', description: 'Failed to create quiz', variant: 'destructive' });
@@ -308,7 +317,15 @@ export default function ClassroomPage() {
         throw questionsError;
       }
 
-      toast({ title: 'Success', description: 'Quiz updated successfully!' });
+      // Show appropriate success message based on draft status
+      const successMessage = quizFormData.is_draft 
+        ? 'Quiz saved as draft successfully!' 
+        : 'Quiz updated and published successfully!';
+      
+      toast({ 
+        title: 'Success', 
+        description: successMessage 
+      });
       
       // Reload feed to show updated quiz
       await loadFeed();
@@ -513,55 +530,22 @@ export default function ClassroomPage() {
   const loadQuizForEdit = async (postId: string) => {
     try {
       console.log('Loading quiz for edit, postId:', postId);
-      // Get quiz data with all fields needed for editing
-      const { data: quizData, error: quizError } = await supabase
-        .from('quizzes')
-        .select('*')
-        .eq('post_id', postId)
-        .single();
-
-      console.log('Quiz data from DB:', quizData, 'Error:', quizError);
-
-      if (quizError || !quizData) {
+      // Use RPC to load everything in one request (reduces PostgREST timeouts)
+      const { data, error } = await supabase.rpc('get_quiz_for_edit', { post_id_param: postId });
+      if (error || !data) {
+        if (error) console.error('get_quiz_for_edit error:', error);
         toast({ title: 'Error', description: 'Quiz not found', variant: 'destructive' });
         return null;
       }
 
-      // Get questions
-      const { data: questionsData, error: questionsError } = await supabase
-        .from('quiz_questions')
-        .select('*')
-        .eq('quiz_id', quizData.id)
-        .order('order_index');
+      const quizData = data.quiz;
+      const questionsData = data.questions || [];
+      const answersData = data.answers || [];
+      const matchingData = data.matching_pairs || [];
 
-      if (questionsError) {
-        throw questionsError;
-      }
-
-      // Get answers
-      const { data: answersData, error: answersError } = await supabase
-        .from('quiz_answers')
-        .select('*')
-        .in('question_id', questionsData?.map(q => q.id) || []);
-
-      if (answersError) {
-        throw answersError;
-      }
-
-      // Get matching pairs
-      const { data: matchingData, error: matchingError } = await supabase
-        .from('quiz_matching_pairs')
-        .select('*')
-        .in('question_id', questionsData?.map(q => q.id) || []);
-
-      if (matchingError) {
-        throw matchingError;
-      }
-
-      // Transform to QuizFormData format
-      const formattedQuestions: QuizQuestionFormData[] = questionsData?.map(q => {
-        const questionAnswers = answersData?.filter(a => a.question_id === q.id) || [];
-        const questionMatching = matchingData?.filter(m => m.question_id === q.id) || [];
+      const formattedQuestions: QuizQuestionFormData[] = questionsData.map((q: any) => {
+        const questionAnswers = answersData.filter((a: any) => a.question_id === q.id) || [];
+        const questionMatching = matchingData.filter((m: any) => m.question_id === q.id) || [];
 
         return {
           id: q.id,
@@ -572,19 +556,19 @@ export default function ClassroomPage() {
           has_image_attachment: q.has_image_attachment || false,
           image_url: q.image_url,
           image_filename: q.image_filename,
-          answers: questionAnswers.map(a => ({
+          answers: questionAnswers.map((a: any) => ({
             id: a.id,
             answer_text: a.answer_text,
             is_correct: a.is_correct,
             order_index: a.order_index
           })),
-          matching_pairs: questionMatching.map(m => ({
+          matching_pairs: questionMatching.map((m: any) => ({
             left: m.left_item,
             right: m.right_item,
             order_index: m.order_index
           }))
         };
-      }) || [];
+      });
 
       const quizFormData: QuizFormData = {
         title: quizData.title,
@@ -602,7 +586,6 @@ export default function ClassroomPage() {
 
       console.log('Formatted quiz data for editing:', quizFormData);
       console.log('Number of questions:', formattedQuestions.length);
-      
       return { quizFormData, quizId: quizData.id };
     } catch (error) {
       console.error('Error loading quiz for edit:', error);
@@ -1107,20 +1090,68 @@ export default function ClassroomPage() {
 
   const handleEditQuiz = async (postId: string) => {
     console.log('handleEditQuiz called with postId:', postId);
+    // Ensure any post edit modal is closed so it doesn't block the quiz editor
+    try { setShowEditModal(false); } catch {}
+    
+    // Helper to retry transient network failures (e.g. QUIC idle timeouts)
+    const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
+    let quizCheck: { is_draft: boolean; scheduled_open_at: string | null; status: string } | null = null;
+    let lastError: any = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const { data, error } = await supabase
+        .from('quizzes')
+        .select('is_draft, scheduled_open_at, status')
+        .eq('post_id', postId)
+        .maybeSingle();
+      if (data) { quizCheck = data as any; break; }
+      lastError = error;
+      // Retry only on obvious network/transient errors
+      const msg = (error as any)?.message || '';
+      if (msg.includes('QUIC') || msg.includes('timeout') || msg.includes('Failed to fetch')) {
+        await sleep(500);
+        continue;
+      }
+      break;
+    }
+
+    // If check failed due to network, continue to try loading full quiz for edit (server-side RPC will still guard updates)
+    if (!quizCheck && lastError) {
+      toast({ title: 'Network issue', description: 'Connection hiccup while checking quiz status. Attempting to open editor…' });
+    }
+
     const quizEditData = await loadQuizForEdit(postId);
     console.log('Quiz edit data loaded:', quizEditData);
     if (quizEditData) {
+      // If we have quiz data, enforce editability based on draft/schedule as a second-line check
+      const editableNow = quizEditData.quizFormData.is_draft ||
+        (quizEditData.quizFormData.scheduled_open_at && new Date(quizEditData.quizFormData.scheduled_open_at) > new Date());
+      if (!editableNow) {
+        toast({
+          title: 'Cannot Edit Quiz',
+          description: 'This quiz has already been published and opened for students. Published quizzes cannot be edited after their scheduled open time.',
+          variant: 'destructive'
+        });
+        return;
+      }
       console.log('Setting editing quiz data...');
       setEditingQuizData(quizEditData.quizFormData);
       setEditingQuizId(quizEditData.quizId);
       setIsEditingQuiz(true);
       console.log('State updated - isEditingQuiz:', true, 'editingQuizId:', quizEditData.quizId);
-      // Force a small delay to ensure state updates
+      toast({ title: 'Quiz Editor', description: 'Editor opened. You can update and save as draft or publish.' });
+      // Safety: if for any reason the dialog fails to mount on first pass (overlay stacking, etc.),
+      // re-assert the open state shortly after to force render.
       setTimeout(() => {
-        console.log('After timeout - editingQuizData should be set');
-      }, 100);
+        console.log('Reasserting quiz editor open state');
+        setIsEditingQuiz(prev => (prev ? prev : true));
+      }, 75);
     } else {
       console.error('Failed to load quiz data for editing');
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to load quiz for editing', 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -1206,19 +1237,25 @@ export default function ClassroomPage() {
   const loadFeed = async (classroomId: string) => {
     const { data, error } = await supabase.rpc("get_classroom_feed", { classroom_id_param: classroomId });
     if (!error) {
-      const postsWithAttachments = await Promise.all(
-        (data || []).map(async (post: any) => {
-          const { data: attachments } = await supabase
-            .from('classroom_post_attachments')
-            .select('*')
-            .eq('post_id', post.post_id);
-          
-          return {
-            ...post,
-            attachments: attachments || []
-          };
-        })
-      );
+      const posts: any[] = data || [];
+      const postIds = posts.map(p => p.post_id);
+      let attachmentsByPost: Record<string, any[]> = {};
+      if (postIds.length > 0) {
+        const { data: allAttachments } = await supabase
+          .from('classroom_post_attachments')
+          .select('*')
+          .in('post_id', postIds);
+        if (allAttachments && allAttachments.length > 0) {
+          attachmentsByPost = allAttachments.reduce((acc: Record<string, any[]>, att: any) => {
+            (acc[att.post_id] = acc[att.post_id] || []).push(att);
+            return acc;
+          }, {});
+        }
+      }
+      const postsWithAttachments = posts.map(post => ({
+        ...post,
+        attachments: attachmentsByPost[post.post_id] || []
+      }));
       setFeed(postsWithAttachments);
       
       // Load quiz submission statuses for enrolled students
@@ -1597,7 +1634,7 @@ export default function ClassroomPage() {
           )}
 
           {/* Quiz Edit Modal */}
-          {isEditingQuiz && editingQuizData && (
+          {isEditingQuiz && (
             <Dialog open={isEditingQuiz} onOpenChange={setIsEditingQuiz}>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
@@ -1606,13 +1643,17 @@ export default function ClassroomPage() {
                     Make changes to your quiz. Changes will be saved immediately.
                   </DialogDescription>
                 </DialogHeader>
-                <QuizCreationForm
-                  initialData={editingQuizData}
-                  isEditMode={true}
-                  onSubmit={handleSubmitQuizEdit}
-                  isSubmitting={false}
-                  hideSubmitButton={false}
-                />
+                {editingQuizData ? (
+                  <QuizCreationForm
+                    initialData={editingQuizData}
+                    isEditMode={true}
+                    onSubmit={handleSubmitQuizEdit}
+                    isSubmitting={false}
+                    hideSubmitButton={false}
+                  />
+                ) : (
+                  <div className="p-6 text-center text-sm text-gray-600">Loading quiz editor…</div>
+                )}
               </DialogContent>
             </Dialog>
           )}

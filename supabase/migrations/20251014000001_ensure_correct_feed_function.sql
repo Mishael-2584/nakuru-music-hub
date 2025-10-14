@@ -1,6 +1,9 @@
--- Fix draft quiz visibility by checking user's actual role, not just teacher existence
--- Date: 2025-10-13
--- Issue: Same person can be both student and teacher, need to check which role they're using
+-- Ensure get_classroom_feed function is using the correct implementation
+-- Date: 2025-10-14
+-- This migration ensures the function doesn't rely on profiles.role to determine
+-- whether the current user is the teacher of THIS classroom. The profiles table
+-- stores all users (admin, teacher, student), but classroom ownership must be
+-- verified via the teachers/classrooms relationship.
 
 DROP FUNCTION IF EXISTS get_classroom_feed(UUID);
 
@@ -27,16 +30,19 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-  user_role TEXT;
+  is_teacher BOOLEAN;
   teacher_id_var UUID;
 BEGIN
-  -- Get the user's role from profiles table
-  SELECT role INTO user_role
-  FROM profiles
-  WHERE user_id = auth.uid();
+  -- Check if the current user is a teacher of this classroom
+  SELECT EXISTS(
+    SELECT 1 FROM classrooms c
+    INNER JOIN teachers t ON c.teacher_id = t.id
+    WHERE c.id = classroom_id_param 
+    AND t.user_id = auth.uid()
+  ) INTO is_teacher;
 
-  -- Get the teacher_id if the user has teacher role
-  IF user_role = 'teacher' THEN
+  -- Get the teacher_id if the user is a teacher
+  IF is_teacher THEN
     SELECT t.id INTO teacher_id_var
     FROM teachers t
     WHERE t.user_id = auth.uid();
@@ -66,19 +72,20 @@ BEGIN
   WHERE cp.classroom_id = classroom_id_param
     AND (
       -- Teachers can see all their own posts (including drafts)
-      (user_role = 'teacher' AND cp.author_teacher_id = teacher_id_var)
+      (is_teacher AND cp.author_teacher_id = teacher_id_var)
       OR
-      -- Students can only see:
+      -- Students can see:
       -- 1. Non-quiz posts
-      -- 2. Published quizzes that are not drafts and are either not scheduled or scheduled time has passed
-      (user_role = 'student' AND (
+      -- 2. Published quizzes (regardless of scheduled time - UI will handle access restrictions)
+      -- 3. Draft quizzes WITH scheduled time (UI will show as restricted)
+      -- 4. NOT draft quizzes WITHOUT scheduled time (completely hidden)
+      (NOT is_teacher AND (
         q.id IS NULL  -- Non-quiz posts
         OR
-        (q.is_draft = FALSE AND (q.scheduled_open_at IS NULL OR q.scheduled_open_at <= NOW()))  -- Published, available quizzes
+        q.is_draft = FALSE  -- Published quizzes (all visible, UI handles access)
+        OR
+        (q.is_draft = TRUE AND q.scheduled_open_at IS NOT NULL)  -- Draft with scheduled time (show as restricted)
       ))
-      OR
-      -- Admins can see all posts
-      (user_role = 'admin')
     )
   ORDER BY cp.created_at DESC;
 END;
@@ -88,5 +95,5 @@ $$;
 GRANT EXECUTE ON FUNCTION get_classroom_feed(UUID) TO authenticated;
 
 -- Add comments
-COMMENT ON FUNCTION get_classroom_feed(UUID) IS 'Returns classroom feed with proper visibility based on user role: teachers see all their posts including drafts, students only see non-draft quizzes that have passed their scheduled open time, admins see all';
+COMMENT ON FUNCTION get_classroom_feed(UUID) IS 'Returns classroom feed with correct visibility logic. Uses teachers table to check teacher status, NOT profiles.role (which is only for admins). Teachers see all posts, students see published quizzes and draft quizzes with scheduled times (shown as restricted), but NOT draft quizzes without scheduled times';
 

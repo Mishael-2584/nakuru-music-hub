@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,13 @@ export default function QuizQuestionEditor({
   const [newMatchingRight, setNewMatchingRight] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  // Initialize preview when editing an existing question
+  useEffect(() => {
+    if (question.image_url && !imagePreview) {
+      setImagePreview(question.image_url);
+    }
+  }, [question.image_url]);
 
   const updateQuestion = (updates: Partial<QuizQuestionFormData>) => {
     onChange({ ...question, ...updates });
@@ -234,9 +241,9 @@ export default function QuizQuestionEditor({
               Require image attachment from students
             </label>
           </div>
-          
-          {question.has_image_attachment && (
-            <div className="space-y-3">
+          {/* Teacher reference image upload: available regardless of the checkbox */}
+          <div className="space-y-3">
+            {question.has_image_attachment && (
               <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
                 <p className="font-medium">Image Attachment Instructions:</p>
                 <p>Students will be required to upload an image when answering this question. This is useful for questions like:</p>
@@ -246,56 +253,55 @@ export default function QuizQuestionEditor({
                   <li>"Show your completed assignment"</li>
                 </ul>
               </div>
-              
-              {/* Optional: Teacher can upload reference image */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Reference Image (Optional)
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Reference Image (Optional)
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  id={`image-upload-${index}`}
+                />
+                <label
+                  htmlFor={`image-upload-${index}`}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50"
+                >
+                  <Upload className="h-4 w-4" />
+                  {imagePreview ? 'Change Reference Image' : 'Upload Reference Image'}
                 </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    id={`image-upload-${index}`}
-                  />
-                  <label
-                    htmlFor={`image-upload-${index}`}
-                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50"
-                  >
-                    <Upload className="h-4 w-4" />
-                    Upload Reference Image
-                  </label>
-                  {imagePreview && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={removeImage}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <X className="h-4 w-4" />
-                      Remove
-                    </Button>
-                  )}
-                </div>
-                
                 {imagePreview && (
-                  <div className="mt-3">
-                    <img
-                      src={imagePreview}
-                      alt="Reference"
-                      className="max-w-xs max-h-48 object-contain border rounded-lg"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Reference image for this question
-                    </p>
-                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={removeImage}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <X className="h-4 w-4" />
+                    Remove
+                  </Button>
                 )}
               </div>
+
+              {imagePreview && (
+                <div className="mt-3">
+                  <img
+                    src={imagePreview}
+                    alt="Reference"
+                    className="max-w-xs max-h-48 object-contain border rounded-lg"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Reference image for this question
+                  </p>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Multiple Choice Answers */}

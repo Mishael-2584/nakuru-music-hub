@@ -737,7 +737,7 @@ const TeacherDashboard = () => {
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('classroom_posts')
         .select(`
-          post_id,
+          id:post_id,
           content,
           assignment_title,
           due_date,
