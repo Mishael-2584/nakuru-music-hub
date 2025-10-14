@@ -74,16 +74,23 @@ export default function QuizCreationForm({
 
   // Get validation message for why quiz can't be submitted
   const getValidationMessage = () => {
-    if (!quizData.title.trim()) return "Please enter a quiz title";
-    if (quizData.questions.length === 0) return "Please add at least one question";
+    if (!quizData.title.trim()) return "Quiz title cannot be empty";
+    if (quizData.questions.length === 0) return "Please add at least one question to the quiz";
     
     for (let i = 0; i < quizData.questions.length; i++) {
       const q = quizData.questions[i];
+      if (!q.question_text.trim()) return `Question ${i + 1}: Question text cannot be empty`;
+      
       if (q.question_type === 'multiple_choice' || q.question_type === 'true_false') {
-        if (q.answers.length < 2) return `Question ${i + 1}: Please add at least 2 answer options`;
-        if (!q.answers.some(a => a.is_correct)) return `Question ${i + 1}: Please select at least one correct answer`;
+        if (q.answers.length < 2) return `Question ${i + 1}: Must have at least 2 answer options`;
+        if (!q.answers.some(a => a.is_correct)) {
+          return `Question ${i + 1}: You must select the correct answer before submitting`;
+        }
       } else if (q.question_type === 'matching') {
-        if (q.matching_pairs.length < 2) return `Question ${i + 1}: Please add at least 2 matching pairs`;
+        if (q.matching_pairs.length < 2) return `Question ${i + 1}: Must have at least 2 matching pairs`;
+        if (q.matching_pairs.some(p => !p.left.trim() || !p.right.trim())) {
+          return `Question ${i + 1}: All matching pairs must have text`;
+        }
       }
     }
     return "";

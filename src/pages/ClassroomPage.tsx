@@ -114,6 +114,16 @@ export default function ClassroomPage() {
   const [editingQuizData, setEditingQuizData] = useState<QuizFormData | null>(null);
   const [editingQuizId, setEditingQuizId] = useState<string | null>(null);
   const [showTeacherPreview, setShowTeacherPreview] = useState(false);
+  
+  // Debug: Log when editing state changes
+  useEffect(() => {
+    console.log('Edit quiz state changed:', {
+      isEditingQuiz,
+      hasEditingQuizData: !!editingQuizData,
+      editingQuizId,
+      editingQuizDataTitle: editingQuizData?.title
+    });
+  }, [isEditingQuiz, editingQuizData, editingQuizId]);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -502,12 +512,15 @@ export default function ClassroomPage() {
   // Load quiz data for editing
   const loadQuizForEdit = async (postId: string) => {
     try {
+      console.log('Loading quiz for edit, postId:', postId);
       // Get quiz data with all fields needed for editing
       const { data: quizData, error: quizError } = await supabase
         .from('quizzes')
         .select('*')
         .eq('post_id', postId)
         .single();
+
+      console.log('Quiz data from DB:', quizData, 'Error:', quizError);
 
       if (quizError || !quizData) {
         toast({ title: 'Error', description: 'Quiz not found', variant: 'destructive' });
@@ -587,6 +600,9 @@ export default function ClassroomPage() {
         questions: formattedQuestions
       };
 
+      console.log('Formatted quiz data for editing:', quizFormData);
+      console.log('Number of questions:', formattedQuestions.length);
+      
       return { quizFormData, quizId: quizData.id };
     } catch (error) {
       console.error('Error loading quiz for edit:', error);
@@ -1090,11 +1106,21 @@ export default function ClassroomPage() {
   };
 
   const handleEditQuiz = async (postId: string) => {
+    console.log('handleEditQuiz called with postId:', postId);
     const quizEditData = await loadQuizForEdit(postId);
+    console.log('Quiz edit data loaded:', quizEditData);
     if (quizEditData) {
+      console.log('Setting editing quiz data...');
       setEditingQuizData(quizEditData.quizFormData);
       setEditingQuizId(quizEditData.quizId);
       setIsEditingQuiz(true);
+      console.log('State updated - isEditingQuiz:', true, 'editingQuizId:', quizEditData.quizId);
+      // Force a small delay to ensure state updates
+      setTimeout(() => {
+        console.log('After timeout - editingQuizData should be set');
+      }, 100);
+    } else {
+      console.error('Failed to load quiz data for editing');
     }
   };
 
