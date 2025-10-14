@@ -485,7 +485,20 @@ export default function QuizPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(-1)}
+                onClick={() => {
+                  // Try to close the tab if it was opened as a new tab
+                  if (window.history.length <= 1) {
+                    window.close();
+                    // If window.close() doesn't work (browser security), try to navigate back
+                    setTimeout(() => {
+                      if (!window.closed) {
+                        navigate(-1);
+                      }
+                    }, 100);
+                  } else {
+                    navigate(-1);
+                  }
+                }}
                 className="flex items-center gap-2"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -544,7 +557,20 @@ export default function QuizPage() {
               setTimerCompleted(false);
             }}
             canRetake={quizData.max_attempts > 1}
-            onBack={() => navigate(-1)}
+            onBack={() => {
+              // Try to close the tab if it was opened as a new tab
+              if (window.history.length <= 1) {
+                window.close();
+                // If window.close() doesn't work (browser security), try to navigate back
+                setTimeout(() => {
+                  if (!window.closed) {
+                    navigate(-1);
+                  }
+                }, 100);
+              } else {
+                navigate(-1);
+              }
+            }}
           />
         )}
       </div>

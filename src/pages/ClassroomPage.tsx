@@ -1601,7 +1601,7 @@ export default function ClassroomPage() {
             <QuizResultsDisplay
               result={{
                 submission: currentQuizSubmission,
-                answers: [], // Would need to load these
+                answers: [],
                 questions: quizQuestions,
                 showAnswers: quizData?.show_answers_after || false
               }}
@@ -1612,6 +1612,12 @@ export default function ClassroomPage() {
                 setTimerCompleted(false);
               }}
               canRetake={true}
+              onBack={() => {
+                setShowQuizResults(false);
+                setCurrentQuizSubmission(null);
+                setTimerStarted(false);
+                setTimerCompleted(false);
+              }}
             />
           )}
 
@@ -1715,18 +1721,23 @@ export default function ClassroomPage() {
                                   ⏱️ {post.quiz_time_limit} min
                                 </Badge>
                               )}
-                              {quizSubmissionStatuses[post.post_id] && (
-                                <Badge 
-                                  variant="outline" 
-                                  className={`${
-                                    quizSubmissionStatuses[post.post_id].is_passed 
-                                      ? 'text-green-600 border-green-200 bg-green-50' 
-                                      : 'text-red-600 border-red-200 bg-red-50'
-                                  }`}
-                                >
-                                  {quizSubmissionStatuses[post.post_id].is_passed ? '✅ Passed' : '❌ Failed'}
-                                </Badge>
-                              )}
+                      {quizSubmissionStatuses[post.post_id] && (
+                        <>
+                          <Badge 
+                            variant="outline" 
+                            className={`${
+                              quizSubmissionStatuses[post.post_id].is_passed 
+                                ? 'text-green-600 border-green-200 bg-green-50' 
+                                : 'text-red-600 border-red-200 bg-red-50'
+                            }`}
+                          >
+                            {quizSubmissionStatuses[post.post_id].is_passed ? '✅ Passed' : '❌ Failed'}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs px-2 py-0 bg-blue-50 text-blue-700 border-blue-200">
+                            Submitted
+                          </Badge>
+                        </>
+                      )}
                             </div>
                             <div className="flex gap-2">
                               {quizSubmissionStatuses[post.post_id] ? (
@@ -1738,7 +1749,7 @@ export default function ClassroomPage() {
                                   }}
                                   className="text-blue-600 border-blue-200 hover:bg-blue-50"
                                 >
-                                  View Results
+                                  View Quiz
                                 </Button>
                               ) : (
                                 <Button

@@ -199,6 +199,25 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
     }
   };
 
+  const diagnoseAccess = async () => {
+    try {
+      const { data, error } = await supabase.rpc('diagnose_student_access');
+      if (error) throw error;
+      console.log('Access diagnosis:', data);
+      toast({
+        title: "Access Diagnosis",
+        description: `User ID: ${data[0]?.user_id}, Has student record: ${data[0]?.has_student_record}, Can access students: ${data[0]?.can_access_students}`,
+      });
+    } catch (error: any) {
+      console.error('Diagnosis error:', error);
+      toast({
+        title: "Diagnosis Error",
+        description: error.message || "Failed to diagnose access",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="w-full max-w-xs">
       <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm rounded-xl">
@@ -325,9 +344,12 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
                 </div>
               )}
               {isLogin && (
-                <div className="text-center mt-3">
+                <div className="text-center mt-3 space-y-2">
                   <Button variant="link" type="button" className="text-sm text-blue-600 hover:text-blue-700 transition-colors duration-200" onClick={() => setShowForgot(true)}>
                     Forgot Password?
+                  </Button>
+                  <Button variant="link" type="button" className="text-sm text-gray-600 hover:text-gray-700 transition-colors duration-200" onClick={diagnoseAccess}>
+                    Diagnose Access
                   </Button>
                 </div>
               )}
