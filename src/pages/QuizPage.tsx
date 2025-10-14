@@ -60,7 +60,9 @@ export default function QuizPage() {
             show_answers_after,
             show_marks_immediately,
             passing_score,
-            max_attempts
+            max_attempts,
+            scheduled_open_at,
+            status
           `)
           .eq('post_id', postId)
           .single();
@@ -193,6 +195,32 @@ export default function QuizPage() {
         }
       }
 
+      const quizScheduledOpenAt = quiz.scheduled_open_at || quiz.quiz_scheduled_open_at;
+      const isScheduled = quizScheduledOpenAt && new Date(quizScheduledOpenAt) > new Date();
+      
+      // Check if quiz is scheduled and not yet open
+      if (isScheduled) {
+        toast({
+          title: 'Quiz Not Available',
+          description: `This quiz opens on ${new Date(quizScheduledOpenAt).toLocaleString()}. Please come back at that time.`,
+          variant: 'destructive'
+        });
+        setIsLoading(false);
+        // Set quiz data to show restriction message
+        setQuizData({
+          id: quiz.quiz_id,
+          title: quiz.quiz_title,
+          description: quiz.quiz_description,
+          time_limit_minutes: quiz.time_limit_minutes,
+          show_answers_after: quiz.show_answers_after,
+          show_marks_immediately: quiz.show_marks_immediately,
+          passing_score: quiz.passing_score,
+          max_attempts: quiz.max_attempts,
+          scheduled_open_at: quizScheduledOpenAt
+        });
+        return;
+      }
+      
       setQuizData({
         id: quiz.quiz_id,
         title: quiz.quiz_title,
@@ -201,7 +229,8 @@ export default function QuizPage() {
         show_answers_after: quiz.show_answers_after,
         show_marks_immediately: quiz.show_marks_immediately,
         passing_score: quiz.passing_score,
-        max_attempts: quiz.max_attempts
+        max_attempts: quiz.max_attempts,
+        scheduled_open_at: quizScheduledOpenAt
       });
       setQuizQuestions(questions);
       setQuizAnswers(answers);
@@ -471,6 +500,37 @@ export default function QuizPage() {
             Go Back
           </Button>
         </div>
+      </div>
+    );
+  }
+
+  // Check if quiz is scheduled and not yet open
+  const isQuizLocked = quizData.scheduled_open_at && new Date(quizData.scheduled_open_at) > new Date();
+  
+  if (isQuizLocked && quizQuestions.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="h-8 w-8 text-yellow-600" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">🔒 Quiz Not Yet Available</h2>
+            <p className="text-gray-600 mb-4">
+              This quiz is scheduled to open on:
+            </p>
+            <Badge variant="outline" className="text-lg px-4 py-2 text-yellow-600 border-yellow-300 bg-yellow-50 mb-6">
+              {new Date(quizData.scheduled_open_at).toLocaleString()}
+            </Badge>
+            <p className="text-sm text-gray-500 mb-6">
+              Please come back at the scheduled time to start the quiz.
+            </p>
+            <Button onClick={() => navigate(-1)} variant="outline">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Classroom
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

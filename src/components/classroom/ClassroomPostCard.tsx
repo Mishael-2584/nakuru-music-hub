@@ -90,6 +90,17 @@ export default function ClassroomPostCard({
   const isOverdue = post.due_date && new Date(post.due_date) < new Date();
   const isDueSoon = post.due_date && new Date(post.due_date).getTime() - new Date().getTime() < 24 * 60 * 60 * 1000;
 
+  // Debug: Log quiz scheduled time
+  if (post.has_quiz) {
+    console.log('ClassroomPostCard - Quiz post:', {
+      post_id: post.post_id,
+      has_quiz: post.has_quiz,
+      quiz_scheduled_open_at: post.quiz_scheduled_open_at,
+      quiz_is_draft: post.quiz_is_draft,
+      isTeacher: isTeacher
+    });
+  }
+
   const handleExtendDeadline = () => {
     if (!newDueDate) return;
     onExtendDeadline?.(post.post_id, newDueDate);
@@ -163,6 +174,16 @@ export default function ClassroomPostCard({
                     <Badge variant="outline" className="text-xs px-2 py-0 bg-gray-100 text-gray-700 border-gray-200">
                       🕐 Upcoming
                     </Badge>
+                  )}
+                  {/* Show scheduled opening time for all users */}
+                  {post.quiz_scheduled_open_at && (
+                    <span className="text-xs text-gray-600 flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {new Date(post.quiz_scheduled_open_at) > new Date() 
+                        ? `Opens ${formatDistanceToNow(new Date(post.quiz_scheduled_open_at), { addSuffix: true })}`
+                        : `Opened ${formatDistanceToNow(new Date(post.quiz_scheduled_open_at), { addSuffix: true })}`
+                      }
+                    </span>
                   )}
                 </>
               )}

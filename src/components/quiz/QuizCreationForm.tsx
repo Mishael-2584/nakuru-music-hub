@@ -345,15 +345,36 @@ export default function QuizCreationForm({
             </label>
             <Input
               type="datetime-local"
-              value={quizData.scheduled_open_at ? new Date(quizData.scheduled_open_at).toISOString().slice(0, 16) : ''}
-              onChange={(e) => setQuizData({ 
-                ...quizData, 
-                scheduled_open_at: e.target.value ? new Date(e.target.value).toISOString() : undefined 
-              })}
+              value={quizData.scheduled_open_at ? (() => {
+                const date = new Date(quizData.scheduled_open_at);
+                // Get local datetime string in format YYYY-MM-DDTHH:mm
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `${year}-${month}-${day}T${hours}:${minutes}`;
+              })() : ''}
+              onChange={(e) => {
+                if (e.target.value) {
+                  // Convert local datetime-local value to ISO string maintaining local time
+                  const localDateTime = e.target.value; // Format: YYYY-MM-DDTHH:mm
+                  const dateObj = new Date(localDateTime);
+                  setQuizData({ 
+                    ...quizData, 
+                    scheduled_open_at: dateObj.toISOString()
+                  });
+                } else {
+                  setQuizData({ 
+                    ...quizData, 
+                    scheduled_open_at: undefined 
+                  });
+                }
+              }}
               placeholder="Leave empty to publish immediately"
             />
             <p className="text-xs text-gray-500 mt-1">
-              If set, the quiz will only be available to students after this date and time.
+              If set, the quiz will only be available to students after this date and time. (Your local timezone)
             </p>
           </div>
 

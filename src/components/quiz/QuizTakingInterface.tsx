@@ -51,7 +51,7 @@ export default function QuizTakingInterface({
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [studentAnswers, setStudentAnswers] = useState<StudentQuizAnswer[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showReview, setShowReview] = useState(false);
+  const [showReview, setShowReview] = useState(true);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [imageFiles, setImageFiles] = useState<Record<string, File>>({});
   const [imagePreviews, setImagePreviews] = useState<Record<string, string>>({});
@@ -230,104 +230,57 @@ export default function QuizTakingInterface({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Quiz Header */}
-      <Card className="border-l-4 border-l-purple-500">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-xl">{quiz.title}</CardTitle>
-              {quiz.description && (
-                <p className="text-gray-600 mt-1">{quiz.description}</p>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-sm">
-                Question {currentQuestionIndex + 1} of {questions.length}
-              </Badge>
-              <Badge variant="outline" className="text-sm">
-                {getAnsweredCount()} answered
-              </Badge>
-            </div>
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* Top Navigation Bar - Similar to ABRSM */}
+      <div className="bg-white border-b shadow-sm sticky top-0 z-10">
+        <div className="flex items-center justify-between px-6 py-3">
+          {/* Left: Quiz Title */}
+          <div>
+            <h1 className="text-lg font-semibold">{quiz.title}</h1>
+            {quiz.description && (
+              <p className="text-sm text-gray-600">{quiz.description}</p>
+            )}
           </div>
-        </CardHeader>
-      </Card>
-
-      {/* Timer */}
-      {timeLimitMinutes && !isTeacherPreview && (
-        <div className="mb-4">
-          <AssignmentTimer
-            timeLimitMinutes={timeLimitMinutes}
-            onTimeUp={() => {
-              if (!timerCompleted && !isSubmitting) {
-                console.log('Timer expired, auto-submitting quiz');
-                handleSubmit();
-              }
-            }}
-            onStartTimer={onStartTimer}
-            isStarted={timerStarted}
-            isCompleted={timerCompleted}
-          />
+          
+          {/* Right: Controls */}
+          <div className="flex items-center gap-4">
+            {/* Question Progress Badge */}
+            <Badge variant="outline" className="text-sm">
+              Question {currentQuestionIndex + 1} of {questions.length}
+            </Badge>
+            
+            {/* End Test Button - Only show on last question */}
+            {!isTeacherPreview && currentQuestionIndex === questions.length - 1 && (
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting || timerCompleted}
+                variant="outline"
+                className="border-gray-300 hover:bg-gray-50"
+              >
+                {isSubmitting ? 'Submitting...' : 'End Test'}
+              </Button>
+            )}
+            
+            {/* Timer */}
+            {timeLimitMinutes && !isTeacherPreview && (
+              <div className="flex items-center">
+                <AssignmentTimer
+                  timeLimitMinutes={timeLimitMinutes}
+                  onTimeUp={() => {
+                    if (!timerCompleted && !isSubmitting) {
+                      console.log('Timer expired, auto-submitting quiz');
+                      handleSubmit();
+                    }
+                  }}
+                  onStartTimer={onStartTimer}
+                  isStarted={timerStarted}
+                  isCompleted={timerCompleted}
+                />
+              </div>
+            )}
+          </div>
         </div>
-      )}
-
-      {/* Question Navigation */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold">Question Navigation</h3>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowReview(!showReview)}
-              className="flex items-center gap-2"
-            >
-              {showReview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              {showReview ? 'Hide Review' : 'Show Review'}
-            </Button>
-          </div>
-          
-          {showReview && (
-            <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 mb-4">
-              {questions.map((question, index) => (
-                <Button
-                  key={question.id}
-                  variant={index === currentQuestionIndex ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setCurrentQuestionIndex(index)}
-                  className={`h-8 w-8 p-0 ${
-                    isQuestionAnswered(question.id) 
-                      ? 'bg-green-100 text-green-800 border-green-300' 
-                      : ''
-                  }`}
-                >
-                  {index + 1}
-                </Button>
-              ))}
-            </div>
-          )}
-          
-          <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
-              disabled={currentQuestionIndex === 0}
-            >
-              Previous
-            </Button>
-            <span className="text-sm text-gray-600">
-              {currentQuestionIndex + 1} of {questions.length}
-            </span>
-            <Button
-              variant="outline"
-              onClick={() => setCurrentQuestionIndex(Math.min(questions.length - 1, currentQuestionIndex + 1))}
-              disabled={currentQuestionIndex === questions.length - 1}
-            >
-              Next
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      </div>
 
       {/* Current Question */}
       <Card>
@@ -597,19 +550,73 @@ export default function QuizTakingInterface({
         </CardContent>
       </Card>
 
-      {/* Submit Button */}
-      {!isTeacherPreview && (
-        <div className="flex justify-center pt-4">
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting || timerCompleted}
-            className="bg-purple-600 hover:bg-purple-700 px-8"
-          >
-            {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
-          </Button>
+      {/* Bottom Navigation - ABRSM Style */}
+      <div className="bg-white border-t shadow-sm fixed bottom-0 left-0 right-0 z-10">
+        <div className="max-w-6xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            {/* Previous Button */}
+            <Button
+              variant="outline"
+              onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
+              disabled={currentQuestionIndex === 0}
+              className="min-w-[100px]"
+            >
+              Prev
+            </Button>
+            
+            {/* Question Dots Navigation */}
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              {questions.map((question, index) => (
+                <button
+                  key={question.id}
+                  onClick={() => setCurrentQuestionIndex(index)}
+                  className={`w-10 h-10 rounded-md flex items-center justify-center text-sm font-medium transition-all ${
+                    index === currentQuestionIndex
+                      ? 'bg-red-500 text-white'
+                      : isQuestionAnswered(question.id)
+                      ? 'bg-green-500 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                  title={`Question ${index + 1}${isQuestionAnswered(question.id) ? ' (Answered)' : ''}`}
+                >
+                  {index + 1}
+                </button>
+              ))}
+            </div>
+            
+            {/* Next Button */}
+            <Button
+              variant="outline"
+              onClick={() => setCurrentQuestionIndex(Math.min(questions.length - 1, currentQuestionIndex + 1))}
+              disabled={currentQuestionIndex === questions.length - 1}
+              className="min-w-[100px]"
+            >
+              Next
+            </Button>
+          </div>
+          
+          {/* Info/Legend */}
+          <div className="flex items-center justify-center gap-4 mt-3 text-xs text-gray-600">
+            <div className="flex items-center gap-1">
+              <div className="w-4 h-4 rounded bg-red-500"></div>
+              <span>Current</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-4 h-4 rounded bg-green-500"></div>
+              <span>Answered</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-4 h-4 rounded bg-gray-200"></div>
+              <span>Not Answered</span>
+            </div>
+          </div>
         </div>
-      )}
+      </div>
       
+      {/* Add bottom padding to prevent content from being hidden by fixed navigation */}
+      <div className="h-32"></div>
+
+      {/* Teacher Preview Badge */}
       {isTeacherPreview && (
         <div className="flex justify-center pt-4">
           <Badge variant="outline" className="bg-blue-100 text-blue-700 px-4 py-2 text-sm">

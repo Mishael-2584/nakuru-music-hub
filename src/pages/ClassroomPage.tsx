@@ -1238,6 +1238,15 @@ export default function ClassroomPage() {
     const { data, error } = await supabase.rpc("get_classroom_feed", { classroom_id_param: classroomId });
     if (!error) {
       const posts: any[] = data || [];
+      
+      // Debug: Log quiz scheduled times
+      console.log('Feed posts with quiz scheduled times:', posts.filter(p => p.has_quiz).map(p => ({
+        post_id: p.post_id,
+        has_quiz: p.has_quiz,
+        quiz_scheduled_open_at: p.quiz_scheduled_open_at,
+        quiz_is_draft: p.quiz_is_draft
+      })));
+      
       const postIds = posts.map(p => p.post_id);
       let attachmentsByPost: Record<string, any[]> = {};
       if (postIds.length > 0) {
@@ -1721,6 +1730,11 @@ export default function ClassroomPage() {
                                   ⏱️ {post.quiz_time_limit} min
                                 </Badge>
                               )}
+                              {post.quiz_scheduled_open_at && new Date(post.quiz_scheduled_open_at) > new Date() && (
+                                <Badge variant="outline" className="text-yellow-600 border-yellow-200 bg-yellow-50">
+                                  🔒 Opens {new Date(post.quiz_scheduled_open_at).toLocaleString()}
+                                </Badge>
+                              )}
                       {quizSubmissionStatuses[post.post_id] && (
                         <>
                           <Badge 
@@ -1750,6 +1764,16 @@ export default function ClassroomPage() {
                                   className="text-blue-600 border-blue-200 hover:bg-blue-50"
                                 >
                                   View Quiz
+                                </Button>
+                              ) : post.quiz_scheduled_open_at && new Date(post.quiz_scheduled_open_at) > new Date() ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled
+                                  className="text-gray-500 border-gray-200 cursor-not-allowed"
+                                  title={`Quiz opens on ${new Date(post.quiz_scheduled_open_at).toLocaleString()}`}
+                                >
+                                  🔒 Quiz Locked
                                 </Button>
                               ) : (
                                 <Button
