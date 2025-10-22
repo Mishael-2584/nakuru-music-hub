@@ -269,6 +269,8 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   let paymentType = 'monthly'; // Default
   if (courseCategory === 'production' || courseCategory === 'photography') {
     paymentType = 'term';
+  } else if (courseCategory === 'Technology') {
+    paymentType = 'per_class'; // Technology courses use per_class billing
   }
   
   console.log('Determined payment type:', paymentType, 'for course category:', courseCategory);
@@ -297,6 +299,11 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   if (normalizedCourseCategory === 'art') {
     normalizedCourseCategory = 'art';
     normalizedInstrument = 'Art Classes'; // canonical name for art in fees table
+  } else if (normalizedCourseCategory === 'technology') {
+    normalizedCourseCategory = 'technology';
+    // For technology courses, always use 'Web Design & Programming' as the course name
+    // This ensures we find the correct Technology fee
+    normalizedInstrument = 'Web Design & Programming';
   }
   
   // First try to find exact match with normalized learning mode and correct payment type
@@ -343,8 +350,25 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
         fee = typeFee;
         console.log('Found fee by course_type only with payment type:', fee);
       } else {
-        // Fallback 3: For termly courses, try to find any term fee for the course category
-        if (paymentType === 'term') {
+        // Fallback 3: For Technology courses, prioritize 1-on-1 fee
+        if (normalizedCourseCategory === 'technology' && paymentType === 'per_class') {
+          const { data: techFee, error: techFeeError } = await supabase
+            .from('fees')
+            .select('*')
+            .eq('course_type', 'technology')
+            .eq('course_name', 'Web Design & Programming')
+            .eq('payment_type', 'per_class')
+            .eq('is_active', true)
+            .order('price', { ascending: false }) // Get highest price (1-on-1) first
+            .limit(1)
+            .maybeSingle();
+          
+          if (techFee && !techFeeError) {
+            fee = techFee;
+            console.log('Found Technology 1-on-1 fee:', fee);
+          }
+        } else if (paymentType === 'term') {
+          // Fallback 4: For termly courses, try to find any term fee for the course category
           const { data: termFee, error: termFeeError } = await supabase
             .from('fees')
             .select('*')
@@ -359,7 +383,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
           }
         }
         
-        // Fallback 4: Try to find any fee for the normalized learning mode with correct payment type
+        // Fallback 5: Try to find any fee for the normalized learning mode with correct payment type
         if (!fee) {
           const { data: modeAnyFee, error: modeAnyFeeError } = await supabase
             .from('fees')
@@ -375,7 +399,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
           }
         }
         
-        // Fallback 5: Try to find any active fee with correct payment type
+        // Fallback 6: Try to find any active fee with correct payment type
         if (!fee) {
           const { data: anyFee, error: anyFeeError } = await supabase
             .from('fees')
@@ -522,11 +546,20 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     paymentType: fee.payment_type
   });
   
-  if (fee.payment_type === 'monthly') {
-    // Always set period to current month (1st to last day)
-    periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
-    // Due date should be 7th of the next month after periodEnd
+  if (fee.payment_type === 'monthly' || fee.payment_type === 'per_class') {
+    if (isFirstInvoice) {
+      // First invoice: Full current month (1st to last day of enrollment month)
+      periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+    } else {
+      // Subsequent invoices: Next month billing period
+      const lastInvoice = existingInvoices[existingInvoices.length - 1];
+      const lastPeriodEnd = new Date(lastInvoice.period_end);
+      
+      // Next billing period starts the month after the last invoice
+      periodStart = new Date(lastPeriodEnd.getFullYear(), lastPeriodEnd.getMonth() + 1, 1);
+      periodEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0);
+    }
   } else if (fee.payment_type === 'term') {
     if (isFirstInvoice) {
       // First term: From registration date to 3 months later
@@ -551,8 +584,16 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   const periodStartStr = periodStart.toISOString().slice(0, 10);
   const periodEndStr = periodEnd.toISOString().slice(0, 10);
 
-  // Calculate due_date as 7th of the month after periodEnd (UTC to avoid timezone issues)
-  const dueDateObj = new Date(Date.UTC(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 7));
+  // Calculate due_date based on invoice type
+  let dueDateObj: Date;
+  if (isFirstInvoice) {
+    // First invoice: Due date is the last day of the enrollment month (regardless of payment type)
+    dueDateObj = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate());
+  } else {
+    // Subsequent invoices: Due date is 7th of the month after periodEnd at midnight GMT+3
+    // GMT+3 = UTC+3, so midnight GMT+3 = 21:00 UTC (previous day)
+    dueDateObj = new Date(Date.UTC(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 6, 21, 0, 0, 0));
+  }
   const dueDateStr = dueDateObj.toISOString().slice(0, 10);
 
   // Check for existing invoice for this student/period (temporarily without registration_id)
@@ -609,8 +650,19 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
 
   // Declare invoiceAmount
   let invoiceAmount = 0;
-  // If the fee has a sessions_per_week column, use it for matching
-  if (fee && fee.sessions_per_week) {
+  
+  if (fee.payment_type === 'per_class') {
+    // For per_class payment type (Technology courses): price × sessions_per_week × 4 weeks
+    const numWeeks = 4; // Always 4 weeks for monthly billing
+    invoiceAmount = fee.price * sessionsPerWeek * numWeeks;
+    console.log('Per-class billing calculation:', {
+      pricePerClass: fee.price,
+      sessionsPerWeek,
+      numWeeks,
+      totalAmount: invoiceAmount
+    });
+  } else if (fee && fee.sessions_per_week) {
+    // If the fee has a sessions_per_week column, use it for matching
     // If the fee is for 1 session/week, multiply by sessionsPerWeek
     if (fee.sessions_per_week === 1) {
       invoiceAmount = fee.price * sessionsPerWeek;
@@ -661,11 +713,62 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     }
   }
 
-  // Calculate number of weeks in the invoice period (4 weeks for monthly billing)
-  const numWeeks = 4; // Monthly billing = 4 weeks
+  // Calculate number of weeks in the invoice period
+  // For monthly billing and per_class (Technology), use exactly 4 weeks (28 days) regardless of actual month length
+  let numWeeks: number;
+  if (fee.payment_type === 'monthly' || fee.payment_type === 'per_class') {
+    numWeeks = 4; // Always 4 weeks for monthly billing and Technology per_class billing
+  } else {
+    // For term billing, calculate actual weeks
+    const daysDiff = Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24));
+    numWeeks = Math.ceil(daysDiff / 7);
+  }
   const quantity = sessionsPerWeek * numWeeks;
+  
   // Calculate unit price per session
-  const unitPrice = Math.round((invoiceAmount / quantity) * 100) / 100;
+  let unitPrice: number;
+  if (fee.payment_type === 'per_class') {
+    // For per_class, unit price is the fee price directly
+    unitPrice = fee.price;
+  } else {
+    // For monthly/term, calculate based on total amount and quantity
+    unitPrice = Math.round((invoiceAmount / quantity) * 100) / 100;
+  }
+  
+  // Apply partial month billing logic for subsequent invoices (only for monthly payment type, not Technology)
+  if (!isFirstInvoice && fee.payment_type === 'monthly' && courseCategory !== 'Technology') {
+    // For subsequent invoices, check if student enrolled mid-month in the first month
+    const registrationDate = new Date(registration.created_at);
+    const firstMonthStart = new Date(registrationDate.getFullYear(), registrationDate.getMonth(), 1);
+    
+    // If student enrolled after the 1st of their enrollment month, calculate partial billing
+    if (registrationDate.getDate() > 1) {
+      const daysBeforeEnrollment = registrationDate.getDate() - 1;
+      const sessionsBeforeEnrollment = Math.ceil((daysBeforeEnrollment / 7) * sessionsPerWeek);
+      const deductionAmount = sessionsBeforeEnrollment * unitPrice;
+      
+      // Deduct the amount for sessions before enrollment
+      invoiceAmount = Math.max(0, invoiceAmount - deductionAmount);
+      
+      // Update notes to reflect the deduction
+      if (notes) {
+        notes += ` Deducted KES ${deductionAmount.toLocaleString()} for ${sessionsBeforeEnrollment} sessions before enrollment date.`;
+      } else {
+        notes = `Deducted KES ${deductionAmount.toLocaleString()} for ${sessionsBeforeEnrollment} sessions before enrollment date.`;
+      }
+      
+      console.log('📊 Partial month billing applied:', {
+        enrollmentDate: registrationDate.toISOString().slice(0, 10),
+        daysBeforeEnrollment,
+        sessionsBeforeEnrollment,
+        deductionAmount,
+        adjustedInvoiceAmount: invoiceAmount
+      });
+    }
+  }
+  
+  // For Technology courses (per_class), first invoice is always: per_class price × sessions_per_week × 4 weeks
+  // No partial month logic applies to Technology courses
 
   // Add application fee for first invoice only
   const applicationFee = isFirstInvoice ? 800 : 0;
@@ -677,6 +780,8 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
       return 'Art Classes';
     } else if (registration.course_category === 'Production') {
       return registration.production_type || 'Production';
+    } else if (registration.course_category === 'Technology') {
+      return registration.technology_type || 'Technology';
     } else {
       return registration.instrument || 'Music Lessons';
     }

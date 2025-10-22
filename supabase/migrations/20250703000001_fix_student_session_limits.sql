@@ -31,7 +31,10 @@ BEGIN
       goals,
       preferred_schedule,
       date_of_birth,
-      sessions_per_week
+      sessions_per_week,
+      course_category,
+      production_type,
+      technology_type
     ) VALUES (
       NEW.id,
       NEW.student_name,
@@ -52,7 +55,10 @@ BEGIN
       NEW.goals,
       NEW.preferred_schedule,
       NEW.date_of_birth,
-      COALESCE(NEW.sessions_per_week, 1) -- Use registration sessions_per_week, default to 1
+      COALESCE(NEW.sessions_per_week, 1), -- Use registration sessions_per_week, default to 1
+      NEW.course_category,
+      NEW.production_type,
+      NEW.technology_type
     );
   END IF;
   RETURN NEW;

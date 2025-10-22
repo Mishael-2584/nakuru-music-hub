@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { sendApplicationConfirmationEmail } from '@/lib/emailService';
-import { Music, Users, Award, Star, ArrowRight, ArrowLeft, CheckCircle, MapPin, Phone, Mail, User, Calendar, Guitar, Mic, Palette, Video, Speaker, Music2, Users2 } from "lucide-react";
+import { Music, Users, Award, Star, ArrowRight, ArrowLeft, CheckCircle, MapPin, Phone, Mail, User, Calendar, Guitar, Mic, Palette, Video, Speaker, Music2, Users2, Code } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Registration = () => {
@@ -28,6 +28,7 @@ const Registration = () => {
     instrument: "",
     custom_instrument: "",
     production_type: "",
+    technology_type: "",
     experience: "",
     goals: "",
     preferred_schedule: "",
@@ -109,6 +110,10 @@ const Registration = () => {
 
   const productionTypes = [
     "Music Production", "Live Sound", "Videography"
+  ];
+
+  const technologyTypes = [
+    "Web Design & Programming", "Mobile App Development", "Software Engineering", "Data Science"
   ];
 
   const proficiencyLevels = [
@@ -234,7 +239,7 @@ const Registration = () => {
         break;
       
       case 'course_category':
-        if (!value || !['Music', 'Production', 'Art'].includes(value)) {
+        if (!value || !['Music', 'Production', 'Art', 'Technology'].includes(value)) {
           return { isValid: false, error: 'Please select a valid course category' };
         }
         break;
@@ -258,6 +263,12 @@ const Registration = () => {
       case 'production_type':
         if (formData.course_category === 'Production' && (!value || value.trim().length === 0)) {
           return { isValid: false, error: 'Please select a production type' };
+        }
+        break;
+      
+      case 'technology_type':
+        if (formData.course_category === 'Technology' && (!value || value.trim().length === 0)) {
+          return { isValid: false, error: 'Please select a technology type' };
         }
         break;
       
@@ -335,6 +346,13 @@ const Registration = () => {
         
         if (formData.course_category === 'Production') {
           const validation = validateField('production_type', formData.production_type);
+          if (!validation.isValid) {
+            errors.push(validation.error);
+          }
+        }
+        
+        if (formData.course_category === 'Technology') {
+          const validation = validateField('technology_type', formData.technology_type);
           if (!validation.isValid) {
             errors.push(validation.error);
           }
@@ -452,6 +470,7 @@ const Registration = () => {
         music_subcategory: formData.music_subcategory?.trim() || null,
         instrument: instrumentValue === "Other" ? formData.custom_instrument?.trim() : (instrumentValue?.trim() || "Not specified"),
         production_type: formData.production_type?.trim() || null,
+        technology_type: formData.technology_type?.trim() || null,
         experience: formData.proficiency_level || "beginner",
         proficiency_level: formData.proficiency_level || "beginner",
         learning_mode: formData.learning_mode || "in-person",
@@ -957,8 +976,8 @@ const Registration = () => {
           <Label className="text-sm font-medium text-gray-700">Course Category *</Label>
           <RadioGroup 
             value={formData.course_category} 
-            onValueChange={(value) => setFormData({...formData, course_category: value, music_subcategory: "", instrument: "", production_type: ""})}
-            className="grid md:grid-cols-3 gap-4"
+            onValueChange={(value) => setFormData({...formData, course_category: value, music_subcategory: "", instrument: "", production_type: "", technology_type: ""})}
+            className="grid md:grid-cols-4 gap-4"
           >
             <div className="relative">
               <RadioGroupItem value="Music" id="music" className="sr-only" />
@@ -1018,6 +1037,26 @@ const Registration = () => {
                   formData.course_category === "Art" ? "text-primary" : "text-gray-800"
                 }`}>Art</span>
                 <span className="text-sm text-gray-500 text-center mt-1">Visual arts & creativity</span>
+              </Label>
+            </div>
+            <div className="relative">
+              <RadioGroupItem value="Technology" id="technology" className="sr-only" />
+              <Label htmlFor="technology" className={`flex flex-col items-center p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                formData.course_category === "Technology" 
+                  ? "border-primary bg-primary/5 shadow-lg" 
+                  : "border-gray-200 hover:border-primary"
+              }`}>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-all duration-200 ${
+                  formData.course_category === "Technology" 
+                    ? "bg-gradient-to-r from-blue-500 to-purple-500 scale-110" 
+                    : "bg-gradient-to-r from-blue-500 to-purple-500"
+                }`}>
+                  <Code className="w-6 h-6 text-white" />
+                </div>
+                <span className={`font-medium transition-colors duration-200 ${
+                  formData.course_category === "Technology" ? "text-primary" : "text-gray-800"
+                }`}>Technology</span>
+                <span className="text-sm text-gray-500 text-center mt-1">Web design & programming</span>
               </Label>
             </div>
           </RadioGroup>
@@ -1154,6 +1193,24 @@ const Registration = () => {
               </SelectTrigger>
               <SelectContent>
                 {productionTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {formData.course_category === "Technology" && (
+          <div className="space-y-4">
+            <Label className="text-sm font-medium text-gray-700">Technology Type *</Label>
+            <Select value={formData.technology_type} onValueChange={(value) => setFormData({...formData, technology_type: value})}>
+              <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
+                <SelectValue placeholder="Select technology type" />
+              </SelectTrigger>
+              <SelectContent>
+                {technologyTypes.map((type) => (
                   <SelectItem key={type} value={type}>
                     {type}
                   </SelectItem>

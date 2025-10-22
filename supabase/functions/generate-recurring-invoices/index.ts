@@ -134,6 +134,8 @@ async function findFeeForRegistration(registration) {
   let paymentType = 'monthly'; // Default
   if (courseCategory === 'production' || courseCategory === 'photography') {
     paymentType = 'term';
+  } else if (courseCategory === 'Technology') {
+    paymentType = 'per_class'; // Technology courses use per_class billing
   }
   
   console.log('Looking for fee with preferences:', {
@@ -308,6 +310,13 @@ async function findFeeForRegistration(registration) {
     } else {
       defaultPrice = 40000; // KES 40,000 for other termly courses
     }
+  } else if (courseCategory === 'technology') {
+    // Technology courses - based on group size (default to 1-on-1)
+    if (learningMode === 'online') {
+      defaultPrice = 2200; // KES 2,200 for 1-on-1 online technology per class
+    } else {
+      defaultPrice = 2200; // KES 2,200 for 1-on-1 at academy technology per class
+    }
   } else if (learningMode === 'online') {
     defaultPrice = 44; // $44 USD
     defaultCurrency = '$';
@@ -336,6 +345,43 @@ async function findFeeForRegistration(registration) {
   return convertedFee;
 }
 
+// Helper function to determine if we should send an invoice reminder
+function shouldSendInvoiceReminder(invoice, period) {
+  const now = new Date();
+  const dueDate = new Date(invoice.due_date);
+  
+  // Send reminder if:
+  // 1. It's 7 days before the due date, OR
+  // 2. It's the due date (7th of the month) and invoice is still pending
+  const sevenDaysBeforeDue = new Date(dueDate);
+  sevenDaysBeforeDue.setDate(sevenDaysBeforeDue.getDate() - 7);
+  
+  return (
+    (now >= sevenDaysBeforeDue && now < dueDate) || // 7 days before due date
+    (now.getDate() === 7 && now.getMonth() === dueDate.getMonth() && now.getFullYear() === dueDate.getFullYear()) // On due date
+  );
+}
+
+// Helper function to determine if we should create a new invoice
+function shouldCreateNewInvoice(period, now) {
+  const periodStart = period.periodStart;
+  const periodEnd = period.periodEnd;
+  
+  // Create invoice if:
+  // 1. It's 7 days before the period ends (advance notice), OR
+  // 2. It's 7 days after the period starts (on the 7th of the month)
+  const sevenDaysBeforePeriodEnd = new Date(periodEnd);
+  sevenDaysBeforePeriodEnd.setDate(sevenDaysBeforePeriodEnd.getDate() - 7);
+  
+  const sevenDaysAfterPeriodStart = new Date(periodStart);
+  sevenDaysAfterPeriodStart.setDate(sevenDaysAfterPeriodStart.getDate() + 7);
+  
+  return (
+    now >= sevenDaysBeforePeriodEnd || // 7 days before period ends
+    now >= sevenDaysAfterPeriodStart // 7 days after period starts (7th of month)
+  );
+}
+
 async function generateInvoicesForRegistration(registration, fee, student, summary) {
   // Check if this is the first invoice for this student
   const { data: existingInvoices, error: existingInvoicesError } = await supabase
@@ -350,7 +396,7 @@ async function generateInvoicesForRegistration(registration, fee, student, summa
   const now = new Date();
   let periods: Array<{ periodStart: Date; periodEnd: Date; dueDate: Date }> = [];
 
-  if (fee.payment_type === 'monthly') {
+  if (fee.payment_type === 'monthly' || fee.payment_type === 'per_class') {
     if (isFirstInvoice) {
       // First invoice: Current month (regardless of start date) until 30th
       const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -358,25 +404,22 @@ async function generateInvoicesForRegistration(registration, fee, student, summa
       periods.push({
         periodStart: new Date(periodStart),
         periodEnd: new Date(periodEnd),
-        dueDate: new Date(periodStart.getFullYear(), periodStart.getMonth(), 10) // Due on 10th of current month
+        dueDate: new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate()) // First invoice: Due on last day of enrollment month
       });
     } else {
-      // Subsequent invoices: Generate for any missing months up to current month
+      // Subsequent invoices: Generate for next month billing period
       const lastInvoice = existingInvoices[existingInvoices.length - 1];
       const lastPeriodEnd = new Date(lastInvoice.period_end);
-      let periodStart = new Date(lastPeriodEnd);
-      periodStart.setDate(periodStart.getDate() + 1);
       
-      while (periodStart <= now) {
-        const periodEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0);
-        periods.push({
-          periodStart: new Date(periodStart),
-          periodEnd: new Date(periodEnd),
-          dueDate: new Date(periodStart.getFullYear(), periodStart.getMonth(), 10) // Due on 10th of each month
-        });
-        // Next month
-        periodStart = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 1);
-      }
+      // Next billing period starts the month after the last invoice
+      const periodStart = new Date(lastPeriodEnd.getFullYear(), lastPeriodEnd.getMonth() + 1, 1);
+      const periodEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0);
+      
+      periods.push({
+        periodStart: new Date(periodStart),
+        periodEnd: new Date(periodEnd),
+        dueDate: new Date(Date.UTC(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 6, 21, 0, 0, 0)) // 7th of next month at midnight GMT+3
+      });
     }
   } else if (fee.payment_type === 'term') {
     if (isFirstInvoice) {
@@ -418,6 +461,7 @@ async function generateInvoicesForRegistration(registration, fee, student, summa
   for (const period of periods) {
     const periodStartStr = formatDate(period.periodStart);
     const periodEndStr = formatDate(period.periodEnd);
+    
     // Check if invoice exists for this period (using student_id only)
     const { data: existingInvoice, error: existingError } = await supabase
       .from('invoices')
@@ -427,8 +471,11 @@ async function generateInvoicesForRegistration(registration, fee, student, summa
       .eq('period_end', periodEndStr)
       .maybeSingle();
     if (existingError) throw existingError;
+    
     if (existingInvoice) {
-      if (existingInvoice.status !== 'paid') {
+      // Check if we should send reminder based on timing
+      const shouldSendReminder = shouldSendInvoiceReminder(existingInvoice, period);
+      if (shouldSendReminder && existingInvoice.status !== 'paid') {
         await sendInvoiceEmail(existingInvoice, student, true);
         summary.reminders++;
       } else {
@@ -436,18 +483,75 @@ async function generateInvoicesForRegistration(registration, fee, student, summa
       }
       continue;
     }
+    
+    // Check if it's time to create a new invoice based on timing rules
+    const shouldCreateInvoice = shouldCreateNewInvoice(period, now);
+    if (!shouldCreateInvoice) {
+      summary.skipped++;
+      continue;
+    }
+    // Calculate invoice amount with partial month billing logic
+    let invoiceAmount = fee.price;
+    let notes = null;
+    
+    // For per_class payment type (Technology courses): price × sessions_per_week × 4 weeks
+    if (fee.payment_type === 'per_class') {
+      const sessionsPerWeek = registration.sessions_per_week || 1;
+      const numWeeks = 4; // Always 4 weeks for monthly billing
+      invoiceAmount = fee.price * sessionsPerWeek * numWeeks;
+      console.log('Per-class billing calculation:', {
+        pricePerClass: fee.price,
+        sessionsPerWeek,
+        numWeeks,
+        totalAmount: invoiceAmount
+      });
+    }
+    
+    // Apply partial month billing logic for subsequent invoices (only for monthly payment type, not Technology)
+    if (!isFirstInvoice && fee.payment_type === 'monthly' && courseCategory !== 'Technology') {
+      // For subsequent invoices, check if student enrolled mid-month in the first month
+      const registrationDate = new Date(registration.created_at);
+      
+      // If student enrolled after the 1st of their enrollment month, calculate partial billing
+      if (registrationDate.getDate() > 1) {
+        const daysBeforeEnrollment = registrationDate.getDate() - 1;
+        const sessionsPerWeek = registration.sessions_per_week || 1;
+        const sessionsBeforeEnrollment = Math.ceil((daysBeforeEnrollment / 7) * sessionsPerWeek);
+        
+        // Calculate deduction based on session price
+        const sessionPrice = fee.price / (sessionsPerWeek * 4); // Assuming 4 weeks per month
+        const deductionAmount = sessionsBeforeEnrollment * sessionPrice;
+        
+        // Deduct the amount for sessions before enrollment
+        invoiceAmount = Math.max(0, fee.price - deductionAmount);
+        
+        notes = `Deducted KES ${deductionAmount.toLocaleString()} for ${sessionsBeforeEnrollment} sessions before enrollment date.`;
+        
+        console.log('📊 Partial month billing applied:', {
+          enrollmentDate: registrationDate.toISOString().slice(0, 10),
+          daysBeforeEnrollment,
+          sessionsBeforeEnrollment,
+          deductionAmount,
+          adjustedInvoiceAmount: invoiceAmount
+        });
+      }
+    }
+    
+    // For Technology courses (per_class), first invoice is always: per_class price × sessions_per_week × 4 weeks
+    // No partial month logic applies to Technology courses
+    
     // Create invoice (using current schema with student_id only)
     const invoiceData = {
       student_id: student.id,
       fee_id: fee.id,
-      amount_due: fee.price,
+      amount_due: invoiceAmount,
       period_start: periodStartStr,
       period_end: periodEndStr,
       due_date: formatDate(period.dueDate),
       status: 'pending',
       is_auto_generated: true,
       admin_override: false,
-      notes: null,
+      notes: notes,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

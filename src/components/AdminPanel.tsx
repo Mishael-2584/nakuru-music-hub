@@ -37,6 +37,7 @@ interface Registration {
   course_category: string;
   instrument: string;
   production_type?: string;
+  technology_type?: string;
   experience: string;
   proficiency_level: string;
   learning_mode: string;
@@ -3384,6 +3385,7 @@ const AdminPanel = () => {
                             <span className="text-sm text-gray-700">
                               {registration.course_category === 'Music' ? registration.instrument : 
                                registration.course_category === 'Production' ? registration.production_type : 
+                               registration.course_category === 'Technology' ? registration.technology_type : 
                                'Art Course'}
                             </span>
                           </div>

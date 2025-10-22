@@ -1135,13 +1135,29 @@ export const sendInvoiceEmail = async (
       };
       reader.readAsDataURL(pdfBlob);
     });
-    // Email content
+    // Email content with proper due date messaging
+    const dueDate = new Date(invoice.due_date);
+    const dueDateStr = dueDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
     const subject = options.subject || (options.isReminder
       ? `Payment Reminder: Invoice for ${student.student_name} - Damon Music Academy`
       : `Your Invoice for ${student.student_name} - Damon Music Academy`);
+      
     const body = options.body || (options.isReminder
-      ? `<p>Dear ${student.student_name},</p><p>This is a friendly reminder that your invoice for the current period is due. Please find the attached invoice PDF for details.</p><p>If you have already paid, please disregard this message.</p>`
-      : `<p>Dear ${student.student_name},</p><p>Please find attached your invoice for the current period. If you have any questions, let us know.</p>`);
+      ? `<p>Dear ${student.student_name},</p>
+         <p>This is a friendly reminder that your invoice for the current period is due on <strong>${dueDateStr}</strong>.</p>
+         <p><strong>Important:</strong> Payment must be completed by midnight GMT+3 on ${dueDateStr}. After this date, the invoice will be marked as overdue.</p>
+         <p>Please find the attached invoice PDF for payment details.</p>
+         <p>If you have already paid, please disregard this message.</p>`
+      : `<p>Dear ${student.student_name},</p>
+         <p>Please find attached your invoice for the current period.</p>
+         <p><strong>Due Date:</strong> ${dueDateStr} (midnight GMT+3)</p>
+         <p><strong>Important:</strong> Payment must be completed by midnight GMT+3 on ${dueDateStr}. After this date, the invoice will be marked as overdue.</p>
+         <p>If you have any questions, please contact us.</p>`);
     // Send email using the same pattern as working emails
     const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
       body: {
