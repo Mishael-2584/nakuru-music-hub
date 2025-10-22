@@ -363,23 +363,30 @@ function shouldSendInvoiceReminder(invoice, period) {
 }
 
 // Helper function to determine if we should create a new invoice
-function shouldCreateNewInvoice(period, now) {
+function shouldCreateNewInvoice(period, now, isFirstInvoice) {
   const periodStart = period.periodStart;
   const periodEnd = period.periodEnd;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   
-  // Create invoice if:
-  // 1. It's 7 days before the period ends (advance notice), OR
-  // 2. It's 7 days after the period starts (on the 7th of the month)
-  const sevenDaysBeforePeriodEnd = new Date(periodEnd);
-  sevenDaysBeforePeriodEnd.setDate(sevenDaysBeforePeriodEnd.getDate() - 7);
-  
-  const sevenDaysAfterPeriodStart = new Date(periodStart);
-  sevenDaysAfterPeriodStart.setDate(sevenDaysAfterPeriodStart.getDate() + 7);
-  
-  return (
-    now >= sevenDaysBeforePeriodEnd || // 7 days before period ends
-    now >= sevenDaysAfterPeriodStart // 7 days after period starts (7th of month)
-  );
+  if (isFirstInvoice) {
+    // First invoice: Generate on the 30th of the enrollment month
+    const enrollmentMonth = periodEnd.getMonth();
+    const enrollmentYear = periodEnd.getFullYear();
+    const thirtiethOfMonth = new Date(enrollmentYear, enrollmentMonth, 30);
+    
+    return today.getTime() === thirtiethOfMonth.getTime();
+  } else {
+    // Subsequent invoices: Generate on specific dates
+    const sevenDaysBeforePeriodEnd = new Date(periodEnd);
+    sevenDaysBeforePeriodEnd.setDate(sevenDaysBeforePeriodEnd.getDate() - 7);
+    
+    const seventhOfNextMonth = new Date(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 7);
+    
+    return (
+      today.getTime() === sevenDaysBeforePeriodEnd.getTime() || // 7 days before period ends
+      today.getTime() === seventhOfNextMonth.getTime() // 7th of next month (due date)
+    );
+  }
 }
 
 async function generateInvoicesForRegistration(registration, fee, student, summary) {
@@ -485,7 +492,7 @@ async function generateInvoicesForRegistration(registration, fee, student, summa
     }
     
     // Check if it's time to create a new invoice based on timing rules
-    const shouldCreateInvoice = shouldCreateNewInvoice(period, now);
+    const shouldCreateInvoice = shouldCreateNewInvoice(period, now, isFirstInvoice);
     if (!shouldCreateInvoice) {
       summary.skipped++;
       continue;
