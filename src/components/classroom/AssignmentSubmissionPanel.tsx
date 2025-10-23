@@ -64,23 +64,36 @@ export default function AssignmentSubmissionPanel({
   const isGraded = userSubmission?.grade_points !== undefined && userSubmission?.grade_points !== null;
 
   const handleSubmission = () => {
-    if (!submissionText.trim() && submissionFiles.length === 0) {
-      toast({
-        title: 'Nothing to Submit',
-        description: 'Please add some text or upload files before submitting.',
-        variant: 'destructive'
-      });
-      return;
-    }
+    // For quiz assignments, only text is required (no files)
+    if (post.has_quiz) {
+      if (!submissionText.trim()) {
+        toast({
+          title: 'Response Required',
+          description: 'Please provide a written response before submitting.',
+          variant: 'destructive'
+        });
+        return;
+      }
+    } else {
+      // For regular assignments, require either text or files
+      if (!submissionText.trim() && submissionFiles.length === 0) {
+        toast({
+          title: 'Nothing to Submit',
+          description: 'Please add some text or upload files before submitting.',
+          variant: 'destructive'
+        });
+        return;
+      }
 
-    const hasPendingUploads = submissionFiles.some(f => f.file && !f.uploaded);
-    if (hasPendingUploads) {
-      toast({
-        title: 'Upload Required',
-        description: 'Please upload all files before submitting.',
-        variant: 'destructive'
-      });
-      return;
+      const hasPendingUploads = submissionFiles.some(f => f.file && !f.uploaded);
+      if (hasPendingUploads) {
+        toast({
+          title: 'Upload Required',
+          description: 'Please upload all files before submitting.',
+          variant: 'destructive'
+        });
+        return;
+      }
     }
 
     // Show confirmation dialog instead of submitting directly
@@ -140,8 +153,8 @@ export default function AssignmentSubmissionPanel({
 
   return (
     <div className="border-t border-gray-100 mt-4">
-      {/* Student View */}
-      {!isTeacher && (
+      {/* Student View - Hide for quiz assignments */}
+      {!isTeacher && !post.has_quiz && (
         <div className="pt-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -298,18 +311,21 @@ export default function AssignmentSubmissionPanel({
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Upload Files (Optional)
-                  </label>
-                  <PostFileUpload
-                    attachments={submissionFiles}
-                    onAttachmentsChange={setSubmissionFiles}
-                    maxFiles={5}
-                    acceptedTypes=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.zip,.rar"
-                    showUploadedFiles={true}
-                  />
-                </div>
+                {/* Hide file upload for quiz assignments */}
+                {!post.has_quiz && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Upload Files (Optional)
+                    </label>
+                    <PostFileUpload
+                      attachments={submissionFiles}
+                      onAttachmentsChange={setSubmissionFiles}
+                      maxFiles={5}
+                      acceptedTypes=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.zip,.rar"
+                      showUploadedFiles={true}
+                    />
+                  </div>
+                )}
 
                 <div className="flex justify-between items-center pt-2 border-t">
                   <div className="text-sm text-gray-600">
@@ -317,7 +333,7 @@ export default function AssignmentSubmissionPanel({
                   </div>
                   <Button
                     onClick={handleSubmission}
-                    disabled={!submissionText.trim() && submissionFiles.length === 0}
+                    disabled={post.has_quiz ? !submissionText.trim() : (!submissionText.trim() && submissionFiles.length === 0)}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />

@@ -80,11 +80,6 @@ export default function QuizPage() {
           .eq('quiz_id', quizData.id)
           .order('order_index');
           
-        console.log('Direct query questions data:', questionsData);
-        if (questionsData && questionsData.length > 0) {
-          console.log('First question from direct query:', questionsData[0]);
-          console.log('Image URL from direct query:', questionsData[0].image_url);
-        }
 
         if (questionsError) throw questionsError;
 
@@ -187,9 +182,6 @@ export default function QuizPage() {
             image_filename: row.image_filename
           };
           
-          console.log('Processing question:', questionData);
-          console.log('Image URL from row:', row.image_url);
-          console.log('Has image attachment:', row.has_image_attachment);
           
           questions.push(questionData);
         }
