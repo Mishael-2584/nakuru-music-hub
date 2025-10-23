@@ -39,6 +39,8 @@ import PasswordChangePrompt from "./components/PasswordChangePrompt";
 import ClassroomPage from "./pages/ClassroomPage";
 import FAQ from "./pages/FAQ";
 import TrialClassesPage from "./pages/TrialClassesPage";
+import QuizDebugPage from "./pages/QuizDebugPage";
+import QuizResultsPage from "./pages/QuizResultsPage";
 
 const queryClient = new QueryClient();
 
@@ -100,6 +102,8 @@ const App = () => (
             <Route path="/teacher/account" element={<TeacherAccount />} />
             <Route path="/classrooms/:id" element={<ClassroomPage />} />
             <Route path="/quiz/:postId" element={<QuizPage />} />
+            <Route path="/quiz-results/:submissionId" element={<QuizResultsPage />} />
+            <Route path="/quiz-debug" element={<QuizDebugPage />} />
             <Route path="/teacher-signup" element={<TeacherSignup />} />
             <Route path="/pending-teacher" element={<PendingTeacherPage />} />
             <Route path="/signout" element={<SignOut />} />

@@ -123,7 +123,15 @@ export default function QuizResultsDisplay({
   };
 
   const getAnswerForQuestion = (questionId: string) => {
-    return localAnswers.find(answer => answer.question_id === questionId);
+    // Try to find the answer in localAnswers first
+    let answer = localAnswers.find(answer => answer.question_id === questionId);
+    
+    // If not found, try to find it in the answers prop
+    if (!answer && result.answers) {
+      answer = result.answers.find(answer => answer.question_id === questionId);
+    }
+    
+    return answer;
   };
 
   const getCorrectAnswerForQuestion = (question: QuizQuestion) => {
@@ -326,13 +334,9 @@ export default function QuizResultsDisplay({
                       <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                         {question.question_type === 'matching' ? (
                           <div className="space-y-2">
-                            {correctAnswers[question.id] ? (
-                              <div className="text-green-800">
-                                Correct matching pairs would be shown here
-                              </div>
-                            ) : (
-                              <div className="text-green-800">Correct matching pairs not available</div>
-                            )}
+                            <div className="text-green-800">
+                              Correct matching pairs would be shown here
+                            </div>
                           </div>
                         ) : (
                           <span className="text-green-800">

@@ -1555,9 +1555,43 @@ const TeacherDashboard = () => {
     if (!error) setTeacherClassrooms(data || []);
   };
 
+  const fetchRecentQuizAssignments = async () => {
+    if (!profile) return;
+    const { data, error } = await supabase
+      .from('posts')
+      .select(`
+        id,
+        title,
+        content,
+        created_at,
+        classroom_id,
+        classrooms!inner(
+          id,
+          name,
+          teacher_id
+        )
+      `)
+      .eq('classrooms.teacher_id', profile.id)
+      .eq('has_quiz', true)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    
+    if (!error) {
+      const assignments = data?.map(post => ({
+        id: post.id,
+        title: post.title,
+        classroom_id: post.classroom_id,
+        classroom_name: post.classrooms?.name || 'Unknown Classroom',
+        created_at: post.created_at
+      })) || [];
+      setRecentAssignments(assignments);
+    }
+  };
+
   useEffect(() => {
     if (profile && isTeacher && isApproved) {
       fetchTeacherClassrooms();
+      fetchRecentQuizAssignments();
     }
   }, [profile, isTeacher, isApproved]);
 
@@ -1764,6 +1798,12 @@ const TeacherDashboard = () => {
                       <span>Classroom</span>
                     </div>
                   </SelectItem>
+                  <SelectItem value="quiz-management">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      <span>Quiz Management</span>
+                    </div>
+                  </SelectItem>
                   <SelectItem value="availability">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4" />
@@ -1835,6 +1875,10 @@ const TeacherDashboard = () => {
               <TabsTrigger value="classroom" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all">
                 <BookOpen className="w-5 h-5" />
                 <span>Classroom</span>
+              </TabsTrigger>
+              <TabsTrigger value="quiz-management" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all">
+                <FileText className="w-5 h-5" />
+                <span>Quiz Management</span>
               </TabsTrigger>
               <TabsTrigger value="availability" className="flex-1 flex items-center justify-center gap-2 px-0 py-2 rounded-full font-semibold text-blue-700 data-[state=active]:bg-blue-100 data-[state=active]:shadow-md transition-all">
                 <Clock className="w-5 h-5" />
@@ -2364,6 +2408,102 @@ const TeacherDashboard = () => {
                           )) : (
                             <p className="text-gray-500">No posts yet.</p>
                           )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Quiz Management Tab */}
+            <TabsContent value="quiz-management" className="mt-8">
+              <Card className="shadow-lg border-0 bg-white/95">
+                <CardHeader>
+                  <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Quiz Management
+                  </CardTitle>
+                  <CardDescription>Manage quizzes across all your classrooms</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {/* Quick Access to All Classrooms */}
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-lg">Access Any Classroom</h4>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Click on any classroom below to manage quizzes and view student submissions.
+                      </p>
+                      {teacherClassrooms.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {teacherClassrooms.map(classroom => (
+                            <Card key={classroom.id} className="hover:shadow-lg transition-shadow duration-300 border-l-4 border-l-blue-500">
+                              <CardContent className="p-4">
+                                <div className="flex items-start justify-between mb-3">
+                                  <div className="flex-1">
+                                    <div className="font-semibold text-lg text-gray-800 mb-1">{classroom.name}</div>
+                                    {classroom.description && (
+                                      <div className="text-sm text-gray-600 mb-2 max-w-md">
+                                        {classroom.description}
+                                      </div>
+                                    )}
+                                    <div className="text-sm text-gray-600 mb-2">
+                                      Status: <Badge className={`ml-1 ${classroom.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                        {classroom.status}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="default" 
+                                    onClick={() => navigate(`/classrooms/${classroom.id}`)}
+                                    className="flex-1"
+                                  >
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    Manage Quizzes
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                          <p className="text-lg font-medium mb-2">No Classrooms Yet</p>
+                          <p className="text-sm mb-4">Create a classroom first to start managing quizzes.</p>
+                          <Button onClick={() => setShowCreateClassroomModal(true)}>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create Your First Classroom
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Recent Quiz Activity */}
+                    {recentAssignments.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="font-semibold text-lg">Recent Quiz Activity</h4>
+                        <div className="space-y-2">
+                          {recentAssignments.slice(0, 5).map(assignment => (
+                            <div key={assignment.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <div className="flex-1">
+                                <div className="font-medium">{assignment.title || 'Untitled Quiz'}</div>
+                                <div className="text-sm text-gray-600">
+                                  {assignment.classroom_name} • {new Date(assignment.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => navigate(`/classrooms/${assignment.classroom_id}`)}
+                              >
+                                View
+                              </Button>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}

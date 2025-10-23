@@ -136,8 +136,44 @@ export default function ClassroomPage() {
   const [loadingStudents, setLoadingStudents] = useState(false);
 
   const loadComments = async (postId: string) => {
-    const { data } = await supabase.rpc('get_post_comments', { post_id_param: postId });
-    setPostComments(prev => ({ ...prev, [postId]: data || [] }));
+    try {
+      const { data, error } = await supabase.rpc('get_post_comments', { post_id_param: postId });
+      if (error) {
+        console.warn('Error loading comments:', error);
+        return;
+      }
+      setPostComments(prev => ({ ...prev, [postId]: data || [] }));
+    } catch (error) {
+      console.error('Error loading comments:', error);
+    }
+  };
+
+  // Batch load comments for multiple posts
+  const loadAllComments = async (postIds: string[]) => {
+    if (postIds.length === 0) return;
+    
+    try {
+      const commentsPromises = postIds.map(postId => 
+        supabase.rpc('get_post_comments', { post_id_param: postId })
+      );
+      
+      const results = await Promise.allSettled(commentsPromises);
+      const commentsMap: Record<string, any[]> = {};
+      
+      results.forEach((result, index) => {
+        const postId = postIds[index];
+        if (result.status === 'fulfilled' && !result.value.error) {
+          commentsMap[postId] = result.value.data || [];
+        } else {
+          console.warn(`Error loading comments for post ${postId}:`, result.status === 'rejected' ? result.reason : result.value.error);
+          commentsMap[postId] = [];
+        }
+      });
+      
+      setPostComments(prev => ({ ...prev, ...commentsMap }));
+    } catch (error) {
+      console.error('Error batch loading comments:', error);
+    }
   };
 
   const checkQuizSubmissionStatus = async (quizId: string) => {
@@ -168,23 +204,43 @@ export default function ClassroomPage() {
   const loadQuizSubmissionStatuses = async (posts: any[]) => {
     try {
       const quizPosts = posts.filter(post => post.has_quiz);
-      const statusMap: {[key: string]: any} = {};
+      if (quizPosts.length === 0) return;
       
-      for (const post of quizPosts) {
-        // Get quiz ID from the post
-        const { data: quizData } = await supabase
-          .from('quizzes')
-          .select('id')
-          .eq('post_id', post.post_id)
-          .single();
-        
-        if (quizData) {
-          const submission = await checkQuizSubmissionStatus(quizData.id);
-          if (submission) {
-            statusMap[post.post_id] = submission;
-          }
-        }
+      // Batch get all quiz IDs
+      const postIds = quizPosts.map(post => post.post_id);
+      const { data: quizData, error: quizError } = await supabase
+        .from('quizzes')
+        .select('id, post_id')
+        .in('post_id', postIds);
+      
+      if (quizError) {
+        console.warn('Error loading quiz data:', quizError);
+        return;
       }
+      
+      if (!quizData || quizData.length === 0) return;
+      
+      // Batch check submission statuses for all quizzes
+      const quizIds = quizData.map(q => q.id);
+      const { data: submissions, error: submissionError } = await supabase
+        .from('quiz_submissions')
+        .select('quiz_id, status, submitted_at, total_score, percentage_score, is_passed')
+        .in('quiz_id', quizIds)
+        .eq('student_id', classroom?.currentStudent?.user_id);
+      
+      if (submissionError) {
+        console.warn('Error loading quiz submissions:', submissionError);
+        return;
+      }
+      
+      // Create status map
+      const statusMap: {[key: string]: any} = {};
+      quizData.forEach(quiz => {
+        const submission = submissions?.find(sub => sub.quiz_id === quiz.id);
+        if (submission) {
+          statusMap[quiz.post_id] = submission;
+        }
+      });
       
       setQuizSubmissionStatuses(statusMap);
     } catch (error) {
@@ -523,6 +579,172 @@ export default function ClassroomPage() {
       setTimerCompleted(false);
     } catch (error) {
       console.error('Error loading quiz data:', error);
+    }
+  };
+
+  // Load quiz submissions for teacher management
+  const loadQuizSubmissions = async (quizId: string) => {
+    try {
+      // First, get the quiz submissions
+      const { data: submissions, error: submissionsError } = await supabase
+        .from('quiz_submissions')
+        .select(`
+          id,
+          student_id,
+          quiz_id,
+          status,
+          total_score,
+          percentage_score,
+          is_passed,
+          started_at,
+          submitted_at,
+          time_taken_minutes
+        `)
+        .eq('quiz_id', quizId)
+        .order('submitted_at', { ascending: false });
+
+      if (submissionsError) throw submissionsError;
+
+      console.log('Raw quiz submissions:', submissions);
+
+      if (!submissions || submissions.length === 0) {
+        setQuizSubmissions([]);
+        return;
+      }
+
+      // Get student information for each submission
+      // Note: quiz_submissions.student_id contains the profile ID (user_id)
+      const studentIds = [...new Set(submissions.map(s => s.student_id))];
+      console.log('Student IDs from submissions:', studentIds);
+      
+      const { data: students, error: studentsError } = await supabase
+        .from('students')
+        .select('id, user_id, student_name, email')
+        .in('user_id', studentIds);
+
+      console.log('Students found:', students);
+      console.log('Students error:', studentsError);
+
+      if (studentsError) {
+        console.warn('Error fetching student details:', studentsError);
+      }
+
+      // Transform the data to match the expected format
+      const transformedSubmissions = submissions.map(submission => {
+        const student = students?.find(s => s.user_id === submission.student_id);
+        console.log('Matching student for submission:', {
+          submission_student_id: submission.student_id,
+          student_found: student,
+          student_name: student?.student_name,
+          student_email: student?.email
+        });
+        
+        const transformed = {
+          id: submission.id,
+          student_id: submission.student_id,
+          student_name: student?.student_name || student?.email || 'Unknown Student',
+          student_email: student?.email || '',
+          quiz_id: submission.quiz_id,
+          status: submission.status,
+          total_score: submission.total_score || 0,
+          percentage_score: submission.percentage_score || 0,
+          is_passed: submission.is_passed || false,
+          started_at: submission.started_at,
+          submitted_at: submission.submitted_at,
+          time_taken_minutes: submission.time_taken_minutes
+        };
+        console.log('Transformed submission:', transformed);
+        return transformed;
+      });
+
+      console.log('Final transformed submissions:', transformedSubmissions);
+      setQuizSubmissions(transformedSubmissions);
+    } catch (error) {
+      console.error('Error loading quiz submissions:', error);
+      toast({ title: 'Error', description: 'Failed to load quiz submissions', variant: 'destructive' });
+    }
+  };
+
+  // Load individual quiz submission for viewing
+  const loadQuizSubmissionDetails = async (submissionId: string) => {
+    console.log('loadQuizSubmissionDetails called with submissionId:', submissionId);
+    try {
+      // First, get the quiz submission
+      const { data: submission, error: submissionError } = await supabase
+        .from('quiz_submissions')
+        .select('*')
+        .eq('id', submissionId)
+        .single();
+
+      if (submissionError) throw submissionError;
+      console.log('Quiz submission found:', submission);
+
+      // Get student information using the student_id (which is the profile ID)
+      const { data: student, error: studentError } = await supabase
+        .from('students')
+        .select('id, user_id, student_name, email')
+        .eq('user_id', submission.student_id)
+        .single();
+
+      if (studentError) {
+        console.warn('Error fetching student details:', studentError);
+      }
+      console.log('Student found:', student);
+
+      // Load submission answers using the same RPC function as students use
+      const { data: answersData, error: answersError } = await supabase.rpc('get_quiz_submission_answers', {
+        submission_id_param: submissionId
+      });
+
+      if (answersError) {
+        console.warn('Error fetching submission answers via RPC:', answersError);
+        
+        // Fallback to direct table access
+        const { data: directAnswers, error: directError } = await supabase
+          .from('quiz_submission_answers')
+          .select('*')
+          .eq('submission_id', submissionId);
+
+        if (directError) {
+          console.warn('Error fetching submission answers directly:', directError);
+        } else {
+          console.log('Fetched submission answers via direct access:', directAnswers);
+        }
+        
+        // Use direct answers if RPC failed
+        answersData = directAnswers;
+      } else {
+        console.log('Fetched submission answers via RPC:', answersData);
+      }
+
+      // Transform the submission data to match QuizResultsDisplay expected format
+      const submissionData = {
+        submission: {
+          ...submission,
+          student_name: student?.student_name || student?.email || 'Unknown Student',
+          student_email: student?.email || ''
+        },
+        questions: quizQuestions,
+        answers: answersData || [],
+        showAnswers: true, // Teachers can always see answers
+        totalScore: submission.total_score || 0,
+        totalPoints: quizQuestions.reduce((sum, q) => sum + q.points, 0),
+        percentage: submission.percentage_score || 0,
+        isPassed: submission.is_passed || false,
+        timeTaken: submission.time_taken_minutes || 0,
+        submittedAt: submission.submitted_at
+      };
+
+      console.log('Transformed submission data:', submissionData);
+      
+      // Store the submission data in sessionStorage for the new page
+      sessionStorage.setItem('quizSubmissionData', JSON.stringify(submissionData));
+      
+      // Navigate to a dedicated quiz results page
+      window.open(`/quiz-results/${submissionId}`, '_blank');
+    } catch (error) {
+      console.error('Error loading quiz submission details:', error);
+      toast({ title: 'Error', description: 'Failed to load submission details', variant: 'destructive' });
     }
   };
 
@@ -1173,6 +1395,37 @@ export default function ClassroomPage() {
     setShowTeacherPreview(true);
   };
 
+  const handleManageQuiz = async (postId: string) => {
+    console.log('handleManageQuiz called with postId:', postId);
+    
+    // Clear any existing quiz states to avoid conflicts
+    setShowQuizResults(false);
+    setShowTeacherPreview(false);
+    setCurrentQuizSubmission(null);
+    
+    await loadQuizData(postId);
+    // Load quiz submissions after quiz data is loaded
+    // We need to get the quiz ID from the loaded data
+    const { data: quizData } = await supabase
+      .from('quizzes')
+      .select('id')
+      .eq('post_id', postId)
+      .single();
+    
+    console.log('Quiz data found:', quizData);
+    
+    if (quizData?.id) {
+      console.log('Loading quiz submissions for quiz ID:', quizData.id);
+      await loadQuizSubmissions(quizData.id);
+    } else {
+      console.log('No quiz data found for postId:', postId);
+    }
+    
+    // Ensure we're showing the management interface, not preview
+    setShowQuizManagement(true);
+    setShowTeacherPreview(false);
+  };
+
   useEffect(() => {
     if (!id) return;
     (async () => {
@@ -1198,28 +1451,31 @@ export default function ClassroomPage() {
         setClassroom(loaded);
 
         if (user?.id) {
-          const { data: t } = await supabase
-            .from("teachers")
-            .select("id")
-            .eq("user_id", user.id)
-            .single();
-          if (t?.id && loaded.teacher_id === t.id) setIsTeacherOfClass(true);
-
-          const { data: s } = await supabase
-            .from("students")
-            .select("id, user_id")
-            .eq("user_id", user.id)
-            .single();
-          if (s?.id) {
-            const { data: enr } = await supabase
+          // Batch check user roles and enrollment status
+          const [teacherResult, studentResult] = await Promise.allSettled([
+            supabase.from("teachers").select("id").eq("user_id", user.id).single(),
+            supabase.from("students").select("id, user_id").eq("user_id", user.id).single()
+          ]);
+          
+          // Check if user is a teacher
+          if (teacherResult.status === 'fulfilled' && teacherResult.value.data?.id) {
+            setIsTeacherOfClass(true);
+          }
+          
+          // Check if user is a student and enrolled
+          if (studentResult.status === 'fulfilled' && studentResult.value.data?.id) {
+            const student = studentResult.value.data;
+            const { data: enrollment } = await supabase
               .from("classroom_enrollments")
               .select("id")
               .eq("classroom_id", id)
-              .eq("student_id", s.id)
+              .eq("student_id", student.id)
               .maybeSingle();
-            if (enr) setIsEnrolledStudent(true);
-            
-            setClassroom(prev => prev ? { ...prev, currentStudent: s } : null);
+              
+            if (enrollment) {
+              setIsEnrolledStudent(true);
+              setClassroom(prev => prev ? { ...prev, currentStudent: student } : null);
+            }
           }
         }
 
@@ -1235,48 +1491,146 @@ export default function ClassroomPage() {
   }, [id, user?.id]);
 
   const loadFeed = async (classroomId: string) => {
-    const { data, error } = await supabase.rpc("get_classroom_feed", { classroom_id_param: classroomId });
-    if (!error) {
+    try {
+      const { data, error } = await supabase.rpc("get_classroom_feed", { classroom_id_param: classroomId });
+      if (error) {
+        console.error('Error loading feed:', error);
+        toast({ title: 'Error', description: 'Failed to load classroom feed', variant: 'destructive' });
+        return;
+      }
+
       const posts: any[] = data || [];
+      console.log('Loaded feed posts:', posts.length);
       
-      // Debug: Log quiz scheduled times
-      console.log('Feed posts with quiz scheduled times:', posts.filter(p => p.has_quiz).map(p => ({
-        post_id: p.post_id,
-        has_quiz: p.has_quiz,
-        quiz_scheduled_open_at: p.quiz_scheduled_open_at,
-        quiz_is_draft: p.quiz_is_draft
-      })));
-      
+      // Get all post IDs for batch operations
       const postIds = posts.map(p => p.post_id);
+      
+      // Batch load attachments for all posts
       let attachmentsByPost: Record<string, any[]> = {};
       if (postIds.length > 0) {
-        const { data: allAttachments } = await supabase
+        const { data: allAttachments, error: attachmentError } = await supabase
           .from('classroom_post_attachments')
           .select('*')
           .in('post_id', postIds);
-        if (allAttachments && allAttachments.length > 0) {
+          
+        if (attachmentError) {
+          console.warn('Error loading attachments:', attachmentError);
+        } else if (allAttachments && allAttachments.length > 0) {
           attachmentsByPost = allAttachments.reduce((acc: Record<string, any[]>, att: any) => {
             (acc[att.post_id] = acc[att.post_id] || []).push(att);
             return acc;
           }, {});
         }
       }
+      
       const postsWithAttachments = posts.map(post => ({
         ...post,
         attachments: attachmentsByPost[post.post_id] || []
       }));
+      
       setFeed(postsWithAttachments);
       
-      // Load quiz submission statuses for enrolled students
+      // Batch load submissions for all assignment posts
+      const assignmentPosts = postsWithAttachments.filter(p => p.is_assignment);
+      if (assignmentPosts.length > 0) {
+        await loadAllSubmissions(assignmentPosts.map(p => p.post_id));
+      }
+      
+      // Batch load comments for all posts
+      await loadAllComments(postIds);
+      
+      // Load quiz submission statuses for enrolled students (only if needed)
       if (isEnrolledStudent && classroom?.currentStudent) {
         await loadQuizSubmissionStatuses(postsWithAttachments);
       }
       
-      for (const post of postsWithAttachments) {
-        if (post.is_assignment) {
-          await loadSubmissions(post.post_id);
+    } catch (error) {
+      console.error('Error in loadFeed:', error);
+      toast({ title: 'Error', description: 'Failed to load classroom content', variant: 'destructive' });
+    }
+  };
+
+  // Batch load submissions for multiple posts
+  const loadAllSubmissions = async (postIds: string[]) => {
+    if (postIds.length === 0) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('assignment_submissions')
+        .select(`
+          *,
+          students(student_name, user_id),
+          teachers(name),
+          assignment_submission_files(*)
+        `)
+        .in('post_id', postIds);
+      
+      if (error) {
+        console.error('Error loading submissions:', error);
+        return;
+      }
+      
+      // Group submissions by post_id
+      const submissionsByPost: Record<string, any[]> = {};
+      const userIds = new Set<string>();
+      
+      (data || []).forEach(submission => {
+        const postId = submission.post_id;
+        if (!submissionsByPost[postId]) {
+          submissionsByPost[postId] = [];
+        }
+        submissionsByPost[postId].push(submission);
+        
+        if (submission.students?.user_id) {
+          userIds.add(submission.students.user_id);
+        }
+      });
+      
+      // Batch fetch user emails
+      let userEmails: { [key: string]: string } = {};
+      if (userIds.size > 0) {
+        try {
+          const { data: profiles, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, email')
+            .in('id', Array.from(userIds));
+          
+          if (!profileError && profiles) {
+            userEmails = profiles.reduce((acc: { [key: string]: string }, profile: any) => {
+              acc[profile.id] = profile.email || 'No email found';
+              return acc;
+            }, {});
+          }
+        } catch (profileError) {
+          console.warn('Error fetching user emails:', profileError);
         }
       }
+      
+      // Transform and set submissions for each post
+      Object.keys(submissionsByPost).forEach(postId => {
+        const transformedSubmissions = submissionsByPost[postId].map(sub => {
+          const files = sub.assignment_submission_files || [];
+          
+          return {
+            ...sub,
+            author_name: sub.students?.student_name || 'Unknown Student',
+            author_email: userEmails[sub.students?.user_id] || 'No email',
+            graded_by_name: sub.teachers?.name || 'Unknown Teacher',
+            files: files.map(file => ({
+              id: file.id,
+              file_name: file.file_name,
+              file_url: file.file_url,
+              file_size: file.file_size || 0,
+              file_type: file.file_type || 'application/octet-stream'
+            }))
+          };
+        });
+        
+        setSubmissions(prev => ({ ...prev, [postId]: transformedSubmissions }));
+      });
+      
+    } catch (err) {
+      console.error('Failed to load submissions:', err);
     }
   };
 
@@ -1609,10 +1963,10 @@ export default function ClassroomPage() {
           {showQuizResults && currentQuizSubmission && (
             <QuizResultsDisplay
               result={{
-                submission: currentQuizSubmission,
-                answers: [],
-                questions: quizQuestions,
-                showAnswers: quizData?.show_answers_after || false
+                submission: currentQuizSubmission.submission,
+                answers: currentQuizSubmission.answers,
+                questions: currentQuizSubmission.questions,
+                showAnswers: true // Teachers can always see answers
               }}
               onRetake={() => {
                 setShowQuizResults(false);
@@ -1624,8 +1978,7 @@ export default function ClassroomPage() {
               onBack={() => {
                 setShowQuizResults(false);
                 setCurrentQuizSubmission(null);
-                setTimerStarted(false);
-                setTimerCompleted(false);
+                setShowQuizManagement(true); // Go back to management interface
               }}
             />
           )}
@@ -1637,10 +1990,7 @@ export default function ClassroomPage() {
               quizTitle={quizData?.title || ''}
               submissions={quizSubmissions}
               questions={quizQuestions}
-              onViewSubmission={(submissionId) => {
-                // Handle viewing individual submission
-                console.log('View submission:', submissionId);
-              }}
+              onViewSubmission={loadQuizSubmissionDetails}
               onExportResults={() => {
                 // Handle exporting results
                 console.log('Export results');
@@ -1713,6 +2063,7 @@ export default function ClassroomPage() {
                   onExtendDeadline={handleExtendDeadline}
                   onEditQuiz={handleEditQuiz}
                   onPreviewQuiz={handlePreviewQuiz}
+                  onManageQuiz={handleManageQuiz}
                   comments={postComments[post.post_id] || []}
                 >
                   {post.is_assignment && (
@@ -1791,8 +2142,20 @@ export default function ClassroomPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => {
-                                    loadQuizData(post.post_id);
+                                  onClick={async () => {
+                                    console.log('Manage Quiz clicked, isTeacherOfClass:', isTeacherOfClass);
+                                    await loadQuizData(post.post_id);
+                                    // Load quiz submissions after quiz data is loaded
+                                    // We need to get the quiz ID from the loaded data
+                                    const { data: quizData } = await supabase
+                                      .from('quizzes')
+                                      .select('id')
+                                      .eq('post_id', post.post_id)
+                                      .single();
+                                    
+                                    if (quizData?.id) {
+                                      await loadQuizSubmissions(quizData.id);
+                                    }
                                     setShowQuizManagement(true);
                                   }}
                                   className="text-blue-600 border-blue-200 hover:bg-blue-50"

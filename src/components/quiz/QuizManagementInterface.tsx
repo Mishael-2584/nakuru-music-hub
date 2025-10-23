@@ -55,7 +55,7 @@ export default function QuizManagementInterface({
   const sortedSubmissions = [...filteredSubmissions].sort((a, b) => {
     switch (sortBy) {
       case 'name':
-        return a.student_id.localeCompare(b.student_id);
+        return (a.student_name || a.student_id).localeCompare(b.student_name || b.student_id);
       case 'score':
         return b.percentage_score - a.percentage_score;
       case 'submitted_at':
@@ -200,7 +200,7 @@ export default function QuizManagementInterface({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div>
-                      <div className="font-semibold">{submission.student_id}</div>
+                      <div className="font-semibold">{submission.student_name || submission.student_id}</div>
                       <div className="text-sm text-gray-600">
                         Attempt {submission.attempt_number}
                       </div>

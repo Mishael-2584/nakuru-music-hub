@@ -34,6 +34,7 @@ interface ClassroomPostCardProps {
   onExtendDeadline?: (postId: string, newDueDate: string) => void;
   onEditQuiz?: (postId: string) => void;
   onPreviewQuiz?: (postId: string) => void;
+  onManageQuiz?: (postId: string) => void;
   comments?: any[];
   children?: React.ReactNode; // For submission/grading sections
 }
@@ -47,6 +48,7 @@ export default function ClassroomPostCard({
   onExtendDeadline,
   onEditQuiz,
   onPreviewQuiz,
+  onManageQuiz,
   comments = [],
   children 
 }: ClassroomPostCardProps) {
@@ -391,6 +393,15 @@ export default function ClassroomPostCard({
                         >
                           <Eye className="h-4 w-4" />
                           Preview Quiz
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => onManageQuiz?.(post.post_id)}
+                          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          <Users className="h-4 w-4" />
+                          Manage Quiz
                         </Button>
                       </div>
                     )}
