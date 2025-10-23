@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,8 @@ import {
   X
 } from "lucide-react";
 import { QuizQuestionFormData, QuizAnswerFormData, QuizMatchingPairFormData } from '@/types/quiz';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface QuizQuestionEditorProps {
   question: QuizQuestionFormData;
@@ -35,11 +37,13 @@ export default function QuizQuestionEditor({
   onMoveUp,
   onMoveDown
 }: QuizQuestionEditorProps) {
+  const { toast } = useToast();
   const [newAnswer, setNewAnswer] = useState('');
   const [newMatchingLeft, setNewMatchingLeft] = useState('');
   const [newMatchingRight, setNewMatchingRight] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize preview when editing an existing question
   useEffect(() => {
@@ -52,25 +56,90 @@ export default function QuizQuestionEditor({
     onChange({ ...question, ...updates });
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setImageFile(file);
+      
+      // Create preview immediately
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
         setImagePreview(result);
-        updateQuestion({
-          has_image_attachment: true,
-          image_url: result,
-          image_filename: file.name
-        });
       };
       reader.readAsDataURL(file);
+      
+      // Upload to Supabase Storage
+      try {
+        const fileName = `quiz-images/${Date.now()}-${Math.random().toString(36).substring(2)}-${file.name}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('images')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          toast({
+            title: 'Upload failed',
+            description: 'Failed to upload image. Please try again.',
+            variant: 'destructive'
+          });
+          return;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('images')
+          .getPublicUrl(fileName);
+
+        updateQuestion({
+          has_image_attachment: true,
+          image_url: publicUrl,
+          image_filename: file.name
+        });
+
+        toast({
+          title: 'Success',
+          description: 'Image uploaded successfully'
+        });
+
+      } catch (error) {
+        console.error('Unexpected error:', error);
+        toast({
+          title: 'Error',
+          description: 'An unexpected error occurred while uploading the image.',
+          variant: 'destructive'
+        });
+      }
     }
   };
 
-  const removeImage = () => {
+  const removeImage = async () => {
+    // If there's an existing image URL, try to delete it from storage
+    if (question.image_url && question.image_url.startsWith('https://')) {
+      try {
+        // Extract the file path from the URL
+        const url = new URL(question.image_url);
+        const pathParts = url.pathname.split('/');
+        const fileName = pathParts[pathParts.length - 1];
+        const filePath = `quiz-images/${fileName}`;
+        
+        const { error } = await supabase.storage
+          .from('images')
+          .remove([filePath]);
+          
+        if (error) {
+          console.warn('Failed to delete image from storage:', error);
+          // Continue with removal even if storage deletion fails
+        }
+      } catch (error) {
+        console.warn('Error parsing image URL for deletion:', error);
+        // Continue with removal even if URL parsing fails
+      }
+    }
+    
     setImageFile(null);
     setImagePreview(null);
     updateQuestion({
@@ -266,10 +335,11 @@ export default function QuizQuestionEditor({
                   onChange={handleImageUpload}
                   className="hidden"
                   id={`image-upload-${index}`}
+                  ref={fileInputRef}
                 />
                 <label
                   htmlFor={`image-upload-${index}`}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50"
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 bg-white"
                 >
                   <Upload className="h-4 w-4" />
                   {imagePreview ? 'Change Reference Image' : 'Upload Reference Image'}

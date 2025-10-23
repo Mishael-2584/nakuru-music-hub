@@ -1,3 +1,6 @@
+-- Clean cron job setup for automatic invoice generation
+-- This creates the necessary functions and schedules cron jobs
+
 -- Create a function to check if invoices should be generated today
 CREATE OR REPLACE FUNCTION should_generate_invoices_today()
 RETURNS boolean

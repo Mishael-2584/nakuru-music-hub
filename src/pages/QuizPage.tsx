@@ -48,6 +48,7 @@ export default function QuizPage() {
         });
         data = result.data;
         error = result.error;
+        
       } catch (rpcError) {
         // Fallback: Get quiz data using direct queries
         const { data: quizData, error: quizError } = await supabase
@@ -78,6 +79,12 @@ export default function QuizPage() {
           .select('*')
           .eq('quiz_id', quizData.id)
           .order('order_index');
+          
+        console.log('Direct query questions data:', questionsData);
+        if (questionsData && questionsData.length > 0) {
+          console.log('First question from direct query:', questionsData[0]);
+          console.log('Image URL from direct query:', questionsData[0].image_url);
+        }
 
         if (questionsError) throw questionsError;
 
@@ -113,7 +120,10 @@ export default function QuizPage() {
             question_text: question.question_text,
             question_type: question.question_type,
             question_points: question.points,
-            question_order: question.order_index
+            question_order: question.order_index,
+            has_image_attachment: question.has_image_attachment || false,
+            image_url: question.image_url,
+            image_filename: question.image_filename
           };
 
           // Add answers
@@ -165,14 +175,23 @@ export default function QuizPage() {
 
       for (const row of data) {
         if (row.question_id && !questions.find(q => q.id === row.question_id)) {
-          questions.push({
+          const questionData = {
             id: row.question_id,
             quiz_id: row.quiz_id,
             question_text: row.question_text,
             question_type: row.question_type,
             points: row.question_points,
-            order_index: row.question_order
-          });
+            order_index: row.question_order,
+            has_image_attachment: row.has_image_attachment || false,
+            image_url: row.image_url,
+            image_filename: row.image_filename
+          };
+          
+          console.log('Processing question:', questionData);
+          console.log('Image URL from row:', row.image_url);
+          console.log('Has image attachment:', row.has_image_attachment);
+          
+          questions.push(questionData);
         }
 
         if (row.answer_id && !answers.find(a => a.id === row.answer_id)) {

@@ -1,7 +1,10 @@
--- Add RPC functions for quiz lookup by post_id
--- Date: 2025-07-02
+-- Fix quiz image display by updating the get_quiz_by_post_id function
+-- This ensures teacher-uploaded images appear in quizzes
 
--- Function to get quiz data by post_id (bypasses RLS issues)
+-- Drop the existing function first
+DROP FUNCTION IF EXISTS get_quiz_by_post_id(UUID);
+
+-- Create the updated function with image fields
 CREATE OR REPLACE FUNCTION get_quiz_by_post_id(post_id_param UUID)
 RETURNS TABLE (
   quiz_id UUID,
@@ -66,5 +69,4 @@ BEGIN
 END;
 $$;
 
--- Grant execute permissions
-GRANT EXECUTE ON FUNCTION get_quiz_by_post_id(UUID) TO authenticated;
+COMMENT ON FUNCTION get_quiz_by_post_id(UUID) IS 'Updated to include image fields for quiz questions';

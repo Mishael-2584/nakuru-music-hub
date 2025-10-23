@@ -500,7 +500,8 @@ export default function QuizCreationForm({
               <p className="text-sm text-yellow-800 font-medium">⚠️ {getValidationMessage()}</p>
             </div>
           )}
-          <div className="flex justify-end gap-3">
+          <div className="flex justify-between gap-3">
+            {/* Save as Draft button moved to left */}
             <Button
               onClick={() => onSubmit({ ...quizData, is_draft: true, status: 'draft' })}
               disabled={isSubmitting}
@@ -510,15 +511,8 @@ export default function QuizCreationForm({
               <Save className="h-4 w-4" />
               Save as Draft
             </Button>
-            {isQuizReady() && (
-              <Button
-                onClick={() => onSubmit({ ...quizData, is_draft: false, status: 'published' })}
-                disabled={isSubmitting}
-                className="bg-purple-600 hover:bg-purple-700"
-              >
-                {isSubmitting ? (isEditMode ? 'Updating Quiz...' : 'Publishing Quiz...') : (isEditMode ? 'Update Quiz' : 'Publish Quiz')}
-              </Button>
-            )}
+            
+            {/* Right side buttons - removed duplicate Publish Quiz button */}
           </div>
         </div>
       )}

@@ -1,7 +1,8 @@
--- Add RPC functions for quiz lookup by post_id
--- Date: 2025-07-02
+-- Fix the get_quiz_by_post_id RPC function to properly return image data
+-- Drop and recreate the function to ensure it has the correct column references
 
--- Function to get quiz data by post_id (bypasses RLS issues)
+DROP FUNCTION IF EXISTS get_quiz_by_post_id(UUID);
+
 CREATE OR REPLACE FUNCTION get_quiz_by_post_id(post_id_param UUID)
 RETURNS TABLE (
   quiz_id UUID,
@@ -47,7 +48,7 @@ BEGIN
     qq.question_type,
     qq.points as question_points,
     qq.order_index as question_order,
-    qq.has_image_attachment,
+    COALESCE(qq.has_image_attachment, false) as has_image_attachment,
     qq.image_url,
     qq.image_filename,
     qa.id as answer_id,

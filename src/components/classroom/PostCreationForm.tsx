@@ -9,7 +9,8 @@ import {
   Users, 
   X,
   Calendar,
-  Hash
+  Hash,
+  Save
 } from "lucide-react";
 import { SimpleTextEditor } from "@/components/SimpleTextEditor";
 import { PostFileUpload } from "@/components/PostFileUpload";
@@ -61,7 +62,7 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
       isTimed: postType === 'assignment' ? isTimed : false,
       timeLimitMinutes: postType === 'assignment' ? timeLimitMinutes : 0,
       attachments,
-      quizData: isQuiz ? quizData : undefined
+      quizData: isQuiz ? { ...quizData, is_draft: false, status: 'published' } : undefined
     });
 
     // Reset form after submission
@@ -371,19 +372,21 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
           </div>
         )}
 
-        {/* File Attachments */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-3">
-            Attach Files (Optional)
-          </label>
-          <PostFileUpload
-            attachments={attachments}
-            onAttachmentsChange={setAttachments}
-            maxFiles={5}
-            acceptedTypes=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.mp3,.mp4,.zip,.rar"
-            showUploadedFiles={true}
-          />
-        </div>
+        {/* File Attachments - Hide for quizzes */}
+        {!isQuiz && (
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-3">
+              Attach Files (Optional)
+            </label>
+            <PostFileUpload
+              attachments={attachments}
+              onAttachmentsChange={setAttachments}
+              maxFiles={5}
+              acceptedTypes=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.mp3,.mp4,.zip,.rar"
+              showUploadedFiles={true}
+            />
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex items-center justify-between pt-4 border-t border-gray-200">
@@ -391,14 +394,15 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
             {postType === 'assignment' && (
               <Badge className="bg-purple-100 text-purple-800 border-purple-200">
                 <BookOpen className="h-3 w-3 mr-1" />
-                Assignment
+                {isQuiz ? 'Quiz' : 'Assignment'}
               </Badge>
             )}
-            {attachments.length > 0 && (
+            {!isQuiz && attachments.length > 0 && (
               <Badge variant="outline" className="text-gray-600">
                 {attachments.length} file{attachments.length > 1 ? 's' : ''} attached
               </Badge>
             )}
+            
           </div>
           
           <div className="flex gap-3">
@@ -409,6 +413,8 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
             >
               Cancel
             </Button>
+            
+            {/* Single Quiz/Assignment button */}
             <Button
               onClick={handleSubmit}
               disabled={
@@ -426,9 +432,9 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
               } text-white shadow-md`}
             >
               {isSubmitting 
-                ? (isQuiz ? 'Creating Quiz...' : 'Creating...') 
+                ? (isQuiz ? 'Publishing Quiz...' : 'Creating...') 
                 : isQuiz 
-                  ? 'Create Quiz' 
+                  ? 'Publish Quiz' 
                   : postType === 'assignment' 
                     ? 'Create Assignment' 
                     : 'Share Post'
