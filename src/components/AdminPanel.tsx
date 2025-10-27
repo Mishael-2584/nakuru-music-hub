@@ -23,6 +23,8 @@ import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
 import { generateInvoiceForRegistration } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
 import LearningModeDebugTest from './LearningModeDebugTest';
+import ShopProductManager from './admin/ShopProductManager';
+import ShopOrderManager from './admin/ShopOrderManager';
 
 interface Registration {
   id: string;
@@ -104,7 +106,7 @@ interface ClassSchedule {
 }
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes' | 'gallery' | 'finances' | 'requests' | 'notifications' | 'debug' | 'trials'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'registrations' | 'messages' | 'students' | 'schedule' | 'events' | 'admins' | 'teachers' | 'quotes' | 'gallery' | 'finances' | 'shop' | 'requests' | 'notifications' | 'debug' | 'trials'>('stats');
   const [teachersSubTab, setTeachersSubTab] = useState<'pending' | 'approved' | 'classrooms' | 'approved-classrooms'>('pending');
   const [searchTerm, setSearchTerm] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
@@ -2896,6 +2898,15 @@ const AdminPanel = () => {
               <DollarSign className="h-4 w-4 mr-2" />
               Finances
             </Button>
+            <Button
+              variant={activeTab === 'shop' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('shop')}
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              style={{ minWidth: 120 }}
+            >
+              <Gift className="h-4 w-4 mr-2" />
+              Shop Manager
+            </Button>
               {/* Learning Mode Requests Button - Removed */}
               <Button
                 variant={activeTab === 'debug' ? 'default' : 'ghost'}
@@ -4776,6 +4787,30 @@ const AdminPanel = () => {
         {/* Gallery Tab */}
         <div style={{ display: activeTab === 'gallery' ? 'block' : 'none' }}>
           <AdminGalleryManager />
+        </div>
+
+        {/* Shop Manager Tab */}
+        <div style={{ display: activeTab === 'shop' ? 'block' : 'none' }}>
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Shop Management
+              </h3>
+            </div>
+            
+            <Tabs defaultValue="products" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="products">Products</TabsTrigger>
+                <TabsTrigger value="orders">Orders</TabsTrigger>
+              </TabsList>
+              <TabsContent value="products">
+                <ShopProductManager />
+              </TabsContent>
+              <TabsContent value="orders">
+                <ShopOrderManager />
+              </TabsContent>
+            </Tabs>
+          </div>
         </div>
 
         {/* Finances Tab */}

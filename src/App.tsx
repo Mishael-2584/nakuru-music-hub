@@ -27,6 +27,9 @@ import TeacherAccount from "./pages/TeacherAccount";
 import TeacherSignup from "./pages/TeacherSignup";
 import QuizPage from "./pages/QuizPage";
 import Shop from "./pages/Shop";
+import DynamicShop from "./pages/DynamicShop";
+import Checkout from "./pages/Checkout";
+import OrderConfirmation from "./pages/OrderConfirmation";
 import Team from "./pages/Team";
 import SignOut from "./pages/SignOut";
 import RoleTest from "./pages/RoleTest";
@@ -87,7 +90,10 @@ const App = () => (
             <Route path="/services" element={<ServicesPage />} />
             <Route path="/fees" element={<FeesPage />} />
             <Route path="/gallery" element={<Gallery />} />
-            <Route path="/shop" element={<Shop />} />
+            <Route path="/shop" element={<DynamicShop />} />
+            <Route path="/shop-legacy" element={<Shop />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
             <Route path="/team" element={<Team />} />
             <Route path="/events" element={<Events />} />
             <Route path="/events/:slug" element={<EventDetail />} />
