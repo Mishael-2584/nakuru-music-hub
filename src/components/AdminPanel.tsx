@@ -191,8 +191,11 @@ const AdminPanel = () => {
   const [newPortalMessage, setNewPortalMessage] = useState({
     subject: '',
     message: '',
-    recipient_id: ''
+    recipient_ids: [] as string[]
   });
+  const [selectedMessageRecipients, setSelectedMessageRecipients] = useState<any[]>([]);
+  const [recipientSearchTerm, setRecipientSearchTerm] = useState('');
+  const [showRecipientDropdown, setShowRecipientDropdown] = useState(false);
   const [students, setStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   // Classroom approval state
@@ -1621,32 +1624,60 @@ const AdminPanel = () => {
   const handleSendPortalMessage = async () => {
     if (!user) return;
 
-    try {
-      const { data, error } = await supabase
-        .from('portal_messages')
-        .insert({
-          sender_id: user.id,
-          recipient_id: newPortalMessage.recipient_id,
-          subject: newPortalMessage.subject,
-          message: newPortalMessage.message
-        })
-        .select()
-        .single();
+    if (!newPortalMessage.subject || !newPortalMessage.message || newPortalMessage.recipient_ids.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all fields and select at least one recipient",
+        variant: "destructive",
+      });
+      return;
+    }
 
-      if (error) {
-        throw error;
-      }
+    try {
+      // Send message to each recipient
+      const messagePromises = newPortalMessage.recipient_ids.map(async (recipientId) => {
+        // First insert the message
+        const { data: messageData, error: messageError } = await supabase
+          .from('portal_messages')
+          .insert({
+            sender_id: user.id,
+            recipient_id: recipientId,
+            subject: newPortalMessage.subject,
+            message: newPortalMessage.message
+          })
+          .select()
+          .single();
+
+        if (messageError) throw messageError;
+
+        // Then insert into message_recipients junction table
+        const { error: recipientError } = await supabase
+          .from('message_recipients')
+          .insert({
+            message_id: messageData.id,
+            recipient_id: recipientId,
+            is_read: false
+          });
+
+        if (recipientError) throw recipientError;
+
+        return messageData;
+      });
+
+      await Promise.all(messagePromises);
 
       setShowPortalMessageModal(false);
       setNewPortalMessage({
         subject: '',
         message: '',
-        recipient_id: ''
+        recipient_ids: []
       });
+      setSelectedMessageRecipients([]);
+      setRecipientSearchTerm('');
 
       toast({
         title: "Success",
-        description: "Portal message sent successfully!",
+        description: `Portal message sent successfully to ${newPortalMessage.recipient_ids.length} recipient${newPortalMessage.recipient_ids.length > 1 ? 's' : ''}!`,
       });
     } catch (error) {
       console.error('Error sending portal message:', error);

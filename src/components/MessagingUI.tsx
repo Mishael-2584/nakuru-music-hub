@@ -68,7 +68,7 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
   const [newMessage, setNewMessage] = useState({
     subject: '',
     message: '',
-    recipient_id: ''
+    recipient_ids: [] as string[]
   });
   const [chatMessage, setChatMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -81,7 +81,7 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
   // Search functionality for recipients
   const [recipientSearchTerm, setRecipientSearchTerm] = useState('');
   const [showRecipientDropdown, setShowRecipientDropdown] = useState(false);
-  const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(null);
+  const [selectedRecipients, setSelectedRecipients] = useState<Recipient[]>([]);
 
   // Enhanced name resolution function
   const resolveUserName = async (userId: string): Promise<{ name: string; type: string }> => {
@@ -265,36 +265,56 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.subject || !newMessage.message || !newMessage.recipient_id) {
+    if (!newMessage.subject || !newMessage.message || newMessage.recipient_ids.length === 0) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all fields",
+        description: "Please fill in all fields and select at least one recipient",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      const { data, error } = await supabase
-        .from('portal_messages')
-        .insert({
-          sender_id: currentUserId,
-          recipient_id: newMessage.recipient_id,
-          subject: newMessage.subject,
-          message: newMessage.message
-        })
-        .select()
-        .single();
+      // Send message to each recipient
+      const messagePromises = newMessage.recipient_ids.map(async (recipientId) => {
+        // First insert the message
+        const { data: messageData, error: messageError } = await supabase
+          .from('portal_messages')
+          .insert({
+            sender_id: currentUserId,
+            recipient_id: recipientId,
+            subject: newMessage.subject,
+            message: newMessage.message
+          })
+          .select()
+          .single();
 
-      if (error) throw error;
+        if (messageError) throw messageError;
+
+        // Then insert into message_recipients junction table
+        const { error: recipientError } = await supabase
+          .from('message_recipients')
+          .insert({
+            message_id: messageData.id,
+            recipient_id: recipientId,
+            is_read: false
+          });
+
+        if (recipientError) throw recipientError;
+
+        return messageData;
+      });
+
+      await Promise.all(messagePromises);
 
       setShowComposeModal(false);
-      setNewMessage({ subject: '', message: '', recipient_id: '' });
+      setNewMessage({ subject: '', message: '', recipient_ids: [] });
+      setSelectedRecipients([]);
       await fetchMessages();
 
       toast({
         title: "Success",
-        description: "Message sent successfully!",
+        description: `Message sent successfully to ${newMessage.recipient_ids.length} recipient${newMessage.recipient_ids.length > 1 ? 's' : ''}!`,
       });
     } catch (error) {
       console.error('Error sending message:', error);
@@ -482,10 +502,28 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
   useEffect(() => {
     if (!showComposeModal) {
       setRecipientSearchTerm('');
-      setSelectedRecipient(null);
+      setSelectedRecipients([]);
       setShowRecipientDropdown(false);
     }
   }, [showComposeModal]);
+
+  // Add recipient to selection
+  const addRecipient = (recipient: Recipient) => {
+    if (!selectedRecipients.find(r => r.user_id === recipient.user_id)) {
+      const newRecipients = [...selectedRecipients, recipient];
+      setSelectedRecipients(newRecipients);
+      setNewMessage({...newMessage, recipient_ids: newRecipients.map(r => r.user_id)});
+    }
+    setRecipientSearchTerm('');
+    setShowRecipientDropdown(false);
+  };
+
+  // Remove recipient from selection
+  const removeRecipient = (recipientId: string) => {
+    const newRecipients = selectedRecipients.filter(r => r.user_id !== recipientId);
+    setSelectedRecipients(newRecipients);
+    setNewMessage({...newMessage, recipient_ids: newRecipients.map(r => r.user_id)});
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -511,45 +549,70 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
               <DialogTitle>Compose New Message</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="recipient" className="text-right">To</Label>
-                <div className="col-span-3 relative recipient-search-container">
-                  <Input
-                    id="recipient"
-                    placeholder="Search for recipient..."
-                    value={selectedRecipient ? `${selectedRecipient.name} (${selectedRecipient.type})` : recipientSearchTerm}
-                    onChange={(e) => {
-                      setRecipientSearchTerm(e.target.value);
-                      setSelectedRecipient(null);
-                      setNewMessage({...newMessage, recipient_id: ''});
-                      setShowRecipientDropdown(true);
-                    }}
-                    onFocus={() => setShowRecipientDropdown(true)}
-                    className="w-full"
-                  />
-                  {showRecipientDropdown && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                      {filteredRecipients.length > 0 ? (
-                        filteredRecipients.map(recipient => (
-                          <div
-                            key={recipient.user_id}
-                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
-                            onClick={() => {
-                              setSelectedRecipient(recipient);
-                              setNewMessage({...newMessage, recipient_id: recipient.user_id});
-                              setRecipientSearchTerm('');
-                              setShowRecipientDropdown(false);
-                            }}
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="recipient" className="text-right mt-2">To</Label>
+                <div className="col-span-3 space-y-2">
+                  {/* Selected Recipients */}
+                  {selectedRecipients.length > 0 && (
+                    <div className="flex flex-wrap gap-2 p-2 bg-gray-50 rounded-md border">
+                      {selectedRecipients.map(recipient => (
+                        <div
+                          key={recipient.user_id}
+                          className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm"
+                        >
+                          <span>{recipient.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeRecipient(recipient.user_id)}
+                            className="hover:bg-blue-200 rounded-full p-0.5"
                           >
-                            <div className="font-medium">{recipient.name}</div>
-                            <div className="text-sm text-gray-500">{recipient.email} ({recipient.type})</div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="px-4 py-2 text-gray-500">No recipients found</div>
-                      )}
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
+                  {/* Recipient Search */}
+                  <div className="relative recipient-search-container">
+                    <Input
+                      id="recipient"
+                      placeholder="Search and add recipients..."
+                      value={recipientSearchTerm}
+                      onChange={(e) => {
+                        setRecipientSearchTerm(e.target.value);
+                        setShowRecipientDropdown(true);
+                      }}
+                      onFocus={() => setShowRecipientDropdown(true)}
+                      className="w-full"
+                    />
+                    {showRecipientDropdown && recipientSearchTerm && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        {filteredRecipients.filter(r => !selectedRecipients.find(sr => sr.user_id === r.user_id)).length > 0 ? (
+                          filteredRecipients
+                            .filter(r => !selectedRecipients.find(sr => sr.user_id === r.user_id))
+                            .map(recipient => (
+                            <div
+                              key={recipient.user_id}
+                              className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                              onClick={() => addRecipient(recipient)}
+                            >
+                              <div className="font-medium">{recipient.name}</div>
+                              <div className="text-sm text-gray-500">{recipient.email} ({recipient.type})</div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-4 py-2 text-gray-500">No more recipients found</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {selectedRecipients.length === 0 
+                      ? 'Search and select one or more recipients' 
+                      : `${selectedRecipients.length} recipient${selectedRecipients.length > 1 ? 's' : ''} selected`}
+                  </p>
                 </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
