@@ -86,18 +86,67 @@
   50% { transform: translateY(-20px); }
 }
 
+@keyframes float-delayed {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-25px) rotate(5deg); }
+}
+
 @keyframes gradient {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes gradient-text {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes gradient-text-reverse {
+  0%, 100% { background-position: 100% 50%; }
+  50% { background-position: 0% 50%; }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .animate-float {
   animation: float 6s ease-in-out infinite;
 }
 
+.animate-float-delayed {
+  animation: float-delayed 8s ease-in-out infinite;
+}
+
 .animate-gradient {
   background-size: 200% 200%;
   animation: gradient 4s ease infinite;
+}
+
+.animate-gradient-shift {
+  background-size: 400% 400%;
+  animation: gradient-shift 15s ease infinite;
+}
+
+.animate-gradient-text {
+  background-size: 200% auto;
+  animation: gradient-text 3s linear infinite;
+}
+
+.animate-gradient-text-reverse {
+  background-size: 200% auto;
+  animation: gradient-text-reverse 3s linear infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 20s linear infinite;
 }
 
 /* Shadow variants */
