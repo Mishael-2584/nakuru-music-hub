@@ -1534,67 +1534,51 @@ export default function ClassroomPage() {
 
   const loadFeed = async (classroomId: string, currentStudent?: { id: string; user_id: string }) => {
     try {
-      // PERFORMANCE FIX: Limit to 50 most recent posts to reduce I/O
-      const { data, error } = await supabase
-        .from('classroom_posts')
-        .select(`
-          id,
-          content,
-          created_at,
-          author_teacher_id,
-          is_assignment,
-          assignment_title,
-          due_date,
-          max_points,
-          is_timed,
-          time_limit_minutes,
-          teachers!classroom_posts_author_teacher_id_fkey(name)
-        `)
-        .eq('classroom_id', classroomId)
-        .order('created_at', { ascending: false })
-        .limit(50);
-        
+      // Use the RPC function but it returns all posts - we'll limit client-side for now
+      const { data, error } = await supabase.rpc("get_classroom_feed", { classroom_id_param: classroomId });
       if (error) {
         console.error('Error loading feed:', error);
         toast({ title: 'Error', description: 'Failed to load classroom feed', variant: 'destructive' });
         return;
       }
 
-      const posts: any[] = (data || []).map(post => ({
-        post_id: post.id,
-        content: post.content,
-        created_at: post.created_at,
-        author_name: post.teachers?.name || 'Unknown',
-        author_teacher_id: post.author_teacher_id,
-        is_assignment: post.is_assignment,
-        assignment_title: post.assignment_title,
-        due_date: post.due_date,
-        max_points: post.max_points,
-        is_timed: post.is_timed,
-        time_limit_minutes: post.time_limit_minutes,
-        has_quiz: false, // Will be populated below
-        quiz_time_limit: null,
-        quiz_is_draft: null,
-        quiz_scheduled_open_at: null,
-        quiz_status: null
-      }));
-      
+      // PERFORMANCE FIX: Limit to 50 most recent posts client-side
+      const posts: any[] = (data || []).slice(0, 50);
       console.log('Loaded feed posts:', posts.length);
       
       // Get all post IDs for batch operations
       const postIds = posts.map(p => p.post_id);
       
-      // Batch load attachments for all posts
+      // OPTIMIZATION: Run all data loading in parallel
+      const studentToUse = currentStudent || classroom?.currentStudent;
+      
+      const [attachmentsResult, submissionsResult, commentsResult, quizStatusResult] = await Promise.allSettled([
+        // Load attachments
+        postIds.length > 0 
+          ? supabase.from('classroom_post_attachments').select('*').in('post_id', postIds)
+          : Promise.resolve({ data: null, error: null }),
+        
+        // Load assignment submissions
+        posts.some(p => p.is_assignment) && studentToUse
+          ? loadAllSubmissions(posts.filter(p => p.is_assignment).map(p => p.post_id))
+          : Promise.resolve(null),
+        
+        // Load comments
+        postIds.length > 0
+          ? loadAllComments(postIds)
+          : Promise.resolve(null),
+        
+        // Load quiz statuses
+        posts.some(p => p.has_quiz) && studentToUse
+          ? loadQuizSubmissionStatuses(posts, studentToUse.user_id)
+          : Promise.resolve(null)
+      ]);
+      
+      // Process attachments
       let attachmentsByPost: Record<string, any[]> = {};
-      if (postIds.length > 0) {
-        const { data: allAttachments, error: attachmentError } = await supabase
-          .from('classroom_post_attachments')
-          .select('*')
-          .in('post_id', postIds);
-          
-        if (attachmentError) {
-          console.warn('Error loading attachments:', attachmentError);
-        } else if (allAttachments && allAttachments.length > 0) {
+      if (attachmentsResult.status === 'fulfilled' && attachmentsResult.value?.data) {
+        const allAttachments = attachmentsResult.value.data;
+        if (allAttachments && allAttachments.length > 0) {
           attachmentsByPost = allAttachments.reduce((acc: Record<string, any[]>, att: any) => {
             (acc[att.post_id] = acc[att.post_id] || []).push(att);
             return acc;
@@ -1602,62 +1586,12 @@ export default function ClassroomPage() {
         }
       }
       
-      // Batch load quiz data for posts
-      const { data: quizData } = await supabase
-        .from('quizzes')
-        .select('id, post_id, time_limit_minutes, is_draft, scheduled_open_at, status')
-        .in('post_id', postIds);
-      
-      // Map quiz data to posts
-      const quizByPostId: Record<string, any> = {};
-      quizData?.forEach(quiz => {
-        quizByPostId[quiz.post_id] = quiz;
-      });
-      
-      const postsWithAttachments = posts.map(post => {
-        const quiz = quizByPostId[post.post_id];
-        return {
-          ...post,
-          attachments: attachmentsByPost[post.post_id] || [],
-          has_quiz: !!quiz,
-          quiz_time_limit: quiz?.time_limit_minutes || null,
-          quiz_is_draft: quiz?.is_draft || null,
-          quiz_scheduled_open_at: quiz?.scheduled_open_at || null,
-          quiz_status: quiz?.status || null
-        };
-      });
+      const postsWithAttachments = posts.map(post => ({
+        ...post,
+        attachments: attachmentsByPost[post.post_id] || []
+      }));
       
       setFeed(postsWithAttachments);
-      
-      // Batch load submissions for all assignment posts
-      const assignmentPosts = postsWithAttachments.filter(p => p.is_assignment);
-      if (assignmentPosts.length > 0) {
-        await loadAllSubmissions(assignmentPosts.map(p => p.post_id));
-      }
-      
-      // Batch load comments for all posts
-      await loadAllComments(postIds);
-      
-      // Use the passed currentStudent parameter or fall back to state
-      const studentToUse = currentStudent || classroom?.currentStudent;
-      
-      console.log('Checking quiz submission status loading:', {
-        hasCurrentStudent: !!studentToUse,
-        currentStudentUserId: studentToUse?.user_id,
-        passedAsParameter: !!currentStudent
-      });
-      
-      if (studentToUse) {
-        console.log('Loading quiz submission statuses for student:', studentToUse.user_id);
-        // Temporarily update classroom state if we have a student
-        if (currentStudent) {
-          setClassroom(prev => prev ? { ...prev, currentStudent } : null);
-        }
-        // Pass the student's user_id directly to avoid closure issues
-        await loadQuizSubmissionStatuses(postsWithAttachments, studentToUse.user_id);
-      } else {
-        console.log('Skipping quiz submission status loading - no current student');
-      }
       
     } catch (error) {
       console.error('Error in loadFeed:', error);
