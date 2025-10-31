@@ -5,10 +5,8 @@ import { Button } from "@/components/ui/button";
 import { 
   Facebook, 
   Instagram, 
-  Twitter, 
   ExternalLink, 
   Calendar,
-  MapPin,
   Users,
   Music,
   Heart,
@@ -21,7 +19,7 @@ import { SocialMediaManager, SocialPost } from '@/utils/socialMediaAPI';
 const SocialMediaFeed = () => {
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activePlatform, setActivePlatform] = useState<'all' | 'facebook' | 'instagram' | 'twitter'>('all');
+  const [activePlatform, setActivePlatform] = useState<'all' | 'facebook' | 'instagram'>('all');
   const [refreshing, setRefreshing] = useState(false);
 
   // Mock data - fallback when API is not configured
@@ -64,18 +62,6 @@ const SocialMediaFeed = () => {
         type: 'event'
       },
       {
-        id: '4',
-        platform: 'twitter',
-        content: 'Just finished an amazing guitar workshop with our students! The energy and passion for music is incredible. 🎸 #MusicEducation #GuitarWorkshop',
-        author: '@DamonMusicAcademy',
-        timestamp: '2025-01-04T14:20:00Z',
-        likes: 34,
-        comments: 7,
-        shares: 12,
-        url: 'https://twitter.com/damonmusicacademy/status/1',
-        type: 'post'
-      },
-      {
         id: '5',
         platform: 'instagram',
         content: 'New student spotlight! Meet Sarah, our talented violinist who just completed her Grade 5 exam with distinction! 🎻🌟 #StudentSpotlight #Violin',
@@ -106,9 +92,8 @@ const SocialMediaFeed = () => {
       // Check if API credentials are configured
       const hasFacebookConfig = process.env.REACT_APP_FACEBOOK_ACCESS_TOKEN && process.env.REACT_APP_FACEBOOK_PAGE_ID;
       const hasInstagramConfig = process.env.REACT_APP_INSTAGRAM_ACCESS_TOKEN && process.env.REACT_APP_INSTAGRAM_USER_ID;
-      const hasTwitterConfig = process.env.REACT_APP_TWITTER_BEARER_TOKEN && process.env.REACT_APP_TWITTER_USERNAME;
 
-      if (hasFacebookConfig || hasInstagramConfig || hasTwitterConfig) {
+      if (hasFacebookConfig || hasInstagramConfig) {
         // Use real API data
         const socialMediaManager = new SocialMediaManager({
           facebook: hasFacebookConfig ? {
@@ -118,10 +103,6 @@ const SocialMediaFeed = () => {
           instagram: hasInstagramConfig ? {
             accessToken: process.env.REACT_APP_INSTAGRAM_ACCESS_TOKEN!,
             userId: process.env.REACT_APP_INSTAGRAM_USER_ID!
-          } : undefined,
-          twitter: hasTwitterConfig ? {
-            bearerToken: process.env.REACT_APP_TWITTER_BEARER_TOKEN!,
-            username: process.env.REACT_APP_TWITTER_USERNAME!
           } : undefined
         });
 
@@ -158,7 +139,6 @@ const SocialMediaFeed = () => {
     switch (platform) {
       case 'facebook': return <Facebook className="h-4 w-4" />;
       case 'instagram': return <Instagram className="h-4 w-4" />;
-      case 'twitter': return <Twitter className="h-4 w-4" />;
       default: return null;
     }
   };
@@ -167,7 +147,6 @@ const SocialMediaFeed = () => {
     switch (platform) {
       case 'facebook': return 'bg-blue-600 text-white';
       case 'instagram': return 'bg-gradient-to-r from-purple-500 to-pink-500 text-white';
-      case 'twitter': return 'bg-blue-400 text-white';
       default: return 'bg-gray-600 text-white';
     }
   };
@@ -262,15 +241,6 @@ const SocialMediaFeed = () => {
             >
               <Instagram className="h-4 w-4" />
               Instagram
-            </Button>
-            <Button
-              variant={activePlatform === 'twitter' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setActivePlatform('twitter')}
-              className="flex items-center gap-2"
-            >
-              <Twitter className="h-4 w-4" />
-              Twitter
             </Button>
             </div>
             
@@ -384,14 +354,6 @@ const SocialMediaFeed = () => {
                 >
                   <Instagram className="h-4 w-4 mr-2" />
                   Instagram
-                </Button>
-                <Button
-                  variant="outline"
-                  className="bg-white/20 border-white/30 text-white hover:bg-white/30"
-                  onClick={() => window.open('https://twitter.com/damonmusicacademy', '_blank')}
-                >
-                  <Twitter className="h-4 w-4 mr-2" />
-                  Twitter
                 </Button>
               </div>
             </CardContent>

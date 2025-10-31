@@ -201,13 +201,24 @@ export default function ClassroomPage() {
     }
   };
 
-  const loadQuizSubmissionStatuses = async (posts: any[]) => {
+  const loadQuizSubmissionStatuses = async (posts: any[], studentUserId?: string) => {
     try {
       const quizPosts = posts.filter(post => post.has_quiz);
       if (quizPosts.length === 0) return;
       
-      // Batch get all quiz IDs
+      const userIdToUse = studentUserId || classroom?.currentStudent?.user_id;
+      
+      console.log('Loading quiz submission statuses for student:', userIdToUse);
+      
+      if (!userIdToUse) {
+        console.log('No student user ID available');
+        return;
+      }
+      
       const postIds = quizPosts.map(post => post.post_id);
+      console.log('Looking for quiz submissions for post IDs:', postIds);
+      
+      // First, let's get all quizzes for these posts to map quiz_id to post_id
       const { data: quizData, error: quizError } = await supabase
         .from('quizzes')
         .select('id, post_id')
@@ -215,32 +226,59 @@ export default function ClassroomPage() {
       
       if (quizError) {
         console.warn('Error loading quiz data:', quizError);
+      }
+      
+      console.log('Found quizzes:', quizData);
+      
+      if (!quizData || quizData.length === 0) {
+        console.log('No quizzes found in database for these posts');
         return;
       }
       
-      if (!quizData || quizData.length === 0) return;
-      
-      // Batch check submission statuses for all quizzes
+      // Now get submissions for these quiz IDs
       const quizIds = quizData.map(q => q.id);
+      console.log('Looking for submissions for quiz IDs:', quizIds);
+      
       const { data: submissions, error: submissionError } = await supabase
         .from('quiz_submissions')
         .select('quiz_id, status, submitted_at, total_score, percentage_score, is_passed')
-        .in('quiz_id', quizIds)
-        .eq('student_id', classroom?.currentStudent?.user_id);
+        .eq('student_id', userIdToUse)
+        .in('quiz_id', quizIds);
       
       if (submissionError) {
         console.warn('Error loading quiz submissions:', submissionError);
         return;
       }
       
-      // Create status map
+      console.log('Found quiz submissions:', submissions);
+      
+      // Create status map by post_id
       const statusMap: {[key: string]: any} = {};
+      
+      // Map quiz_id to post_id
+      const quizIdToPostId: {[key: string]: string} = {};
       quizData.forEach(quiz => {
-        const submission = submissions?.find(sub => sub.quiz_id === quiz.id);
-        if (submission) {
-          statusMap[quiz.post_id] = submission;
+        quizIdToPostId[quiz.id] = quiz.post_id;
+      });
+      
+      console.log('Quiz ID to Post ID mapping:', quizIdToPostId);
+      
+      // Map submissions to posts
+      submissions?.forEach((submission: any) => {
+        const postId = quizIdToPostId[submission.quiz_id];
+        if (postId) {
+          statusMap[postId] = {
+            quiz_id: submission.quiz_id,
+            status: submission.status,
+            submitted_at: submission.submitted_at,
+            total_score: submission.total_score,
+            percentage_score: submission.percentage_score,
+            is_passed: submission.is_passed
+          };
         }
       });
+      
+      console.log('Quiz submission status map:', statusMap);
       
       setQuizSubmissionStatuses(statusMap);
     } catch (error) {
@@ -384,7 +422,7 @@ export default function ClassroomPage() {
       });
       
       // Reload feed to show updated quiz
-      await loadFeed();
+      if (classroom) await loadFeed(classroom.id, classroom.currentStudent);
     } catch (error: any) {
       console.error('Error updating quiz:', error);
       const errorMessage = error?.message || 'Failed to update quiz';
@@ -1106,7 +1144,7 @@ export default function ClassroomPage() {
         }
       }
       
-      await loadFeed(classroom.id);
+      await loadFeed(classroom.id, classroom.currentStudent);
       toast({ title: "Posted", description: "Your update has been shared." });
     } catch (err: any) {
       console.error(err);
@@ -1198,7 +1236,7 @@ export default function ClassroomPage() {
       
       toast({ title: 'Success', description: 'Assignment submitted successfully' });
       await loadSubmissions(postId);
-      if (classroom) await loadFeed(classroom.id);
+      if (classroom) await loadFeed(classroom.id, classroom.currentStudent);
     } catch (err) {
       console.error('Failed to submit assignment:', err);
       toast({ 
@@ -1302,7 +1340,7 @@ export default function ClassroomPage() {
         post_id_param: postId,
       });
       if (error) throw error;
-      await loadFeed(classroom!.id);
+      await loadFeed(classroom!.id, classroom?.currentStudent);
       toast({ title: "Deleted", description: "Post has been deleted." });
     } catch (err: any) {
       console.error(err);
@@ -1450,6 +1488,8 @@ export default function ClassroomPage() {
         };
         setClassroom(loaded);
 
+        let enrolledStudent: { id: string; user_id: string } | null = null;
+        
         if (user?.id) {
           // Batch check user roles and enrollment status
           const [teacherResult, studentResult] = await Promise.allSettled([
@@ -1475,11 +1515,13 @@ export default function ClassroomPage() {
             if (enrollment) {
               setIsEnrolledStudent(true);
               setClassroom(prev => prev ? { ...prev, currentStudent: student } : null);
+              enrolledStudent = student;
             }
           }
         }
 
-        await loadFeed(id);
+        // Pass the enrolled student to loadFeed so it can load quiz statuses immediately
+        await loadFeed(id, enrolledStudent || undefined);
         await loadEnrolledStudents(id);
       } catch (err: any) {
         console.error("Failed to load classroom:", err);
@@ -1490,16 +1532,53 @@ export default function ClassroomPage() {
     })();
   }, [id, user?.id]);
 
-  const loadFeed = async (classroomId: string) => {
+  const loadFeed = async (classroomId: string, currentStudent?: { id: string; user_id: string }) => {
     try {
-      const { data, error } = await supabase.rpc("get_classroom_feed", { classroom_id_param: classroomId });
+      // PERFORMANCE FIX: Limit to 50 most recent posts to reduce I/O
+      const { data, error } = await supabase
+        .from('classroom_posts')
+        .select(`
+          id,
+          content,
+          created_at,
+          author_teacher_id,
+          is_assignment,
+          assignment_title,
+          due_date,
+          max_points,
+          is_timed,
+          time_limit_minutes,
+          teachers!classroom_posts_author_teacher_id_fkey(name)
+        `)
+        .eq('classroom_id', classroomId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+        
       if (error) {
         console.error('Error loading feed:', error);
         toast({ title: 'Error', description: 'Failed to load classroom feed', variant: 'destructive' });
         return;
       }
 
-      const posts: any[] = data || [];
+      const posts: any[] = (data || []).map(post => ({
+        post_id: post.id,
+        content: post.content,
+        created_at: post.created_at,
+        author_name: post.teachers?.name || 'Unknown',
+        author_teacher_id: post.author_teacher_id,
+        is_assignment: post.is_assignment,
+        assignment_title: post.assignment_title,
+        due_date: post.due_date,
+        max_points: post.max_points,
+        is_timed: post.is_timed,
+        time_limit_minutes: post.time_limit_minutes,
+        has_quiz: false, // Will be populated below
+        quiz_time_limit: null,
+        quiz_is_draft: null,
+        quiz_scheduled_open_at: null,
+        quiz_status: null
+      }));
+      
       console.log('Loaded feed posts:', posts.length);
       
       // Get all post IDs for batch operations
@@ -1523,10 +1602,30 @@ export default function ClassroomPage() {
         }
       }
       
-      const postsWithAttachments = posts.map(post => ({
-        ...post,
-        attachments: attachmentsByPost[post.post_id] || []
-      }));
+      // Batch load quiz data for posts
+      const { data: quizData } = await supabase
+        .from('quizzes')
+        .select('id, post_id, time_limit_minutes, is_draft, scheduled_open_at, status')
+        .in('post_id', postIds);
+      
+      // Map quiz data to posts
+      const quizByPostId: Record<string, any> = {};
+      quizData?.forEach(quiz => {
+        quizByPostId[quiz.post_id] = quiz;
+      });
+      
+      const postsWithAttachments = posts.map(post => {
+        const quiz = quizByPostId[post.post_id];
+        return {
+          ...post,
+          attachments: attachmentsByPost[post.post_id] || [],
+          has_quiz: !!quiz,
+          quiz_time_limit: quiz?.time_limit_minutes || null,
+          quiz_is_draft: quiz?.is_draft || null,
+          quiz_scheduled_open_at: quiz?.scheduled_open_at || null,
+          quiz_status: quiz?.status || null
+        };
+      });
       
       setFeed(postsWithAttachments);
       
@@ -1539,9 +1638,25 @@ export default function ClassroomPage() {
       // Batch load comments for all posts
       await loadAllComments(postIds);
       
-      // Load quiz submission statuses for enrolled students (only if needed)
-      if (isEnrolledStudent && classroom?.currentStudent) {
-        await loadQuizSubmissionStatuses(postsWithAttachments);
+      // Use the passed currentStudent parameter or fall back to state
+      const studentToUse = currentStudent || classroom?.currentStudent;
+      
+      console.log('Checking quiz submission status loading:', {
+        hasCurrentStudent: !!studentToUse,
+        currentStudentUserId: studentToUse?.user_id,
+        passedAsParameter: !!currentStudent
+      });
+      
+      if (studentToUse) {
+        console.log('Loading quiz submission statuses for student:', studentToUse.user_id);
+        // Temporarily update classroom state if we have a student
+        if (currentStudent) {
+          setClassroom(prev => prev ? { ...prev, currentStudent } : null);
+        }
+        // Pass the student's user_id directly to avoid closure issues
+        await loadQuizSubmissionStatuses(postsWithAttachments, studentToUse.user_id);
+      } else {
+        console.log('Skipping quiz submission status loading - no current student');
       }
       
     } catch (error) {
@@ -2065,6 +2180,8 @@ export default function ClassroomPage() {
                   onPreviewQuiz={handlePreviewQuiz}
                   onManageQuiz={handleManageQuiz}
                   comments={postComments[post.post_id] || []}
+                  userSubmission={submissions[post.post_id]?.find(s => s.student_id === classroom?.currentStudent?.id)}
+                  quizSubmissionStatus={quizSubmissionStatuses[post.post_id]}
                 >
                   {post.is_assignment && (
                     <>
@@ -2172,7 +2289,7 @@ export default function ClassroomPage() {
                         post={post}
                         isTeacher={isTeacherOfClass}
                         submissions={submissions[post.post_id] || []}
-                        currentStudentId={classroom.currentStudent?.user_id}
+                        currentStudentId={classroom.currentStudent?.id}
                         onSubmit={handleSubmitAssignment}
                         onGrade={handleGradeSubmission}
                         onLoadSubmissions={loadSubmissions}

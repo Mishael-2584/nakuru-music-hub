@@ -37,6 +37,8 @@ interface ClassroomPostCardProps {
   onManageQuiz?: (postId: string) => void;
   comments?: any[];
   children?: React.ReactNode; // For submission/grading sections
+  userSubmission?: any; // Student's submission for this assignment
+  quizSubmissionStatus?: any; // Student's quiz submission status
 }
 
 export default function ClassroomPostCard({ 
@@ -50,7 +52,9 @@ export default function ClassroomPostCard({
   onPreviewQuiz,
   onManageQuiz,
   comments = [],
-  children 
+  children,
+  userSubmission,
+  quizSubmissionStatus
 }: ClassroomPostCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -92,14 +96,15 @@ export default function ClassroomPostCard({
   const isOverdue = post.due_date && new Date(post.due_date) < new Date();
   const isDueSoon = post.due_date && new Date(post.due_date).getTime() - new Date().getTime() < 24 * 60 * 60 * 1000;
 
-  // Debug: Log quiz scheduled time
+  // Debug: Log quiz scheduled time and submission status
   if (post.has_quiz) {
     console.log('ClassroomPostCard - Quiz post:', {
       post_id: post.post_id,
       has_quiz: post.has_quiz,
       quiz_scheduled_open_at: post.quiz_scheduled_open_at,
       quiz_is_draft: post.quiz_is_draft,
-      isTeacher: isTeacher
+      isTeacher: isTeacher,
+      quizSubmissionStatus: quizSubmissionStatus
     });
   }
 
@@ -131,17 +136,30 @@ export default function ClassroomPostCard({
               {post.is_assignment && post.max_points && (
                 <span className="text-xs font-medium text-blue-600">{post.max_points} pts</span>
               )}
+              {/* Show assignment submission status for students */}
+              {!isTeacher && post.is_assignment && !post.has_quiz && userSubmission && (
+                <>
+                  {userSubmission.grade_points !== undefined && userSubmission.grade_points !== null ? (
+                    <Badge variant="outline" className="text-xs px-2 py-0 bg-green-100 text-green-700 border-green-200">
+                      ✓ Graded: {userSubmission.grade_points}/{post.max_points} pts
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs px-2 py-0 bg-yellow-100 text-yellow-700 border-yellow-200">
+                      ⏳ Submitted - Awaiting Grade
+                    </Badge>
+                  )}
+                </>
+              )}
+              {!isTeacher && post.is_assignment && !post.has_quiz && !userSubmission && (
+                <Badge variant="outline" className="text-xs px-2 py-0 bg-gray-100 text-gray-700 border-gray-200">
+                  📝 Not Submitted
+                </Badge>
+              )}
               {post.due_date && (
                 <span className={`text-xs font-medium ${
                   isOverdue ? 'text-red-600' : isDueSoon ? 'text-orange-600' : 'text-green-600'
                 }`}>
                   Due {formatDistanceToNow(new Date(post.due_date), { addSuffix: true })}
-                </span>
-              )}
-              {post.is_assignment && post.is_timed && (
-                <span className="text-xs text-gray-600 flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {Math.floor(post.time_limit_minutes / 60)}h {post.time_limit_minutes % 60}m
                 </span>
               )}
               {post.attachments && post.attachments.length > 0 && (
@@ -155,6 +173,27 @@ export default function ClassroomPostCard({
                   <Badge variant="outline" className="text-xs px-2 py-0 bg-purple-100 text-purple-700 border-purple-200">
                     🧠 Quiz
                   </Badge>
+                  {/* Show quiz submission status for students */}
+                  {!isTeacher && quizSubmissionStatus ? (
+                    <>
+                      <Badge variant="outline" className="text-xs px-2 py-0 bg-green-100 text-green-700 border-green-200">
+                        ✓ Completed
+                      </Badge>
+                      {quizSubmissionStatus.is_passed !== undefined && (
+                        <Badge variant="outline" className={`text-xs px-2 py-0 ${
+                          quizSubmissionStatus.is_passed 
+                            ? 'bg-green-100 text-green-700 border-green-200' 
+                            : 'bg-orange-100 text-orange-700 border-orange-200'
+                        }`}>
+                          Score: {quizSubmissionStatus.percentage_score?.toFixed(0)}%
+                        </Badge>
+                      )}
+                    </>
+                  ) : !isTeacher ? (
+                    <Badge variant="outline" className="text-xs px-2 py-0 bg-gray-100 text-gray-700 border-gray-200">
+                      📝 Not Started
+                    </Badge>
+                  ) : null}
                   {/* Show draft/scheduled status to teachers */}
                   {isTeacher && post.quiz_is_draft && (
                     <Badge variant="outline" className="text-xs px-2 py-0 bg-yellow-100 text-yellow-700 border-yellow-200">
@@ -289,7 +328,7 @@ export default function ClassroomPostCard({
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-gray-900">{post.author_name}</span>
                   {isTeacher && (
-                    <CheckCircle className="h-3 w-3 text-blue-600" title="Verified Teacher" />
+                    <CheckCircle className="h-3 w-3 text-blue-600" />
                   )}
                 </div>
                 <div className="text-xs text-gray-500">
