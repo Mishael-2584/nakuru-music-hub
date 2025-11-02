@@ -17,7 +17,7 @@ const FeesPage = () => {
               Course Fees & Pricing
             </h1>
             <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
-              Affordable, transparent pricing for world-class music education
+              Affordable, transparent pricing for world-class education
             </p>
           </div>
         </div>

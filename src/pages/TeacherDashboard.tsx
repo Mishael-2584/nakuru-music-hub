@@ -1738,7 +1738,7 @@ const TeacherDashboard = () => {
             </span>
           </div>
           </div>
-          <p className="text-white/90 text-sm sm:text-base lg:text-lg mb-4 px-4">Empowering music education and managing your teaching journey</p>
+          <p className="text-white/90 text-sm sm:text-base lg:text-lg mb-4 px-4">Empowering education and managing your teaching journey</p>
           <div className="flex flex-col sm:flex-row justify-center w-full max-w-4xl mx-auto mt-2 gap-2">
             <Button 
               variant="outline" 

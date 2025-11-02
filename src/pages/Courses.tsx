@@ -16,7 +16,7 @@ const Courses = () => {
               Our Programs
             </h1>
             <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
-              Comprehensive music education designed for all skill levels and ages
+              Comprehensive education designed for all skill levels and ages
             </p>
           </div>
         </div>

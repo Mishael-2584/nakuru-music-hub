@@ -199,7 +199,7 @@ const Courses = () => {
             </span>
           </div>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Comprehensive music education for students aged 3 years and above with expert instruction and modern facilities
+            Comprehensive education for students aged 3 years and above with expert instruction and modern facilities
           </p>
         </div>
         

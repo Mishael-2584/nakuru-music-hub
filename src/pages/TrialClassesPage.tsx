@@ -109,8 +109,8 @@ const TrialClassesPage = () => {
               <Sparkles className="w-8 h-8 text-yellow-500" />
             </div>
             <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-              Experience world-class music education with our complimentary trial session. 
-              No commitment, no pressure - just pure musical discovery.
+              Experience world-class education with our complimentary trial session. 
+              No commitment, no pressure - just pure discovery.
             </p>
             <div className="flex flex-wrap justify-center gap-2 mb-8">
               <Badge className="bg-green-100 text-green-800 px-4 py-2 text-sm">

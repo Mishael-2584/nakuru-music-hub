@@ -317,7 +317,7 @@ const TrialBookingForm = ({ className }: TrialBookingFormProps) => {
           <Star className="w-8 h-8 text-yellow-500" />
         </div>
         <p className="text-lg text-muted-foreground mb-6">
-          Experience world-class music education with our complimentary trial session
+          Experience world-class education with our complimentary trial session
         </p>
         
         {/* Benefits Grid */}
