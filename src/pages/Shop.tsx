@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ShoppingCart, Music, Headphones, Shirt, Globe, MapPin, Download, Clock, AlertCircle, Play, Package, Star, Users, FileAudio, Guitar, Piano, Drum, Mic, Volume2 } from "lucide-react";
 import WhatsAppChat from "@/components/WhatsAppChat";
+import { formatPrice } from "@/lib/priceFormatter";
 
 const Shop = () => {
   const [activeTab, setActiveTab] = useState("digital");
@@ -103,55 +104,44 @@ const Shop = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {/* Hymn Track Cards */}
                     {[
-                      { name: "Amazing Grace", key: "C", duration: "3:45", price: "KES 500" },
-                      { name: "How Great Thou Art", key: "D", duration: "4:12", price: "KES 500" },
-                      { name: "It Is Well", key: "E", duration: "3:58", price: "KES 500" },
-                      { name: "Great Is Thy Faithfulness", key: "F", duration: "4:30", price: "KES 500" },
-                      { name: "What A Friend We Have In Jesus", key: "G", duration: "3:20", price: "KES 500" },
-                      { name: "The Old Rugged Cross", key: "A", duration: "4:05", price: "KES 500" }
+                      { name: "Amazing Grace", key: "C", duration: "3:45", price: 500 },
+                      { name: "How Great Thou Art", key: "D", duration: "4:12", price: 500 },
+                      { name: "It Is Well", key: "E", duration: "3:58", price: 500 },
+                      { name: "Great Is Thy Faithfulness", key: "F", duration: "4:30", price: 500 },
+                      { name: "What A Friend We Have In Jesus", key: "G", duration: "3:20", price: 500 },
+                      { name: "The Old Rugged Cross", key: "A", duration: "4:05", price: 500 }
                     ].map((hymn, index) => (
-                      <Card key={index} className="group border-0 shadow-lg hover:shadow-2xl transition-all duration-300 bg-white/95 hover:-translate-y-1">
-                        <CardHeader className="pb-3">
+                      <Card key={index} className="group border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-white/95 hover:-translate-y-1 flex flex-col h-full max-h-[420px]">
+                        <CardHeader className="pb-2">
                           <div className="flex items-center justify-between">
                             <Badge variant="secondary" className="text-xs">Key: {hymn.key}</Badge>
                             <Badge variant="outline" className="text-xs">{hymn.duration}</Badge>
                           </div>
-                          <CardTitle className="text-lg font-bold mt-2">Hymn Performance Track: {hymn.name}</CardTitle>
+                          <CardTitle className="text-sm font-bold mt-1 line-clamp-1">Hymn: {hymn.name}</CardTitle>
                         </CardHeader>
-                        <CardContent className="pt-0">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                              <Music className="w-6 h-6 text-primary" />
+                        <CardContent className="pt-0 pb-3 flex-1 flex flex-col">
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                              <Music className="w-5 h-5 text-primary" />
                             </div>
                             <div className="flex-1">
-                              <div className="font-semibold text-lg">{hymn.price}</div>
-                              <div className="text-sm text-muted-foreground">Per track</div>
+                              <div className="font-bold text-base text-primary">{formatPrice(hymn.price)}</div>
+                              <div className="text-xs text-muted-foreground">Per track</div>
                             </div>
                           </div>
                           
-                          {/* Audio Preview Placeholder */}
-                          <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                            <div className="flex items-center gap-3">
-                              <Button size="sm" variant="outline" disabled>
-                                <Play className="w-4 h-4 mr-1" />
-                                Preview
-                              </Button>
-                              <span className="text-sm text-muted-foreground">Audio preview coming soon</span>
+                          <div className="space-y-1 mb-3 flex-1">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Download className="w-3 h-3" />
+                              <span>WAV & MP3</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Package className="w-3 h-3" />
+                              <span>Instant download</span>
                             </div>
                           </div>
                           
-                          <div className="space-y-2 mb-4">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Download className="w-4 h-4" />
-                              <span>Available in WAV & MP3</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Package className="w-4 h-4" />
-                              <span>Instant download after payment</span>
-                            </div>
-                          </div>
-                          
-                          <Button variant="outline" className="w-full" disabled>
+                          <Button variant="outline" className="w-full text-sm py-2" disabled>
                             <ShoppingCart className="w-4 h-4 mr-2" />
                             Add to Cart
                           </Button>
@@ -169,7 +159,7 @@ const Shop = () => {
                     <CardContent>
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="text-2xl font-bold text-primary">KES 2,000</div>
+                          <div className="text-2xl font-bold text-primary">{formatPrice(2000)}</div>
                           <div className="text-sm text-muted-foreground">Save KES 500 on 5-track bundle</div>
                         </div>
                         <Button variant="default" disabled>
@@ -267,17 +257,17 @@ const Shop = () => {
                               <div className="text-sm text-muted-foreground">Simple instrumentation</div>
                             </div>
                             <div className="text-right">
-                              <div className="font-bold text-primary">KES 3,000</div>
+                              <div className="font-bold text-primary">{formatPrice(3000)}</div>
                               <div className="text-xs text-muted-foreground">Starting price</div>
                             </div>
                           </div>
                           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                             <div>
-                              <div className="font-semibold">Standard Track</div>
+                              <div className="font-semibold">Full Arrangement</div>
                               <div className="text-sm text-muted-foreground">Multiple instruments</div>
                             </div>
                             <div className="text-right">
-                              <div className="font-bold text-primary">KES 5,000</div>
+                              <div className="font-bold text-primary">{formatPrice(5000)}</div>
                               <div className="text-xs text-muted-foreground">Most popular</div>
                             </div>
                           </div>
@@ -328,46 +318,46 @@ const Shop = () => {
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                      { name: "Student Acoustic Guitar", brand: "Yamaha", price: "KES 15,000", image: "/lovable-uploads/guitar.jpg", specs: "3/4 Size, Spruce Top" },
-                      { name: "Digital Piano", brand: "Casio", price: "KES 45,000", image: "/lovable-uploads/piano.jpg", specs: "88 Keys, Weighted Action" },
-                      { name: "Violin Set", brand: "Stentor", price: "KES 25,000", image: "/lovable-uploads/guitar.jpg", specs: "4/4 Size, Complete Set" },
-                      { name: "Electric Guitar", brand: "Fender", price: "KES 35,000", image: "/lovable-uploads/guitar.jpg", specs: "Stratocaster Style" },
-                      { name: "Keyboard", brand: "Roland", price: "KES 30,000", image: "/lovable-uploads/piano.jpg", specs: "61 Keys, Multiple Sounds" },
-                      { name: "Drum Set", brand: "Pearl", price: "KES 55,000", image: "/lovable-uploads/guitar.jpg", specs: "5-Piece, Complete Setup" }
+                      { name: "Student Acoustic Guitar", brand: "Yamaha", price: 15000, image: "/lovable-uploads/guitar.jpg", specs: "3/4 Size, Spruce Top" },
+                      { name: "Digital Piano", brand: "Casio", price: 45000, image: "/lovable-uploads/piano.jpg", specs: "88 Keys, Weighted Action" },
+                      { name: "Violin Set", brand: "Stentor", price: 25000, image: "/lovable-uploads/guitar.jpg", specs: "4/4 Size, Complete Set" },
+                      { name: "Electric Guitar", brand: "Fender", price: 35000, image: "/lovable-uploads/guitar.jpg", specs: "Stratocaster Style" },
+                      { name: "Keyboard", brand: "Roland", price: 30000, image: "/lovable-uploads/piano.jpg", specs: "61 Keys, Multiple Sounds" },
+                      { name: "Drum Set", brand: "Pearl", price: 55000, image: "/lovable-uploads/guitar.jpg", specs: "5-Piece, Complete Setup" }
                     ].map((instrument, index) => (
-                      <Card key={index} className="group border-0 shadow-lg hover:shadow-2xl transition-all duration-300 bg-white/95 hover:-translate-y-1">
+                      <Card key={index} className="group border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-white/95 hover:-translate-y-1 flex flex-col max-h-[380px]">
                         <div className="relative overflow-hidden">
                           <img 
                             src={instrument.image} 
                             alt={instrument.name} 
-                            className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500" 
+                            className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300" 
                           />
-                          <Badge className="absolute top-3 right-3 bg-orange-500">On Demand</Badge>
+                          <Badge className="absolute top-2 right-2 bg-orange-500 text-xs">On Demand</Badge>
                         </div>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-lg font-bold">{instrument.name} - {instrument.brand}</CardTitle>
-                          <CardDescription>{instrument.specs}</CardDescription>
+                        <CardHeader className="pb-2 flex-1">
+                          <CardTitle className="text-xs font-bold line-clamp-1">{instrument.name}</CardTitle>
+                          <CardDescription className="text-xs line-clamp-1">{instrument.brand} • {instrument.specs}</CardDescription>
                         </CardHeader>
-                        <CardContent className="pt-0">
-                          <div className="space-y-3 mb-4">
+                        <CardContent className="pt-0 pb-3">
+                          <div className="space-y-2 mb-2">
                             <div className="flex items-center justify-between">
-                              <span className="font-bold text-xl text-primary">{instrument.price}</span>
+                              <span className="font-bold text-base text-primary">{formatPrice(instrument.price)}</span>
                               <Badge variant="outline" className="text-xs">3-7 days</Badge>
                             </div>
-                            <div className="space-y-2 text-sm text-muted-foreground">
-                              <div className="flex items-center gap-2">
-                                <Package className="w-4 h-4" />
-                                <span>Ordered on Demand (No in-house stock)</span>
+                            <div className="space-y-1 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Package className="w-3 h-3" />
+                                <span>On Demand</span>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <Star className="w-4 h-4" />
-                                <span>1 year warranty via supplier</span>
+                              <div className="flex items-center gap-1">
+                                <Star className="w-3 h-3" />
+                                <span>1 year warranty</span>
                               </div>
                             </div>
                           </div>
-                          <Button variant="outline" className="w-full" disabled>
+                          <Button variant="outline" className="w-full text-xs py-2" disabled>
                             <ShoppingCart className="w-4 h-4 mr-2" />
                             Add to Cart
                           </Button>
@@ -396,35 +386,35 @@ const Shop = () => {
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {[
-                      { name: "Guitar Picks (Pack of 10)", price: "KES 500", image: "/lovable-uploads/guitar.jpg", category: "Guitar" },
-                      { name: "Guitar Strings Set", price: "KES 1,200", image: "/lovable-uploads/guitar.jpg", category: "Guitar" },
-                      { name: "Guitar Strap", price: "KES 800", image: "/lovable-uploads/guitar.jpg", category: "Guitar" },
-                      { name: "Digital Tuner", price: "KES 1,500", image: "/lovable-uploads/guitar.jpg", category: "Universal" },
-                      { name: "Metronome", price: "KES 2,000", image: "/lovable-uploads/piano.jpg", category: "Universal" },
-                      { name: "Cleaning Kit", price: "KES 1,800", image: "/lovable-uploads/guitar.jpg", category: "Universal" },
-                      { name: "Music Stand", price: "KES 2,500", image: "/lovable-uploads/piano.jpg", category: "Universal" },
-                      { name: "Violin Rosin", price: "KES 300", image: "/lovable-uploads/guitar.jpg", category: "Violin" }
+                      { name: "Guitar Picks (Pack of 10)", price: 500, image: "/lovable-uploads/guitar.jpg", category: "Guitar" },
+                      { name: "Guitar Strings Set", price: 1200, image: "/lovable-uploads/guitar.jpg", category: "Guitar" },
+                      { name: "Guitar Strap", price: 800, image: "/lovable-uploads/guitar.jpg", category: "Guitar" },
+                      { name: "Digital Tuner", price: 1500, image: "/lovable-uploads/guitar.jpg", category: "Universal" },
+                      { name: "Metronome", price: 2000, image: "/lovable-uploads/piano.jpg", category: "Universal" },
+                      { name: "Cleaning Kit", price: 1800, image: "/lovable-uploads/guitar.jpg", category: "Universal" },
+                      { name: "Music Stand", price: 2500, image: "/lovable-uploads/piano.jpg", category: "Universal" },
+                      { name: "Violin Rosin", price: 300, image: "/lovable-uploads/guitar.jpg", category: "Violin" }
                     ].map((accessory, index) => (
-                      <Card key={index} className="group border-0 shadow-lg hover:shadow-2xl transition-all duration-300 bg-white/95 hover:-translate-y-1">
+                      <Card key={index} className="group border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-white/95 hover:-translate-y-1 flex flex-col max-h-[260px]">
                         <div className="relative overflow-hidden">
                           <img 
                             src={accessory.image} 
                             alt={accessory.name} 
-                            className="w-full h-32 object-cover group-hover:scale-110 transition-transform duration-500" 
+                            className="w-full h-24 object-cover group-hover:scale-105 transition-transform duration-300" 
                           />
-                          <Badge className="absolute top-2 right-2 bg-green-500 text-xs">{accessory.category}</Badge>
+                          <Badge className="absolute top-1 right-1 bg-green-500 text-xs px-1 py-0">{accessory.category}</Badge>
                         </div>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-sm font-bold">{accessory.name}</CardTitle>
+                        <CardHeader className="pb-2 flex-1 py-2">
+                          <CardTitle className="text-xs font-bold line-clamp-2">{accessory.name}</CardTitle>
                         </CardHeader>
-                        <CardContent className="pt-0">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="font-bold text-primary">{accessory.price}</span>
+                        <CardContent className="pt-0 pb-2 px-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-bold text-sm text-primary">{formatPrice(accessory.price)}</span>
                             <Badge variant="outline" className="text-xs">1-5 days</Badge>
                           </div>
-                          <Button variant="outline" className="w-full" disabled>
+                          <Button variant="outline" className="w-full text-xs py-1" disabled>
                             <ShoppingCart className="w-4 h-4 mr-2" />
                             Add to Cart
                           </Button>

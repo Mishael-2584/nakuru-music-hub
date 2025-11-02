@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Edit, Trash2, Upload, Package, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import ProductImageUploader from './ProductImageUploader';
+import { formatPrice } from '@/lib/priceFormatter';
 
 interface Category {
   id: string;
@@ -28,6 +30,7 @@ interface Product {
   base_price: number;
   image_url?: string;
   image_filename?: string;
+  primary_image_url?: string;
   specs?: string;
   brand?: string;
   delivery_days_min?: number;
@@ -58,8 +61,9 @@ export default function ShopProductManager() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [uploadedImages, setUploadedImages] = useState<any[]>([]);
   const [isVariantDialogOpen, setIsVariantDialogOpen] = useState(false);
   const [selectedProductForVariant, setSelectedProductForVariant] = useState<Product | null>(null);
 
@@ -80,9 +84,6 @@ export default function ShopProductManager() {
     image_url: '',
     image_filename: ''
   });
-
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
 
   const [variantForm, setVariantForm] = useState({
     variant_name: '',
@@ -127,11 +128,25 @@ export default function ShopProductManager() {
 
       if (error) throw error;
 
-      const productsWithCategories = data?.map(product => ({
-        ...product,
-        category: product.shop_categories,
-        variants: product.shop_product_variants || []
-      })) || [];
+      // Fetch primary images for all products
+      const productsWithCategories = await Promise.all(
+        (data || []).map(async (product) => {
+          // Try to get primary image from product_images table
+          const { data: primaryImage } = await supabase
+            .from('product_images')
+            .select('image_url')
+            .eq('product_id', product.id)
+            .eq('is_primary', true)
+            .single();
+
+          return {
+            ...product,
+            category: product.shop_categories,
+            variants: product.shop_product_variants || [],
+            primary_image_url: primaryImage?.image_url || product.image_url // Fallback to old image_url
+          };
+        })
+      );
 
       setProducts(productsWithCategories);
     } catch (error) {
@@ -169,41 +184,50 @@ export default function ShopProductManager() {
     }
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleImageUploadClick = async () => {
-    if (!imageFile) return;
-
-    const result = await handleImageUpload(imageFile);
-    if (result) {
-      setProductForm(prev => ({
-        ...prev,
-        image_url: result.url,
-        image_filename: result.filename
-      }));
-      toast({ title: 'Success', description: 'Image uploaded successfully' });
-    }
-  };
-
+  
+  
   const handleCreateProduct = async () => {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('shop_products')
-        .insert(productForm);
+        .insert(productForm)
+        .select()
+        .single();
 
       if (error) throw error;
 
-      toast({ title: 'Success', description: 'Product created successfully' });
+      // Save uploaded images to database with the new product ID
+      if (uploadedImages.length > 0) {
+        const imagesToSave = uploadedImages
+          .filter(img => img.image_url && img.image_filename) // Only save uploaded images
+          .map((img, index) => ({
+            product_id: data.id,
+            image_url: img.image_url,
+            image_filename: img.image_filename,
+            display_order: index,
+            is_primary: index === 0 // First image is primary
+          }));
+
+        if (imagesToSave.length > 0) {
+          const { error: imageError } = await supabase
+            .from('product_images')
+            .insert(imagesToSave);
+          
+          if (imageError) {
+            console.error('Error saving images:', imageError);
+            toast({ 
+              title: 'Warning', 
+              description: 'Product created but some images failed to save. Please try uploading again.',
+              variant: 'destructive' 
+            });
+          }
+        }
+      }
+
+      toast({ title: 'Success', description: 'Product created successfully with images.' });
+      
+      // Clear uploaded images after saving
+      setUploadedImages([]);
       setIsDialogOpen(false);
       resetProductForm();
       loadProducts();
@@ -286,7 +310,7 @@ export default function ShopProductManager() {
       brand: '',
       delivery_days_min: 0,
       delivery_days_max: 0,
-      availability_status: 'in_stock',
+      availability_status: 'in_stock' as const,
       stock_quantity: 0,
       low_stock_threshold: 5,
       is_active: true,
@@ -295,8 +319,7 @@ export default function ShopProductManager() {
       image_url: '',
       image_filename: ''
     });
-    setImagePreview(null);
-    setImageFile(null);
+    setUploadedImages([]);
   };
 
   const resetVariantForm = () => {
@@ -330,8 +353,7 @@ export default function ShopProductManager() {
       image_url: product.image_url || '',
       image_filename: product.image_filename || ''
     });
-    setImagePreview(product.image_url || null);
-    setImageFile(null);
+    setUploadedImages([]); // Clear uploaded images when editing
     setIsDialogOpen(true);
   };
 
@@ -355,7 +377,12 @@ export default function ShopProductManager() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Product Management</h2>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) {
+            setUploadedImages([]); // Clear uploaded images when dialog closes
+          }
+        }}>
           <DialogTrigger asChild>
             <Button onClick={() => { setSelectedProduct(null); resetProductForm(); }}>
               <Plus className="h-4 w-4 mr-2" />
@@ -505,63 +532,11 @@ export default function ShopProductManager() {
                 />
               </div>
 
-              {/* Image Upload Section */}
-              <div>
-                <Label htmlFor="image">Product Image</Label>
-                <div className="space-y-4">
-                  {/* Image Preview */}
-                  {(imagePreview || productForm.image_url) && (
-                    <div className="relative">
-                      <img
-                        src={imagePreview || productForm.image_url}
-                        alt="Product preview"
-                        className="w-32 h-32 object-cover rounded-lg border border-gray-200"
-                      />
-                      {productForm.image_url && !imagePreview && (
-                        <div className="absolute top-1 right-1">
-                          <Badge variant="outline" className="text-xs">
-                            Current
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* File Input */}
-                  <div className="flex items-center space-x-4">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                      id="image-upload"
-                    />
-                    <label
-                      htmlFor="image-upload"
-                      className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 bg-white"
-                    >
-                      <Upload className="h-4 w-4" />
-                      {imageFile ? 'Change Image' : 'Select Image'}
-                    </label>
-                    
-                    {imageFile && (
-                      <Button
-                        type="button"
-                        onClick={handleImageUploadClick}
-                        className="bg-primary hover:bg-primary/90"
-                      >
-                        Upload Image
-                      </Button>
-                    )}
-                  </div>
-                  
-                  {productForm.image_url && (
-                    <p className="text-xs text-gray-500">
-                      Current image: {productForm.image_filename}
-                    </p>
-                  )}
-                </div>
-              </div>
+              {/* Multiple Image Upload Section */}
+              <ProductImageUploader 
+                productId={selectedProduct?.id}
+                onImagesChange={setUploadedImages}
+              />
 
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
@@ -608,9 +583,9 @@ export default function ShopProductManager() {
             {products.map((product) => (
               <Card key={product.id} className="overflow-hidden">
                 <div className="aspect-square bg-gray-100 relative">
-                  {product.image_url ? (
+                  {product.primary_image_url ? (
                     <img
-                      src={product.image_url}
+                      src={product.primary_image_url}
                       alt={product.name}
                       className="w-full h-full object-cover"
                     />
@@ -634,7 +609,7 @@ export default function ShopProductManager() {
                   <div className="space-y-2">
                     <h3 className="font-semibold text-lg truncate">{product.name}</h3>
                     <p className="text-sm text-gray-600">{product.category?.name}</p>
-                    <p className="text-lg font-bold text-primary">KES {product.base_price.toFixed(2)}</p>
+                    <p className="text-lg font-bold text-primary">{formatPrice(product.base_price)}</p>
                     <div className="flex items-center justify-between text-sm">
                       <span>Stock: {product.stock_quantity}</span>
                       <Badge variant="outline">

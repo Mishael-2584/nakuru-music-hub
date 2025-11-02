@@ -85,22 +85,16 @@ const programs = [
 const About = () => {
   return (
     <div className="bg-gradient-to-b from-slate-50 via-white to-slate-50 overflow-hidden">
-      {/* Floating Musical Notes Background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-5">
-        <Music className="absolute top-20 left-10 w-12 h-12 text-primary animate-float" />
-        <Music2 className="absolute top-40 right-20 w-16 h-16 text-accent animate-float-delayed" />
-        <Headphones className="absolute bottom-40 left-1/4 w-14 h-14 text-secondary animate-float" />
-        <Radio className="absolute bottom-20 right-1/3 w-10 h-10 text-primary animate-float-delayed" />
-      </div>
+      {/* Floating Musical Notes Background - Removed for better readability */}
 
       {/* Hero Section - Enhanced */}
       <div className="relative pt-20 pb-32 overflow-hidden">
-        {/* Animated gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 animate-gradient-shift"></div>
+        {/* Static gradient background - removed animation for readability */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50"></div>
         
-        {/* Decorative elements */}
-        <div className="absolute top-20 left-0 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
+        {/* Decorative elements - static */}
+        <div className="absolute top-20 left-0 w-72 h-72 bg-primary/10 rounded-full blur-3xl opacity-50"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-accent/10 rounded-full blur-3xl opacity-50"></div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <motion.div 
@@ -109,7 +103,7 @@ const About = () => {
             transition={{ duration: 0.6 }}
             className="inline-flex items-center gap-2 bg-gradient-to-r from-primary/20 to-accent/20 backdrop-blur-sm text-primary font-semibold py-2 px-5 rounded-full text-sm mb-6 border border-primary/20 shadow-lg"
           >
-            <Music className="w-4 h-4 animate-bounce" />
+            <Music className="w-4 h-4" />
             About Damon Music Academy
           </motion.div>
           
@@ -119,11 +113,11 @@ const About = () => {
             transition={{ duration: 0.8, delay: 0.2 }}
             className="text-5xl md:text-7xl font-extrabold leading-tight tracking-tight mb-8"
           >
-            <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent animate-gradient-text">
+            <span className="text-blue-600">
               Where Creativity
             </span>
             <br />
-            <span className="bg-gradient-to-r from-pink-600 via-purple-600 to-blue-600 bg-clip-text text-transparent animate-gradient-text-reverse">
+            <span className="text-purple-600">
               Finds Its Voice
             </span>
           </motion.h1>
@@ -137,20 +131,18 @@ const About = () => {
             Welcome to <span className="font-semibold text-primary">Damon Music Academy</span>, Nakuru's premier destination for music, creative arts, and digital technology. Since <span className="font-semibold text-accent">2016</span>, our academy has been a vibrant hub where passion meets purpose, and where the unique potential of every student is celebrated and nurtured.
           </motion.p>
           
-          {/* Decorative music wave */}
+          {/* Decorative music wave - static after entrance */}
           <div className="mt-12 flex justify-center gap-1">
             {[...Array(20)].map((_, i) => (
               <motion.div
                 key={i}
                 className="w-1 bg-gradient-to-t from-primary to-accent rounded-full"
-                style={{ height: `${Math.random() * 40 + 20}px` }}
-                animate={{
-                  height: [`${Math.random() * 40 + 20}px`, `${Math.random() * 60 + 30}px`, `${Math.random() * 40 + 20}px`]
-                }}
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: `${35 + (i % 3) * 15}px`, opacity: 1 }}
                 transition={{
-                  duration: 1.5,
-                  repeat: Infinity,
-                  delay: i * 0.1
+                  duration: 0.6,
+                  delay: 0.6 + i * 0.03,
+                  ease: "easeOut"
                 }}
               />
             ))}
@@ -171,14 +163,14 @@ const About = () => {
           >
             <div className="flex flex-col md:flex-row items-center gap-8">
               <div className="flex-shrink-0 relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent rounded-full blur-xl opacity-50 animate-pulse"></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent rounded-full blur-xl opacity-30"></div>
                 <div className="relative flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-primary via-purple-500 to-accent shadow-2xl">
-                  <Globe className="w-12 h-12 text-white animate-spin-slow" />
+                  <Globe className="w-12 h-12 text-white" />
                 </div>
               </div>
               
               <div className="flex-1 text-center md:text-left space-y-6">
-                <h2 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary via-purple-600 to-accent bg-clip-text text-transparent">
+                <h2 className="text-3xl md:text-4xl font-bold text-primary">
                   Learn With Us, From Anywhere in the World
                 </h2>
                 <p className="text-lg text-gray-700 leading-relaxed">
@@ -188,8 +180,8 @@ const About = () => {
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-2xl border border-primary/20 hover:border-primary/40 transition-all duration-300 hover:shadow-lg group">
                     <div className="flex items-center gap-2 mb-3">
-                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-                      <span className="font-bold text-primary text-lg group-hover:scale-105 transition-transform">Our Global Online Campus</span>
+                      <div className="w-2 h-2 rounded-full bg-primary"></div>
+                      <span className="font-bold text-primary text-lg">Our Global Online Campus</span>
                     </div>
                     <p className="text-gray-700 leading-relaxed">
                       Join our global classroom. Our online program connects students from anywhere in the world with our expert instructors in Kenya. Through live, interactive sessions, you can access our unique curriculum in music, arts, and tech, no matter your location.
@@ -198,8 +190,8 @@ const About = () => {
                   
                   <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-2xl border border-accent/20 hover:border-accent/40 transition-all duration-300 hover:shadow-lg group">
                     <div className="flex items-center gap-2 mb-3">
-                      <div className="w-2 h-2 rounded-full bg-accent animate-pulse" style={{animationDelay: '0.5s'}}></div>
-                      <span className="font-bold text-accent text-lg group-hover:scale-105 transition-transform">Now in Nairobi</span>
+                      <div className="w-2 h-2 rounded-full bg-accent"></div>
+                      <span className="font-bold text-accent text-lg">Now in Nairobi</span>
                     </div>
                     <p className="text-gray-700 leading-relaxed">
                       We are thrilled to announce that we are now offering in-person classes in Nairobi. Led by our top faculty, we're bringing the same passion and vibrant creative community that defines our Nakuru campus to students in the city.
@@ -226,9 +218,9 @@ const About = () => {
             >
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-gradient-to-br from-primary to-accent rounded-2xl shadow-lg">
-                  <Sparkles className="h-8 w-8 text-white animate-pulse" />
+                  <Sparkles className="h-8 w-8 text-white" />
                 </div>
-                <h2 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
                   Your Search Ends Here: Why Damon is Different
                 </h2>
               </div>
@@ -255,30 +247,22 @@ const About = () => {
               viewport={{ once: true }}
               className="grid grid-cols-2 gap-4 md:gap-6"
             >
-              <motion.div
-                whileHover={{ scale: 1.05, rotate: 2 }}
-                transition={{ duration: 0.3 }}
-                className="relative group"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl blur-xl opacity-50"></div>
                 <img
                   src="/about-art-class.jpg"
                   alt="A teacher and students in an art class at Damon Music Academy"
-                  className="relative rounded-2xl object-cover w-full h-full shadow-2xl border-4 border-white"
+                  className="relative rounded-2xl object-cover w-full h-full shadow-2xl border-4 border-white transition-transform duration-300 hover:scale-[1.02]"
                 />
-              </motion.div>
-              <motion.div
-                whileHover={{ scale: 1.05, rotate: -2 }}
-                transition={{ duration: 0.3 }}
-                className="relative group mt-8"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-secondary/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+              </div>
+              <div className="relative group mt-8">
+                <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-secondary/20 rounded-2xl blur-xl opacity-50"></div>
                 <img
                   src="/about-happy-kids.jpg"
                   alt="Happy students of Damon Music Academy"
-                  className="relative rounded-2xl object-cover w-full h-full shadow-2xl border-4 border-white"
+                  className="relative rounded-2xl object-cover w-full h-full shadow-2xl border-4 border-white transition-transform duration-300 hover:scale-[1.02]"
                 />
-              </motion.div>
+              </div>
             </motion.div>
           </div>
         </div>
@@ -299,7 +283,7 @@ const About = () => {
               <div className="p-3 bg-gradient-to-br from-primary to-accent rounded-2xl shadow-xl">
                 <GraduationCap className="h-8 w-8 text-white" />
               </div>
-              <h2 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary via-purple-600 to-accent bg-clip-text text-transparent">
+              <h2 className="text-4xl md:text-5xl font-bold text-primary">
                 Your Creative Path Awaits: Our Programs
               </h2>
             </div>
@@ -395,8 +379,8 @@ const About = () => {
       {/* CTA Section - Enhanced */}
       <section className="py-24 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50"></div>
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl opacity-50"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl opacity-50"></div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <motion.div
@@ -406,7 +390,7 @@ const About = () => {
             viewport={{ once: true }}
             className="space-y-8"
           >
-            <h2 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary via-purple-600 to-accent bg-clip-text text-transparent leading-tight">
+            <h2 className="text-4xl md:text-5xl font-bold text-primary leading-tight">
               Ready to unleash your creative potential or elevate your event?
             </h2>
             <motion.div

@@ -14,6 +14,8 @@ import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import WhatsAppChat from '@/components/WhatsAppChat';
+import ProductImageGallery from '@/components/shop/ProductImageGallery';
+import { formatPrice } from '@/lib/priceFormatter';
 
 interface Category {
   id: string;
@@ -409,17 +411,12 @@ export default function DynamicShop() {
           {filteredProducts.map((product) => (
             <Card key={product.id} className="group hover:shadow-xl transition-all duration-300 border-0 bg-white/95 backdrop-blur-sm overflow-hidden">
               <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                {product.image_url ? (
-                  <img
-                    src={product.image_url}
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <Package className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400" />
-                  </div>
-                )}
+                <ProductImageGallery
+                  productId={product.id}
+                  fallbackImage={product.image_url}
+                  className="w-full h-full group-hover:scale-110 transition-transform duration-500"
+                  showControls={false}
+                />
                 
                 {/* Overlay badges */}
                 <div className="absolute top-2 left-2 right-2 sm:top-3 sm:left-3 sm:right-3 flex justify-between">
@@ -455,7 +452,7 @@ export default function DynamicShop() {
                   
                   <div className="flex items-center justify-between">
                     <p className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                      KES {product.base_price.toFixed(2)}
+                      {formatPrice(product.base_price)}
                     </p>
                     {product.variants && product.variants.length > 0 && (
                       <Badge variant="outline" className="text-xs hidden sm:inline-flex">
@@ -558,7 +555,7 @@ export default function DynamicShop() {
                       <p className="text-xs text-gray-600 truncate">{item.variant.variant_name}</p>
                     )}
                     <p className="text-xs sm:text-sm font-bold text-primary">
-                      KES {((item.variant ? item.product.base_price + item.variant.price_adjustment : item.product.base_price) * item.quantity).toFixed(2)}
+                      {formatPrice((item.variant ? item.product.base_price + item.variant.price_adjustment : item.product.base_price) * item.quantity)}
                     </p>
                   </div>
                   <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
@@ -597,7 +594,7 @@ export default function DynamicShop() {
               <div className="flex justify-between text-lg sm:text-xl font-bold">
                 <span>Total:</span>
                 <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  KES {getTotalPrice().toFixed(2)}
+                  {formatPrice(getTotalPrice())}
                 </span>
               </div>
               <Button 
@@ -623,17 +620,11 @@ export default function DynamicShop() {
             <div className="space-y-4 sm:space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
                 <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg sm:rounded-xl overflow-hidden shadow-lg">
-                  {selectedProduct.image_url ? (
-                    <img
-                      src={selectedProduct.image_url}
-                      alt={selectedProduct.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <Package className="h-12 w-12 sm:h-20 sm:w-20 text-gray-400" />
-                    </div>
-                  )}
+                  <ProductImageGallery
+                    productId={selectedProduct.id}
+                    fallbackImage={selectedProduct.image_url}
+                    className="w-full h-full"
+                  />
                 </div>
                 <div className="space-y-4 sm:space-y-6">
                   <div>
@@ -644,7 +635,7 @@ export default function DynamicShop() {
                   </div>
                   
                   <div className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                    KES {selectedProduct.base_price.toFixed(2)}
+                    {formatPrice(selectedProduct.base_price)}
                   </div>
 
                   {selectedProduct.description && (
@@ -705,7 +696,7 @@ export default function DynamicShop() {
                       </Button>
                     </div>
                     <div className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                      KES {((selectedVariant ? selectedProduct.base_price + selectedVariant.price_adjustment : selectedProduct.base_price) * quantity).toFixed(2)}
+                      {formatPrice((selectedVariant ? selectedProduct.base_price + selectedVariant.price_adjustment : selectedProduct.base_price) * quantity)}
                     </div>
                   </div>
 

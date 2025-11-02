@@ -109,8 +109,8 @@ const TrialBookingForm = ({ className }: TrialBookingFormProps) => {
     'Morning (8:00 AM - 12:00 PM)', 
     'Afternoon (12:00 PM - 4:00 PM)', 
     'Evening (4:00 PM - 8:00 PM)',
-    'Weekend Morning (8:00 AM - 12:00 PM)',
-    'Weekend Afternoon (12:00 PM - 4:00 PM)'
+    'Sunday Morning (8:00 AM - 12:00 PM)',
+    'Sunday Afternoon (12:00 PM - 4:00 PM)'
   ];
 
   const handleInputChange = (field: keyof TrialFormData, value: string | Date) => {
@@ -138,10 +138,12 @@ const TrialBookingForm = ({ className }: TrialBookingFormProps) => {
       return;
     }
 
-    if (!formData.parentName.trim()) {
+    // Only require parent/guardian name if student is under 18
+    const studentAge = parseInt(formData.age);
+    if (studentAge < 18 && !formData.parentName.trim()) {
       toast({
         title: "Missing Information",
-        description: "Please enter the parent/guardian's name",
+        description: "Please enter the parent/guardian's name (required for students under 18)",
         variant: "destructive",
       });
       return;
@@ -374,16 +376,26 @@ const TrialBookingForm = ({ className }: TrialBookingFormProps) => {
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="parentName">Parent/Guardian Name *</Label>
-                  <Input
-                    id="parentName"
-                    value={formData.parentName}
-                    onChange={(e) => handleInputChange('parentName', e.target.value)}
-                    placeholder="Enter parent/guardian name"
-                    required
-                  />
-                </div>
+                {/* Only show parent/guardian field if student is under 18 */}
+                {(!formData.age || parseInt(formData.age) < 18) && (
+                  <div>
+                    <Label htmlFor="parentName">
+                      Parent/Guardian Name {parseInt(formData.age) < 18 ? '*' : ''}
+                    </Label>
+                    <Input
+                      id="parentName"
+                      value={formData.parentName}
+                      onChange={(e) => handleInputChange('parentName', e.target.value)}
+                      placeholder="Enter parent/guardian name"
+                      required={parseInt(formData.age) < 18}
+                    />
+                    {formData.age && parseInt(formData.age) < 18 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Required for students under 18 years old
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Contact Information */}
