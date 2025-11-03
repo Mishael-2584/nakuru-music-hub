@@ -45,6 +45,7 @@ interface Product {
   category_id: string;
   category?: Category;
   variants?: ProductVariant[];
+  enable_variants?: boolean;
 }
 
 interface ProductVariant {
@@ -454,7 +455,7 @@ export default function DynamicShop() {
                     <p className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                       {formatPrice(product.base_price)}
                     </p>
-                    {product.variants && product.variants.length > 0 && (
+                    {product.enable_variants && product.variants && product.variants.length > 0 && (
                       <Badge variant="outline" className="text-xs hidden sm:inline-flex">
                         {product.variants.length} variant{product.variants.length !== 1 ? 's' : ''}
                       </Badge>
@@ -649,7 +650,7 @@ export default function DynamicShop() {
                     </div>
                   )}
 
-                  {selectedProduct.variants && selectedProduct.variants.length > 0 && (
+                  {selectedProduct.enable_variants && selectedProduct.variants && selectedProduct.variants.length > 0 && (
                     <div>
                       <Label htmlFor="variant" className="text-base sm:text-lg font-semibold text-gray-900">Select Variant</Label>
                       <Select value={selectedVariant?.id || ''} onValueChange={(value) => {

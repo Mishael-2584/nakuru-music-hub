@@ -43,6 +43,7 @@ interface Product {
   category_id: string;
   category?: Category;
   variants?: ProductVariant[];
+  enable_variants?: boolean;
 }
 
 interface ProductVariant {
@@ -82,7 +83,8 @@ export default function ShopProductManager() {
     featured: false,
     category_id: '',
     image_url: '',
-    image_filename: ''
+    image_filename: '',
+    enable_variants: true
   });
 
   const [variantForm, setVariantForm] = useState({
@@ -317,7 +319,8 @@ export default function ShopProductManager() {
       featured: false,
       category_id: '',
       image_url: '',
-      image_filename: ''
+      image_filename: '',
+      enable_variants: true
     });
     setUploadedImages([]);
   };
@@ -351,7 +354,8 @@ export default function ShopProductManager() {
       featured: product.featured,
       category_id: product.category_id,
       image_url: product.image_url || '',
-      image_filename: product.image_filename || ''
+      image_filename: product.image_filename || '',
+      enable_variants: product.enable_variants ?? true
     });
     setUploadedImages([]); // Clear uploaded images when editing
     setIsDialogOpen(true);
@@ -538,7 +542,7 @@ export default function ShopProductManager() {
                 onImagesChange={setUploadedImages}
               />
 
-              <div className="flex items-center space-x-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center space-x-2">
                   <input
                     type="checkbox"
@@ -556,6 +560,15 @@ export default function ShopProductManager() {
                     onChange={(e) => setProductForm(prev => ({ ...prev, featured: e.target.checked }))}
                   />
                   <Label htmlFor="featured">Featured</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="enable_variants"
+                    checked={productForm.enable_variants}
+                    onChange={(e) => setProductForm(prev => ({ ...prev, enable_variants: e.target.checked }))}
+                  />
+                  <Label htmlFor="enable_variants">Show variant selector</Label>
                 </div>
               </div>
 
@@ -616,7 +629,7 @@ export default function ShopProductManager() {
                         {product.availability_status.replace('_', ' ')}
                       </Badge>
                     </div>
-                    {product.variants && product.variants.length > 0 && (
+                    {product.enable_variants && product.variants && product.variants.length > 0 && (
                       <p className="text-xs text-gray-500">
                         {product.variants.length} variant{product.variants.length !== 1 ? 's' : ''}
                       </p>
