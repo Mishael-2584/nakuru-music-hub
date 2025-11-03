@@ -364,7 +364,8 @@ export default function OrderConfirmation() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-gray-500" />
-                  <span>+254 XXX XXX XXX</span>
+                  <span className="block">+254 701 195 460</span>
+                  <span className="block">+254 713 490 535</span>
                 </div>
               </div>
             </div>
