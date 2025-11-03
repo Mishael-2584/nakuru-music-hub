@@ -25,6 +25,8 @@ import MessagingUI from './MessagingUI';
 import LearningModeDebugTest from './LearningModeDebugTest';
 import ShopProductManager from './admin/ShopProductManager';
 import ShopOrderManager from './admin/ShopOrderManager';
+import ManualInvoiceManager from './admin/ManualInvoiceManager';
+import StudentAccountControl from './admin/StudentAccountControl';
 
 interface Registration {
   id: string;
@@ -3343,6 +3345,23 @@ const AdminPanel = () => {
                           )}
                           </div>
                         )}
+                      
+                      {/* Account Control Section */}
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <StudentAccountControl
+                          student={{
+                            ...student,
+                            account_suspended: student.account_suspended || student.is_access_suspended || false,
+                            suspension_reason: student.suspension_reason,
+                            first_invoice_paid: student.first_invoice_paid || false,
+                            can_book_classes: student.can_book_classes || false,
+                            account_notes: student.account_notes
+                          }}
+                          onUpdate={() => {
+                            fetchData();
+                          }}
+                        />
+                      </div>
                     </CardContent>
                   </Card>
                 );
@@ -4894,7 +4913,26 @@ const AdminPanel = () => {
                               </span>
                             </td>
                             <td>{student.instrument || student.course_category}</td>
-                            <td>{inv ? inv.status : <span className="text-red-500">Not Sent</span>}</td>
+                            <td>
+                              {inv ? (
+                                <ManualInvoiceManager
+                                  invoice={{ 
+                                    ...inv, 
+                                    students: { 
+                                      student_name: student.student_name, 
+                                      email: student.email,
+                                      registration_id: student.registration_id,
+                                      sessions_per_week: student.sessions_per_week
+                                    } 
+                                  }}
+                                  onUpdate={() => {
+                                    fetchData();
+                                  }}
+                                />
+                              ) : (
+                                <span className="text-red-500">Not Sent</span>
+                              )}
+                            </td>
                             <td>{inv ? inv.due_date : '-'}</td>
                             <td className="flex gap-2">
                               {!inv ? (

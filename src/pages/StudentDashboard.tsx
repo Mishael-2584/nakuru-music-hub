@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -22,6 +22,9 @@ import { Invoice } from '../integrations/supabase/types';
 import VideoConferenceModal from '../components/VideoConferenceModal';
 import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getMeetingDuration, getUserInvitedMeetings, joinMeetingByCode, InstantMeeting } from '../lib/videoConferencing';
 import MessagingUI from '../components/MessagingUI';
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
+import StudentAccountStatusBanner from '../components/StudentAccountStatusBanner';
+import { checkBookingEligibility, validateBookingAttempt, getUnpaidInvoiceCount } from '../lib/bookingRestrictions';
 
 interface StudentProfile {
   id: string;
@@ -51,6 +54,10 @@ interface StudentProfile {
   updated_at: string;
   date_of_birth?: string;
   profile_photo_url?: string;
+  is_access_suspended?: boolean;
+  suspension_reason?: string | null;
+  suspension_updated_at?: string | null;
+  allow_unpaid_access?: boolean;
 }
 
 interface Lesson {
@@ -215,6 +222,7 @@ const StudentDashboard = () => {
   const [materials, setMaterials] = useState<LessonMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [unpaidInvoiceCount, setUnpaidInvoiceCount] = useState(0);
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [passwordChecked, setPasswordChecked] = useState(false);
   
@@ -323,6 +331,8 @@ const StudentDashboard = () => {
   const timeSlotsPerPage = 5;
 
   const [showAllInvoices, setShowAllInvoices] = useState(false);
+  const [hasPaidFirstInvoice, setHasPaidFirstInvoice] = useState(false);
+  const [accessLockReason, setAccessLockReason] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -507,6 +517,12 @@ const StudentDashboard = () => {
         .single();
       const studentProfileData = { ...student, ...profile };
       setStudentProfile(studentProfileData);
+      
+      // Fetch unpaid invoice count for status banner
+      if (student.id) {
+        const unpaidCount = await getUnpaidInvoiceCount(student.id);
+        setUnpaidInvoiceCount(unpaidCount);
+      }
       
       // Fetch lessons
       const { data: lessonsData, error: lessonsError } = await supabase
@@ -1374,6 +1390,25 @@ const StudentDashboard = () => {
   const handleBookTimeSlot = async () => {
     if (!selectedTimeSlot || !studentProfile) return;
 
+    // CHECK BOOKING ELIGIBILITY FIRST
+    const validation = validateBookingAttempt({
+      id: studentProfile.id,
+      account_suspended: studentProfile.account_suspended || studentProfile.is_access_suspended,
+      suspension_reason: studentProfile.suspension_reason,
+      first_invoice_paid: studentProfile.first_invoice_paid,
+      can_book_classes: studentProfile.can_book_classes,
+      is_access_suspended: studentProfile.is_access_suspended
+    });
+
+    if (!validation.success) {
+      toast({
+        title: validation.title,
+        description: validation.message,
+        variant: validation.variant
+      });
+      return; // BLOCK the booking
+    }
+
     try {
       // Automatically calculate the next available date for the selected day
       const bookingDate = getNextAvailableDateISO(selectedTimeSlot.day_of_week, selectedTimeSlot.start_time);
@@ -1836,6 +1871,25 @@ const StudentDashboard = () => {
   // Handle booking a recurring slot
   const handleBookRecurringSlot = async (timeSlot: AvailableTimeSlot) => {
     if (!studentProfile) return;
+
+    // CHECK BOOKING ELIGIBILITY FIRST
+    const validation = validateBookingAttempt({
+      id: studentProfile.id,
+      account_suspended: studentProfile.account_suspended || studentProfile.is_access_suspended,
+      suspension_reason: studentProfile.suspension_reason,
+      first_invoice_paid: studentProfile.first_invoice_paid,
+      can_book_classes: studentProfile.can_book_classes,
+      is_access_suspended: studentProfile.is_access_suspended
+    });
+
+    if (!validation.success) {
+      toast({
+        title: validation.title,
+        description: validation.message,
+        variant: validation.variant
+      });
+      return; // BLOCK the booking
+    }
     
     setSelectedTimeSlot(timeSlot);
     setNewBooking({
@@ -2135,6 +2189,25 @@ const StudentDashboard = () => {
       style: 'currency',
       currency: 'KES'
     }).format(amount);
+  };
+
+  const getEffectiveAmountDue = (invoice: any) => {
+    if (!invoice) return 0;
+    const manualRaw = invoice.manual_amount_due;
+    const manual = manualRaw !== null && manualRaw !== undefined ? Number(manualRaw) : null;
+    const base = invoice.amount_due !== null && invoice.amount_due !== undefined ? Number(invoice.amount_due) : 0;
+    if (manual !== null && !Number.isNaN(manual)) {
+      return manual;
+    }
+    return base;
+  };
+
+  const getOutstandingAmount = (invoice: any) => {
+    if (!invoice) return 0;
+    const due = getEffectiveAmountDue(invoice);
+    const paidRaw = invoice.amount_paid !== null && invoice.amount_paid !== undefined ? Number(invoice.amount_paid) : 0;
+    const paid = Number.isNaN(paidRaw) ? 0 : paidRaw;
+    return Math.max(0, due - paid);
   };
 
   const formatDate = (dateString: string) => {
@@ -2696,6 +2769,8 @@ const StudentDashboard = () => {
           </div>
           </div>
           <p className="text-white/90 text-sm sm:text-base lg:text-lg mb-4 px-4">Your creative journey starts here. Access lessons, bookings, resources, and more!</p>
+          
+          {/* Sign Out Button */}
           <div className="flex flex-col sm:flex-row justify-center w-full max-w-4xl mx-auto mt-2 gap-2">
             <Button variant="outline" size="sm" className="bg-white/80 backdrop-blur-sm border-primary/20 hover:bg-primary/10 text-xs sm:text-sm">
               <Bell className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-blue-700" />
@@ -2710,6 +2785,23 @@ const StudentDashboard = () => {
           </div>
         </div>
       </section>
+
+      {/* Account Status Banner */}
+      <div className="w-full max-w-6xl px-2 sm:px-4 lg:px-8 mx-auto mt-6">
+        {studentProfile && (
+          <StudentAccountStatusBanner 
+            student={{
+              account_suspended: studentProfile.account_suspended || studentProfile.is_access_suspended,
+              suspension_reason: studentProfile.suspension_reason,
+              first_invoice_paid: studentProfile.first_invoice_paid,
+              can_book_classes: studentProfile.can_book_classes,
+              is_access_suspended: studentProfile.is_access_suspended
+            }}
+            unpaidInvoiceCount={unpaidInvoiceCount}
+          />
+        )}
+      </div>
+
       <main className="w-full max-w-6xl px-2 sm:px-4 lg:px-8 py-4 sm:py-8 mx-auto">
         <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-3 sm:p-4 lg:p-8 shadow-xl border border-primary/10">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">

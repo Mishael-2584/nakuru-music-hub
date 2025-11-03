@@ -790,26 +790,36 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   const courseDisplayName = getCourseDisplayName();
 
   // Build invoiceDetails for PDF with detailed breakdown
+  // IMPORTANT: Calculate amount as quantity × unitPrice to ensure correct totals
+  const lineItemAmount = quantity * unitPrice;
+  
+  // Build line items array
+  const lineItemsArray = [
+    {
+      description: `${courseDisplayName} - ${sessionsPerWeek} session${sessionsPerWeek > 1 ? 's' : ''} per week × ${numWeeks} weeks`,
+      quantity,
+      unitPrice,
+      amount: lineItemAmount, // Use calculated amount (quantity × unitPrice)
+      lessonIds: [],
+    },
+    ...(isFirstInvoice ? [{
+      description: 'Application Fee (One-time, non-refundable enrollment fee)',
+      quantity: 1,
+      unitPrice: applicationFee,
+      amount: applicationFee,
+      lessonIds: [],
+    }] : [])
+  ];
+  
+  // Calculate subtotal and total from actual line items
+  const calculatedSubtotal = lineItemsArray.reduce((sum, item) => sum + item.amount, 0);
+  const calculatedTotal = calculatedSubtotal; // No tax
+  
   const invoiceDetails = {
-    lineItems: [
-      {
-        description: `${courseDisplayName} - ${sessionsPerWeek} session${sessionsPerWeek > 1 ? 's' : ''} per week × ${numWeeks} weeks`,
-        quantity,
-        unitPrice,
-        amount: invoiceAmount,
-        lessonIds: [],
-      },
-      ...(isFirstInvoice ? [{
-        description: 'Application Fee (One-time, non-refundable enrollment fee)',
-        quantity: 1,
-        unitPrice: applicationFee,
-        amount: applicationFee,
-        lessonIds: [],
-      }] : [])
-    ],
-    subtotal: totalAmount,
+    lineItems: lineItemsArray,
+    subtotal: calculatedSubtotal, // Use sum of line item amounts
     tax: 0, // Remove tax as requested
-    total: totalAmount,
+    total: calculatedTotal, // Use sum of line item amounts
     paymentTerms: 'Payment due within 7 days of invoice date',
     validUntil: '',
     serviceBreakdown: `${courseDisplayName} as scheduled`,
