@@ -10,6 +10,7 @@ import { Edit, Save, X, AlertTriangle, DollarSign, Plus, Trash2 } from 'lucide-r
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/priceFormatter';
+import { sendInvoiceEmail } from '@/lib/emailService';
 
 interface InvoiceLineItem {
   description: string;
@@ -160,10 +161,62 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
 
       if (error) throw error;
 
-      toast({
-        title: 'Success',
-        description: `Invoice updated to ${formatPrice(calculatedAmount)}`
-      });
+      // Fetch updated invoice with student data to send email
+      const { data: updatedInvoiceData, error: fetchError } = await supabase
+        .from('invoices')
+        .select(`
+          *,
+          students (
+            id,
+            student_name,
+            email
+          )
+        `)
+        .eq('id', invoice.id)
+        .single();
+
+      if (!fetchError && updatedInvoiceData && updatedInvoiceData.students) {
+        // Check if this is the first invoice by checking if student has any other invoices
+        const { data: otherInvoices } = await supabase
+          .from('invoices')
+          .select('id')
+          .eq('student_id', updatedInvoiceData.student_id)
+          .neq('id', invoice.id)
+          .limit(1);
+        
+        const isFirstInvoice = !otherInvoices || otherInvoices.length === 0;
+        
+        // Check if invoice has been paid (for credentials message logic)
+        const invoicePaid = updatedInvoiceData.payment_status === 'paid' || 
+                            updatedInvoiceData.status === 'paid' ||
+                            (updatedInvoiceData.amount_paid && updatedInvoiceData.amount_paid >= updatedInvoiceData.amount_due);
+        
+        // Send updated invoice email to student with isUpdated flag
+        // Only show credentials message if it's first invoice AND not paid yet
+        await sendInvoiceEmail(
+          updatedInvoiceData,
+          {
+            id: updatedInvoiceData.students.id,
+            student_name: updatedInvoiceData.students.student_name,
+            email: updatedInvoiceData.students.email
+          },
+          {
+            subject: `Updated Invoice - ${updatedInvoiceData.students.student_name} - Damon Music Academy`,
+            isUpdated: true,
+            isFirstInvoice: isFirstInvoice && !invoicePaid // Only true if first invoice AND not paid
+          }
+        );
+        
+        toast({
+          title: 'Success',
+          description: `Invoice updated to ${formatPrice(calculatedAmount)} and email sent to student`
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: `Invoice updated to ${formatPrice(calculatedAmount)}`
+        });
+      }
 
       setIsDialogOpen(false);
       onUpdate();

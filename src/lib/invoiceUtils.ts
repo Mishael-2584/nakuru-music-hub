@@ -590,14 +590,15 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     // First invoice: Due date is the last day of the enrollment month (regardless of payment type)
     dueDateObj = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate());
   } else {
-    // Subsequent invoices: Due date is 7th of the month after periodEnd at midnight GMT+3
-    // GMT+3 = UTC+3, so midnight GMT+3 = 21:00 UTC (previous day)
-    dueDateObj = new Date(Date.UTC(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 6, 21, 0, 0, 0));
+    // Subsequent invoices: Due date is 10th of the month after periodEnd at midnight GMT+3
+    // GMT+3 = UTC+3, so midnight GMT+3 on 10th = 21:00 UTC on 9th
+    dueDateObj = new Date(Date.UTC(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 9, 21, 0, 0, 0));
   }
   const dueDateStr = dueDateObj.toISOString().slice(0, 10);
 
   // Check for existing invoice for this student/period (temporarily without registration_id)
   const { data: existingInvoice, error: existingError } = await supabase
+// ... (rest of the code remains the same)
     .from('invoices')
     .select('*')
     .eq('student_id', student.id)

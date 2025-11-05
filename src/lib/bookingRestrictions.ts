@@ -16,8 +16,6 @@ export interface StudentAccountInfo {
   id: string;
   account_suspended?: boolean;
   suspension_reason?: string | null;
-  first_invoice_paid?: boolean;
-  can_book_classes?: boolean;
   is_access_suspended?: boolean; // Legacy field
 }
 
@@ -27,37 +25,17 @@ export interface StudentAccountInfo {
  * @returns Access status with reason if blocked
  */
 export function checkBookingEligibility(student: StudentAccountInfo): StudentAccessStatus {
-  // Priority 1: Check for account suspension (most critical)
+  // Only check for account suspension
   if (student.account_suspended || student.is_access_suspended) {
     return {
       canBook: false,
       reason: student.suspension_reason || 'Your account has been suspended. Please contact administration.',
       severity: 'blocked',
-      actionRequired: 'Contact admin at info@damonmusicacademy.co.ke or call +254 701 195 460'
+      actionRequired: 'Contact admin at info@damonmusicacademy.co.ke or call +254 701 195 460 or +254 713 490 535'
     };
   }
 
-  // Priority 2: Check explicit booking permission flag
-  if (student.can_book_classes === false) {
-    return {
-      canBook: false,
-      reason: 'Booking privileges have been restricted on your account.',
-      severity: 'blocked',
-      actionRequired: 'Please contact administration to restore access.'
-    };
-  }
-
-  // Priority 3: Check first invoice payment requirement
-  if (!student.first_invoice_paid) {
-    return {
-      canBook: false,
-      reason: 'Your first invoice must be paid before you can book classes.',
-      severity: 'blocked',
-      actionRequired: 'Please check your Invoices tab and complete payment. Once confirmed by admin, you can book immediately.'
-    };
-  }
-
-  // All checks passed
+  // Account is active - allow booking
   return {
     canBook: true,
     severity: 'ok'
@@ -73,7 +51,7 @@ export async function fetchStudentAccessStatus(userId: string): Promise<StudentA
   try {
     const { data, error } = await supabase
       .from('students')
-      .select('id, account_suspended, suspension_reason, first_invoice_paid, can_book_classes, is_access_suspended')
+      .select('id, account_suspended, suspension_reason, is_access_suspended')
       .eq('user_id', userId)
       .single();
 
@@ -136,24 +114,8 @@ export function getAccountStatusMessage(student: StudentAccountInfo): {
     };
   }
 
-  if (!student.first_invoice_paid) {
-    return {
-      message: 'First Invoice Payment Required',
-      icon: 'alert',
-      color: 'yellow'
-    };
-  }
-
-  if (!student.can_book_classes) {
-    return {
-      message: 'Booking Privileges Restricted',
-      icon: 'lock',
-      color: 'blue'
-    };
-  }
-
   return {
-    message: 'Full Access - Can Book Classes',
+    message: 'Account Active - Full Access',
     icon: 'check',
     color: 'green'
   };

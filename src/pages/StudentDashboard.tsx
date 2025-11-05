@@ -224,6 +224,9 @@ const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [unpaidInvoiceCount, setUnpaidInvoiceCount] = useState(0);
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
+  
+  // Helper function to check if student is suspended
+  const isSuspended = studentProfile ? (studentProfile.account_suspended || studentProfile.is_access_suspended) : false;
   const [passwordChecked, setPasswordChecked] = useState(false);
   
   // Classroom state
@@ -626,6 +629,18 @@ const StudentDashboard = () => {
       setLoading(false);
     }
   };
+
+  // Prevent tab switching when suspended (only allow dashboard, account, invoices, payments, notifications)
+  useEffect(() => {
+    if (isSuspended && activeTab && !['dashboard', 'account', 'invoices', 'payments', 'notifications'].includes(activeTab)) {
+      setActiveTab('dashboard');
+      toast({
+        title: 'Access Restricted',
+        description: 'This feature is not available while your account is suspended.',
+        variant: 'destructive'
+      });
+    }
+  }, [isSuspended, activeTab, toast]);
 
   // Photo upload functions
   const handlePhotoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1390,13 +1405,21 @@ const StudentDashboard = () => {
   const handleBookTimeSlot = async () => {
     if (!selectedTimeSlot || !studentProfile) return;
 
-    // CHECK BOOKING ELIGIBILITY FIRST
+    // CHECK BOOKING ELIGIBILITY FIRST - Block if suspended
+    const isSuspended = studentProfile.account_suspended || studentProfile.is_access_suspended;
+    if (isSuspended) {
+      toast({
+        title: '🚫 Booking Not Allowed',
+        description: `Your account has been suspended. ${studentProfile.suspension_reason || 'Please contact administration.'}\n\nContact admin at info@damonmusicacademy.co.ke or call +254 701 195 460 or +254 713 490 535`,
+        variant: 'destructive'
+      });
+      return; // BLOCK the booking
+    }
+
     const validation = validateBookingAttempt({
       id: studentProfile.id,
-      account_suspended: studentProfile.account_suspended || studentProfile.is_access_suspended,
+      account_suspended: isSuspended,
       suspension_reason: studentProfile.suspension_reason,
-      first_invoice_paid: studentProfile.first_invoice_paid,
-      can_book_classes: studentProfile.can_book_classes,
       is_access_suspended: studentProfile.is_access_suspended
     });
 
@@ -1872,13 +1895,21 @@ const StudentDashboard = () => {
   const handleBookRecurringSlot = async (timeSlot: AvailableTimeSlot) => {
     if (!studentProfile) return;
 
-    // CHECK BOOKING ELIGIBILITY FIRST
+    // CHECK BOOKING ELIGIBILITY FIRST - Block if suspended
+    const isSuspended = studentProfile.account_suspended || studentProfile.is_access_suspended;
+    if (isSuspended) {
+      toast({
+        title: '🚫 Booking Not Allowed',
+        description: `Your account has been suspended. ${studentProfile.suspension_reason || 'Please contact administration.'}\n\nContact admin at info@damonmusicacademy.co.ke or call +254 701 195 460 or +254 713 490 535`,
+        variant: 'destructive'
+      });
+      return; // BLOCK the booking
+    }
+
     const validation = validateBookingAttempt({
       id: studentProfile.id,
-      account_suspended: studentProfile.account_suspended || studentProfile.is_access_suspended,
+      account_suspended: isSuspended,
       suspension_reason: studentProfile.suspension_reason,
-      first_invoice_paid: studentProfile.first_invoice_paid,
-      can_book_classes: studentProfile.can_book_classes,
       is_access_suspended: studentProfile.is_access_suspended
     });
 
@@ -2793,8 +2824,6 @@ const StudentDashboard = () => {
             student={{
               account_suspended: studentProfile.account_suspended || studentProfile.is_access_suspended,
               suspension_reason: studentProfile.suspension_reason,
-              first_invoice_paid: studentProfile.first_invoice_paid,
-              can_book_classes: studentProfile.can_book_classes,
               is_access_suspended: studentProfile.is_access_suspended
             }}
             unpaidInvoiceCount={unpaidInvoiceCount}
@@ -2940,31 +2969,31 @@ const StudentDashboard = () => {
                 <BarChart3 className="w-4 h-4" />
                 <span className="hidden sm:inline">Dashboard</span>
               </TabsTrigger>
-              <TabsTrigger value="bookings" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+              <TabsTrigger value="bookings" disabled={isSuspended} className={`flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start ${isSuspended ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <Calendar className="w-4 h-4" />
                 <span className="hidden sm:inline">Bookings</span>
               </TabsTrigger>
-              <TabsTrigger value="schedule" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-blue-700 data-[state=active]:bg-blue-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+              <TabsTrigger value="schedule" disabled={isSuspended} className={`flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-blue-700 data-[state=active]:bg-blue-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start ${isSuspended ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <CalendarDays className="w-4 h-4" />
                 <span className="hidden sm:inline">Schedule</span>
               </TabsTrigger>
-              <TabsTrigger value="calendar" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-gray-700 data-[state=active]:bg-gray-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+              <TabsTrigger value="calendar" disabled={isSuspended} className={`flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-gray-700 data-[state=active]:bg-gray-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start ${isSuspended ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <CalendarIcon className="w-4 h-4" />
                 <span className="hidden sm:inline">Calendar</span>
               </TabsTrigger>
-              <TabsTrigger value="classroom" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+              <TabsTrigger value="classroom" disabled={isSuspended} className={`flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-green-700 data-[state=active]:bg-green-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start ${isSuspended ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <BookOpen className="w-4 h-4" />
                 <span className="hidden sm:inline">Classroom</span>
               </TabsTrigger>
-              <TabsTrigger value="practice" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+              <TabsTrigger value="practice" disabled={isSuspended} className={`flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-purple-700 data-[state=active]:bg-purple-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start ${isSuspended ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <Clock className="w-4 h-4" />
                 <span className="hidden sm:inline">Practice</span>
               </TabsTrigger>
-              <TabsTrigger value="progress" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-orange-700 data-[state=active]:bg-orange-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start">
+              <TabsTrigger value="progress" disabled={isSuspended} className={`flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-orange-700 data-[state=active]:bg-orange-100 data-[state=active]:shadow-md transition-all scroll-snap-align-start ${isSuspended ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <TrendingUp className="w-4 h-4" />
                 <span className="hidden sm:inline">Progress</span>
               </TabsTrigger>
-              <TabsTrigger value="messages" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-pink-600 data-[state=active]:bg-pink-100 data-[state=active]:shadow-md transition-all relative scroll-snap-align-start">
+              <TabsTrigger value="messages" disabled={isSuspended} className={`flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-pink-600 data-[state=active]:bg-pink-100 data-[state=active]:shadow-md transition-all relative scroll-snap-align-start ${isSuspended ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <MessageSquare className="w-4 h-4" />
                 <span className="hidden sm:inline">Messages</span>
                 {messages.filter(m => !m.is_read).length > 0 && (
@@ -2994,7 +3023,7 @@ const StudentDashboard = () => {
                 <FileText className="w-4 h-4" />
                 <span className="hidden sm:inline">Invoices</span>
               </TabsTrigger>
-              <TabsTrigger value="video-conferencing" className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:shadow-md transition-all relative scroll-snap-align-start">
+              <TabsTrigger value="video-conferencing" disabled={isSuspended} className={`flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-full font-semibold text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:shadow-md transition-all relative scroll-snap-align-start ${isSuspended ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <Video className="w-4 h-4" />
                 <span className="hidden sm:inline">Video Conferencing</span>
                 {/* Live Meeting Notification Badge */}
@@ -3311,10 +3340,11 @@ const StudentDashboard = () => {
                               <Button 
                                 variant="outline"
                                 onClick={() => handleBookRecurringSlot(slot)}
-                                disabled={bookingStatus && !bookingStatus.can_book_more}
+                                disabled={isSuspended || (bookingStatus && !bookingStatus.can_book_more)}
                                 className="w-full mt-2"
                               >
-                                {bookingStatus && !bookingStatus.can_book_more ? 'Limit Reached' : 'Book Recurring'}
+                                {isSuspended ? 'Account Suspended' :
+                                 bookingStatus && !bookingStatus.can_book_more ? 'Limit Reached' : 'Book Recurring'}
                               </Button>
                             )}
                           </div>
@@ -4705,9 +4735,10 @@ const StudentDashboard = () => {
             </Button>
             <Button 
               onClick={handleBookTimeSlot}
-              disabled={!selectedTimeSlot}
+              disabled={!selectedTimeSlot || isSuspended}
             >
-              {!selectedTimeSlot ? 'Select a Time Slot' : 
+              {isSuspended ? 'Account Suspended' :
+               !selectedTimeSlot ? 'Select a Time Slot' : 
                isBookingWithMakeupCredit ? 'Book Make-up Lesson' : 'Book Lesson'}
             </Button>
           </DialogFooter>

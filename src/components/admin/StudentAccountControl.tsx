@@ -17,9 +17,6 @@ interface Student {
   account_suspended: boolean;
   suspension_reason?: string | null;
   suspended_at?: string | null;
-  first_invoice_paid: boolean;
-  first_invoice_paid_date?: string | null;
-  can_book_classes: boolean;
   account_notes?: string | null;
 }
 
@@ -98,7 +95,7 @@ export default function StudentAccountControl({ student, onUpdate }: StudentAcco
 
       toast({
         title: 'Account Activated',
-        description: `${student.student_name}'s account has been reactivated.${student.first_invoice_paid ? ' They can now book classes.' : ' Note: First invoice must be paid before they can book classes.'}`
+        description: `${student.student_name}'s account has been reactivated. They can now book classes and access all features.`
       });
 
       onUpdate();
@@ -148,7 +145,7 @@ export default function StudentAccountControl({ student, onUpdate }: StudentAcco
 
   return (
     <>
-      <Card className={`border-2 ${student.account_suspended ? 'border-red-300 bg-red-50' : student.first_invoice_paid ? 'border-green-300 bg-green-50' : 'border-yellow-300 bg-yellow-50'}`}>
+      <Card className={`border-2 ${student.account_suspended ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
         <CardContent className="p-4">
           <div className="space-y-3">
             {/* Account Status */}
@@ -156,10 +153,8 @@ export default function StudentAccountControl({ student, onUpdate }: StudentAcco
               <div className="flex items-center gap-2">
                 {student.account_suspended ? (
                   <Ban className="h-5 w-5 text-red-600" />
-                ) : student.can_book_classes ? (
-                  <CheckCircle className="h-5 w-5 text-green-600" />
                 ) : (
-                  <AlertCircle className="h-5 w-5 text-yellow-600" />
+                  <CheckCircle className="h-5 w-5 text-green-600" />
                 )}
                 <div>
                   <p className="font-semibold text-sm">Account Status</p>
@@ -168,15 +163,10 @@ export default function StudentAccountControl({ student, onUpdate }: StudentAcco
                       <Ban className="h-3 w-3 mr-1" />
                       Suspended
                     </Badge>
-                  ) : student.can_book_classes ? (
+                  ) : (
                     <Badge className="mt-1 bg-green-600">
                       <CheckCircle className="h-3 w-3 mr-1" />
-                      Active - Can Book
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="mt-1 bg-yellow-50 text-yellow-700 border-yellow-300">
-                      <AlertCircle className="h-3 w-3 mr-1" />
-                      Awaiting First Payment
+                      Active
                     </Badge>
                   )}
                 </div>
@@ -208,30 +198,9 @@ export default function StudentAccountControl({ student, onUpdate }: StudentAcco
               )}
             </div>
 
-            {/* First Invoice Status */}
-            <div className="flex items-center justify-between text-sm border-t pt-2">
-              <span className="text-gray-600">First Invoice:</span>
-              {student.first_invoice_paid ? (
-                <div className="flex items-center gap-2 text-green-700">
-                  <CheckCircle className="h-4 w-4" />
-                  <span className="font-medium">Paid</span>
-                  {student.first_invoice_paid_date && (
-                    <span className="text-xs text-gray-500">
-                      ({new Date(student.first_invoice_paid_date).toLocaleDateString()})
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-yellow-700">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="font-medium">Unpaid</span>
-                </div>
-              )}
-            </div>
-
             {/* Suspension Reason (if suspended) */}
             {student.account_suspended && student.suspension_reason && (
-              <div className="bg-red-100 border border-red-200 rounded p-2 text-sm">
+              <div className="bg-red-100 border border-red-200 rounded p-2 text-sm border-t pt-2">
                 <p className="font-semibold text-red-800 mb-1">Suspension Reason:</p>
                 <p className="text-red-700">{student.suspension_reason}</p>
                 {student.suspended_at && (

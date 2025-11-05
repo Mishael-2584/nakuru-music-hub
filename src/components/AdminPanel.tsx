@@ -2205,6 +2205,33 @@ const AdminPanel = () => {
   // Handler to mark invoice as paid
   const handleMarkInvoicePaid = async (invoiceId: string) => {
     try {
+      // First, fetch the invoice to check if it's the first invoice
+      const { data: invoiceData, error: fetchError } = await supabase
+        .from('invoices')
+        .select('*, students(*)')
+        .eq('id', invoiceId)
+        .single();
+
+      if (fetchError || !invoiceData) {
+        console.error('Error fetching invoice:', fetchError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch invoice details",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check if this is the student's first invoice
+      const { data: allStudentInvoices, error: invoicesError } = await supabase
+        .from('invoices')
+        .select('id, created_at')
+        .eq('student_id', invoiceData.student_id)
+        .order('created_at', { ascending: true });
+
+      const isFirstInvoice = allStudentInvoices && allStudentInvoices.length > 0 && allStudentInvoices[0].id === invoiceId;
+
+      // Update invoice status to paid
       const { error } = await supabase
         .from('invoices')
         .update({ 
@@ -2221,12 +2248,31 @@ const AdminPanel = () => {
           description: "Failed to mark invoice as paid",
           variant: "destructive",
         });
-      return;
-    }
+        return;
+      }
+
+      // If this is the first invoice, update the student's first_invoice_paid flag
+      if (isFirstInvoice && invoiceData.students) {
+        const { error: studentUpdateError } = await supabase
+          .from('students')
+          .update({
+            first_invoice_paid: true,
+            first_invoice_paid_date: new Date().toISOString(),
+            can_book_classes: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', invoiceData.student_id);
+
+        if (studentUpdateError) {
+          console.error('Error updating student first_invoice_paid:', studentUpdateError);
+        } else {
+          console.log('✅ Updated student first_invoice_paid to TRUE');
+        }
+      }
     
       // Fetch invoice and student data for email
       const { data: invoice, error: invoiceError } = await supabase
-      .from('invoices')
+        .from('invoices')
         .select('*, students(*)')
         .eq('id', invoiceId)
         .single();
@@ -2244,6 +2290,7 @@ const AdminPanel = () => {
       // Fetch registration data for email
       const { data: registration, error: regError } = await supabase
         .from('registrations')
+        .select('*')
       .select('*')
         .eq('id', invoice.students?.registration_id)
         .single();
@@ -3350,11 +3397,12 @@ const AdminPanel = () => {
                       <div className="mt-4 pt-4 border-t border-gray-200">
                         <StudentAccountControl
                           student={{
-                            ...student,
+                            id: student.id,
+                            student_name: student.student_name,
+                            email: student.email,
                             account_suspended: student.account_suspended || student.is_access_suspended || false,
                             suspension_reason: student.suspension_reason,
-                            first_invoice_paid: student.first_invoice_paid || false,
-                            can_book_classes: student.can_book_classes || false,
+                            suspended_at: student.suspended_at,
                             account_notes: student.account_notes
                           }}
                           onUpdate={() => {
