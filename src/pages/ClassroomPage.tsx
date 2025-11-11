@@ -1558,8 +1558,8 @@ export default function ClassroomPage() {
           ? supabase.from('classroom_post_attachments').select('*').in('post_id', postIds)
           : Promise.resolve({ data: null, error: null }),
         
-        // Load assignment submissions
-        posts.some(p => p.is_assignment) && studentToUse
+        // Load assignment submissions (available for teachers and students)
+        posts.some(p => p.is_assignment)
           ? loadAllSubmissions(posts.filter(p => p.is_assignment).map(p => p.post_id))
           : Promise.resolve(null),
         
