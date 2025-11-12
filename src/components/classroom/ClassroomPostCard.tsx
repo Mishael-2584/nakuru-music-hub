@@ -76,6 +76,47 @@ export default function ClassroomPostCard({
     return cleanName;
   };
 
+  const formatFileSize = (size?: number) => {
+    if (!size || size <= 0) return '0 KB';
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const renderAttachmentList = (attachments: any[]) => (
+    <div className="space-y-2">
+      {attachments.map((attachment: any, index: number) => (
+        <div
+          key={attachment.id || `${attachment.file_url || attachment.file_name}-${index}`}
+          className="flex items-center justify-between p-2 bg-white rounded border border-gray-100 hover:border-gray-200 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-blue-600" />
+            <div>
+              <div className="font-medium text-gray-800 text-sm">
+                {getDisplayFileName(attachment.file_name)}
+              </div>
+              <div className="text-xs text-gray-500">
+                {formatFileSize(attachment.file_size)}
+              </div>
+            </div>
+          </div>
+          {attachment.file_url && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open(attachment.file_url, '_blank')}
+              className="h-7 px-2 text-xs"
+            >
+              <Download className="h-3 w-3 mr-1" />
+              Download
+            </Button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
   const renderContent = (content: string) => {
     if (!content) return '';
     
@@ -304,6 +345,21 @@ export default function ClassroomPostCard({
           </div>
         </div>
         
+        {/* Attachments for non-assignment posts */}
+        {post.attachments && post.attachments.length > 0 && !post.is_assignment && (
+          <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-gray-600" />
+                <span className="text-sm font-medium text-gray-700">
+                  {post.attachments.length} attachment{post.attachments.length > 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+            {renderAttachmentList(post.attachments)}
+          </div>
+        )}
+        
         {/* Overdue Badge */}
         {isOverdue && (
           <div className="mt-2">
@@ -471,32 +527,7 @@ export default function ClassroomPostCard({
                     {post.attachments.length} attachment{post.attachments.length > 1 ? 's' : ''}
                   </span>
                 </div>
-                <div className="space-y-2">
-                  {post.attachments.map((attachment: any, index: number) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-white rounded border border-gray-100 hover:border-gray-200 transition-colors">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-blue-600" />
-                        <div>
-                          <div className="font-medium text-gray-800 text-sm">
-                            {getDisplayFileName(attachment.file_name)}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {attachment.file_size ? `${(attachment.file_size / 1024).toFixed(1)} KB` : '0 KB'}
-                          </div>
-                        </div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(attachment.file_url, '_blank')}
-                        className="h-7 px-2 text-xs"
-                      >
-                        <Download className="h-3 w-3 mr-1" />
-                        Download
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                {renderAttachmentList(post.attachments)}
               </div>
             )}
 
