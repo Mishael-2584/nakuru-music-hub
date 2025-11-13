@@ -167,12 +167,25 @@ const AuthForm = ({ onSuccess, role = 'admin' }: AuthFormProps) => {
     }
   };
 
+  const getResetRedirectUrl = () => {
+    const envUrl = import.meta.env.VITE_PUBLIC_SITE_URL || import.meta.env.VITE_SITE_URL;
+    if (envUrl) {
+      return `${envUrl.replace(/\/$/, '')}/reset-password`;
+    }
+
+    if (typeof window !== "undefined" && window.location?.origin) {
+      return `${window.location.origin}/reset-password`;
+    }
+
+    return "https://damonmusicacademy.co.ke/reset-password";
+  };
+
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: 'https://damonmusicacademy.co.ke/reset-password',
+        redirectTo: getResetRedirectUrl(),
       });
       if (error) {
         toast({
