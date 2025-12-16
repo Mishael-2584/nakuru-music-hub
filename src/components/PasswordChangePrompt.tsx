@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Alert, AlertDescription } from './ui/alert';
-import { Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 
 interface PasswordChangePromptProps {
@@ -18,9 +18,130 @@ const PasswordChangePrompt: React.FC<PasswordChangePromptProps> = ({ onPasswordC
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
   const { toast } = useToast();
+
+  // Handle password reset hash fragments on mount
+  useEffect(() => {
+    let mounted = true;
+    let subscription: { unsubscribe: () => void } | null = null;
+    
+    const initializeSession = async () => {
+      try {
+        // Check if there's a hash fragment in the URL (from password reset email)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const type = hashParams.get('type');
+        
+        if (type === 'recovery') {
+          // This is a password reset link - Supabase will automatically handle the session
+          console.log('Password reset link detected, establishing session...');
+          
+          // Set up auth state listener to catch session when it's established
+          const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('Auth state changed:', event, session ? 'Session exists' : 'No session');
+            
+            if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+              if (session && mounted) {
+                console.log('Session established via auth state change');
+                setSessionReady(true);
+                setInitializing(false);
+                // Clear the hash from URL for security
+                window.history.replaceState(null, '', window.location.pathname);
+                if (authSubscription) {
+                  authSubscription.unsubscribe();
+                }
+              }
+            }
+          });
+          
+          subscription = authSubscription;
+          
+          // Try to get session immediately (Supabase should parse hash automatically)
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          
+          if (sessionError) {
+            console.error('Session error:', sessionError);
+            if (mounted) {
+              setError('Invalid or expired reset link. Please request a new password reset.');
+              setInitializing(false);
+            }
+            if (subscription) {
+              subscription.unsubscribe();
+            }
+            return;
+          }
+          
+          if (session) {
+            console.log('Session established successfully on first try');
+            if (mounted) {
+              setSessionReady(true);
+              setInitializing(false);
+              // Clear the hash from URL for security
+              window.history.replaceState(null, '', window.location.pathname);
+            }
+            if (subscription) {
+              subscription.unsubscribe();
+            }
+          } else {
+            // Wait a bit for Supabase to process the hash fragments
+            console.log('No session yet, waiting for hash processing...');
+            setTimeout(async () => {
+              if (mounted) {
+                const { data: { session: retrySession }, error: retryError } = await supabase.auth.getSession();
+                if (retrySession) {
+                  console.log('Session established on retry');
+                  setSessionReady(true);
+                  window.history.replaceState(null, '', window.location.pathname);
+                } else if (retryError) {
+                  console.error('Retry session error:', retryError);
+                  setError('Invalid or expired reset link. Please request a new password reset.');
+                } else {
+                  console.error('No session after retry');
+                  setError('Invalid or expired reset link. Please request a new password reset.');
+                }
+                setInitializing(false);
+                if (subscription) {
+                  subscription.unsubscribe();
+                }
+              }
+            }, 1500);
+          }
+        } else {
+          // Not a recovery link - check if user is already logged in
+          const { data: { session } } = await supabase.auth.getSession();
+          if (mounted) {
+            if (session) {
+              setSessionReady(true);
+            } else {
+              setError('Please use the password reset link from your email to change your password.');
+            }
+            setInitializing(false);
+          }
+        }
+      } catch (err) {
+        console.error('Error initializing session:', err);
+        if (mounted) {
+          setError('An error occurred while processing your reset link. Please try again.');
+          setInitializing(false);
+        }
+        if (subscription) {
+          subscription.unsubscribe();
+        }
+      }
+    };
+
+    initializeSession();
+    
+    return () => {
+      mounted = false;
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
+  }, []);
 
   const validatePassword = (password: string) => {
     const minLength = 8;
@@ -44,6 +165,21 @@ const PasswordChangePrompt: React.FC<PasswordChangePromptProps> = ({ onPasswordC
     setError('');
     setLoading(true);
 
+    // Check if session is ready
+    if (!sessionReady) {
+      setError('Session not ready. Please wait...');
+      setLoading(false);
+      return;
+    }
+
+    // Verify session is still valid
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setError('Your session has expired. Please request a new password reset link.');
+      setLoading(false);
+      return;
+    }
+
     // Validate passwords match
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match');
@@ -60,15 +196,16 @@ const PasswordChangePrompt: React.FC<PasswordChangePromptProps> = ({ onPasswordC
     }
 
     try {
-      const { error } = await supabase.auth.updateUser({
+      const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword
       });
 
-      if (error) {
-        setError(error.message);
+      if (updateError) {
+        console.error('Password update error:', updateError);
+        setError(updateError.message || 'Failed to update password. Please try again.');
         toast({
           title: "Error",
-          description: "Failed to update password. Please try again.",
+          description: updateError.message || "Failed to update password. Please try again.",
           variant: "destructive",
         });
       } else {
@@ -84,6 +221,7 @@ const PasswordChangePrompt: React.FC<PasswordChangePromptProps> = ({ onPasswordC
         }, 2000);
       }
     } catch (err) {
+      console.error('Unexpected error:', err);
       setError('An unexpected error occurred');
       toast({
         title: "Error",
@@ -103,9 +241,25 @@ const PasswordChangePrompt: React.FC<PasswordChangePromptProps> = ({ onPasswordC
             <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Password Updated!</h2>
             <p className="text-gray-600 mb-4">
-              Your password has been successfully changed. You will be redirected to your dashboard shortly.
+              Your password has been successfully changed. You will be redirected to login shortly.
             </p>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (initializing) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Verifying Reset Link...</h2>
+            <p className="text-gray-600">
+              Please wait while we verify your password reset link.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -119,16 +273,26 @@ const PasswordChangePrompt: React.FC<PasswordChangePromptProps> = ({ onPasswordC
           <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <Lock className="w-8 h-8 text-white" />
           </div>
-          <CardTitle className="text-2xl font-bold">Welcome to Damon Music Academy!</CardTitle>
+          <CardTitle className="text-2xl font-bold">Reset Your Password</CardTitle>
           <CardDescription>
-            For security reasons, please change your temporary password to continue.
+            Enter your new password below. Make sure it meets all the security requirements.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handlePasswordChange} className="space-y-6">
             {error && (
               <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            
+            {!sessionReady && !error && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Please use the password reset link from your email to change your password.
+                </AlertDescription>
               </Alert>
             )}
 
@@ -194,7 +358,7 @@ const PasswordChangePrompt: React.FC<PasswordChangePromptProps> = ({ onPasswordC
             <Button
               type="submit"
               className="w-full"
-              disabled={loading || !newPassword || !confirmPassword}
+              disabled={loading || !newPassword || !confirmPassword || !sessionReady}
             >
               {loading ? (
                 <>
@@ -205,6 +369,20 @@ const PasswordChangePrompt: React.FC<PasswordChangePromptProps> = ({ onPasswordC
                 'Update Password'
               )}
             </Button>
+            
+            {!sessionReady && (
+              <div className="text-center">
+                <p className="text-sm text-gray-600 mb-2">Don't have a reset link?</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => window.location.href = '/auth'}
+                >
+                  Go to Login
+                </Button>
+              </div>
+            )}
           </form>
         </CardContent>
       </Card>
