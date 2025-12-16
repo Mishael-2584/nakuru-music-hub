@@ -46,7 +46,7 @@ const Shop = () => {
               <TabsList className="hidden sm:flex w-full gap-1 bg-white/90 shadow-lg rounded-lg p-1">
                 <TabsTrigger value="digital" className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md font-semibold text-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-md transition-all text-sm">
                   <Music className="w-4 h-4" />
-                  <span>Performance Tracks</span>
+                  <span>Performance Tracks & Scores</span>
                   <Badge variant="outline" className="ml-1 text-xs">Global</Badge>
                 </TabsTrigger>
                 <TabsTrigger value="instruments" className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md font-semibold text-accent data-[state=active]:bg-accent/10 data-[state=active]:shadow-md transition-all text-sm">
@@ -69,7 +69,7 @@ const Shop = () => {
                   className="w-full p-3 rounded-lg border border-gray-200 bg-white shadow-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 >
                   <option value="digital">
-                    🎵 Performance Tracks (Global)
+                    🎵 Performance Tracks & Scores (Global)
                   </option>
                   <option value="instruments">
                     🎧 Instruments & Accessories (Kenya)

@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Trash2, Upload, Package, Image as ImageIcon } from 'lucide-react';
+import { Plus, Edit, Trash2, Upload, Package, Image as ImageIcon, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import ProductImageUploader from './ProductImageUploader';
@@ -67,6 +67,12 @@ export default function ShopProductManager() {
   const [uploadedImages, setUploadedImages] = useState<any[]>([]);
   const [isVariantDialogOpen, setIsVariantDialogOpen] = useState(false);
   const [selectedProductForVariant, setSelectedProductForVariant] = useState<Product | null>(null);
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [previewAudioFile, setPreviewAudioFile] = useState<File | null>(null);
+  const [scorePreviewFile, setScorePreviewFile] = useState<File | null>(null);
+  const [uploadingAudio, setUploadingAudio] = useState(false);
+  const [uploadingPreviewAudio, setUploadingPreviewAudio] = useState(false);
+  const [uploadingScorePreview, setUploadingScorePreview] = useState(false);
 
   const [productForm, setProductForm] = useState({
     name: '',
@@ -84,7 +90,15 @@ export default function ShopProductManager() {
     category_id: '',
     image_url: '',
     image_filename: '',
-    enable_variants: true
+    enable_variants: true,
+    is_digital_product: false,
+    audio_file_url: '',
+    audio_filename: '',
+    preview_audio_url: '',
+    preview_audio_filename: '',
+    score_preview_url: '',
+    score_preview_filename: '',
+    part_name: ''
   });
 
   const [variantForm, setVariantForm] = useState({
@@ -186,10 +200,245 @@ export default function ShopProductManager() {
     }
   };
 
-  
+  const handleAudioUpload = async (file: File) => {
+    setUploadingAudio(true);
+    try {
+      // Validate file type
+      const allowedTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/m4a', 'audio/ogg', 'audio/flac'];
+      if (!allowedTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|m4a|ogg|flac)$/i)) {
+        toast({ 
+          title: 'Invalid File Type', 
+          description: 'Please upload an audio file (MP3, WAV, M4A, OGG, or FLAC)', 
+          variant: 'destructive' 
+        });
+        return null;
+      }
+
+      // Check file size (max 100MB for audio files)
+      const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+      if (file.size > MAX_FILE_SIZE) {
+        toast({ 
+          title: 'File Too Large', 
+          description: 'Audio file must be less than 100MB. Please compress the file.', 
+          variant: 'destructive' 
+        });
+        return null;
+      }
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `backing-tracks/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(filePath, file, {
+          contentType: file.type,
+          upsert: false
+        });
+
+      if (uploadError) {
+        if (uploadError.message.includes('size') || uploadError.message.includes('exceeded')) {
+          toast({ 
+            title: 'File Too Large', 
+            description: 'Audio file exceeds the storage limit. Please compress the file.', 
+            variant: 'destructive' 
+          });
+        } else {
+          toast({ 
+            title: 'Upload Failed', 
+            description: `Failed to upload audio file: ${uploadError.message}`, 
+            variant: 'destructive' 
+          });
+        }
+        throw uploadError;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('images')
+        .getPublicUrl(filePath);
+
+      setProductForm(prev => ({
+        ...prev,
+        audio_file_url: urlData.publicUrl,
+        audio_filename: fileName
+      }));
+
+      toast({ 
+        title: 'Success', 
+        description: 'Audio file uploaded successfully' 
+      });
+
+      return {
+        url: urlData.publicUrl,
+        filename: fileName
+      };
+    } catch (error) {
+      console.error('Error uploading audio:', error);
+      return null;
+    } finally {
+      setUploadingAudio(false);
+    }
+  };
+
+  const handlePreviewAudioUpload = async (file: File) => {
+    setUploadingPreviewAudio(true);
+    try {
+      const allowedTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/m4a', 'audio/ogg', 'audio/flac'];
+      if (!allowedTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|m4a|ogg|flac)$/i)) {
+        toast({ 
+          title: 'Invalid File Type', 
+          description: 'Please upload an audio file (MP3, WAV, M4A, OGG, or FLAC)', 
+          variant: 'destructive' 
+        });
+        return null;
+      }
+
+      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB for preview
+      if (file.size > MAX_FILE_SIZE) {
+        toast({ 
+          title: 'File Too Large', 
+          description: 'Preview audio should be less than 10MB. Please compress the file.', 
+          variant: 'destructive' 
+        });
+        return null;
+      }
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `preview-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `preview-audio/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(filePath, file, {
+          contentType: file.type,
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('images')
+        .getPublicUrl(filePath);
+
+      setProductForm(prev => ({
+        ...prev,
+        preview_audio_url: urlData.publicUrl,
+        preview_audio_filename: fileName
+      }));
+
+      toast({ 
+        title: 'Success', 
+        description: 'Preview audio uploaded successfully' 
+      });
+
+      return {
+        url: urlData.publicUrl,
+        filename: fileName
+      };
+    } catch (error) {
+      console.error('Error uploading preview audio:', error);
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to upload preview audio', 
+        variant: 'destructive' 
+      });
+      return null;
+    } finally {
+      setUploadingPreviewAudio(false);
+    }
+  };
+
+  const handleScorePreviewUpload = async (file: File) => {
+    setUploadingScorePreview(true);
+    try {
+      if (!file.type.includes('pdf') && !file.name.match(/\.pdf$/i)) {
+        toast({ 
+          title: 'Invalid File Type', 
+          description: 'Please upload a PDF file', 
+          variant: 'destructive' 
+        });
+        return null;
+      }
+
+      const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB for PDF
+      if (file.size > MAX_FILE_SIZE) {
+        toast({ 
+          title: 'File Too Large', 
+          description: 'PDF file must be less than 50MB. Please compress the file.', 
+          variant: 'destructive' 
+        });
+        return null;
+      }
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `score-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `score-previews/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(filePath, file, {
+          contentType: 'application/pdf',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('images')
+        .getPublicUrl(filePath);
+
+      setProductForm(prev => ({
+        ...prev,
+        score_preview_url: urlData.publicUrl,
+        score_preview_filename: fileName
+      }));
+
+      toast({ 
+        title: 'Success', 
+        description: 'Score preview uploaded successfully' 
+      });
+
+      return {
+        url: urlData.publicUrl,
+        filename: fileName
+      };
+    } catch (error) {
+      console.error('Error uploading score preview:', error);
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to upload score preview', 
+        variant: 'destructive' 
+      });
+      return null;
+    } finally {
+      setUploadingScorePreview(false);
+    }
+  };
   
   const handleCreateProduct = async () => {
     try {
+      // Upload preview audio if provided
+      if (previewAudioFile && !productForm.preview_audio_url) {
+        const previewResult = await handlePreviewAudioUpload(previewAudioFile);
+        if (!previewResult) {
+          return; // Stop if preview upload failed
+        }
+      }
+
+      // Upload full audio file if provided
+      if (audioFile && !productForm.audio_file_url) {
+        const audioResult = await handleAudioUpload(audioFile);
+        if (!audioResult) {
+          return; // Stop if audio upload failed
+        }
+      }
+
+      // Upload score preview if provided (optional)
+      if (scorePreviewFile && !productForm.score_preview_url) {
+        await handleScorePreviewUpload(scorePreviewFile);
+        // Don't stop if score preview fails - it's optional
+      }
+
       const { data, error } = await supabase
         .from('shop_products')
         .insert(productForm)
@@ -228,8 +477,11 @@ export default function ShopProductManager() {
 
       toast({ title: 'Success', description: 'Product created successfully with images.' });
       
-      // Clear uploaded images after saving
+      // Clear uploaded images and audio after saving
       setUploadedImages([]);
+      setAudioFile(null);
+      setPreviewAudioFile(null);
+      setScorePreviewFile(null);
       setIsDialogOpen(false);
       resetProductForm();
       loadProducts();
@@ -243,6 +495,28 @@ export default function ShopProductManager() {
     if (!selectedProduct) return;
 
     try {
+      // Upload preview audio if a new one was selected
+      if (previewAudioFile && !productForm.preview_audio_url) {
+        const previewResult = await handlePreviewAudioUpload(previewAudioFile);
+        if (!previewResult) {
+          return;
+        }
+      }
+
+      // Upload full audio file if a new one was selected
+      if (audioFile && !productForm.audio_file_url) {
+        const audioResult = await handleAudioUpload(audioFile);
+        if (!audioResult) {
+          return; // Stop if audio upload failed
+        }
+      }
+
+      // Upload score preview if provided (optional)
+      if (scorePreviewFile && !productForm.score_preview_url) {
+        await handleScorePreviewUpload(scorePreviewFile);
+        // Don't stop if score preview fails - it's optional
+      }
+
       const { error } = await supabase
         .from('shop_products')
         .update(productForm)
@@ -253,6 +527,9 @@ export default function ShopProductManager() {
       toast({ title: 'Success', description: 'Product updated successfully' });
       setIsDialogOpen(false);
       setSelectedProduct(null);
+      setAudioFile(null);
+      setPreviewAudioFile(null);
+      setScorePreviewFile(null);
       resetProductForm();
       loadProducts();
     } catch (error) {
@@ -320,9 +597,20 @@ export default function ShopProductManager() {
       category_id: '',
       image_url: '',
       image_filename: '',
-      enable_variants: true
+      enable_variants: true,
+      is_digital_product: false,
+      audio_file_url: '',
+      audio_filename: '',
+      preview_audio_url: '',
+      preview_audio_filename: '',
+      score_preview_url: '',
+      score_preview_filename: '',
+      part_name: ''
     });
     setUploadedImages([]);
+    setAudioFile(null);
+    setPreviewAudioFile(null);
+    setScorePreviewFile(null);
   };
 
   const resetVariantForm = () => {
@@ -355,9 +643,20 @@ export default function ShopProductManager() {
       category_id: product.category_id,
       image_url: product.image_url || '',
       image_filename: product.image_filename || '',
-      enable_variants: product.enable_variants ?? true
+      enable_variants: product.enable_variants ?? true,
+      is_digital_product: (product as any).is_digital_product || false,
+      audio_file_url: (product as any).audio_file_url || '',
+      audio_filename: (product as any).audio_filename || '',
+      preview_audio_url: (product as any).preview_audio_url || '',
+      preview_audio_filename: (product as any).preview_audio_filename || '',
+      score_preview_url: (product as any).score_preview_url || '',
+      score_preview_filename: (product as any).score_preview_filename || '',
+      part_name: (product as any).part_name || ''
     });
     setUploadedImages([]); // Clear uploaded images when editing
+    setAudioFile(null); // Clear audio file when editing
+    setPreviewAudioFile(null);
+    setScorePreviewFile(null);
     setIsDialogOpen(true);
   };
 
@@ -541,6 +840,237 @@ export default function ShopProductManager() {
                 productId={selectedProduct?.id}
                 onImagesChange={setUploadedImages}
               />
+
+              {/* Digital Product / Backing Track Section */}
+              <div className="space-y-4 border-t pt-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="is_digital_product"
+                    checked={productForm.is_digital_product}
+                    onChange={(e) => setProductForm(prev => ({ ...prev, is_digital_product: e.target.checked }))}
+                  />
+                  <Label htmlFor="is_digital_product" className="font-semibold">
+                    This is a digital product (Backing Track/Soundtrack)
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Digital products will be delivered via email download link after purchase
+                </p>
+
+                {productForm.is_digital_product && (
+                  <div className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    {/* Part Name */}
+                    <div>
+                      <Label htmlFor="part_name">Part Name (Optional)</Label>
+                      <Input
+                        id="part_name"
+                        value={productForm.part_name}
+                        onChange={(e) => setProductForm(prev => ({ ...prev, part_name: e.target.value }))}
+                        placeholder="e.g., Vocal Part, Guitar Part, Piano Part"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Use this for multi-part songs. Each part can be sold separately.
+                      </p>
+                    </div>
+
+                    {/* Preview Audio */}
+                    <div className="space-y-2">
+                      <Label htmlFor="preview_audio_file">Preview Audio (Short Preview) *</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="preview_audio_file"
+                          type="file"
+                          accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setPreviewAudioFile(file);
+                            }
+                          }}
+                          className="flex-1"
+                        />
+                        {productForm.preview_audio_url && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setProductForm(prev => ({ ...prev, preview_audio_url: '', preview_audio_filename: '' }));
+                              setPreviewAudioFile(null);
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      {productForm.preview_audio_url && (
+                        <div className="text-sm text-green-600 flex items-center gap-2">
+                          <span>✓ Preview audio: {productForm.preview_audio_filename || 'Uploaded'}</span>
+                          <a 
+                            href={productForm.preview_audio_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            Listen
+                          </a>
+                        </div>
+                      )}
+                      {previewAudioFile && !productForm.preview_audio_url && (
+                        <div className="text-sm text-gray-600">
+                          Selected: {previewAudioFile.name} ({(previewAudioFile.size / 1024 / 1024).toFixed(2)} MB)
+                          {!uploadingPreviewAudio && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handlePreviewAudioUpload(previewAudioFile)}
+                              className="ml-2"
+                            >
+                              Upload Preview
+                            </Button>
+                          )}
+                          {uploadingPreviewAudio && (
+                            <span className="ml-2 text-blue-600">Uploading...</span>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Short preview that customers can play before purchasing (max 10MB)
+                      </p>
+                    </div>
+
+                    {/* Full Audio Track */}
+                    <div className="space-y-2">
+                      <Label htmlFor="audio_file">Full Audio Track (Complete File) *</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="audio_file"
+                          type="file"
+                          accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setAudioFile(file);
+                            }
+                          }}
+                          className="flex-1"
+                        />
+                        {productForm.audio_file_url && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setProductForm(prev => ({ ...prev, audio_file_url: '', audio_filename: '' }));
+                              setAudioFile(null);
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      {productForm.audio_file_url && (
+                        <div className="text-sm text-green-600 flex items-center gap-2">
+                          <span>✓ Full audio: {productForm.audio_filename || 'Uploaded'}</span>
+                          <a 
+                            href={productForm.audio_file_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            Preview
+                          </a>
+                        </div>
+                      )}
+                      {audioFile && !productForm.audio_file_url && (
+                        <div className="text-sm text-gray-600">
+                          Selected: {audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(2)} MB)
+                          {!uploadingAudio && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handleAudioUpload(audioFile)}
+                              className="ml-2"
+                            >
+                              Upload Full Audio
+                            </Button>
+                          )}
+                          {uploadingAudio && (
+                            <span className="ml-2 text-blue-600">Uploading...</span>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Complete audio file sent to customers after purchase (max 100MB)
+                      </p>
+                    </div>
+
+                    {/* Optional PDF Score Preview */}
+                    <div className="space-y-2">
+                      <Label htmlFor="score_preview_file">Score Preview PDF (Optional)</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="score_preview_file"
+                          type="file"
+                          accept=".pdf,application/pdf"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setScorePreviewFile(file);
+                            }
+                          }}
+                          className="flex-1"
+                        />
+                        {productForm.score_preview_url && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setProductForm(prev => ({ ...prev, score_preview_url: '', score_preview_filename: '' }));
+                              setScorePreviewFile(null);
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      {productForm.score_preview_url && (
+                        <div className="text-sm text-green-600 flex items-center gap-2">
+                          <span>✓ Score preview: {productForm.score_preview_filename || 'Uploaded'}</span>
+                          <a 
+                            href={productForm.score_preview_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            View
+                          </a>
+                        </div>
+                      )}
+                      {scorePreviewFile && !productForm.score_preview_url && (
+                        <div className="text-sm text-gray-600">
+                          Selected: {scorePreviewFile.name} ({(scorePreviewFile.size / 1024 / 1024).toFixed(2)} MB)
+                          {!uploadingScorePreview && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handleScorePreviewUpload(scorePreviewFile)}
+                              className="ml-2"
+                            >
+                              Upload Score
+                            </Button>
+                          )}
+                          {uploadingScorePreview && (
+                            <span className="ml-2 text-blue-600">Uploading...</span>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        First page of the score shown to customers (optional, max 50MB)
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center space-x-2">

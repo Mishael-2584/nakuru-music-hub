@@ -15,6 +15,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import WhatsAppChat from '@/components/WhatsAppChat';
 import ProductImageGallery from '@/components/shop/ProductImageGallery';
+import ProductPreview from '@/components/shop/ProductPreview';
 import { formatPrice } from '@/lib/priceFormatter';
 
 interface Category {
@@ -46,6 +47,14 @@ interface Product {
   category?: Category;
   variants?: ProductVariant[];
   enable_variants?: boolean;
+  is_digital_product?: boolean;
+  audio_file_url?: string;
+  audio_filename?: string;
+  preview_audio_url?: string;
+  preview_audio_filename?: string;
+  score_preview_url?: string;
+  score_preview_filename?: string;
+  part_name?: string;
 }
 
 interface ProductVariant {
@@ -352,7 +361,11 @@ export default function DynamicShop() {
                   <TabsTrigger key={category.id} value={category.id} className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3 py-2 sm:py-3">
                     {getIcon(category.name)}
                     <span className="hidden sm:inline">{category.name}</span>
-                    <span className="sm:hidden">{category.name.split(' ')[0]}</span>
+                    <span className="sm:hidden">
+                      {category.name.length > 15 
+                        ? category.name.split(' ').slice(0, 2).join(' ') + '...'
+                        : category.name}
+                    </span>
                   </TabsTrigger>
                 );
               })}
@@ -446,6 +459,11 @@ export default function DynamicShop() {
                     <h3 className="font-bold text-base sm:text-lg line-clamp-2 group-hover:text-primary transition-colors mb-1">
                       {product.name}
                     </h3>
+                    {product.part_name && (
+                      <Badge variant="outline" className="text-xs mb-1">
+                        {product.part_name}
+                      </Badge>
+                    )}
                     {product.brand && (
                       <p className="text-xs sm:text-sm text-gray-600 font-medium">{product.brand}</p>
                     )}
@@ -647,6 +665,28 @@ export default function DynamicShop() {
                     <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
                       <h4 className="font-bold text-base sm:text-lg mb-2 sm:mb-3 text-gray-900">Specifications:</h4>
                       <p className="text-gray-700 whitespace-pre-line leading-relaxed text-sm sm:text-base">{selectedProduct.specs}</p>
+                    </div>
+                  )}
+
+                  {/* Part Name Badge */}
+                  {selectedProduct.part_name && (
+                    <div>
+                      <Badge variant="outline" className="text-sm font-semibold">
+                        Part: {selectedProduct.part_name}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Preview Section for Digital Products */}
+                  {selectedProduct.is_digital_product && (
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                      <h4 className="font-bold text-base sm:text-lg mb-3 text-gray-900">Preview</h4>
+                      <ProductPreview
+                        previewAudioUrl={selectedProduct.preview_audio_url}
+                        scorePreviewUrl={selectedProduct.score_preview_url}
+                        productName={selectedProduct.name}
+                        partName={selectedProduct.part_name}
+                      />
                     </div>
                   )}
 

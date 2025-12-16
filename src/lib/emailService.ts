@@ -196,6 +196,16 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
             <div class="status-badge">${registration.status.toUpperCase()}</div>
           </div>
 
+          <div class="next-steps">
+            <h3>📋 What's Next?</h3>
+            <ul>
+              <li>We'll review your application and contact you within <strong>24-48 hours</strong> to confirm your enrollment.</li>
+              <li>Please keep this receipt number (<strong>${registration.receipt_number}</strong>) for your records.</li>
+              <li>You can track your application status using your email address.</li>
+              <li>If you have any questions, feel free to contact us using the information below.</li>
+            </ul>
+          </div>
+
           <div class="section">
             <div class="section-title">👤 Student Information</div>
             <div class="info-grid">
@@ -298,16 +308,6 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
             <p>${registration.goals}</p>
           </div>
           ` : ''}
-
-          <div class="next-steps">
-            <h3>📋 What's Next?</h3>
-            <ul>
-              <li>We'll review your application and contact you within <strong>24-48 hours</strong> to confirm your enrollment.</li>
-              <li>Please keep this receipt number (<strong>${registration.receipt_number}</strong>) for your records.</li>
-              <li>You can track your application status using your email address.</li>
-              <li>If you have any questions, feel free to contact us using the information below.</li>
-            </ul>
-          </div>
 
           <div class="contact-info">
             <h3>📞 Need Help? Contact Us</h3>
@@ -570,6 +570,30 @@ export const sendAcceptedEmail = async (registration: RegistrationData, tempPass
             <div>Application Date: ${formatDate(registration.created_at)}</div>
             <div class="status-badge">APPROVED</div>
           </div>
+          
+          <div class="payment-notice">
+            <h3>💰 Payment Required to Secure Your Spot</h3>
+            <p><strong>Important:</strong> We have sent you an invoice that includes:</p>
+            <ul>
+              <li><strong>One-time enrollment fee:</strong> 800 KSh (non-refundable)</li>
+              <li><strong>First month's tuition:</strong> Based on your selected course and sessions</li>
+              <li><strong>Total due:</strong> Enrollment fee + Tuition</li>
+            </ul>
+            <p style="margin-top: 15px; font-size: 14px; color: #666;">
+              <strong>Next Step:</strong> Please check your email for the invoice and complete payment to finalize your enrollment and secure your spot in our program.
+            </p>
+          </div>
+          
+          <div class="next-steps">
+            <h3>✅ Next Steps</h3>
+            <ul>
+              <li><strong>Complete payment</strong> using the invoice we sent you to secure your enrollment.</li>
+              <li>Once payment is confirmed, you will receive a final enrollment confirmation email with your student portal login credentials.</li>
+              <li>If you have any questions about payment or enrollment, feel free to reply to this email or contact us using the information below.</li>
+              <li>We look forward to seeing you at Damon Music Academy!</li>
+            </ul>
+          </div>
+          
           <div class="section">
             <div class="section-title">👤 Student Information</div>
             <div class="info-grid">
@@ -597,29 +621,6 @@ export const sendAcceptedEmail = async (registration: RegistrationData, tempPass
           </div>
           ${registration.parent_name ? `<div class="section"><div class="section-title">👨‍👩‍👧‍👦 Parent/Guardian Information</div><div class="info-grid"><div class="info-item"><span class="info-label">Name:</span><span class="info-value">${registration.parent_name}</span></div>${registration.parent_phone ? `<div class="info-item"><span class="info-label">Phone:</span><span class="info-value">${registration.parent_phone}</span></div>` : ''}</div></div>` : ''}
           ${registration.medical_condition === 'yes' ? `<div class="section"><div class="section-title">🏥 Medical Information</div><div class="info-item"><span class="info-label">Medical Conditions:</span><span class="info-value">Yes</span></div><div class="info-item"><span class="info-label">Details:</span><span class="info-value">${registration.medical_details}</span></div></div>` : ''}
-          
-          <div class="payment-notice">
-            <h3>💰 Payment Required to Secure Your Spot</h3>
-            <p><strong>Important:</strong> We have sent you an invoice that includes:</p>
-            <ul>
-              <li><strong>One-time enrollment fee:</strong> 800 KSh (non-refundable)</li>
-              <li><strong>First month's tuition:</strong> Based on your selected course and sessions</li>
-              <li><strong>Total due:</strong> Enrollment fee + Tuition</li>
-            </ul>
-            <p style="margin-top: 15px; font-size: 14px; color: #666;">
-              <strong>Next Step:</strong> Please check your email for the invoice and complete payment to finalize your enrollment and secure your spot in our program.
-            </p>
-          </div>
-          
-          <div class="next-steps">
-            <h3>✅ Next Steps</h3>
-            <ul>
-              <li><strong>Complete payment</strong> using the invoice we sent you to secure your enrollment.</li>
-              <li>Once payment is confirmed, you will receive a final enrollment confirmation email with your student portal login credentials.</li>
-              <li>If you have any questions about payment or enrollment, feel free to reply to this email or contact us using the information below.</li>
-              <li>We look forward to seeing you at Damon Music Academy!</li>
-            </ul>
-          </div>
           <div class="contact-info">
             <h3>📞 Need Help? Contact Us</h3>
             <div class="contact-grid">
@@ -1397,6 +1398,30 @@ export const sendApplicationConfirmationEmail = async (registration: Registratio
             <div class="status-badge">UNDER REVIEW</div>
           </div>
 
+          <div class="next-steps">
+            <h3>📋 What's Next?</h3>
+            <ul>
+              <li>We'll review your application and contact you within <strong>2 business days</strong> with an update.</li>
+              <li>Please keep this receipt number (<strong>${registration.receipt_number}</strong>) for your records.</li>
+              <li>You can track your application status using your email address.</li>
+              <li>If you have any questions, feel free to contact us using the information below.</li>
+              <li>In the meantime, explore more about our diverse offerings on our website, or check our <a href="${siteUrl}/faq" style="color: #2196f3;">FAQs</a>.</li>
+            </ul>
+          </div>
+
+          <div class="application-fee">
+            <h3>💰 Application Fee Information</h3>
+            <p><strong>Important:</strong> If your application is accepted, you will receive an invoice that includes:</p>
+            <ul>
+              <li><strong>One-time enrollment fee:</strong> 800 KSh (non-refundable)</li>
+              <li><strong>First month's tuition:</strong> Based on your selected course and sessions</li>
+              <li><strong>Total due:</strong> Enrollment fee + Tuition</li>
+            </ul>
+            <p style="margin-top: 15px; font-size: 14px; color: #666;">
+              <strong>Note:</strong> Payment of this invoice will finalize your enrollment and secure your spot in our program.
+            </p>
+          </div>
+
           <div class="section">
             <div class="section-title">👤 Student Information</div>
             <div class="info-grid">
@@ -1499,30 +1524,6 @@ export const sendApplicationConfirmationEmail = async (registration: Registratio
             <p>${registration.goals}</p>
           </div>
           ` : ''}
-
-          <div class="application-fee">
-            <h3>💰 Application Fee Information</h3>
-            <p><strong>Important:</strong> If your application is accepted, you will receive an invoice that includes:</p>
-            <ul>
-              <li><strong>One-time enrollment fee:</strong> 800 KSh (non-refundable)</li>
-              <li><strong>First month's tuition:</strong> Based on your selected course and sessions</li>
-              <li><strong>Total due:</strong> Enrollment fee + Tuition</li>
-            </ul>
-            <p style="margin-top: 15px; font-size: 14px; color: #666;">
-              <strong>Note:</strong> Payment of this invoice will finalize your enrollment and secure your spot in our program.
-            </p>
-          </div>
-
-          <div class="next-steps">
-            <h3>📋 What's Next?</h3>
-            <ul>
-              <li>We'll review your application and contact you within <strong>2 business days</strong> with an update.</li>
-              <li>Please keep this receipt number (<strong>${registration.receipt_number}</strong>) for your records.</li>
-              <li>You can track your application status using your email address.</li>
-              <li>If you have any questions, feel free to contact us using the information below.</li>
-              <li>In the meantime, explore more about our diverse offerings on our website, or check our <a href="${siteUrl}/faq" style="color: #2196f3;">FAQs</a>.</li>
-            </ul>
-          </div>
 
           <div class="contact-info">
             <h3>📞 Need Help? Contact Us</h3>
@@ -1649,6 +1650,43 @@ export const sendPaymentConfirmationEmail = async (registration: RegistrationDat
             <div>Enrollment Date: ${formatDate(registration.created_at)}</div>
             <div class="status-badge">ENROLLED</div>
           </div>
+          
+          ${tempPassword ? `
+          <div class="login-credentials">
+            <h3>🔐 Your Student Portal Login Credentials</h3>
+            <p><strong>Important:</strong> You can now access your personalized student portal with the following credentials:</p>
+            <div class="info-grid">
+              <div class="info-item"><span class="info-label">Login URL:</span><span class="info-value"><a href="${siteUrl}/auth" style="color: #2196f3; text-decoration: none;">${siteUrl}/auth</a></span></div>
+              <div class="info-item"><span class="info-label">Email:</span><span class="info-value">${registration.email}</span></div>
+              <div class="info-item"><span class="info-label">Temporary Password:</span><span class="info-value"><strong>${tempPassword}</strong></span></div>
+            </div>
+            <p style="margin-top: 15px; font-size: 14px; color: #666;">
+              <strong>Security Note:</strong> Please change your password on your first login for security purposes.
+            </p>
+          </div>
+          ` : ''}
+          
+          <div class="payment-confirmed">
+            <h3>✅ Payment Confirmed</h3>
+            <p><strong>Great news!</strong> Your payment has been successfully processed and your enrollment is now complete.</p>
+            <ul>
+              <li><strong>Enrollment fee:</strong> ✅ Paid</li>
+              <li><strong>First month's tuition:</strong> ✅ Paid</li>
+              <li><strong>Status:</strong> ✅ Officially Enrolled</li>
+            </ul>
+          </div>
+          
+          <div class="next-steps">
+            <h3>🎯 What's Next?</h3>
+            <ul>
+              ${tempPassword ? '<li><strong>Student Portal:</strong> Access your student portal using the credentials provided above to view your lessons, materials, and progress.</li>' : ''}
+              <li><strong>Class Schedule:</strong> We will contact you within 24-48 hours with your personalized class schedule.</li>
+              <li><strong>First Lesson:</strong> Your first lesson will be scheduled based on your preferred schedule and instructor availability.</li>
+              <li><strong>Welcome Kit:</strong> You will receive information about any required materials or equipment for your course.</li>
+              <li><strong>Questions:</strong> If you have any questions, feel free to contact us using the information below.</li>
+            </ul>
+          </div>
+          
           <div class="section">
             <div class="section-title">👤 Student Information</div>
             <div class="info-grid">
@@ -1676,45 +1714,6 @@ export const sendPaymentConfirmationEmail = async (registration: RegistrationDat
           </div>
           ${registration.parent_name ? `<div class="section"><div class="section-title">👨‍👩‍👧‍👦 Parent/Guardian Information</div><div class="info-grid"><div class="info-item"><span class="info-label">Name:</span><span class="info-value">${registration.parent_name}</span></div>${registration.parent_phone ? `<div class="info-item"><span class="info-label">Phone:</span><span class="info-value">${registration.parent_phone}</span></div>` : ''}</div></div>` : ''}
           ${registration.medical_condition === 'yes' ? `<div class="section"><div class="section-title">🏥 Medical Information</div><div class="info-item"><span class="info-label">Medical Conditions:</span><span class="info-value">Yes</span></div><div class="info-item"><span class="info-label">Details:</span><span class="info-value">${registration.medical_details}</span></div></div>` : ''}
-          
-          <div class="payment-confirmed">
-            <h3>✅ Payment Confirmed</h3>
-            <p><strong>Great news!</strong> Your payment has been successfully processed and your enrollment is now complete.</p>
-            <ul>
-              <li><strong>Enrollment fee:</strong> ✅ Paid</li>
-              <li><strong>First month's tuition:</strong> ✅ Paid</li>
-              <li><strong>Status:</strong> ✅ Officially Enrolled</li>
-            </ul>
-            <p style="margin-top: 15px; font-size: 14px; color: #666;">
-              <strong>What's next:</strong> We will contact you within 24-48 hours with your personalized class schedule and further instructions.
-            </p>
-          </div>
-          
-          ${tempPassword ? `
-          <div class="login-credentials">
-            <h3>🔐 Your Student Portal Login Credentials</h3>
-            <p><strong>Important:</strong> You can now access your personalized student portal with the following credentials:</p>
-            <div class="info-grid">
-              <div class="info-item"><span class="info-label">Login URL:</span><span class="info-value"><a href="${siteUrl}/auth" style="color: #2196f3; text-decoration: none;">${siteUrl}/auth</a></span></div>
-              <div class="info-item"><span class="info-label">Email:</span><span class="info-value">${registration.email}</span></div>
-              <div class="info-item"><span class="info-label">Temporary Password:</span><span class="info-value"><strong>${tempPassword}</strong></span></div>
-            </div>
-            <p style="margin-top: 15px; font-size: 14px; color: #666;">
-              <strong>Security Note:</strong> Please change your password on your first login for security purposes.
-            </p>
-          </div>
-          ` : ''}
-          
-          <div class="next-steps">
-            <h3>🎯 What's Next?</h3>
-            <ul>
-              <li><strong>Class Schedule:</strong> We will contact you within 24-48 hours with your personalized class schedule.</li>
-              <li><strong>First Lesson:</strong> Your first lesson will be scheduled based on your preferred schedule and instructor availability.</li>
-              <li><strong>Welcome Kit:</strong> You will receive information about any required materials or equipment for your course.</li>
-              ${tempPassword ? '<li><strong>Student Portal:</strong> Access your student portal using the credentials provided above to view your lessons, materials, and progress.</li>' : ''}
-              <li><strong>Questions:</strong> If you have any questions, feel free to contact us using the information below.</li>
-            </ul>
-          </div>
           <div class="contact-info">
             <h3>📞 Need Help? Contact Us</h3>
             <div class="contact-grid">

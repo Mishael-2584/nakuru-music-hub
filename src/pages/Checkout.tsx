@@ -46,9 +46,14 @@ interface ProductVariant {
 }
 
 interface CartItem {
-  product: Product;
+  product: Product & {
+    is_digital_product?: boolean;
+    audio_file_url?: string;
+  };
   variant?: ProductVariant;
   quantity: number;
+  product_id?: string;
+  variant_id?: string;
 }
 
 interface OrderFormData {
@@ -227,14 +232,15 @@ export default function Checkout() {
       // Create order items
       const orderItems = cartItems.map(item => ({
         order_id: order.id,
-        product_id: item.product_id,
-        variant_id: item.variant_id,
+        product_id: item.product.id,
+        variant_id: item.variant?.id,
         product_name: item.product.name,
         variant_name: item.variant?.variant_name,
         price: getItemPrice(item),
         quantity: item.quantity,
         subtotal: getItemPrice(item) * item.quantity,
-        image_url: item.product.image_url
+        image_url: item.product.image_url,
+        audio_file_url: (item.product as any).is_digital_product ? (item.product as any).audio_file_url : null
       }));
 
       const { error: itemsError } = await supabase

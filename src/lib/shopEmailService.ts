@@ -7,6 +7,7 @@ interface OrderItem {
   quantity: number;
   subtotal: number;
   image_url?: string;
+  audio_file_url?: string;
 }
 
 interface OrderData {
@@ -210,6 +211,7 @@ export const sendOrderConfirmationEmail = async (orderData: OrderData): Promise<
                   <td>
                     ${item.image_url ? `<img src="${item.image_url}" alt="${item.product_name}" style="max-width: 50px; margin-right: 10px; border-radius: 5px;">` : ''}
                     ${item.product_name}${item.variant_name ? ` (${item.variant_name})` : ''}
+                    ${item.audio_file_url ? `<br><small style="color: #6f42c1; font-weight: bold;">🎵 Digital Download Available</small>` : ''}
                   </td>
                   <td style="text-align: center;">${item.quantity}</td>
                   <td class="price-column">KES ${item.price.toFixed(2)}</td>
@@ -218,6 +220,30 @@ export const sendOrderConfirmationEmail = async (orderData: OrderData): Promise<
               `).join('')}
             </tbody>
           </table>
+
+          ${orderData.items.some(item => item.audio_file_url) ? `
+            <div class="payment-box" style="background: #f0f7ff; border-left: 4px solid #6f42c1; margin-top: 20px;">
+              <h3 style="margin-top: 0; color: #6f42c1;">🎵 Digital Downloads</h3>
+              <p style="margin-bottom: 15px;">Your backing tracks/soundtracks are ready for download:</p>
+              <div style="space-y: 10px;">
+                ${orderData.items.filter(item => item.audio_file_url).map((item, index) => `
+                  <div style="background: white; padding: 12px; margin-bottom: 10px; border-radius: 4px; border-left: 3px solid #6f42c1;">
+                    <strong>${item.product_name}${item.variant_name ? ` (${item.variant_name})` : ''}</strong>
+                    ${item.quantity > 1 ? ` <span style="color: #666;">x${item.quantity}</span>` : ''}
+                    <br>
+                    <a href="${item.audio_file_url}" 
+                       style="display: inline-block; background: #6f42c1; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; margin-top: 8px; font-weight: bold;"
+                       target="_blank">
+                      ⬇️ Download Audio File
+                    </a>
+                  </div>
+                `).join('')}
+              </div>
+              <p style="font-size: 12px; color: #666; margin: 10px 0 0 0;">
+                <strong>Note:</strong> Download links are valid indefinitely. Please save your files after downloading.
+              </p>
+            </div>
+          ` : ''}
 
           <div class="totals">
             <div class="total-row">
