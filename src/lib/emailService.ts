@@ -186,6 +186,7 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
           <img src="{{LOGO_URL}}" alt="Damon Music Academy Logo" style="height: 70px; margin-bottom: 20px;">
           <h1>🎵 Damon Music Academy</h1>
           <h2>Registration Confirmation</h2>
+          <p>Dear ${registration.student_name},</p>
           <p>${introMessage}</p>
         </div>
         
@@ -199,37 +200,11 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
           <div class="next-steps">
             <h3>📋 What's Next?</h3>
             <ul>
-              <li>We'll review your application and contact you within <strong>24-48 hours</strong> to confirm your enrollment.</li>
+              <li>We'll review ${registration.student_name}'s application and contact you within <strong>24-48 hours</strong> to confirm your enrollment.</li>
               <li>Please keep this receipt number (<strong>${registration.receipt_number}</strong>) for your records.</li>
               <li>You can track your application status using your email address.</li>
               <li>If you have any questions, feel free to contact us using the information below.</li>
             </ul>
-          </div>
-
-          <div class="section">
-            <div class="section-title">👤 Student Information</div>
-            <div class="info-grid">
-              <div class="info-item">
-                <span class="info-label">Full Name:</span>
-                <span class="info-value">${registration.student_name}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Age:</span>
-                <span class="info-value">${registration.age} years</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Email:</span>
-                <span class="info-value">${registration.email}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Phone:</span>
-                <span class="info-value">${registration.country_code} ${registration.phone}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Location:</span>
-                <span class="info-value">${registration.location}</span>
-              </div>
-            </div>
           </div>
 
           <div class="section">
@@ -332,7 +307,7 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
           </div>
 
           <div class="footer">
-            <p>Thank you for choosing Damon Music Academy!</p>
+            <p>Thank you for choosing Damon Music Academy, ${registration.student_name}!</p>
             <p>We look forward to helping you achieve your creative dreams.</p>
             <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
           </div>
@@ -562,6 +537,7 @@ export const sendAcceptedEmail = async (registration: RegistrationData, tempPass
           <img src="{{LOGO_URL}}" alt="Damon Music Academy Logo" style="height: 70px; margin-bottom: 20px;">
           <h1>🎉 Congratulations, ${registration.student_name}!</h1>
           <h2>Your Application is Successful!</h2>
+          <p>Dear ${registration.student_name},</p>
           <p>Welcome to Damon Music Academy! Your application has been <strong>approved</strong> and you are now ready to begin your creative journey.</p>
         </div>
         <div class="content">
@@ -587,23 +563,13 @@ export const sendAcceptedEmail = async (registration: RegistrationData, tempPass
           <div class="next-steps">
             <h3>✅ Next Steps</h3>
             <ul>
-              <li><strong>Complete payment</strong> using the invoice we sent you to secure your enrollment.</li>
+              <li><strong>Complete payment</strong> using the invoice we sent you to secure ${registration.student_name}'s enrollment.</li>
               <li>Once payment is confirmed, you will receive a final enrollment confirmation email with your student portal login credentials.</li>
               <li>If you have any questions about payment or enrollment, feel free to reply to this email or contact us using the information below.</li>
-              <li>We look forward to seeing you at Damon Music Academy!</li>
+              <li>We look forward to seeing ${registration.student_name} at Damon Music Academy!</li>
             </ul>
           </div>
           
-          <div class="section">
-            <div class="section-title">👤 Student Information</div>
-            <div class="info-grid">
-              <div class="info-item"><span class="info-label">Full Name:</span><span class="info-value">${registration.student_name}</span></div>
-              <div class="info-item"><span class="info-label">Age:</span><span class="info-value">${registration.age} years</span></div>
-              <div class="info-item"><span class="info-label">Email:</span><span class="info-value">${registration.email}</span></div>
-              <div class="info-item"><span class="info-label">Phone:</span><span class="info-value">${registration.country_code} ${registration.phone}</span></div>
-              <div class="info-item"><span class="info-label">Location:</span><span class="info-value">${registration.location}</span></div>
-            </div>
-          </div>
           <div class="section">
             <div class="section-title">🎓 Course Details</div>
             <div class="info-grid">
@@ -631,7 +597,7 @@ export const sendAcceptedEmail = async (registration: RegistrationData, tempPass
             </div>
           </div>
           <div class="footer">
-            <p>Welcome to the Damon Music Academy family!</p>
+            <p>Welcome to the Damon Music Academy family, ${registration.student_name}!</p>
             <p>We are excited to help you achieve your creative dreams.</p>
             <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
           </div>
@@ -719,7 +685,7 @@ export const sendDeclinedEmail = async (registration: RegistrationData): Promise
           <img src="{{LOGO_URL}}" alt="Damon Music Academy Logo" style="height: 70px; margin-bottom: 20px;">
           <h1>Application Update</h1>
           <h2>Dear ${registration.student_name},</h2>
-          <p>Thank you for your interest in Damon Music Academy. We appreciate the time and effort you put into your application.</p>
+          <p>Thank you for your interest in Damon Music Academy, ${registration.student_name}. We appreciate the time and effort you put into your application.</p>
         </div>
         <div class="content">
           <div class="receipt-header">
@@ -1388,7 +1354,8 @@ export const sendApplicationConfirmationEmail = async (registration: Registratio
           <img src="{{LOGO_URL}}" alt="Damon Music Academy Logo" style="height: 70px; margin-bottom: 20px;">
           <h1>🎵 Damon Music Academy</h1>
           <h2>Application Received</h2>
-          <p>Thank you for your interest in joining our creative community!</p>
+          <p>Dear ${registration.student_name},</p>
+          <p>Thank you for your interest in joining our creative community! We're excited to review your application.</p>
         </div>
         
         <div class="content">
@@ -1401,7 +1368,7 @@ export const sendApplicationConfirmationEmail = async (registration: Registratio
           <div class="next-steps">
             <h3>📋 What's Next?</h3>
             <ul>
-              <li>We'll review your application and contact you within <strong>2 business days</strong> with an update.</li>
+              <li>We'll review ${registration.student_name}'s application and contact you within <strong>2 business days</strong> with an update.</li>
               <li>Please keep this receipt number (<strong>${registration.receipt_number}</strong>) for your records.</li>
               <li>You can track your application status using your email address.</li>
               <li>If you have any questions, feel free to contact us using the information below.</li>
@@ -1420,32 +1387,6 @@ export const sendApplicationConfirmationEmail = async (registration: Registratio
             <p style="margin-top: 15px; font-size: 14px; color: #666;">
               <strong>Note:</strong> Payment of this invoice will finalize your enrollment and secure your spot in our program.
             </p>
-          </div>
-
-          <div class="section">
-            <div class="section-title">👤 Student Information</div>
-            <div class="info-grid">
-              <div class="info-item">
-                <span class="info-label">Full Name:</span>
-                <span class="info-value">${registration.student_name}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Age:</span>
-                <span class="info-value">${registration.age} years</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Email:</span>
-                <span class="info-value">${registration.email}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Phone:</span>
-                <span class="info-value">${registration.country_code} ${registration.phone}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Location:</span>
-                <span class="info-value">${registration.location}</span>
-              </div>
-            </div>
           </div>
 
           <div class="section">
@@ -1548,7 +1489,7 @@ export const sendApplicationConfirmationEmail = async (registration: Registratio
           </div>
 
           <div class="footer">
-            <p>Thank you for choosing Damon Music Academy!</p>
+            <p>Thank you for choosing Damon Music Academy, ${registration.student_name}!</p>
             <p>We look forward to connecting with you soon!</p>
             <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
           </div>
@@ -1642,6 +1583,7 @@ export const sendPaymentConfirmationEmail = async (registration: RegistrationDat
           <img src="{{LOGO_URL}}" alt="Damon Music Academy Logo" style="height: 70px; margin-bottom: 20px;">
           <h1>🎉 Payment Received!</h1>
           <h2>You're Officially Enrolled at Damon Music Academy</h2>
+          <p>Dear ${registration.student_name},</p>
           <p>Welcome to the Damon Music Academy family! Your payment has been confirmed and your enrollment is now complete.</p>
         </div>
         <div class="content">
@@ -1649,6 +1591,16 @@ export const sendPaymentConfirmationEmail = async (registration: RegistrationDat
             <div class="receipt-number">Receipt #: ${registration.receipt_number}</div>
             <div>Enrollment Date: ${formatDate(registration.created_at)}</div>
             <div class="status-badge">ENROLLED</div>
+          </div>
+          
+          <div class="payment-confirmed">
+            <h3>✅ Payment Confirmed</h3>
+            <p><strong>Great news!</strong> Your payment has been successfully processed and your enrollment is now complete.</p>
+            <ul>
+              <li><strong>Enrollment fee:</strong> ✅ Paid</li>
+              <li><strong>First month's tuition:</strong> ✅ Paid</li>
+              <li><strong>Status:</strong> ✅ Officially Enrolled</li>
+            </ul>
           </div>
           
           ${tempPassword ? `
@@ -1666,37 +1618,17 @@ export const sendPaymentConfirmationEmail = async (registration: RegistrationDat
           </div>
           ` : ''}
           
-          <div class="payment-confirmed">
-            <h3>✅ Payment Confirmed</h3>
-            <p><strong>Great news!</strong> Your payment has been successfully processed and your enrollment is now complete.</p>
-            <ul>
-              <li><strong>Enrollment fee:</strong> ✅ Paid</li>
-              <li><strong>First month's tuition:</strong> ✅ Paid</li>
-              <li><strong>Status:</strong> ✅ Officially Enrolled</li>
-            </ul>
-          </div>
-          
           <div class="next-steps">
             <h3>🎯 What's Next?</h3>
             <ul>
               ${tempPassword ? '<li><strong>Student Portal:</strong> Access your student portal using the credentials provided above to view your lessons, materials, and progress.</li>' : ''}
-              <li><strong>Class Schedule:</strong> We will contact you within 24-48 hours with your personalized class schedule.</li>
-              <li><strong>First Lesson:</strong> Your first lesson will be scheduled based on your preferred schedule and instructor availability.</li>
+              <li><strong>Class Schedule:</strong> We will contact you within 24-48 hours with ${registration.student_name}'s personalized class schedule.</li>
+              <li><strong>First Lesson:</strong> ${registration.student_name}'s first lesson will be scheduled based on your preferred schedule and instructor availability.</li>
               <li><strong>Welcome Kit:</strong> You will receive information about any required materials or equipment for your course.</li>
               <li><strong>Questions:</strong> If you have any questions, feel free to contact us using the information below.</li>
             </ul>
           </div>
           
-          <div class="section">
-            <div class="section-title">👤 Student Information</div>
-            <div class="info-grid">
-              <div class="info-item"><span class="info-label">Full Name:</span><span class="info-value">${registration.student_name}</span></div>
-              <div class="info-item"><span class="info-label">Age:</span><span class="info-value">${registration.age} years</span></div>
-              <div class="info-item"><span class="info-label">Email:</span><span class="info-value">${registration.email}</span></div>
-              <div class="info-item"><span class="info-label">Phone:</span><span class="info-value">${registration.country_code} ${registration.phone}</span></div>
-              <div class="info-item"><span class="info-label">Location:</span><span class="info-value">${registration.location}</span></div>
-            </div>
-          </div>
           <div class="section">
             <div class="section-title">🎓 Course Details</div>
             <div class="info-grid">
@@ -1724,7 +1656,7 @@ export const sendPaymentConfirmationEmail = async (registration: RegistrationDat
             </div>
           </div>
           <div class="footer">
-            <p>Welcome to the Damon Music Academy family!</p>
+            <p>Welcome to the Damon Music Academy family, ${registration.student_name}!</p>
             <p>We are excited to help you achieve your creative dreams.</p>
             <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
           </div>

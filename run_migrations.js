@@ -21,3 +21,5 @@ console.log(`Executing ${statements.length} SQL statements...`);
 
 console.log('Please run the SQL file directly in Supabase SQL Editor:');
 console.log('File: run_backing_tracks_migrations_direct.sql');
+
+

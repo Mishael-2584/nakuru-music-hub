@@ -274,3 +274,5 @@ BEGIN
   RAISE NOTICE '✅ Preview audio and score preview support added';
   RAISE NOTICE '✅ Category name updated to "Performance Tracks & Scores"';
 END $$;
+
+

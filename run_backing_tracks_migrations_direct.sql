@@ -155,3 +155,5 @@ VALUES
 ON CONFLICT (version) DO NOTHING;
 
 SELECT '✅ Backing tracks migrations completed!' as status;
+
+
