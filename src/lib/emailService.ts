@@ -207,44 +207,6 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
             </ul>
           </div>
 
-          <div class="section">
-            <div class="section-title">🎓 Course Details</div>
-            <div class="info-grid">
-              <div class="info-item">
-                <span class="info-label">Course Category:</span>
-                <span class="info-value">${registration.course_category}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Subject/Instrument:</span>
-                <span class="info-value">${(() => {
-                  if (registration.course_category === 'Music') return registration.instrument;
-                  if (registration.course_category === 'Production') return registration.production_type;
-                  return 'Art Course';
-                })()}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Proficiency Level:</span>
-                <span class="info-value">${registration.proficiency_level}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Learning Mode:</span>
-                <span class="info-value">${registration.learning_mode}</span>
-              </div>
-              ${registration.course_category === 'Music' ? `
-              <div class="info-item">
-                <span class="info-label">Owns Instrument:</span>
-                <span class="info-value">${registration.owns_instrument ? 'Yes' : 'No'}</span>
-              </div>
-              ` : ''}
-              ${registration.preferred_schedule ? `
-              <div class="info-item">
-                <span class="info-label">Preferred Schedule:</span>
-                <span class="info-value">${registration.preferred_schedule}</span>
-              </div>
-              ` : ''}
-            </div>
-          </div>
-
           ${registration.parent_name ? `
           <div class="section">
             <div class="section-title">👨‍👩‍👧‍👦 Parent/Guardian Information</div>
@@ -568,22 +530,6 @@ export const sendAcceptedEmail = async (registration: RegistrationData, tempPass
               <li>If you have any questions about payment or enrollment, feel free to reply to this email or contact us using the information below.</li>
               <li>We look forward to seeing ${registration.student_name} at Damon Music Academy!</li>
             </ul>
-          </div>
-          
-          <div class="section">
-            <div class="section-title">🎓 Course Details</div>
-            <div class="info-grid">
-              <div class="info-item"><span class="info-label">Course Category:</span><span class="info-value">${registration.course_category}</span></div>
-              <div class="info-item"><span class="info-label">Subject/Instrument:</span><span class="info-value">${(() => {
-                if (registration.course_category === 'Music') return registration.instrument;
-                if (registration.course_category === 'Production') return registration.production_type;
-                return 'Art Course';
-              })()}</span></div>
-              <div class="info-item"><span class="info-label">Proficiency Level:</span><span class="info-value">${registration.proficiency_level}</span></div>
-              <div class="info-item"><span class="info-label">Learning Mode:</span><span class="info-value">${registration.learning_mode}</span></div>
-              ${registration.course_category === 'Music' ? `<div class="info-item"><span class="info-label">Owns Instrument:</span><span class="info-value">${registration.owns_instrument ? 'Yes' : 'No'}</span></div>` : ''}
-              ${registration.preferred_schedule ? `<div class="info-item"><span class="info-label">Preferred Schedule:</span><span class="info-value">${registration.preferred_schedule}</span></div>` : ''}
-            </div>
           </div>
           ${registration.parent_name ? `<div class="section"><div class="section-title">👨‍👩‍👧‍👦 Parent/Guardian Information</div><div class="info-grid"><div class="info-item"><span class="info-label">Name:</span><span class="info-value">${registration.parent_name}</span></div>${registration.parent_phone ? `<div class="info-item"><span class="info-label">Phone:</span><span class="info-value">${registration.parent_phone}</span></div>` : ''}</div></div>` : ''}
           ${registration.medical_condition === 'yes' ? `<div class="section"><div class="section-title">🏥 Medical Information</div><div class="info-item"><span class="info-label">Medical Conditions:</span><span class="info-value">Yes</span></div><div class="info-item"><span class="info-label">Details:</span><span class="info-value">${registration.medical_details}</span></div></div>` : ''}

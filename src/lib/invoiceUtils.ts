@@ -209,6 +209,42 @@ export async function generateAndUploadInvoicePDF(invoice: any, student: any, is
   return publicUrl;
 }
 
+/** Generate invoice PDF blob for preview/download without uploading. */
+export async function generateInvoicePDFBlob(invoice: any, student: any, isFirstInvoice: boolean = false): Promise<Blob> {
+  const invoiceDetails = invoice.lessons_summary;
+  const quoteData = {
+    name: student.student_name,
+    email: student.email,
+    phone: student.phone || '',
+    service_category: 'Music Lessons',
+    project_type: '',
+    event_date: '',
+    location: '',
+    budget_range: '',
+    timeline: '',
+    specific_requirements: '',
+    reference_materials_url: '',
+    status: '',
+    admin_notes: '',
+    quote_amount: invoice.amount_due,
+    quote_sent_at: '',
+    preferred_contact_method: 'email',
+    additional_notes: ''
+  };
+  const invoiceMeta = {
+    invoiceNumber: isFirstInvoice ? 'first' : invoice.id || '',
+    periodStart: invoice.period_start || '',
+    periodEnd: invoice.period_end || '',
+    dueDate: invoice.due_date || '',
+    paymentStatus: invoice.status ? invoice.status.toUpperCase() : 'PENDING',
+    studentId: student.id || '',
+    registrationId: student.registration_id || '',
+    sessionsPerWeek: invoice.sessions_per_week || undefined,
+    notes: invoice.notes || '',
+  };
+  return generateQuotePDF(quoteData, invoice.amount_due, '', invoiceDetails, invoiceMeta);
+}
+
 // Add defensive check utility function
 const isValidId = (id: any) => id && id !== 'undefined' && id !== undefined && id !== null;
 

@@ -172,12 +172,13 @@ export default function QuoteForm({ isOpen, onClose, selectedService }: QuoteFor
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number</Label>
+          <Label htmlFor="phone">Phone Number *</Label>
           <Input
             id="phone"
             value={formData.phone}
             onChange={(e) => handleInputChange('phone', e.target.value)}
             placeholder="+254 700 000 000"
+            required
           />
         </div>
 
@@ -198,32 +199,35 @@ export default function QuoteForm({ isOpen, onClose, selectedService }: QuoteFor
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="project_type">Project Type</Label>
+          <Label htmlFor="project_type">Project Type *</Label>
           <Input
             id="project_type"
             value={formData.project_type}
             onChange={(e) => handleInputChange('project_type', e.target.value)}
             placeholder="e.g., Wedding, Corporate Event, Recording Session"
+            required
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="event_date">Event Date</Label>
+          <Label htmlFor="event_date">Event Date *</Label>
           <Input
             id="event_date"
             type="date"
             value={formData.event_date}
             onChange={(e) => handleInputChange('event_date', e.target.value)}
+            required
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="location">Location/Venue</Label>
+          <Label htmlFor="location">Location/Venue *</Label>
           <Input
             id="location"
             value={formData.location}
             onChange={(e) => handleInputChange('location', e.target.value)}
             placeholder="Event location or venue"
+            required
           />
         </div>
       </div>
@@ -239,7 +243,7 @@ export default function QuoteForm({ isOpen, onClose, selectedService }: QuoteFor
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="budget_range">Budget Range</Label>
+          <Label htmlFor="budget_range">Budget Range *</Label>
           <Select value={formData.budget_range} onValueChange={(value) => handleInputChange('budget_range', value)}>
             <SelectTrigger>
               <SelectValue placeholder="Select budget range" />
@@ -255,7 +259,7 @@ export default function QuoteForm({ isOpen, onClose, selectedService }: QuoteFor
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="timeline">Timeline</Label>
+          <Label htmlFor="timeline">Timeline *</Label>
           <Select value={formData.timeline} onValueChange={(value) => handleInputChange('timeline', value)}>
             <SelectTrigger>
               <SelectValue placeholder="Select timeline" />
@@ -272,7 +276,7 @@ export default function QuoteForm({ isOpen, onClose, selectedService }: QuoteFor
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="specific_requirements">Specific Requirements</Label>
+        <Label htmlFor="specific_requirements">Specific Requirements (Optional)</Label>
         <Textarea
           id="specific_requirements"
           value={formData.specific_requirements}
@@ -283,7 +287,7 @@ export default function QuoteForm({ isOpen, onClose, selectedService }: QuoteFor
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="preferred_contact_method">Preferred Contact Method</Label>
+        <Label htmlFor="preferred_contact_method">Preferred Contact Method *</Label>
         <Select value={formData.preferred_contact_method} onValueChange={(value) => handleInputChange('preferred_contact_method', value)}>
           <SelectTrigger>
             <SelectValue />
@@ -405,8 +409,8 @@ export default function QuoteForm({ isOpen, onClose, selectedService }: QuoteFor
               onClick={nextStep}
               className="flex items-center gap-2"
               disabled={
-                (currentStep === 1 && (!formData.name || !formData.email || !formData.service_category)) ||
-                (currentStep === 2 && !formData.budget_range)
+                (currentStep === 1 && (!formData.name || !formData.email || !formData.phone || !formData.service_category || !formData.project_type || !formData.event_date || !formData.location)) ||
+                (currentStep === 2 && (!formData.budget_range || !formData.timeline || !formData.preferred_contact_method))
               }
             >
               Next

@@ -379,6 +379,14 @@ export const generateMeetingCode = (): string => {
   return result;
 };
 
+/** Create a simple meeting URL without DB (e.g. when teacher has no user_id). Returns { meetingUrl, meetingCode } for trial classes. */
+export const createSimpleTrialMeeting = (hostName: string, title: string): { meetingUrl: string; meetingCode: string } => {
+  const meetingCode = generateMeetingCode();
+  const roomName = generateInstantMeetingName(hostName, title);
+  const meetingUrl = generateJitsiMeetUrl(roomName, DEFAULT_VIDEO_SETTINGS);
+  return { meetingUrl, meetingCode };
+};
+
 // Create instant meeting
 export const createInstantMeeting = async ({
   title,

@@ -29,7 +29,7 @@ const Fees = () => {
           name: "Home Lesson",
           location: "Nakuru CBD & Environs",
           duration: "30 minutes", 
-          monthly: "KSh 5,600",
+          monthly: "KSh 6,000",
           icon: Home,
           features: ["One-on-one instruction", "Professional facilities", "Perfect for beginners", "Focused sessions"]
         },
@@ -45,7 +45,7 @@ const Fees = () => {
           name: "Online",
           location: "Global",
           duration: "1 hour",
-          monthly: "$44/month",
+          monthly: "$65/month",
           icon: Globe,
           features: ["Global accessibility", "Flexible timing", "Digital resources", "Interactive sessions"],
           special: true

@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { generateQuotePDF } from "@/lib/pdfGenerator";
 import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
-import { generateInvoiceForRegistration } from "@/lib/invoiceUtils";
+import { generateInvoiceForRegistration, generateInvoicePDFBlob } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
 import LearningModeDebugTest from './LearningModeDebugTest';
 import ShopProductManager from './admin/ShopProductManager';
@@ -124,6 +124,7 @@ const AdminPanel = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [pendingTeachers, setPendingTeachers] = useState([]);
+  const [pendingTeacherDocuments, setPendingTeacherDocuments] = useState<any[]>([]);
   const [approvedTeachers, setApprovedTeachers] = useState([]);
   const [teacherLoading, setTeacherLoading] = useState(false);
   const [showRequestInfo, setShowRequestInfo] = useState(false);
@@ -161,6 +162,19 @@ const AdminPanel = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [requestsPage, setRequestsPage] = useState(1);
   const [requestsPerPage] = useState(10);
+  const [financesSearchTerm, setFinancesSearchTerm] = useState("");
+  const [financesPage, setFinancesPage] = useState(1);
+  const [financesPerPage] = useState(15);
+  const [quotesSearchTerm, setQuotesSearchTerm] = useState("");
+  const [quotesPage, setQuotesPage] = useState(1);
+  const [quotesPerPage] = useState(10);
+  const [registrationsPage, setRegistrationsPage] = useState(1);
+  const [registrationsPerPage] = useState(10);
+  const [studentsPage, setStudentsPage] = useState(1);
+  const [studentsPerPage] = useState(15);
+  const [trialsSearchTerm, setTrialsSearchTerm] = useState("");
+  const [trialsPage, setTrialsPage] = useState(1);
+  const [trialsPerPage] = useState(10);
   const [studentToDelete, setStudentToDelete] = useState<any>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -396,6 +410,102 @@ const AdminPanel = () => {
       registration.receipt_number.toLowerCase().includes(searchLower)
     );
   }, [registrations, searchTerm]);
+
+  // Finances: filter and paginate activeStudents
+  const filteredFinancesStudents = useMemo(() => {
+    if (!financesSearchTerm.trim()) return activeStudents;
+    const q = financesSearchTerm.toLowerCase();
+    return activeStudents.filter(
+      (s) =>
+        (s.student_name && s.student_name.toLowerCase().includes(q)) ||
+        (s.instrument && s.instrument.toLowerCase().includes(q)) ||
+        (s.course_category && s.course_category.toLowerCase().includes(q)) ||
+        (s.email && s.email.toLowerCase().includes(q))
+    );
+  }, [activeStudents, financesSearchTerm]);
+  const financesTotalPages = Math.max(1, Math.ceil(filteredFinancesStudents.length / financesPerPage));
+  const paginatedFinancesStudents = useMemo(() => {
+    const start = (financesPage - 1) * financesPerPage;
+    return filteredFinancesStudents.slice(start, start + financesPerPage);
+  }, [filteredFinancesStudents, financesPage, financesPerPage]);
+
+  // Quotes: filter and paginate
+  const filteredQuotes = useMemo(() => {
+    if (!quotesSearchTerm.trim()) return quotes;
+    const q = quotesSearchTerm.toLowerCase();
+    return quotes.filter(
+      (quote) =>
+        (quote.name && quote.name.toLowerCase().includes(q)) ||
+        (quote.email && quote.email.toLowerCase().includes(q)) ||
+        (quote.service_category && quote.service_category.toLowerCase().includes(q)) ||
+        (quote.status && quote.status.toLowerCase().includes(q)) ||
+        (quote.project_type && quote.project_type.toLowerCase().includes(q))
+    );
+  }, [quotes, quotesSearchTerm]);
+  const quotesTotalPages = Math.max(1, Math.ceil(filteredQuotes.length / quotesPerPage));
+  const paginatedQuotes = useMemo(() => {
+    const start = (quotesPage - 1) * quotesPerPage;
+    return filteredQuotes.slice(start, start + quotesPerPage);
+  }, [filteredQuotes, quotesPage, quotesPerPage]);
+
+  // Registrations: paginate (search already in filteredRegistrations)
+  const registrationsTotalPages = Math.max(1, Math.ceil(filteredRegistrations.length / registrationsPerPage));
+  const paginatedRegistrations = useMemo(() => {
+    const start = (registrationsPage - 1) * registrationsPerPage;
+    return filteredRegistrations.slice(start, start + registrationsPerPage);
+  }, [filteredRegistrations, registrationsPage, registrationsPerPage]);
+
+  // Students: filter (existing) then paginate
+  const filteredStudents = useMemo(() => {
+    if (!searchTerm.trim()) return activeStudents;
+    const q = searchTerm.toLowerCase();
+    return activeStudents.filter(
+      (s) =>
+        (s.student_name && s.student_name.toLowerCase().includes(q)) ||
+        (s.instrument && s.instrument.toLowerCase().includes(q))
+    );
+  }, [activeStudents, searchTerm]);
+  const studentsTotalPages = Math.max(1, Math.ceil(filteredStudents.length / studentsPerPage));
+  const paginatedStudents = useMemo(() => {
+    const start = (studentsPage - 1) * studentsPerPage;
+    return filteredStudents.slice(start, start + studentsPerPage);
+  }, [filteredStudents, studentsPage, studentsPerPage]);
+
+  // Trials: filter and paginate
+  const filteredTrials = useMemo(() => {
+    if (!trialsSearchTerm.trim()) return trialBookings;
+    const q = trialsSearchTerm.toLowerCase();
+    return trialBookings.filter(
+      (t) =>
+        (t.student_name && t.student_name.toLowerCase().includes(q)) ||
+        (t.parent_name && t.parent_name.toLowerCase().includes(q)) ||
+        (t.email && t.email.toLowerCase().includes(q)) ||
+        (t.instrument && t.instrument.toLowerCase().includes(q)) ||
+        (t.status && t.status.toLowerCase().includes(q))
+    );
+  }, [trialBookings, trialsSearchTerm]);
+  const trialsTotalPages = Math.max(1, Math.ceil(filteredTrials.length / trialsPerPage));
+  const paginatedTrials = useMemo(() => {
+    const start = (trialsPage - 1) * trialsPerPage;
+    return filteredTrials.slice(start, start + trialsPerPage);
+  }, [filteredTrials, trialsPage, trialsPerPage]);
+
+  // Reset page to 1 when search term changes (per-tab)
+  useEffect(() => {
+    setFinancesPage(1);
+  }, [financesSearchTerm]);
+  useEffect(() => {
+    setQuotesPage(1);
+  }, [quotesSearchTerm]);
+  useEffect(() => {
+    setRegistrationsPage(1);
+  }, [searchTerm]);
+  useEffect(() => {
+    setStudentsPage(1);
+  }, [searchTerm]);
+  useEffect(() => {
+    setTrialsPage(1);
+  }, [trialsSearchTerm]);
 
   // Function to open quote dialog with existing data
   const openQuoteDialog = (quote: Quote) => {
@@ -1200,29 +1310,36 @@ const AdminPanel = () => {
         return;
       }
 
-      // Create public instant meeting for the trial class
+      // Create public instant meeting for the trial class (or simple URL if teacher has no user_id)
       console.log('🎥 Creating instant meeting for trial class...');
       console.log('👨‍🏫 Teacher details:', { id: teacher.id, name: teacher.name, user_id: teacher.user_id });
       
-      const { createInstantMeeting } = await import('@/lib/videoConferencing');
+      const { createInstantMeeting, createSimpleTrialMeeting } = await import('@/lib/videoConferencing');
+      const meetingTitle = `Trial Class: ${selectedTrialBooking.instrument} with ${teacher.name}`;
       
-      const meetingData = {
-        title: `Trial Class: ${selectedTrialBooking.instrument} with ${teacher.name}`,
-        description: `Trial class for ${selectedTrialBooking.student_name} - ${selectedTrialBooking.instrument}`,
-        hostId: teacher.user_id,
-        hostName: teacher.name,
-        hostRole: 'teacher' as const,
-        participants: [], // No specific participants for public meeting
-        duration: 60, // 1 hour trial class
-        maxParticipants: 5, // Allow some flexibility
-        isPublic: true, // Public meeting so student can join without login
-        allowRecording: false,
-        scheduledStartTime: scheduledDateTime.toISOString()
-      };
+      let meeting: { meetingUrl: string; meetingCode: string };
       
-      console.log('📋 Meeting data:', meetingData);
+      if (teacher.user_id) {
+        const meetingData = {
+          title: meetingTitle,
+          description: `Trial class for ${selectedTrialBooking.student_name} - ${selectedTrialBooking.instrument}`,
+          hostId: teacher.user_id,
+          hostName: teacher.name,
+          hostRole: 'teacher' as const,
+          participants: [],
+          duration: 60,
+          maxParticipants: 5,
+          isPublic: true,
+          allowRecording: false,
+          scheduledStartTime: scheduledDateTime.toISOString()
+        };
+        meeting = await createInstantMeeting(meetingData);
+      } else {
+        // Teacher has no user_id (e.g. not yet linked to auth) – generate Jitsi URL without DB
+        meeting = createSimpleTrialMeeting(teacher.name, meetingTitle);
+        console.log('✅ Simple trial meeting URL created (teacher has no user_id)');
+      }
       
-      const meeting = await createInstantMeeting(meetingData);
       console.log('✅ Meeting created successfully:', meeting);
 
       // Update trial booking with meeting details
@@ -1243,35 +1360,39 @@ const AdminPanel = () => {
         throw updateError;
       }
 
-      // Send notification to assigned teacher
-      const { error: notificationError } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: teacher.user_id,
-          title: 'New Trial Class Assignment',
-          message: `You have been assigned a trial class with ${selectedTrialBooking.student_name} for ${selectedTrialBooking.instrument} on ${scheduledDateTime.toLocaleDateString()} at ${scheduledDateTime.toLocaleTimeString()}`,
-          notification_type: 'trial_assignment',
-          data: {
-            trial_booking_id: selectedTrialBooking.id,
-            student_name: selectedTrialBooking.student_name,
-            instrument: selectedTrialBooking.instrument,
-            scheduled_datetime: scheduledDateTime.toISOString(),
-            meeting_url: meeting.meetingUrl,
-            meeting_code: meeting.meetingCode
-          },
-          is_read: false
-        });
+      // Send notification to assigned teacher (only if teacher has user_id)
+      if (teacher.user_id) {
+        const { error: notificationError } = await supabase
+          .from('notifications')
+          .insert({
+            user_id: teacher.user_id,
+            title: 'New Trial Class Assignment',
+            message: `You have been assigned a trial class with ${selectedTrialBooking.student_name} for ${selectedTrialBooking.instrument} on ${scheduledDateTime.toLocaleDateString()} at ${scheduledDateTime.toLocaleTimeString()}`,
+            notification_type: 'trial_assignment',
+            data: {
+              trial_booking_id: selectedTrialBooking.id,
+              student_name: selectedTrialBooking.student_name,
+              instrument: selectedTrialBooking.instrument,
+              scheduled_datetime: scheduledDateTime.toISOString(),
+              meeting_url: meeting.meetingUrl,
+              meeting_code: meeting.meetingCode
+            },
+            is_read: false
+          });
 
-      if (notificationError) {
-        console.error('Error creating teacher notification:', notificationError);
+        if (notificationError) {
+          console.error('Error creating teacher notification:', notificationError);
+        }
       }
 
-      // Send email to student with meeting details
-      await sendTrialClassEmail(selectedTrialBooking, teacher, scheduledDateTime, meeting);
+      // Send email to student with meeting details (best-effort; scheduling succeeds either way)
+      const emailSent = await sendTrialClassEmail(selectedTrialBooking, teacher, scheduledDateTime, meeting);
 
       toast({
         title: "Trial Class Scheduled Successfully! 🎉",
-        description: `Trial class scheduled with ${teacher.name} for ${scheduledDateTime.toLocaleDateString()}. Meeting link sent to student.`,
+        description: emailSent
+          ? `Trial class scheduled with ${teacher.name} for ${scheduledDateTime.toLocaleDateString()}. Meeting link sent to student.`
+          : `Trial class scheduled with ${teacher.name} for ${scheduledDateTime.toLocaleDateString()}. Confirmation email could not be sent—please share the meeting link with the student manually.`,
         duration: 5000,
       });
 
@@ -1542,7 +1663,7 @@ const AdminPanel = () => {
 
       if (error) {
         console.error('Error sending trial class email:', error);
-        throw error;
+        return false;
       }
 
       console.log('Trial class email sent successfully');
@@ -2031,7 +2152,13 @@ const AdminPanel = () => {
         } else {
           console.error('❌ Error fetching pending teachers:', pendingError);
         }
-        
+
+        const { data: docs, error: docsError } = await supabase
+          .from('pending_teacher_documents')
+          .select('*')
+          .order('uploaded_at', { ascending: false });
+        if (!docsError) setPendingTeacherDocuments(docs || []);
+
         console.log('🔍 Fetching approved teachers...');
         const { data: approved, error: approvedError } = await supabase
           .from("teachers")
@@ -2535,8 +2662,8 @@ const AdminPanel = () => {
     setStudentsNeedingInvoice(needing);
   }, [activeStudents, studentInvoices]);
 
-  // 4. Handler to send invoice for a student
-  const handleSendInvoice = async (student: any) => {
+  // 4. Handler to send invoice for a student (optional existingInvoice = send existing without creating)
+  const handleSendInvoice = async (student: any, existingInvoice?: any) => {
     // Defensive check for student object and ID
     if (!student || !isValidId(student.id)) {
       console.error('Invalid student object or ID for invoice sending:', student);
@@ -2546,55 +2673,72 @@ const AdminPanel = () => {
 
     setSendingInvoiceIds(ids => [...ids, student.id]);
     try {
-      console.log('Send Invoice: student object', student);
-      let regId = student.registration_id;
-      let reg = null;
-      
-      // Defensive check for registration_id
-      if (!regId || regId === 'undefined' || regId === undefined || regId === null) {
-        // Fallback: lookup registration by name/email
-        console.log('Send Invoice: registration_id missing, attempting lookup by name/email');
-        const { data, error } = await supabase
-          .from('registrations')
-          .select('*')
-          .eq('student_name', student.student_name)
-          .eq('email', student.email)
-          .eq('status', 'approved')
-          .single();
-        console.log('Send Invoice: registration lookup result', { data, error });
-        if (error || !data) {
-          toast({ title: 'Error', description: 'Could not find registration for student. ' + (error?.message || ''), variant: 'destructive' });
+      let invoiceToSend: any = null;
+      let isFirstInvoice = false;
+
+      if (existingInvoice) {
+        // Send existing invoice only (no create)
+        invoiceToSend = existingInvoice;
+        const { data: allStudentInvoices } = await supabase
+          .from('invoices')
+          .select('id')
+          .eq('student_id', student.id)
+          .order('period_start', { ascending: true });
+        isFirstInvoice = !!allStudentInvoices?.length && allStudentInvoices[0].id === existingInvoice.id;
+      } else {
+        console.log('Send Invoice: student object', student);
+        let regId = student.registration_id;
+        let reg = null;
+
+        if (!regId || regId === 'undefined' || regId === undefined || regId === null) {
+          const { data, error } = await supabase
+            .from('registrations')
+            .select('*')
+            .eq('student_name', student.student_name)
+            .eq('email', student.email)
+            .eq('status', 'approved')
+            .single();
+          if (error || !data) {
+            toast({ title: 'Error', description: 'Could not find registration for student. ' + (error?.message || ''), variant: 'destructive' });
+            setSendingInvoiceIds(ids => ids.filter(id => id !== student.id));
+            return;
+          }
+          reg = data;
+          regId = data.id;
+        }
+
+        if (!regId || regId === 'undefined' || regId === undefined || regId === null) {
+          toast({ title: 'Error', description: 'Student is missing registration_id or it is invalid. Cannot send invoice.', variant: 'destructive' });
           setSendingInvoiceIds(ids => ids.filter(id => id !== student.id));
           return;
         }
-        reg = data;
-        regId = data.id;
+
+        const { generateInvoiceForRegistration } = await import('@/lib/invoiceUtils');
+        const result = await generateInvoiceForRegistration(regId);
+        if (result && !('existing' in result)) {
+          invoiceToSend = result as any;
+          const { data: earlier } = await supabase.from('invoices').select('id').eq('student_id', student.id).lt('period_start', invoiceToSend.period_start).limit(1);
+          isFirstInvoice = !earlier || earlier.length === 0;
+        } else if (result && 'existing' in result) {
+          // Invoice already exists (e.g. created by Preview): still send email for it
+          invoiceToSend = (result as { existing: any }).existing;
+          const { data: earlier } = await supabase.from('invoices').select('id').eq('student_id', student.id).lt('period_start', invoiceToSend.period_start).limit(1);
+          isFirstInvoice = !earlier || earlier.length === 0;
+        }
       }
-      
-      // Final defensive check for registration ID
-      if (!regId || regId === 'undefined' || regId === undefined || regId === null) {
-        toast({ title: 'Error', description: 'Student is missing registration_id or it is invalid. Cannot send invoice.', variant: 'destructive' });
-        setSendingInvoiceIds(ids => ids.filter(id => id !== student.id));
-        return;
-      }
-      
-      // Generate invoice
-      const { generateInvoiceForRegistration } = await import('@/lib/invoiceUtils');
-      const result = await generateInvoiceForRegistration(regId);
-      if (result && !('existing' in result)) {
-        // Send email for the newly created invoice
-        const invoice = result as any;
-        const sent = await sendInvoiceEmail(invoice, student, { isReminder: false, isFirstInvoice: false });
+
+      if (invoiceToSend) {
+        const sent = await sendInvoiceEmail(invoiceToSend, student, { isReminder: false, isFirstInvoice });
         if (sent) {
           toast({ title: 'Invoice Sent', description: `Invoice sent to ${student.student_name}` });
         } else {
           toast({ title: 'Invoice Created', description: `Invoice created but email failed to send.` });
         }
-      } else {
-        toast({ title: 'Invoice Exists', description: `Invoice already exists for this period.` });
+      } else if (!existingInvoice) {
+        toast({ title: 'No Invoice', description: 'No invoice available to send.' });
       }
-      
-      // Refresh invoices with defensive check for student IDs
+
+      // Refresh invoices
       const validStudentIds = activeStudents.filter(s => isValidId(s.id)).map(s => s.id);
       if (validStudentIds.length > 0) {
         const { data, error } = await supabase
@@ -2617,6 +2761,65 @@ const AdminPanel = () => {
       toast({ title: 'Error', description: (err.message || 'Failed to send invoice') + (err.stack ? '\n' + err.stack : ''), variant: 'destructive' });
     } finally {
       setSendingInvoiceIds(ids => ids.filter(id => id !== student.id));
+    }
+  };
+
+  // Preview invoice (generate PDF and open in new tab; create invoice if needed)
+  const [previewInvoiceLoading, setPreviewInvoiceLoading] = useState<string | null>(null);
+  const handlePreviewInvoice = async (student: any, existingInvoice?: any) => {
+    if (!student || !isValidId(student.id)) {
+      toast({ title: 'Error', description: 'Invalid student for preview.', variant: 'destructive' });
+      return;
+    }
+    setPreviewInvoiceLoading(student.id);
+    try {
+      let invoice = existingInvoice ?? null;
+      if (!invoice) {
+      let regId = student.registration_id;
+      if (!regId) {
+        const { data: regData, error: regErr } = await supabase
+          .from('registrations')
+          .select('id')
+          .eq('student_name', student.student_name)
+          .eq('email', student.email)
+          .eq('status', 'approved')
+          .single();
+        if (regErr || !regData) {
+          toast({ title: 'Error', description: 'Could not find registration for this student.', variant: 'destructive' });
+          return;
+        }
+        regId = regData.id;
+      }
+      const result = await generateInvoiceForRegistration(regId);
+      invoice = result && !('existing' in result) ? (result as any) : ('existing' in result ? (result as { existing: any }).existing : null);
+      const validStudentIds = activeStudents.filter((s: any) => isValidId(s.id)).map((s: any) => s.id);
+      if (validStudentIds.length > 0) {
+        const { data: invData } = await supabase.from('invoices').select('*').in('student_id', validStudentIds).order('period_end', { ascending: false });
+        if (invData) {
+          const latest: Record<string, any> = {};
+          for (const inv of invData) {
+            if (!latest[inv.student_id] || new Date(inv.period_end) > new Date(latest[inv.student_id].period_end)) latest[inv.student_id] = inv;
+          }
+          setStudentInvoices(latest);
+        }
+      }
+      }
+      if (!invoice) {
+        toast({ title: 'No invoice', description: 'No invoice available to preview.', variant: 'destructive' });
+        return;
+      }
+      const { data: earlier } = await supabase.from('invoices').select('id').eq('student_id', student.id).lt('period_start', invoice.period_start).limit(1);
+      const isFirstInvoice = !earlier || earlier.length === 0;
+      const blob = await generateInvoicePDFBlob(invoice, student, !!isFirstInvoice);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      toast({ title: 'Preview opened', description: 'Invoice PDF opened in new tab.' });
+    } catch (err: any) {
+      console.error('Preview invoice error:', err);
+      toast({ title: 'Error', description: err.message || 'Failed to preview invoice.', variant: 'destructive' });
+    } finally {
+      setPreviewInvoiceLoading(null);
     }
   };
 
@@ -2804,7 +3007,7 @@ const AdminPanel = () => {
                 <SelectItem value="teachers">
                   <div className="flex items-center gap-2">
                     <UserCog className="h-4 w-4" />
-                    <span>Teachers</span>
+                    <span>Teachers{pendingTeachers.length > 0 ? ` (${pendingTeachers.length} pending)` : ''}</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="quotes">
@@ -2927,11 +3130,16 @@ const AdminPanel = () => {
             <Button
               variant={activeTab === 'teachers' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('teachers')}
-              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start"
+              className="rounded-xl px-4 py-3 transition-all duration-200 whitespace-nowrap scroll-snap-align-start relative"
               style={{ minWidth: 120 }}
             >
               <UserCog className="h-4 w-4 mr-2" />
               Teachers
+              {pendingTeachers.length > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center min-w-5">
+                  {pendingTeachers.length}
+                </Badge>
+              )}
             </Button>
               <Button
                 variant={activeTab === 'requests' ? 'default' : 'ghost'}
@@ -3163,11 +3371,14 @@ const AdminPanel = () => {
         {/* Trial Bookings Tab */}
         <div style={{ display: activeTab === 'trials' ? 'block' : 'none' }}>
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Trial Class Bookings
-              </h3>
-              <div className="flex gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                  Trial Class Bookings
+                </h3>
+                {trialsTotalPages > 1 && (
+                  <Badge variant="outline" className="text-blue-600">Page {trialsPage} of {trialsTotalPages}</Badge>
+                )}
                 <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
                   Pending: {trialBookings.filter(t => t.status === 'pending').length}
                 </Badge>
@@ -3181,15 +3392,24 @@ const AdminPanel = () => {
                   Converted: {trialBookings.filter(t => t.status === 'converted').length}
                 </Badge>
               </div>
+              <Input
+                placeholder="Search by student, parent, email, instrument, status..."
+                value={trialsSearchTerm}
+                onChange={(e) => setTrialsSearchTerm(e.target.value)}
+                className="max-w-sm bg-white/80 backdrop-blur-sm border-primary/20"
+              />
             </div>
             
             {trialBookings.length === 0 ? (
               <div className="text-center text-muted-foreground py-12 text-lg">
                 No trial bookings yet. They will appear here when students book trial classes.
               </div>
+            ) : filteredTrials.length === 0 ? (
+              <div className="text-center text-muted-foreground py-12 text-lg">No results found.</div>
             ) : (
+              <>
               <div className="grid gap-4">
-                {trialBookings.map((booking) => (
+                {paginatedTrials.map((booking) => (
                   <Card key={booking.id} className="shadow-xl border-0 bg-white/95 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
@@ -3323,6 +3543,27 @@ const AdminPanel = () => {
                   </Card>
                 ))}
               </div>
+              {trialsTotalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                  <div className="text-sm text-gray-600">
+                    Showing {((trialsPage - 1) * trialsPerPage) + 1} to {Math.min(trialsPage * trialsPerPage, filteredTrials.length)} of {filteredTrials.length} bookings
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setTrialsPage((p) => Math.max(1, p - 1))} disabled={trialsPage === 1} className="flex items-center gap-1">
+                      <ArrowLeft className="h-3 w-3" /> Previous
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: trialsTotalPages }, (_, i) => i + 1).map((page) => (
+                        <Button key={page} variant={page === trialsPage ? "default" : "outline"} size="sm" onClick={() => setTrialsPage(page)} className="w-8 h-8 p-0 text-xs">{page}</Button>
+                      ))}
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setTrialsPage((p) => Math.min(trialsTotalPages, p + 1))} disabled={trialsPage === trialsTotalPages} className="flex items-center gap-1">
+                      Next <ArrowRight className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
             )}
           </div>
         </div>
@@ -3330,10 +3571,15 @@ const AdminPanel = () => {
         {/* Active Students Tab */}
         <div style={{ display: activeTab === 'students' ? 'block' : 'none' }}>
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Active Students Orchestra
-              </h3>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                  Active Students Orchestra
+                </h3>
+                {studentsTotalPages > 1 && (
+                  <Badge variant="outline" className="text-blue-600">Page {studentsPage} of {studentsTotalPages}</Badge>
+                )}
+              </div>
               <Input
                 placeholder="Search students..."
                 value={searchTerm}
@@ -3343,10 +3589,7 @@ const AdminPanel = () => {
             </div>
             
             <div className="grid gap-4">
-              {activeStudents.filter(student => 
-                student.student_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                student.instrument.toLowerCase().includes(searchTerm.toLowerCase())
-              ).map((student) => {
+              {paginatedStudents.map((student) => {
                 const InstrumentIcon = getInstrumentIcon(student.instrument);
                 const isExpanded = expandedStudentIds.has(student.id);
                 return (
@@ -3415,16 +3658,41 @@ const AdminPanel = () => {
                 );
               })}
             </div>
+            {studentsTotalPages > 1 && (
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                <div className="text-sm text-gray-600">
+                  Showing {((studentsPage - 1) * studentsPerPage) + 1} to {Math.min(studentsPage * studentsPerPage, filteredStudents.length)} of {filteredStudents.length} students
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setStudentsPage((p) => Math.max(1, p - 1))} disabled={studentsPage === 1} className="flex items-center gap-1">
+                    <ArrowLeft className="h-3 w-3" /> Previous
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: studentsTotalPages }, (_, i) => i + 1).map((page) => (
+                      <Button key={page} variant={page === studentsPage ? "default" : "outline"} size="sm" onClick={() => setStudentsPage(page)} className="w-8 h-8 p-0 text-xs">{page}</Button>
+                    ))}
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setStudentsPage((p) => Math.min(studentsTotalPages, p + 1))} disabled={studentsPage === studentsTotalPages} className="flex items-center gap-1">
+                    Next <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Registrations Tab */}
         <div style={{ display: activeTab === 'registrations' ? 'block' : 'none' }}>
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Student Registration Applications
-              </h3>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                  Student Registration Applications
+                </h3>
+                {registrationsTotalPages > 1 && (
+                  <Badge variant="outline" className="text-blue-600">Page {registrationsPage} of {registrationsTotalPages}</Badge>
+                )}
+              </div>
               <Input
                 placeholder="Search by name, course, location, email..."
                 value={searchTerm}
@@ -3436,8 +3704,9 @@ const AdminPanel = () => {
             {filteredRegistrations.length === 0 ? (
               <div className="text-center text-muted-foreground py-12 text-lg">No results found.</div>
             ) : (
+              <>
               <div className="grid gap-6">
-                {filteredRegistrations.map((registration) => {
+                {paginatedRegistrations.map((registration) => {
                   const isExpanded = expandedCards.has(registration.id);
                   return (
                     <Card key={registration.id} className="shadow-xl border-0 bg-white/95 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
@@ -3792,6 +4061,27 @@ const AdminPanel = () => {
                   );
                 })}
               </div>
+              {registrationsTotalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                  <div className="text-sm text-gray-600">
+                    Showing {((registrationsPage - 1) * registrationsPerPage) + 1} to {Math.min(registrationsPage * registrationsPerPage, filteredRegistrations.length)} of {filteredRegistrations.length} applications
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setRegistrationsPage((p) => Math.max(1, p - 1))} disabled={registrationsPage === 1} className="flex items-center gap-1">
+                      <ArrowLeft className="h-3 w-3" /> Previous
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: registrationsTotalPages }, (_, i) => i + 1).map((page) => (
+                        <Button key={page} variant={page === registrationsPage ? "default" : "outline"} size="sm" onClick={() => setRegistrationsPage(page)} className="w-8 h-8 p-0 text-xs">{page}</Button>
+                      ))}
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setRegistrationsPage((p) => Math.min(registrationsTotalPages, p + 1))} disabled={registrationsPage === registrationsTotalPages} className="flex items-center gap-1">
+                      Next <ArrowRight className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
             )}
           </div>
         </div>
@@ -3865,7 +4155,14 @@ const AdminPanel = () => {
           <div className="mt-8">
             <Tabs value={teachersSubTab} onValueChange={(value) => setTeachersSubTab(value as 'pending' | 'approved' | 'classrooms' | 'approved-classrooms')} className="w-full">
               <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 gap-2">
-                <TabsTrigger value="pending" className="text-xs sm:text-sm px-2 sm:px-3">Pending Teachers</TabsTrigger>
+                <TabsTrigger value="pending" className="text-xs sm:text-sm px-2 sm:px-3 relative">
+                  Pending Teachers
+                  {pendingTeachers.length > 0 && (
+                    <Badge variant="destructive" className="ml-1.5 h-5 min-w-5 rounded-full px-1.5 text-xs">
+                      {pendingTeachers.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
                 <TabsTrigger value="approved" className="text-xs sm:text-sm px-2 sm:px-3">Approved Teachers</TabsTrigger>
                 <TabsTrigger value="classrooms" className="text-xs sm:text-sm px-2 sm:px-3">Classroom Approvals</TabsTrigger>
                 <TabsTrigger value="approved-classrooms" className="text-xs sm:text-sm px-2 sm:px-3">Current Classrooms</TabsTrigger>
@@ -3891,18 +4188,31 @@ const AdminPanel = () => {
                               <div className="text-sm mb-1">Experience: {teacher.experience}</div>
                               <div className="text-sm mb-1">Subjects: {teacher.subjects?.join(", ")}</div>
                               <div className="text-sm mb-1">Bio: {teacher.bio}</div>
-                              {teacher.cv_file_path && (
-                                <div className="text-sm mb-1">
+                              <div className="text-sm mb-1 flex flex-wrap gap-x-4 gap-y-1">
+                                {teacher.cv_file_path && (
                                   <a
-                                    href={`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/teacher-cvs/${teacher.cv_file_path}`}
+                                    href={supabase.storage.from('teacher-cvs').getPublicUrl(teacher.cv_file_path).data.publicUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-primary underline font-medium"
                                   >
                                     Download CV
                                   </a>
-                                </div>
-                              )}
+                                )}
+                                {pendingTeacherDocuments
+                                  .filter((d) => d.pending_teacher_id === teacher.id)
+                                  .map((d) => (
+                                    <a
+                                      key={d.id}
+                                      href={supabase.storage.from('teacher-cvs').getPublicUrl(d.file_path).data.publicUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-primary underline font-medium"
+                                    >
+                                      Download {d.doc_type === 'id' ? 'ID' : d.doc_type === 'kra' ? 'KRA' : d.doc_type}
+                                    </a>
+                                  ))}
+                              </div>
                               <div className="text-xs text-gray-400">Applied: {new Date(teacher.created_at).toLocaleString()}</div>
                             </div>
                             <div className="flex flex-col gap-2 min-w-[180px]">
@@ -3950,18 +4260,18 @@ const AdminPanel = () => {
                               <div className="text-sm mb-1">Experience: {teacher.experience}</div>
                               <div className="text-sm mb-1">Subjects: {teacher.subjects?.join(", ")}</div>
                               <div className="text-sm mb-1">Bio: {teacher.bio}</div>
-                              {teacher.cv_file_path && (
-                                <div className="text-sm mb-1">
+                              <div className="text-sm mb-1 flex flex-wrap gap-x-4 gap-y-1">
+                                {teacher.cv_file_path && (
                                   <a
-                                    href={`https://xtjarscgxhbyktwriahu.supabase.co/storage/v1/object/public/teacher-cvs/${teacher.cv_file_path}`}
+                                    href={supabase.storage.from('teacher-cvs').getPublicUrl(teacher.cv_file_path).data.publicUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-primary underline font-medium"
                                   >
                                     Download CV
                                   </a>
-                                </div>
-                              )}
+                                )}
+                              </div>
                               <div className="text-xs text-gray-400">Approved: {new Date(teacher.created_at).toLocaleString()}</div>
                             </div>
                           </div>
@@ -4492,12 +4802,25 @@ const AdminPanel = () => {
         {/* Quotes Tab */}
         <div style={{ display: activeTab === 'quotes' ? 'block' : 'none' }}>
           <div className="space-y-6">
-            <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Quote Management
-            </h3>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                  Quote Management
+                </h3>
+                {quotesTotalPages > 1 && (
+                  <Badge variant="outline" className="text-blue-600">Page {quotesPage} of {quotesTotalPages}</Badge>
+                )}
+              </div>
+              <Input
+                placeholder="Search by name, email, service, status..."
+                value={quotesSearchTerm}
+                onChange={(e) => setQuotesSearchTerm(e.target.value)}
+                className="max-w-sm bg-white/80 backdrop-blur-sm border-primary/20"
+              />
+            </div>
             
             <div className="grid gap-4">
-              {quotes.map((quote) => (
+              {paginatedQuotes.map((quote) => (
                 <Card key={quote.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
                   <CardContent className="p-6">
                     <div className="flex justify-between items-start mb-4">
@@ -4507,21 +4830,36 @@ const AdminPanel = () => {
                           <Mail className="h-4 w-4" />
                           {quote.email}
                         </p>
+                        {quote.phone != null && quote.phone !== '' && (
+                          <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                            <Phone className="h-3 w-3" />
+                            {quote.phone}
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">{new Date(quote.created_at).toLocaleDateString()}</Badge>
                       </div>
                     </div>
                     
-                    <div className="p-3 bg-accent/5 rounded-lg border border-accent/10 mb-4">
+                    <div className="p-3 bg-accent/5 rounded-lg border border-accent/10 mb-4 space-y-2">
                       <h5 className="font-semibold text-accent mb-2">Service: {quote.service_category}</h5>
-                      <p className="text-muted-foreground">
+                      <p className="text-muted-foreground text-sm">
                         Project Type: {quote.project_type || 'N/A'}, Event Date: {quote.event_date || 'N/A'}, Location: {quote.location || 'N/A'}
                       </p>
                       <p className="text-sm text-muted-foreground">Budget: {quote.budget_range || 'N/A'}, Timeline: {quote.timeline || 'N/A'}</p>
                       <p className="text-sm text-muted-foreground">Preferred Contact: {quote.preferred_contact_method}</p>
+                      {quote.specific_requirements && (
+                        <p className="text-sm text-muted-foreground mt-2"><span className="font-medium">Specific requirements:</span> {quote.specific_requirements}</p>
+                      )}
+                      {quote.reference_materials_url && (
+                        <p className="text-sm text-muted-foreground">
+                          <span className="font-medium">Reference:</span>{' '}
+                          <a href={quote.reference_materials_url} target="_blank" rel="noopener noreferrer" className="text-primary underline">{quote.reference_materials_url}</a>
+                        </p>
+                      )}
                       {quote.additional_notes && (
-                        <p className="text-sm text-muted-foreground mt-2">Additional Notes: {quote.additional_notes}</p>
+                        <p className="text-sm text-muted-foreground mt-2"><span className="font-medium">Additional Notes:</span> {quote.additional_notes}</p>
                       )}
                     </div>
                     
@@ -4543,6 +4881,10 @@ const AdminPanel = () => {
                         {(quote.status === 'completed' || quote.status === 'cancelled') && (
                           <Button size="sm" variant="outline" onClick={() => openQuoteDialog(quote)}>View/Edit</Button>
                         )}
+                        <Button size="sm" variant="outline" onClick={() => openQuoteDialog(quote)} title="Download quote PDF before sending to client">
+                          <FileText className="h-4 w-4 mr-1" />
+                          Download Quote
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => openInvoiceDialog(quote)}>Generate Invoice</Button>
                       </div>
                     </div>
@@ -4550,6 +4892,26 @@ const AdminPanel = () => {
                 </Card>
               ))}
             </div>
+            {quotesTotalPages > 1 && (
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                <div className="text-sm text-gray-600">
+                  Showing {((quotesPage - 1) * quotesPerPage) + 1} to {Math.min(quotesPage * quotesPerPage, filteredQuotes.length)} of {filteredQuotes.length} quotes
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setQuotesPage((p) => Math.max(1, p - 1))} disabled={quotesPage === 1} className="flex items-center gap-1">
+                    <ArrowLeft className="h-3 w-3" /> Previous
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: quotesTotalPages }, (_, i) => i + 1).map((page) => (
+                      <Button key={page} variant={page === quotesPage ? "default" : "outline"} size="sm" onClick={() => setQuotesPage(page)} className="w-8 h-8 p-0 text-xs">{page}</Button>
+                    ))}
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setQuotesPage((p) => Math.min(quotesTotalPages, p + 1))} disabled={quotesPage === quotesTotalPages} className="flex items-center gap-1">
+                    Next <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -4602,7 +4964,55 @@ const AdminPanel = () => {
                 />
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  if (!selectedQuote) return;
+                  const amount = parseFloat(quoteAmount) || 0;
+                  const normalizedQuote = {
+                    name: selectedQuote.name ?? '',
+                    email: selectedQuote.email ?? '',
+                    phone: selectedQuote.phone ?? null,
+                    service_category: selectedQuote.service_category ?? '',
+                    project_type: selectedQuote.project_type ?? null,
+                    event_date: selectedQuote.event_date ?? null,
+                    location: selectedQuote.location ?? null,
+                    budget_range: selectedQuote.budget_range ?? null,
+                    timeline: selectedQuote.timeline ?? null,
+                    specific_requirements: selectedQuote.specific_requirements ?? null,
+                    preferred_contact_method: selectedQuote.preferred_contact_method ?? 'email',
+                    additional_notes: selectedQuote.additional_notes ?? null,
+                    reference_materials_url: selectedQuote.reference_materials_url ?? null,
+                  };
+                  try {
+                    const pdfBlob = await generateQuotePDF(normalizedQuote, amount, adminNotes, undefined, undefined);
+                    const url = URL.createObjectURL(pdfBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `quote-${selectedQuote.service_category?.replace(/\s+/g, '-') || 'quote'}-${selectedQuote.id}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    toast({
+                      title: "Quote Downloaded",
+                      description: "Quote PDF has been downloaded. You can review it before sending to the client.",
+                    });
+                  } catch (err) {
+                    console.error("Error generating quote PDF:", err);
+                    toast({
+                      title: "Download Failed",
+                      description: "Could not generate quote PDF. Please try again.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Download Quote PDF
+              </Button>
               <Button onClick={async () => {
                 if (selectedQuote) {
                   try {
@@ -4927,11 +5337,22 @@ const AdminPanel = () => {
               </TabsList>
               <TabsContent value="invoices">
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                  <h4 className="text-xl font-semibold">Invoice Management</h4>
-                    {studentsNeedingInvoice.length > 0 && (
-                      <Badge className="bg-red-500 text-white">{studentsNeedingInvoice.length} need invoice</Badge>
-                    )}
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-xl font-semibold">Invoice Management</h4>
+                      {studentsNeedingInvoice.length > 0 && (
+                        <Badge className="bg-red-500 text-white">{studentsNeedingInvoice.length} need invoice</Badge>
+                      )}
+                      {financesTotalPages > 1 && (
+                        <Badge variant="outline" className="text-blue-600">Page {financesPage} of {financesTotalPages}</Badge>
+                      )}
+                    </div>
+                    <Input
+                      placeholder="Search by student name, course, email..."
+                      value={financesSearchTerm}
+                      onChange={(e) => setFinancesSearchTerm(e.target.value)}
+                      className="max-w-sm bg-white/80 backdrop-blur-sm border-primary/20"
+                    />
                   </div>
                   <table className="min-w-full text-sm mb-6">
                     <thead>
@@ -4944,7 +5365,7 @@ const AdminPanel = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {activeStudents.map(student => {
+                      {paginatedFinancesStudents.map(student => {
                         const { start, end } = getCurrentPeriod();
                         const inv = Object.values(studentInvoices).find(
                           (inv: any) => inv.student_id === student.id && inv.period_start === start && inv.period_end === end
@@ -4984,12 +5405,23 @@ const AdminPanel = () => {
                             <td>{inv ? inv.due_date : '-'}</td>
                             <td className="flex gap-2">
                               {!inv ? (
-                                <Button size="sm" variant="default" disabled={sendingInvoiceIds.includes(student.id)} onClick={() => handleSendInvoice(student)}>
-                                  {sendingInvoiceIds.includes(student.id) ? 'Sending...' : 'Send Invoice'}
-                                </Button>
+                                <>
+                                  <Button size="sm" variant="outline" disabled={!!previewInvoiceLoading} onClick={() => handlePreviewInvoice(student)}>
+                                    {previewInvoiceLoading === student.id ? 'Opening...' : 'Preview'}
+                                  </Button>
+                                  <Button size="sm" variant="default" disabled={sendingInvoiceIds.includes(student.id)} onClick={() => handleSendInvoice(student)}>
+                                    {sendingInvoiceIds.includes(student.id) ? 'Sending...' : 'Send Invoice'}
+                                  </Button>
+                                </>
                               ) : (
                                 <>
                                 <Button size="sm" variant="outline" onClick={() => handleViewInvoice(inv)}>View</Button>
+                                <Button size="sm" variant="outline" disabled={!!previewInvoiceLoading} onClick={() => handlePreviewInvoice(student, inv)}>Preview</Button>
+                                  {!inv.pdf_url && (
+                                    <Button size="sm" variant="default" disabled={sendingInvoiceIds.includes(student.id)} onClick={() => handleSendInvoice(student, inv)}>
+                                      {sendingInvoiceIds.includes(student.id) ? 'Sending...' : 'Send Invoice'}
+                                    </Button>
+                                  )}
                                   <Button size="sm" variant="ghost" onClick={() => handleOpenInvoiceHistory(student)}>
                                     View All Invoices
                                   </Button>
@@ -5016,6 +5448,26 @@ const AdminPanel = () => {
                       })}
                     </tbody>
                   </table>
+                  {financesTotalPages > 1 && (
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                      <div className="text-sm text-gray-600">
+                        Showing {((financesPage - 1) * financesPerPage) + 1} to {Math.min(financesPage * financesPerPage, filteredFinancesStudents.length)} of {filteredFinancesStudents.length} students
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setFinancesPage((p) => Math.max(1, p - 1))} disabled={financesPage === 1} className="flex items-center gap-1">
+                          <ArrowLeft className="h-3 w-3" /> Previous
+                        </Button>
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: financesTotalPages }, (_, i) => i + 1).map((page) => (
+                            <Button key={page} variant={page === financesPage ? "default" : "outline"} size="sm" onClick={() => setFinancesPage(page)} className="w-8 h-8 p-0 text-xs">{page}</Button>
+                          ))}
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => setFinancesPage((p) => Math.min(financesTotalPages, p + 1))} disabled={financesPage === financesTotalPages} className="flex items-center gap-1">
+                          Next <ArrowRight className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
               <TabsContent value="fees">

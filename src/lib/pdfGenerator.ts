@@ -14,7 +14,46 @@ interface QuoteData {
   specific_requirements: string | null;
   preferred_contact_method: string;
   additional_notes: string | null;
+  reference_materials_url?: string | null;
 }
+
+// Label lookups for quote form value keys (match QuoteForm.tsx)
+const BUDGET_LABELS: Record<string, string> = {
+  'under-10k': 'Under KES 10,000',
+  '10k-25k': 'KES 10,000 - 25,000',
+  '25k-50k': 'KES 25,000 - 50,000',
+  '50k-100k': 'KES 50,000 - 100,000',
+  '100k-250k': 'KES 100,000 - 250,000',
+  'over-250k': 'Over KES 250,000'
+};
+const TIMELINE_LABELS: Record<string, string> = {
+  'asap': 'ASAP (Within 1 week)',
+  '1-2-weeks': '1-2 weeks',
+  '1-month': '1 month',
+  '2-3-months': '2-3 months',
+  '3-6-months': '3-6 months',
+  'flexible': 'Flexible timeline'
+};
+const SERVICE_CATEGORY_LABELS: Record<string, string> = {
+  'live-sound-lighting': 'Live Sound & Lighting',
+  'livestreaming': 'Livestreaming Services',
+  'event-coverage': 'Event Coverage',
+  'photography': 'Photography Services',
+  'songwriting': 'Songwriting',
+  'studio-recording': 'Studio Recording & Production',
+  'audio-mixing': 'Audio Mixing & Mastering',
+  'voice-over': 'Voice-over Production',
+  'podcast': 'Podcast Production',
+  'live-feed': 'Live Feed Services',
+  'stage-lighting': 'Stage Lighting Setup',
+  'led-screen': 'LED Screen Rental',
+  'rehearsal-space': 'Rehearsal Space Rental',
+  'music-production': 'Music Production for Artists',
+  'dj-mc': 'DJ & MC Services',
+  'music-arrangement': 'Music Arrangement & Transcription',
+  'music-composition': 'Music Composition Services',
+  'session-musicians': 'Session & Event Musicians'
+};
 
 interface InvoiceLineItem {
   description: string;
@@ -90,19 +129,52 @@ export const generateQuotePDF = async (
     dueDateStr = dueDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   }
 
-  // Determine course/instrument for specificity
+  // Quote/Project details for PDF (label mapping and formatted event date) — compute early for quote-only
+  const formatEventDate = (d: string | null | undefined) => {
+    if (!d) return '-';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+    return d;
+  };
+  const budgetLabel = quoteData?.budget_range ? (BUDGET_LABELS[quoteData.budget_range] || quoteData.budget_range) : '-';
+  const timelineLabel = quoteData?.timeline ? (TIMELINE_LABELS[quoteData.timeline] || quoteData.timeline) : '-';
+  const serviceLabel = quoteData?.service_category ? (SERVICE_CATEGORY_LABELS[quoteData.service_category] || quoteData.service_category) : '';
+
+  // Determine course/instrument: from invoice line items, or quote-only use human-readable service label
   let courseOrInstrument = '';
   if (invoiceDetails && invoiceDetails.lineItems && invoiceDetails.lineItems.length > 0) {
-    // Extract course name from the first line item description
     const firstItem = invoiceDetails.lineItems[0];
-    if (firstItem.description.includes(' - ')) {
-      courseOrInstrument = firstItem.description.split(' - ')[0];
-    } else {
-      courseOrInstrument = firstItem.description;
-    }
-  } else if (quoteData && quoteData.service_category) {
-    courseOrInstrument = quoteData.service_category;
+    courseOrInstrument = firstItem.description.includes(' - ') ? firstItem.description.split(' - ')[0] : firstItem.description;
+  } else {
+    courseOrInstrument = serviceLabel || (quoteData?.service_category ?? '');
   }
+
+  // Safe line items and totals: quote-only gets one synthetic line; never call .map/.toLocaleString on undefined
+  const isQuoteOnly = !invoiceDetails && !invoiceMeta;
+  const lineItemsForTable: InvoiceLineItem[] = invoiceDetails?.lineItems?.length
+    ? invoiceDetails.lineItems
+    : [{ description: quoteData?.project_type ? `${serviceLabel || 'Quote'} – ${quoteData.project_type}` : (serviceLabel || 'Quote'), quantity: 1, unitPrice: quoteAmount, amount: quoteAmount }];
+  const subtotalVal = invoiceDetails?.subtotal ?? quoteAmount;
+  const totalVal = invoiceDetails?.total ?? quoteAmount;
+
+  const quoteDetailsHtml = quoteData ? `
+    <div style="margin: 12px 32px 0 32px; padding: 12px 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 12px; color: #334155;">
+      <div style="font-weight: bold; color: #1e293b; margin-bottom: 8px;">Quote / Project details</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px;">
+        <div><strong>Service:</strong> ${serviceLabel}</div>
+        <div><strong>Project type:</strong> ${quoteData.project_type || '-'}</div>
+        <div><strong>Event date:</strong> ${formatEventDate(quoteData.event_date)}</div>
+        <div><strong>Location:</strong> ${quoteData.location || '-'}</div>
+        <div><strong>Budget range:</strong> ${budgetLabel}</div>
+        <div><strong>Timeline:</strong> ${timelineLabel}</div>
+        <div><strong>Preferred contact:</strong> ${quoteData.preferred_contact_method || '-'}</div>
+        ${quoteData.reference_materials_url ? `<div><strong>Reference:</strong> ${quoteData.reference_materials_url}</div>` : ''}
+      </div>
+      ${quoteData.specific_requirements ? `<div style="margin-top: 8px;"><strong>Specific requirements:</strong> ${quoteData.specific_requirements}</div>` : ''}
+      ${quoteData.additional_notes ? `<div style="margin-top: 4px;"><strong>Additional notes:</strong> ${quoteData.additional_notes}</div>` : ''}
+    </div>
+  ` : '';
 
   pdfContainer.innerHTML = `
   <div style="max-width: 794px; margin: 0 auto; background: #fff; font-family: 'Arial', sans-serif; border: 1px solid #e5e7eb; border-radius: 10px; padding: 0 0 20px 0;">
@@ -120,11 +192,11 @@ export const generateQuotePDF = async (
         </div>
       </div>
       <div style="text-align: right;">
-        <div style="font-size: 28px; font-weight: bold; color: #1e40af; letter-spacing: 2px; margin-bottom: 2px;">INVOICE</div>
-        <div style="font-size: 15px; color: #64748b;">Receipt: <b>${invoiceMeta?.invoiceNumber || '-'}</b></div>
+        <div style="font-size: 28px; font-weight: bold; color: #1e40af; letter-spacing: 2px; margin-bottom: 2px;">${isQuoteOnly ? 'QUOTE' : 'INVOICE'}</div>
+        <div style="font-size: 15px; color: #64748b;">${isQuoteOnly ? 'Reference:' : 'Receipt:'} <b>${isQuoteOnly ? 'Quote' : (invoiceMeta?.invoiceNumber || '-')}</b></div>
         <div style="font-size: 13px; color: #64748b;">Date: ${invoiceOrQuoteDate}</div>
         <div style="font-size: 15px; color: #e11d48; font-weight: bold; margin-top: 4px;">Due Date: ${dueDateStr || '-'}</div>
-        <div style="font-size: 13px; color: #1e293b; margin-top: 4px;">Course/Instrument: <b>${courseOrInstrument}</b></div>
+        <div style="font-size: 13px; color: #1e293b; margin-top: 4px;">Course/Instrument: <b>${courseOrInstrument || '-'}</b></div>
       </div>
     </div>
 
@@ -139,11 +211,12 @@ export const generateQuotePDF = async (
       </div>
       <div style="text-align: right;">
         <div style="font-weight: bold; color: #1e293b; margin-bottom: 2px;">To:</div>
-        <div>${quoteData.name}</div>
-        <div>${quoteData.email}</div>
-        <div>${quoteData.phone || '-'}</div>
+        <div>${quoteData?.name ?? '-'}</div>
+        <div>${quoteData?.email ?? '-'}</div>
+        <div>${quoteData?.phone || '-'}</div>
       </div>
     </div>
+    ${quoteDetailsHtml}
 
     <!-- Table -->
     <div style="padding: 8px 32px 0 32px;">
@@ -157,7 +230,7 @@ export const generateQuotePDF = async (
           </tr>
         </thead>
         <tbody>
-          ${invoiceDetails?.lineItems.map(item => `
+          ${lineItemsForTable.map(item => `
             <tr>
               <td style="padding: 8px 4px; border: 1px solid #e5e7eb; color: #334155;">${item.description}</td>
               <td style="padding: 8px 4px; border: 1px solid #e5e7eb; text-align: right; color: #334155;">${item.quantity}</td>
@@ -172,11 +245,11 @@ export const generateQuotePDF = async (
           <tbody>
             <tr>
               <td style="padding: 8px 4px; text-align: right; font-weight: 600; color: #1e293b;">Subtotal:</td>
-              <td style="padding: 8px 4px; text-align: right; font-weight: 600; color: #1e293b;">KES ${invoiceDetails?.subtotal.toLocaleString()}</td>
+              <td style="padding: 8px 4px; text-align: right; font-weight: 600; color: #1e293b;">KES ${subtotalVal.toLocaleString()}</td>
             </tr>
             <tr>
               <td style="padding: 8px 4px; text-align: right; font-weight: 700; color: #1e40af; font-size: 15px;">Total:</td>
-              <td style="padding: 8px 4px; text-align: right; font-weight: 700; color: #1e40af; font-size: 15px;">KES ${invoiceDetails?.total.toLocaleString()}</td>
+              <td style="padding: 8px 4px; text-align: right; font-weight: 700; color: #1e40af; font-size: 15px;">KES ${totalVal.toLocaleString()}</td>
             </tr>
           </tbody>
         </table>
@@ -193,6 +266,11 @@ export const generateQuotePDF = async (
       <div>Account Number: <b>1265204926</b></div>
       <div>Branch: <b>Nakuru</b></div>
     </div>
+    ${invoiceMeta ? `
+    <div style="margin: 12px 32px 0 32px; background: #fef2f2; padding: 10px 16px; border-radius: 8px; border-left: 4px solid #ef4444; font-size: 12px; color: #dc2626;">
+      <strong>Important:</strong> Full payment must be received and confirmed before class access is granted. Please complete payment by the due date to secure your place and avoid any interruption to your lessons.
+    </div>
+    ` : ''}
 
     <!-- Footer / Notes -->
     ${invoiceMeta && invoiceMeta.notes ? `
@@ -206,7 +284,7 @@ export const generateQuotePDF = async (
       </div>
     ` : ''}
     ${invoiceMeta && invoiceMeta.invoiceNumber && invoiceMeta.invoiceNumber !== 'first' ? `
-      <div style="margin: 18px 32px 0 32px; background: #fef2f2; padding: 10px 16px; border-radius: 8px; border-left: 4px solid #ef4444; font-size: 12px; color: #dc2626;">
+      <div style="margin: 18px 32px 0 32px; background: #fef3c7; padding: 10px 16px; border-radius: 8px; border-left: 4px solid #f59e0b; font-size: 12px; color: #92400e;">
         <b>⚠️ Automated Invoice:</b> This is an automated invoice kindly ignore if already paid.
       </div>
     ` : ''}
