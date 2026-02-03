@@ -1832,7 +1832,7 @@ const AdminPanel = () => {
         console.error("Error updating registration:", error);
         toast({
           title: "Error",
-          description: "Failed to update registration status",
+          description: error.message || "Failed to update registration status",
           variant: "destructive",
         });
         return;
