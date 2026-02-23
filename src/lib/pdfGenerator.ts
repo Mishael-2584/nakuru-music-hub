@@ -113,21 +113,7 @@ export const generateQuotePDF = async (
     day: 'numeric'
   });
 
-  // 1. Calculate due date as 7th of the next month if invoiceDetails is present
   let invoiceOrQuoteDate = currentDate;
-  let dueDateStr = invoiceMeta?.dueDate;
-  // Format dueDateStr if present and in ISO format
-  if (dueDateStr && /^\d{4}-\d{2}-\d{2}$/.test(dueDateStr)) {
-    const dueDateObj = new Date(dueDateStr);
-    dueDateStr = dueDateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  }
-  if (!dueDateStr && invoiceDetails && invoiceMeta) {
-    // If periodEnd is e.g. 2025-08-31, due date is 7th of next month (2025-09-07)
-    const periodEnd = new Date(invoiceMeta.periodEnd);
-    const dueDate = new Date(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 1);
-    dueDate.setDate(7);
-    dueDateStr = dueDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  }
 
   // Quote/Project details for PDF (label mapping and formatted event date) — compute early for quote-only
   const formatEventDate = (d: string | null | undefined) => {
@@ -195,7 +181,6 @@ export const generateQuotePDF = async (
         <div style="font-size: 28px; font-weight: bold; color: #1e40af; letter-spacing: 2px; margin-bottom: 2px;">${isQuoteOnly ? 'QUOTE' : 'INVOICE'}</div>
         <div style="font-size: 15px; color: #64748b;">${isQuoteOnly ? 'Reference:' : 'Receipt:'} <b>${isQuoteOnly ? 'Quote' : (invoiceMeta?.invoiceNumber || '-')}</b></div>
         <div style="font-size: 13px; color: #64748b;">Date: ${invoiceOrQuoteDate}</div>
-        <div style="font-size: 15px; color: #e11d48; font-weight: bold; margin-top: 4px;">Due Date: ${dueDateStr || '-'}</div>
         <div style="font-size: 13px; color: #1e293b; margin-top: 4px;">Course/Instrument: <b>${courseOrInstrument || '-'}</b></div>
       </div>
     </div>
@@ -268,7 +253,7 @@ export const generateQuotePDF = async (
     </div>
     ${invoiceMeta ? `
     <div style="margin: 12px 32px 0 32px; background: #fef2f2; padding: 10px 16px; border-radius: 8px; border-left: 4px solid #ef4444; font-size: 12px; color: #dc2626;">
-      <strong>Important:</strong> Full payment must be received and confirmed before class access is granted. Please complete payment by the due date to secure your place and avoid any interruption to your lessons.
+      <strong>Please note:</strong> Monthly fees are payable upfront at the beginning of the month. Late payments may affect lesson scheduling. Thank you for your cooperation.
     </div>
     ` : ''}
 
@@ -289,7 +274,7 @@ export const generateQuotePDF = async (
       </div>
     ` : ''}
     <div style="margin: 18px 32px 0 32px; font-size: 11px; color: #64748b;">
-      <div><b>Due Date:</b> ${dueDateStr || '-'}</div>
+      <div style="margin-bottom: 4px;"><strong>Please note:</strong> Monthly fees are payable upfront at the beginning of the month. Late payments may affect lesson scheduling. Thank you for your cooperation.</div>
       <div style="margin-top: 4px;">Thank you for choosing Damon Music Academy. For any queries, contact us at 0701 195 460.</div>
     </div>
   </div>

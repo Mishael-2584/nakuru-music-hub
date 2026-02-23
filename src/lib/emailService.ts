@@ -1048,14 +1048,8 @@ export const sendInvoiceEmail = async (
       };
       reader.readAsDataURL(pdfBlob);
     });
-    // Email content with proper due date messaging
-    const dueDate = new Date(invoice.due_date);
-    const dueDateStr = dueDate.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-    
+    const paymentNote = 'Please note: Monthly fees are payable upfront at the beginning of the month. Late payments may affect lesson scheduling. Thank you for your cooperation.';
+
     const subject = options.subject || (options.isReminder
       ? `Payment Reminder: Invoice for ${student.student_name} - Damon Music Academy`
       : options.isUpdated 
@@ -1071,8 +1065,8 @@ export const sendInvoiceEmail = async (
       
       if (options.isReminder) {
         body = `<p>Dear ${student.student_name},</p>
-         <p>This is a friendly reminder that your invoice for the current period is due on <strong>${dueDateStr}</strong>.</p>
-         <p><strong>Important:</strong> Payment must be completed by midnight GMT+3 on ${dueDateStr}. After this date, the invoice will be marked as overdue.</p>
+         <p>This is a friendly reminder that your invoice for the current period is pending.</p>
+         <p><strong>${paymentNote}</strong></p>
          <p>Please find the attached invoice PDF for payment details.</p>
          <p>If you have already paid, please disregard this message.</p>`;
       } else if (options.isUpdated && options.isFirstInvoice && !invoicePaid) {
@@ -1080,7 +1074,7 @@ export const sendInvoiceEmail = async (
         body = `<p>Dear ${student.student_name},</p>
          <p>Your first invoice has been updated. Please find the <strong>revised invoice</strong> attached.</p>
          <p><strong>⚠️ IMPORTANT:</strong> Please disregard any previous invoice you may have received. This is the correct and current invoice.</p>
-         <p><strong>Due Date:</strong> ${dueDateStr} (midnight GMT+3)</p>
+         <p><strong>${paymentNote}</strong></p>
          <p><strong>Updated Amount:</strong> KES ${invoice.amount_due.toLocaleString()}</p>
          <p><strong>📧 Student Portal Access:</strong> You will receive your student portal login credentials <strong>only after your first invoice payment has been received and confirmed</strong>. Please ensure timely payment to gain access to your portal where you can book classes, view your schedule, track your progress, and access learning materials.</p>
          <p>Please use this updated invoice for payment. If you have already paid using the previous invoice, please contact us immediately.</p>
@@ -1090,7 +1084,7 @@ export const sendInvoiceEmail = async (
         body = `<p>Dear ${student.student_name},</p>
          <p>Your invoice has been updated. Please find the <strong>revised invoice</strong> attached.</p>
          <p><strong>⚠️ IMPORTANT:</strong> Please disregard any previous invoice you may have received. This is the correct and current invoice.</p>
-         <p><strong>Due Date:</strong> ${dueDateStr} (midnight GMT+3)</p>
+         <p><strong>${paymentNote}</strong></p>
          <p><strong>Updated Amount:</strong> KES ${invoice.amount_due.toLocaleString()}</p>
          <p>Please use this updated invoice for payment. If you have already paid using the previous invoice, please contact us immediately.</p>
          <p>If you have any questions about this update, please contact us.</p>`;
@@ -1098,16 +1092,14 @@ export const sendInvoiceEmail = async (
         // First invoice that hasn't been paid yet - show credentials message
         body = `<p>Dear ${student.student_name},</p>
          <p>Welcome to Damon Music Academy! Please find attached your first invoice.</p>
-         <p><strong>Due Date:</strong> ${dueDateStr} (midnight GMT+3)</p>
-         <p><strong>Important:</strong> Payment must be completed by midnight GMT+3 on ${dueDateStr}. After this date, the invoice will be marked as overdue.</p>
+         <p><strong>${paymentNote}</strong></p>
          <p><strong>📧 Student Portal Access:</strong> You will receive your student portal login credentials <strong>only after your first invoice payment has been received and confirmed</strong>. Please ensure timely payment to gain access to your portal where you can book classes, view your schedule, track your progress, and access learning materials.</p>
          <p>If you have any questions, please contact us.</p>`;
       } else {
         // Regular invoice or first invoice already paid - no credentials message
         body = `<p>Dear ${student.student_name},</p>
          <p>Please find attached your invoice for the current period.</p>
-         <p><strong>Due Date:</strong> ${dueDateStr} (midnight GMT+3)</p>
-         <p><strong>Important:</strong> Payment must be completed by midnight GMT+3 on ${dueDateStr}. After this date, the invoice will be marked as overdue.</p>
+         <p><strong>${paymentNote}</strong></p>
          <p>If you have any questions, please contact us.</p>`;
       }
     }

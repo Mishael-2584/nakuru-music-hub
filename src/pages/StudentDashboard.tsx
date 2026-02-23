@@ -3894,7 +3894,7 @@ const StudentDashboard = () => {
                                 )}
                               </div>
                               <p className="text-sm text-gray-600">Period: {formatDate(invoice.period_start)} - {formatDate(invoice.period_end)}</p>
-                              <p className="text-sm text-gray-600">Due: {formatDate(invoice.due_date)}</p>
+                              <p className="text-sm text-gray-600">Please note: Monthly fees are payable upfront at the beginning of the month. Late payments may affect lesson scheduling.</p>
                               {invoice.payment_status === 'partial' && (
                                 <p className="text-sm text-amber-600 font-medium mt-1">
                                   Partial payment received
@@ -4335,13 +4335,16 @@ const StudentDashboard = () => {
                 <CardContent>
                   <div className="space-y-4">
                     {invoices.length > 0 ? (
+                      <>
+                      <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                        <strong>Please note:</strong> Monthly fees are payable upfront at the beginning of the month. Late payments may affect lesson scheduling. Thank you for your cooperation.
+                      </p>
                       <table className="min-w-full text-sm">
                         <thead>
                           <tr>
                             <th className="text-left">Period</th>
                             <th className="text-right">Amount Due</th>
                             <th className="text-center">Status</th>
-                            <th className="text-center">Due Date</th>
                             <th className="text-center">PDF</th>
                             <th className="text-center">Details</th>
                           </tr>
@@ -4359,13 +4362,13 @@ const StudentDashboard = () => {
                                   {inv.status === 'paid' ? 'Paid' : inv.status === 'overdue' ? 'Overdue' : 'Pending'}
                                 </Badge>
                               </td>
-                              <td className="text-center">{inv.due_date}</td>
                               <td className="text-center">{inv.pdf_url ? <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer">Download</a> : '-'}</td>
                               <td className="text-center"><Button size="sm" variant="outline" onClick={() => handleViewInvoice(inv)}>View</Button></td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
+                      </>
                     ) : (
                       <p className="text-gray-500 text-center py-8">No invoices found</p>
                     )}
