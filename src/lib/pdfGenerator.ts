@@ -201,7 +201,7 @@ export const generateQuotePDF = async (
         <div>${quoteData?.phone || '-'}</div>
       </div>
     </div>
-    ${quoteDetailsHtml}
+    ${isQuoteOnly ? quoteDetailsHtml : ''}
 
     <!-- Table -->
     <div style="padding: 8px 32px 0 32px;">
@@ -258,11 +258,6 @@ export const generateQuotePDF = async (
     ` : ''}
 
     <!-- Footer / Notes -->
-    ${invoiceMeta && invoiceMeta.notes ? `
-      <div style="margin: 18px 32px 0 32px; background: #fef3c7; padding: 10px 16px; border-radius: 8px; border-left: 4px solid #f59e0b; font-size: 12px;">
-        <b>Notes:</b> ${invoiceMeta.notes}
-      </div>
-    ` : ''}
     ${adminNotes ? `
       <div style="margin: 18px 32px 0 32px; background: #fef3c7; padding: 10px 16px; border-radius: 8px; border-left: 4px solid #f59e0b; font-size: 12px;">
         <b>Admin Notes:</b> ${adminNotes}
