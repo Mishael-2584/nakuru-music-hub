@@ -93,7 +93,7 @@ const Footer = () => {
         <div className="border-t border-gray-800 mt-12 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-gray-400 text-sm">
-              © 2025 Damon Music Academy. All rights reserved.
+              © 2026 Damon Music Academy. All rights reserved.
             </p>
             <div className="flex gap-6 text-sm">
               <Link to="/privacy-policy" className="text-gray-400 hover:text-primary transition-colors">Privacy Policy</Link>

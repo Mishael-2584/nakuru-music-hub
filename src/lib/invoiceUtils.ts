@@ -505,8 +505,9 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
           } else if (learningMode === 'online') {
             defaultPrice = 44; // $44 USD
             defaultCurrency = '$';
-          } else if (learningMode === 'home') {
-            defaultPrice = 10000; // KES 10,000 for home lessons
+          } else if (learningMode === 'home' || normalizedLearningMode === 'Home (Nakuru & Environs)') {
+            const dur = registration.home_lesson_duration;
+            defaultPrice = (dur === '30_min' || dur === '1_hour') ? (dur === '30_min' ? 6000 : 10000) : 10000; // 30 min = 6,000; 1 hr = 10,000
           } else {
             defaultPrice = 4800; // KES 4,800 for academy lessons
           }
@@ -555,6 +556,14 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
       fee.currency = 'KSh';
       console.log(`🔄 Used fallback rate for ${fee.currency}: ${fee.price} KSh`);
     }
+  }
+
+  // Home lessons (Music only): use duration-based pricing — 30 min = KSh 6,000, 1 hour = KSh 10,000
+  const isHomeMusic = courseCategory === 'Music' && (learningMode === 'home' || learningMode === 'home-lessons' || normalizedLearningMode === 'Home (Nakuru & Environs)');
+  const homeDuration = registration.home_lesson_duration;
+  if (isHomeMusic && (homeDuration === '30_min' || homeDuration === '1_hour')) {
+    fee = { ...fee, price: homeDuration === '30_min' ? 6000 : 10000 };
+    console.log('Home lesson duration pricing applied:', { home_lesson_duration: homeDuration, price: fee.price });
   }
 
   // Determine billing period

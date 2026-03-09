@@ -45,7 +45,7 @@ const Fees = () => {
           name: "Online",
           location: "Global",
           duration: "1 hour",
-          monthly: "$65/month",
+          monthly: "$78/month",
           icon: Globe,
           features: ["Global accessibility", "Flexible timing", "Digital resources", "Interactive sessions"],
           special: true

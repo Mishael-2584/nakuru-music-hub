@@ -333,8 +333,8 @@ const generateInvoiceHTML = (order: OrderData): string => {
             <div class="company-info">
               <h1>Damon Music Academy</h1>
               <p>Professional Music & Media Services</p>
-              <p>0701 195 460 | 0721 962 647</p>
-              <p>damonmusicacademy@gmail.com</p>
+              <p>0701 195 460 | 0713 490 535</p>
+              <p>info@damonmusicacademy.co.ke</p>
             </div>
           </div>
           <div class="invoice-title">
@@ -355,7 +355,7 @@ const generateInvoiceHTML = (order: OrderData): string => {
             <strong>From:</strong>
             <p>Damon Music Academy</p>
             <p>0701 195 460</p>
-            <p>damonmusicacademy@gmail.com</p>
+            <p>info@damonmusicacademy.co.ke</p>
             <p>Nakuru, Kenya</p>
           </div>
           <div class="to">

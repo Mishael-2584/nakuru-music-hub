@@ -45,6 +45,7 @@ interface Registration {
   experience: string;
   proficiency_level: string;
   learning_mode: string;
+  home_lesson_duration?: string | null;
   owns_instrument: boolean;
   location: string;
   medical_condition: string;
@@ -2418,36 +2419,31 @@ const AdminPanel = () => {
       const { data: registration, error: regError } = await supabase
         .from('registrations')
         .select('*')
-      .select('*')
         .eq('id', invoice.students?.registration_id)
         .single();
 
       if (registration && !regError) {
-        // Get the student's user data to retrieve tempPassword
-        let tempPassword = null;
-        try {
-          // Call the Edge Function to get or regenerate the student's tempPassword
-          const { data: userData, error: userError } = await supabase.functions.invoke('create-student-user', {
-            body: {
-              email: registration.email,
-              student_name: registration.student_name,
-              action: 'get_password' // This will retrieve existing password or generate new one
+        // For first invoice only: get tempPassword for portal credentials in the email
+        let tempPassword: string | null = null;
+        if (isFirstInvoice) {
+          try {
+            const { data: userData, error: userError } = await supabase.functions.invoke('create-student-user', {
+              body: {
+                email: registration.email,
+                student_name: registration.student_name,
+                action: 'get_password'
+              }
+            });
+            if (!userError && userData && userData.tempPassword) {
+              tempPassword = userData.tempPassword;
             }
-          });
-
-          if (!userError && userData && userData.tempPassword) {
-            console.log('✅ Retrieved student tempPassword for payment confirmation');
-            tempPassword = userData.tempPassword;
-          } else {
-            console.log('⚠️ Could not retrieve tempPassword, proceeding without login credentials');
+          } catch (passwordError) {
+            console.error('Error retrieving tempPassword:', passwordError);
           }
-        } catch (passwordError) {
-          console.error('Error retrieving tempPassword:', passwordError);
-          // Continue without tempPassword - the email will be sent without login credentials
         }
 
-        // Send payment confirmation email with tempPassword
-        const emailSent = await sendPaymentConfirmationEmail(registration, tempPassword);
+        // First payment: full enrollment + credentials email. Subsequent: short payment confirmation only.
+        const emailSent = await sendPaymentConfirmationEmail(registration, tempPassword, isFirstInvoice);
         if (emailSent) {
           toast({
             title: "Payment Confirmed",
@@ -3928,6 +3924,27 @@ const AdminPanel = () => {
                                       </SelectContent>
                                     </Select>
                                   </div>
+                                  {(registration.course_category === 'Music' && (registration.learning_mode === 'home' || registration.learning_mode === 'home-lessons')) && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-600">Home duration:</span>
+                                      <Select
+                                        value={registration.home_lesson_duration || ''}
+                                        onValueChange={async (value) => {
+                                          await supabase.from('registrations').update({ home_lesson_duration: value || null }).eq('id', registration.id);
+                                          setRegistrations((prev) => prev.map((r) => r.id === registration.id ? { ...r, home_lesson_duration: value || null } : r));
+                                          toast({ title: 'Updated', description: 'Home lesson duration updated.' });
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-8 w-40 border-gray-300">
+                                          <SelectValue placeholder="Select duration" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="30_min">30 min (KSh 6,000)</SelectItem>
+                                          <SelectItem value="1_hour">1 hour (KSh 10,000)</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  )}
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium text-gray-600">Instrument:</span>
                                     <Select

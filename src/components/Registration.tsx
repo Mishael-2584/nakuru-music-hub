@@ -40,6 +40,7 @@ const Registration = () => {
     medical_details: "",
     date_of_birth: '',
     sessions_per_week: 1,
+    home_lesson_duration: '', // For Music + Home only: '30_min' | '1_hour'
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -370,6 +371,9 @@ const Registration = () => {
         if (!sessionsValidation.isValid) {
           errors.push(sessionsValidation.error);
         }
+        if (formData.course_category === 'Music' && formData.learning_mode === 'home' && !formData.home_lesson_duration) {
+          errors.push('Please select home lesson duration (30 minutes or 1 hour).');
+        }
         break;
     }
     
@@ -474,6 +478,7 @@ const Registration = () => {
         experience: formData.proficiency_level || "beginner",
         proficiency_level: formData.proficiency_level || "beginner",
         learning_mode: formData.learning_mode || "in-person",
+        home_lesson_duration: (formData.learning_mode === "home" && formData.course_category === "Music" && formData.home_lesson_duration) ? formData.home_lesson_duration : null,
         owns_instrument: Boolean(formData.owns_instrument),
         location: formData.location?.trim() || null,
         medical_condition: formData.medical_condition || "no",
@@ -589,6 +594,7 @@ const Registration = () => {
           preferred_schedule: "",
           proficiency_level: "beginner",
           learning_mode: "in-person",
+          home_lesson_duration: "",
           owns_instrument: false,
           location: "",
           medical_condition: "no",
@@ -1277,7 +1283,11 @@ const Registration = () => {
             <Label className="text-sm font-medium text-gray-700">Learning Mode *</Label>
             <RadioGroup 
               value={formData.learning_mode} 
-              onValueChange={(value) => setFormData({...formData, learning_mode: value})}
+              onValueChange={(value) => setFormData({
+                ...formData,
+                learning_mode: value,
+                home_lesson_duration: value === "home" ? formData.home_lesson_duration : "",
+              })}
               className="grid gap-4"
             >
               {learningModes.map((mode) => (
@@ -1307,6 +1317,25 @@ const Registration = () => {
               ))}
             </RadioGroup>
           </div>
+
+          {formData.course_category === "Music" && formData.learning_mode === "home" && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">Home lesson session duration *</Label>
+              <Select
+                value={formData.home_lesson_duration || ""}
+                onValueChange={(value) => setFormData({ ...formData, home_lesson_duration: value })}
+              >
+                <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
+                  <SelectValue placeholder="Select duration" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30_min">30 minutes — KSh 6,000/month</SelectItem>
+                  <SelectItem value="1_hour">1 hour — KSh 10,000/month</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-gray-500">Choose how long each home lesson session will be. Billing is based on this selection.</p>
+            </div>
+          )}
 
           <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
             <Checkbox
@@ -1418,6 +1447,12 @@ const Registration = () => {
                 <span className="font-medium text-gray-600">Learning Mode:</span>
                 <p className="text-gray-800">{formData.learning_mode}</p>
               </div>
+              {formData.learning_mode === "home" && (
+                <div>
+                  <span className="font-medium text-gray-600">Home lesson duration:</span>
+                  <p className="text-gray-800">{formData.home_lesson_duration === "30_min" ? "30 minutes (KSh 6,000/month)" : formData.home_lesson_duration === "1_hour" ? "1 hour (KSh 10,000/month)" : "—"}</p>
+                </div>
+              )}
               <div>
                 <span className="font-medium text-gray-600">Owns Instrument:</span>
                 <p className="text-gray-800">{formData.owns_instrument ? "Yes" : "No"}</p>
@@ -1569,7 +1604,7 @@ const Registration = () => {
            formData.course_category === "Production" ? formData.production_type : true);
       case 3:
         return formData.course_category === "Music" ? 
-          (formData.proficiency_level && formData.learning_mode) : true;
+          (formData.proficiency_level && formData.learning_mode && (formData.learning_mode !== "home" || (formData.home_lesson_duration === "30_min" || formData.home_lesson_duration === "1_hour"))) : true;
       case 4:
         return true;
       default:

@@ -1464,13 +1464,70 @@ export const sendApplicationConfirmationEmail = async (registration: Registratio
   }
 };
 
-export const sendPaymentConfirmationEmail = async (registration: RegistrationData, tempPassword?: string | null): Promise<boolean> => {
+export const sendPaymentConfirmationEmail = async (
+  registration: RegistrationData,
+  tempPassword?: string | null,
+  isFirstPayment: boolean = true
+): Promise<boolean> => {
   try {
-    console.log('📧 Sending payment confirmation email to:', registration.email);
+    console.log('📧 Sending payment confirmation email to:', registration.email, isFirstPayment ? '(first payment)' : '(subsequent payment)');
 
     if (!registration.id || !registration.receipt_number || !registration.student_name || !registration.email || !registration.created_at) {
       console.error('❌ Missing required fields for payment confirmation email');
       return false;
+    }
+
+    const siteUrl = 'https://damonmusicacademy.co.ke';
+    const logoUrl = `${siteUrl}/damon-logo.png`;
+
+    // Subsequent payment: short confirmation only (no enrollment welcome, no credentials)
+    if (!isFirstPayment) {
+      const shortHTML = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Payment Received | Damon Music Academy</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; }
+          .header { background: linear-gradient(135deg, #28a745 0%, #00c6ff 100%); color: white; padding: 24px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { background: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+          .confirm-box { background: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745; }
+          .footer { text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e9ecef; color: #6c757d; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>✅ Payment Received</h1>
+          <p style="margin: 0; font-size: 16px;">Damon Music Academy</p>
+        </div>
+        <div class="content">
+          <p>Dear ${registration.student_name},</p>
+          <div class="confirm-box">
+            <p style="margin: 0;"><strong>Thank you.</strong> We have received and confirmed your payment.</p>
+          </div>
+          <p>We appreciate your continued commitment to Damon Music Academy. If you have any questions, contact us at info@damonmusicacademy.co.ke or 0701 195 460 / 0713 490 535.</p>
+          <div class="footer">
+            <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
+          </div>
+        </div>
+      </body>
+      </html>
+      `;
+      const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
+        body: {
+          to: registration.email,
+          subject: `Payment Received | Damon Music Academy`,
+          html: shortHTML,
+          registration: registration
+        }
+      });
+      if (error) {
+        console.error('❌ Subsequent payment confirmation email error:', error);
+        return false;
+      }
+      return !!(data && data.success);
     }
 
     const formatDate = (dateString: string) => {
@@ -1483,10 +1540,7 @@ export const sendPaymentConfirmationEmail = async (registration: RegistrationDat
       });
     };
 
-    const siteUrl = 'https://damonmusicacademy.co.ke';
-    const logoUrl = `${siteUrl}/damon-logo.png`;
-
-    // Create HTML email content for payment confirmation
+    // Create HTML email content for first-payment confirmation (enrollment + credentials)
     const emailHTML = `
       <!DOCTYPE html>
       <html lang="en">

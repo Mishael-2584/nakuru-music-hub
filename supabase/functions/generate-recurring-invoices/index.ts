@@ -321,7 +321,8 @@ async function findFeeForRegistration(registration) {
     defaultPrice = 44; // $44 USD
     defaultCurrency = '$';
   } else if (learningMode === 'home') {
-    defaultPrice = 10000; // KES 10,000 for home lessons
+    const dur = registration.home_lesson_duration;
+    defaultPrice = (dur === '30_min' || dur === '1_hour') ? (dur === '30_min' ? 6000 : 10000) : 10000; // 30 min = 6,000; 1 hr = 10,000
   } else {
     defaultPrice = 4800; // KES 4,800 for academy lessons
   }
@@ -390,6 +391,16 @@ function shouldCreateNewInvoice(period, now, isFirstInvoice) {
 }
 
 async function generateInvoicesForRegistration(registration, fee, student, summary) {
+  // Home lessons (Music only): use duration-based pricing — 30 min = KSh 6,000, 1 hour = KSh 10,000
+  const courseCategory = registration.course_category || 'Music';
+  const learningMode = (registration.learning_mode || 'in-person').toLowerCase();
+  const isHomeMusic = courseCategory === 'Music' && (learningMode === 'home' || learningMode === 'home-lessons' || learningMode === 'home (nakuru & environs)');
+  const homeDuration = registration.home_lesson_duration;
+  if (isHomeMusic && (homeDuration === '30_min' || homeDuration === '1_hour')) {
+    fee = { ...fee, price: homeDuration === '30_min' ? 6000 : 10000 };
+    console.log('Home lesson duration pricing applied:', { home_lesson_duration: homeDuration, price: fee.price });
+  }
+
   // Check if this is the first invoice for this student
   const { data: existingInvoices, error: existingInvoicesError } = await supabase
     .from('invoices')

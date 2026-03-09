@@ -173,8 +173,8 @@ export const generateQuotePDF = async (
         <div>
           <div style="font-size: 22px; font-weight: bold; color: #1e293b; letter-spacing: 1px;">Damon Music Academy</div>
           <div style="font-size: 13px; color: #475569;">Professional Music & Media Services</div>
-          <div style="font-size: 12px; color: #475569; margin-top: 2px;">0701 195 460 | 0721 962 647</div>
-          <div style="font-size: 12px; color: #475569;">damonmusicacademy@gmail.com</div>
+          <div style="font-size: 12px; color: #475569; margin-top: 2px;">0701 195 460 | 0713 490 535</div>
+          <div style="font-size: 12px; color: #475569;">info@damonmusicacademy.co.ke</div>
         </div>
       </div>
       <div style="text-align: right;">
@@ -191,7 +191,7 @@ export const generateQuotePDF = async (
         <div style="font-weight: bold; color: #1e293b; margin-bottom: 2px;">From:</div>
         <div>Damon Music Academy</div>
         <div>0701 195 460</div>
-        <div>damonmusicacademy@gmail.com</div>
+        <div>info@damonmusicacademy.co.ke</div>
         <div>Nakuru, Kenya</div>
       </div>
       <div style="text-align: right;">
