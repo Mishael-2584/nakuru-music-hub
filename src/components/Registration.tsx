@@ -192,8 +192,8 @@ const Registration = () => {
       
       case 'age':
         const ageNum = parseInt(value);
-        if (!ageNum || ageNum < 3 || ageNum > 100) {
-          return { isValid: false, error: 'Age must be between 3 and 100 years' };
+        if (!ageNum || ageNum < 2 || ageNum > 100) {
+          return { isValid: false, error: 'Age must be between 2 and 100 years' };
         }
         break;
       
@@ -231,11 +231,11 @@ const Registration = () => {
         if (date > today) {
           return { isValid: false, error: 'Date of birth cannot be in the future' };
         }
-        // Check if person is at least 3 years old
+        // Check if person is at least 2 years old
         const age = today.getFullYear() - date.getFullYear();
         const monthDiff = today.getMonth() - date.getMonth();
-        if (age < 3 || (age === 3 && monthDiff < 0)) {
-          return { isValid: false, error: 'Student must be at least 3 years old' };
+        if (age < 2 || (age === 2 && monthDiff < 0)) {
+          return { isValid: false, error: 'Student must be at least 2 years old' };
         }
         break;
       
@@ -670,8 +670,8 @@ const Registration = () => {
           <Input
             id="age"
             type="number"
-            min="5"
-            max="80"
+            min="2"
+            max="100"
             value={formData.age}
             onChange={(e) => setFormData({...formData, age: e.target.value})}
             className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
