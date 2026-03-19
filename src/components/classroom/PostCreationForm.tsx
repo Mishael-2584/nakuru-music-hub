@@ -382,7 +382,7 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
               attachments={attachments}
               onAttachmentsChange={setAttachments}
               maxFiles={5}
-              acceptedTypes=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.mp3,.mp4,.zip,.rar"
+              acceptedTypes=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.mp3,.mp4,.zip,.rar,.ppt,.pptx,.pps,.ppsx"
               showUploadedFiles={true}
             />
           </div>

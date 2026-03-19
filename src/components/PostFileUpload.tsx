@@ -32,7 +32,7 @@ export const PostFileUpload: React.FC<PostFileUploadProps> = ({
   postId,
   disabled = false,
   maxFiles = 5,
-  acceptedTypes = ".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.mp3,.mp4,.zip,.rar",
+  acceptedTypes = ".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.mp3,.mp4,.zip,.rar,.ppt,.pptx,.pps,.ppsx",
   showUploadedFiles = true
 }) => {
   const [uploading, setUploading] = useState<string[]>([]);
@@ -89,11 +89,13 @@ export const PostFileUpload: React.FC<PostFileUploadProps> = ({
 
     try {
       const cleanFileName = generateCleanFileName(attachment.file_name);
+      const contentType = attachment.file.type || undefined;
       
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('classroom-files')
         .upload(cleanFileName, attachment.file, {
-          upsert: false // Don't overwrite existing files
+          upsert: false, // Don't overwrite existing files
+          contentType,
         });
 
       if (uploadError) {
@@ -102,7 +104,7 @@ export const PostFileUpload: React.FC<PostFileUploadProps> = ({
           const retryFileName = generateCleanFileName(attachment.file_name);
           const { data: retryData, error: retryError } = await supabase.storage
             .from('classroom-files')
-            .upload(retryFileName, attachment.file);
+            .upload(retryFileName, attachment.file, { contentType });
           
           if (retryError) throw retryError;
           uploadData.path = retryData.path;

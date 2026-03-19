@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
+import { getCurrentExchangeRate } from '@/lib/invoiceUtils';
 
 interface Fee {
   id: string;
@@ -19,6 +20,7 @@ export default function FeeDebug() {
   const [fees, setFees] = useState<Fee[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [fxTestResult, setFxTestResult] = useState<string>('');
 
   const fetchFees = async () => {
     setIsLoading(true);
@@ -91,6 +93,94 @@ export default function FeeDebug() {
     }
   };
 
+  const testOnlineGlobalPianoBillingConversion = async () => {
+    setIsLoading(true);
+    setError('');
+    setFxTestResult('');
+
+    try {
+      // Read saved admin FX rate
+      const { data: fx, error: fxErr } = await supabase
+        .from('exchange_rate_settings')
+        .select('rate,updated_at')
+        .eq('from_currency', 'USD')
+        .eq('to_currency', 'KES')
+        .maybeSingle();
+
+      if (fxErr) throw fxErr;
+
+      // This uses invoiceUtils' override logic for "$" fees
+      const usdToKesRate = await getCurrentExchangeRate('USD', 'KES');
+
+      // Query online/global $ fees WITHOUT assuming course_name="Piano" (your DB fee rows might be generic like
+      // "Instrumental & Music Theory"). We still want the online/global music monthly and per_class prices.
+      const monthlyQuery = await supabase
+        .from('fees')
+        .select('id,course_type,course_name,mode,payment_type,price,currency,sessions_per_week,is_active')
+        .ilike('course_type', '%music%')
+        .ilike('mode', '%online%')
+        .eq('payment_type', 'monthly')
+        .eq('currency', '$')
+        .eq('is_active', true);
+
+      if (monthlyQuery.error) throw monthlyQuery.error;
+
+      const perClassQuery = await supabase
+        .from('fees')
+        .select('id,course_type,course_name,mode,payment_type,price,currency,sessions_per_week,is_active')
+        .ilike('course_type', '%music%')
+        .ilike('mode', '%online%')
+        .eq('payment_type', 'per_class')
+        .eq('currency', '$')
+        .eq('is_active', true);
+
+      if (perClassQuery.error) throw perClassQuery.error;
+
+      const monthlyRows: any[] = monthlyQuery.data || [];
+      const perClassRows: any[] = perClassQuery.data || [];
+
+      const candidates = monthlyRows.length > 0 ? monthlyRows : perClassRows;
+      const label = monthlyRows.length > 0 ? 'monthly' : 'per_class';
+
+      if (candidates.length === 0) {
+        setFxTestResult(
+          [
+            'No online/global music ($) fee rows found.',
+            `Admin FX in settings: ${fx?.rate ?? 'N/A'} (updated_at: ${fx?.updated_at ?? 'N/A'})`,
+            `invoiceUtils USD->KES used rate: ${usdToKesRate}`,
+            'Check fees table: course_type, mode values, currency ($), and is_active=true.',
+          ].join('\n')
+        );
+        return;
+      }
+
+      const chosen = [...candidates].sort((a: any, b: any) => Number(a.price) - Number(b.price))[0] as any;
+      const chosenPrice = Number(chosen.price);
+      const chosenCurrency = chosen.currency;
+
+      const expectedKSh =
+        chosenCurrency === 'KSh'
+          ? chosenPrice
+          : Math.round(chosenPrice * usdToKesRate * 100) / 100;
+
+      setFxTestResult(
+        [
+          'Online Global ($) Music Conversion (DB-driven)',
+          `Admin FX in settings: ${fx?.rate ?? 'N/A'} (updated_at: ${fx?.updated_at ?? 'N/A'})`,
+          `invoiceUtils USD->KES used rate: ${usdToKesRate}`,
+          `Chosen fee (${label}) candidates: monthly=${monthlyRows.length}, per_class=${perClassRows.length}`,
+          `Chosen fee row: ${chosen.course_type} / ${chosen.course_name} / ${chosen.mode} / ${chosen.payment_type} => ${chosenPrice} ${chosenCurrency}`,
+          `Converted KSh value: ${expectedKSh} KSh`,
+        ].join('\n')
+      );
+    } catch (e) {
+      console.error('FX billing conversion test failed:', e);
+      setError(`FX billing test error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchFees();
   }, []);
@@ -121,11 +211,25 @@ export default function FeeDebug() {
             >
               {isLoading ? 'Testing...' : 'Test Fee Lookup'}
             </Button>
+
+            <Button
+              onClick={testOnlineGlobalPianoBillingConversion}
+              disabled={isLoading}
+              variant="outline"
+            >
+              {isLoading ? 'Testing...' : 'Test Online Piano Conversion'}
+            </Button>
           </div>
           
           {error && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-800">
               <pre className="whitespace-pre-wrap text-sm">{error}</pre>
+            </div>
+          )}
+
+          {fxTestResult && (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md text-blue-900">
+              <pre className="whitespace-pre-wrap text-sm">{fxTestResult}</pre>
             </div>
           )}
           

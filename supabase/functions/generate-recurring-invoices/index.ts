@@ -48,10 +48,56 @@ async function getExchangeRate(fromCurrency, toCurrency) {
 const exchangeRateCache = {};
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour cache
 
+// Separate cache for admin-configured FX overrides (so changes apply quickly)
+const ADMIN_OVERRIDE_CACHE_DURATION_MS = 60 * 1000; // 1 minute
+let adminUsdToKesOverride: number | null = null;
+let adminUsdToKesOverrideLoadedAt = 0;
+
+async function getAdminUsdToKesRateFromSettings() {
+  try {
+    const { data, error } = await supabase
+      .from('exchange_rate_settings')
+      .select('rate')
+      .eq('from_currency', 'USD')
+      .eq('to_currency', 'KES')
+      .maybeSingle();
+
+    if (error || !data) return null;
+    const rate = typeof data.rate === 'string' ? parseFloat(data.rate) : Number(data.rate);
+    if (!rate || !Number.isFinite(rate) || rate <= 0) return null;
+    return rate;
+  } catch (e) {
+    console.error('Failed to load admin USD->KES FX rate:', e);
+    return null;
+  }
+}
+
 async function getCachedExchangeRate(fromCurrency, toCurrency) {
-  const cacheKey = `${fromCurrency}_${toCurrency}`;
+  const effectiveFrom = fromCurrency === '$' ? 'USD' : fromCurrency;
+  const cacheKey = `${effectiveFrom}_${toCurrency}`;
   const now = Date.now();
   
+  // Admin override: use stored USD->KES rate for "$" fees
+  if (toCurrency === 'KES' && effectiveFrom === 'USD') {
+    if (
+      adminUsdToKesOverride != null &&
+      (now - adminUsdToKesOverrideLoadedAt) < ADMIN_OVERRIDE_CACHE_DURATION_MS
+    ) {
+      return adminUsdToKesOverride;
+    }
+
+    const overrideRate = await getAdminUsdToKesRateFromSettings();
+    if (overrideRate) {
+      adminUsdToKesOverride = overrideRate;
+      adminUsdToKesOverrideLoadedAt = now;
+      // Also seed the general exchange-rate cache
+      exchangeRateCache[cacheKey] = { rate: overrideRate, timestamp: now };
+      console.log(`Using admin FX override: 1 USD = ${overrideRate} KES`);
+      return overrideRate;
+    }
+    // If no override set, fall through to live API
+  }
+
   // Check if we have a cached rate that's still valid
   if (exchangeRateCache[cacheKey] && (now - exchangeRateCache[cacheKey].timestamp) < CACHE_DURATION) {
     console.log(`Using cached exchange rate: 1 ${fromCurrency} = ${exchangeRateCache[cacheKey].rate} ${toCurrency}`);
@@ -59,7 +105,7 @@ async function getCachedExchangeRate(fromCurrency, toCurrency) {
   }
   
   // Fetch new rate
-  const rate = await getExchangeRate(fromCurrency, toCurrency);
+  const rate = await getExchangeRate(effectiveFrom, toCurrency);
   
   // Cache the new rate
   exchangeRateCache[cacheKey] = {
@@ -127,14 +173,15 @@ function formatDate(date) {
 // Improved fee lookup function with fallbacks and real-time rates
 async function findFeeForRegistration(registration) {
   const courseCategory = registration.course_category || 'Music';
+  const courseCategoryLower = String(courseCategory).toLowerCase();
   const instrument = registration.instrument;
   const learningMode = registration.learning_mode || 'in-person';
   
-  // Determine payment type based on course category
+  // Determine payment type based on course category (case-insensitive)
   let paymentType = 'monthly'; // Default
-  if (courseCategory === 'production' || courseCategory === 'photography') {
+  if (courseCategoryLower === 'production' || courseCategoryLower === 'photography') {
     paymentType = 'term';
-  } else if (courseCategory === 'Technology') {
+  } else if (courseCategoryLower === 'technology') {
     paymentType = 'per_class'; // Technology courses use per_class billing
   }
   
@@ -168,7 +215,7 @@ async function findFeeForRegistration(registration) {
   const { data: exactFee, error: exactFeeError } = await supabase
     .from('fees')
     .select('*')
-    .eq('course_type', courseCategory)
+    .eq('course_type', courseCategoryLower)
     .eq('course_name', instrument)
     .eq('mode', normalizedLearningMode)
     .eq('payment_type', paymentType)
@@ -187,7 +234,7 @@ async function findFeeForRegistration(registration) {
   const { data: modeFee, error: modeFeeError } = await supabase
     .from('fees')
     .select('*')
-    .eq('course_type', courseCategory)
+    .eq('course_type', courseCategoryLower)
     .eq('mode', normalizedLearningMode)
     .eq('payment_type', paymentType)
     .eq('is_active', true)
@@ -203,7 +250,7 @@ async function findFeeForRegistration(registration) {
   const { data: typeFee, error: typeFeeError } = await supabase
     .from('fees')
     .select('*')
-    .eq('course_type', courseCategory)
+    .eq('course_type', courseCategoryLower)
     .eq('payment_type', paymentType)
     .eq('is_active', true)
     .maybeSingle();
@@ -219,7 +266,7 @@ async function findFeeForRegistration(registration) {
     const { data: termFee, error: termFeeError } = await supabase
       .from('fees')
       .select('*')
-      .eq('course_type', courseCategory)
+      .eq('course_type', courseCategoryLower)
       .eq('payment_type', 'term')
       .eq('is_active', true)
       .maybeSingle();
@@ -279,7 +326,7 @@ async function findFeeForRegistration(registration) {
     let bestMatch = null;
     
     // First try to find by course category
-    bestMatch = allFees.find(f => f.course_type === courseCategory);
+    bestMatch = allFees.find(f => String(f.course_type || '').toLowerCase() === courseCategoryLower);
     
     // If no match by course category, find by payment type
     if (!bestMatch) {
@@ -303,24 +350,24 @@ async function findFeeForRegistration(registration) {
   
   if (paymentType === 'term') {
     // Termly courses (production, photography) - higher rates
-    if (courseCategory === 'production') {
+    if (courseCategoryLower === 'production') {
       defaultPrice = 45500; // KES 45,500 for production term
-    } else if (courseCategory === 'photography') {
+    } else if (courseCategoryLower === 'photography') {
       defaultPrice = 45500; // KES 45,500 for photography term
     } else {
       defaultPrice = 40000; // KES 40,000 for other termly courses
     }
-  } else if (courseCategory === 'technology') {
+  } else if (courseCategoryLower === 'technology') {
     // Technology courses - based on group size (default to 1-on-1)
     if (learningMode === 'online') {
       defaultPrice = 2200; // KES 2,200 for 1-on-1 online technology per class
     } else {
       defaultPrice = 2200; // KES 2,200 for 1-on-1 at academy technology per class
     }
-  } else if (learningMode === 'online') {
+  } else if (String(learningMode).toLowerCase() === 'online') {
     defaultPrice = 44; // $44 USD
     defaultCurrency = '$';
-  } else if (learningMode === 'home') {
+  } else if (String(learningMode).toLowerCase() === 'home') {
     const dur = registration.home_lesson_duration;
     defaultPrice = (dur === '30_min' || dur === '1_hour') ? (dur === '30_min' ? 6000 : 10000) : 10000; // 30 min = 6,000; 1 hr = 10,000
   } else {
@@ -329,7 +376,7 @@ async function findFeeForRegistration(registration) {
   
   const defaultFee = {
     id: 'default',
-    course_type: courseCategory,
+    course_type: courseCategoryLower,
     course_name: instrument,
     price: defaultPrice,
     currency: defaultCurrency,
@@ -393,8 +440,9 @@ function shouldCreateNewInvoice(period, now, isFirstInvoice) {
 async function generateInvoicesForRegistration(registration, fee, student, summary) {
   // Home lessons (Music only): use duration-based pricing — 30 min = KSh 6,000, 1 hour = KSh 10,000
   const courseCategory = registration.course_category || 'Music';
+  const courseCategoryLower = String(courseCategory).toLowerCase();
   const learningMode = (registration.learning_mode || 'in-person').toLowerCase();
-  const isHomeMusic = courseCategory === 'Music' && (learningMode === 'home' || learningMode === 'home-lessons' || learningMode === 'home (nakuru & environs)');
+  const isHomeMusic = courseCategoryLower === 'music' && (learningMode === 'home' || learningMode === 'home-lessons' || learningMode === 'home (nakuru & environs)');
   const homeDuration = registration.home_lesson_duration;
   if (isHomeMusic && (homeDuration === '30_min' || homeDuration === '1_hour')) {
     fee = { ...fee, price: homeDuration === '30_min' ? 6000 : 10000 };

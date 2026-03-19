@@ -23,6 +23,7 @@ import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
 import { generateInvoiceForRegistration, generateInvoicePDFBlob } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
 import LearningModeDebugTest from './LearningModeDebugTest';
+import FeeDebug from './FeeDebug';
 import ShopProductManager from './admin/ShopProductManager';
 import ShopOrderManager from './admin/ShopOrderManager';
 import ManualInvoiceManager from './admin/ManualInvoiceManager';
@@ -166,6 +167,11 @@ const AdminPanel = () => {
   const [financesSearchTerm, setFinancesSearchTerm] = useState("");
   const [financesPage, setFinancesPage] = useState(1);
   const [financesPerPage] = useState(15);
+
+  // Exchange rate override (USD -> KES) for invoices involving online/global ($)
+  const [usdToKesRateDraft, setUsdToKesRateDraft] = useState<string>("");
+  const [usdToKesRateLoading, setUsdToKesRateLoading] = useState(false);
+  const [usdToKesRateSaving, setUsdToKesRateSaving] = useState(false);
   const [quotesSearchTerm, setQuotesSearchTerm] = useState("");
   const [quotesPage, setQuotesPage] = useState(1);
   const [quotesPerPage] = useState(10);
@@ -602,6 +608,33 @@ const AdminPanel = () => {
     console.log("AdminPanel: User authenticated, fetching data...");
     fetchData();
   }, [user, navigate]);
+
+  // Load the admin-configured USD -> KES exchange rate when opening Finances
+  useEffect(() => {
+    if (!user) return;
+    if (activeTab !== 'finances') return;
+
+    (async () => {
+      setUsdToKesRateLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('exchange_rate_settings')
+          .select('rate')
+          .eq('from_currency', 'USD')
+          .eq('to_currency', 'KES')
+          .maybeSingle();
+
+        if (error) throw error;
+        const rate = data?.rate;
+        if (rate != null) setUsdToKesRateDraft(String(rate));
+      } catch (e) {
+        console.error('Failed to load USD->KES rate:', e);
+        toast({ title: 'Error', description: 'Failed to load exchange rate.', variant: 'destructive' });
+      } finally {
+        setUsdToKesRateLoading(false);
+      }
+    })();
+  }, [activeTab, user]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -5354,6 +5387,67 @@ const AdminPanel = () => {
               </TabsList>
               <TabsContent value="invoices">
                 <div className="space-y-6">
+                  <div className="bg-white/80 backdrop-blur-sm border border-primary/20 rounded-lg p-4 space-y-3">
+                    <h4 className="text-lg font-semibold">Currency Conversion (Admin FX)</h4>
+                    <p className="text-sm text-gray-600">
+                      Use this rate for converting online/global ($) fees into KSh for invoices.
+                    </p>
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div className="flex-1 min-w-[220px]">
+                        <Label htmlFor="usdToKesRate" className="text-sm font-medium text-gray-700">1 USD =</Label>
+                        <Input
+                          id="usdToKesRate"
+                          type="number"
+                          inputMode="decimal"
+                          step="0.01"
+                          value={usdToKesRateDraft}
+                          onChange={(e) => setUsdToKesRateDraft(e.target.value)}
+                          className="mt-1"
+                          placeholder="e.g., 150.50"
+                        />
+                      </div>
+                      <div className="pb-1 text-sm font-medium text-gray-700">KES</div>
+                      <Button
+                        onClick={async () => {
+                          const rate = parseFloat(usdToKesRateDraft);
+                          if (!rate || rate <= 0) {
+                            toast({ title: 'Invalid Rate', description: 'Please enter a valid USD->KES rate.', variant: 'destructive' });
+                            return;
+                          }
+                          setUsdToKesRateSaving(true);
+                          try {
+                            const { data: updated, error: updateError } = await (supabase as any)
+                              .from('exchange_rate_settings')
+                              .update({ rate } as any)
+                              .eq('from_currency', 'USD')
+                              .eq('to_currency', 'KES')
+                              .select('id');
+
+                            if (updateError) throw updateError;
+
+                            if (!updated || updated.length === 0) {
+                              const { error: insertError } = await (supabase as any)
+                                .from('exchange_rate_settings')
+                                .insert({ from_currency: 'USD', to_currency: 'KES', rate } as any);
+                              if (insertError) throw insertError;
+                            }
+
+                            toast({ title: 'Saved', description: 'USD->KES exchange rate updated.' });
+                          } catch (e) {
+                            console.error('Failed to save USD->KES rate:', e);
+                            toast({ title: 'Error', description: 'Failed to save exchange rate.', variant: 'destructive' });
+                          } finally {
+                            setUsdToKesRateSaving(false);
+                          }
+                        }}
+                        disabled={usdToKesRateLoading || usdToKesRateSaving}
+                        className="bg-primary text-primary-foreground hover:bg-primary/90"
+                      >
+                        {usdToKesRateSaving ? 'Saving...' : 'Save rate'}
+                      </Button>
+                    </div>
+                  </div>
+
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-xl font-semibold">Invoice Management</h4>
@@ -5514,6 +5608,7 @@ const AdminPanel = () => {
               </div>
             </div>
             <LearningModeDebugTest />
+            <FeeDebug />
           </div>
         </div>
 

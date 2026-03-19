@@ -245,11 +245,17 @@ export default function AssignmentSubmissionPanel({
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => window.open(file.file_url, '_blank')}
                             className="h-7 px-2 text-xs"
+                            asChild
                           >
-                            <Download className="h-3 w-3 mr-1" />
-                            View
+                            <a
+                              href={file.file_url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <Download className="h-3 w-3 mr-1" />
+                              View
+                            </a>
                           </Button>
                         </div>
                       ))}
@@ -321,7 +327,7 @@ export default function AssignmentSubmissionPanel({
                       attachments={submissionFiles}
                       onAttachmentsChange={setSubmissionFiles}
                       maxFiles={5}
-                      acceptedTypes=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.zip,.rar"
+                      acceptedTypes=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.zip,.rar,.ppt,.pptx,.pps,.ppsx"
                       showUploadedFiles={true}
                     />
                   </div>
@@ -439,10 +445,16 @@ export default function AssignmentSubmissionPanel({
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => window.open(file.file_url, '_blank')}
                                   className="h-6 px-2 text-xs"
+                                  asChild
                                 >
-                                  View
+                                  <a
+                                    href={file.file_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    View
+                                  </a>
                                 </Button>
                               </div>
                             ))}

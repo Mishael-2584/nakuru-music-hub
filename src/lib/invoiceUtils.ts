@@ -57,8 +57,32 @@ async function getExchangeRate(fromCurrency: string, toCurrency: string): Promis
 const exchangeRateCache: Map<string, { rate: number; timestamp: number }> = new Map();
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour cache
 
+// Separate cache for admin-configured FX overrides (kept short so updates take effect quickly)
+const ADMIN_OVERRIDE_CACHE_DURATION_MS = 60 * 1000; // 1 minute
+let adminUsdToKesOverrideCache: { rate: number; timestamp: number } | null = null;
+
+async function getAdminUsdToKesRateFromSettings(): Promise<number | null> {
+  try {
+    const { data, error } = await supabase
+      .from('exchange_rate_settings')
+      .select('rate')
+      .eq('from_currency', 'USD')
+      .eq('to_currency', 'KES')
+      .maybeSingle();
+
+    if (error || !data) return null;
+    const rate = typeof data.rate === 'string' ? parseFloat(data.rate) : Number(data.rate);
+    if (!rate || !Number.isFinite(rate) || rate <= 0) return null;
+    return rate;
+  } catch (e) {
+    console.error('Failed to load admin USD->KES FX rate:', e);
+    return null;
+  }
+}
+
 async function getCachedExchangeRate(fromCurrency: string, toCurrency: string): Promise<number> {
-  const cacheKey = `${fromCurrency}_${toCurrency}`;
+  const effectiveFrom = fromCurrency === '$' ? 'USD' : fromCurrency;
+  const cacheKey = `${effectiveFrom}_${toCurrency}`;
   const now = Date.now();
   
   // Check if we have a cached rate that's still valid
@@ -68,8 +92,26 @@ async function getCachedExchangeRate(fromCurrency: string, toCurrency: string): 
     return cached.rate;
   }
   
-  // Fetch new rate
-  const rate = await getExchangeRate(fromCurrency, toCurrency);
+  // Admin override: use admin-configured USD->KES rate for "$" fees
+  if (toCurrency === 'KES' && effectiveFrom === 'USD') {
+    // Try override cache first
+    if (adminUsdToKesOverrideCache && (now - adminUsdToKesOverrideCache.timestamp) < ADMIN_OVERRIDE_CACHE_DURATION_MS) {
+      return adminUsdToKesOverrideCache.rate;
+    }
+
+    const overrideRate = await getAdminUsdToKesRateFromSettings();
+    if (overrideRate) {
+      adminUsdToKesOverrideCache = { rate: overrideRate, timestamp: now };
+      // Also seed the general exchange-rate cache so repeated calls are fast
+      exchangeRateCache.set(cacheKey, { rate: overrideRate, timestamp: now });
+      console.log(`Using admin FX override: 1 USD = ${overrideRate} KES`);
+      return overrideRate;
+    }
+    // If override isn't set, fall back to live API below
+  }
+
+  // Fetch new rate from live API
+  const rate = await getExchangeRate(effectiveFrom, toCurrency);
   
   // Cache the new rate
   exchangeRateCache.set(cacheKey, {
