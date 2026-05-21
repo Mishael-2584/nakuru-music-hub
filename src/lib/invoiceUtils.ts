@@ -3,10 +3,14 @@ import { generateQuotePDF } from './pdfGenerator';
 import { Invoice } from '../integrations/supabase/types';
 import { sendInvoiceEmail } from './emailService';
 import {
-  getProductionFeeCourseName,
-  getDefaultProductionTermPrice,
+  getTermlyFeeCourseType,
+  getTermlyFeeCourseName,
+  getDefaultTermPrice,
   getTermDurationPattern,
+  getTermDisplayLabel,
+  getTermScheduleNote,
   normalizeTermPeriod,
+  TERMLY_FEE_MODE_ACADEMY,
 } from './termlyFeeUtils';
 
 export interface InvoiceLineItem {
@@ -383,61 +387,93 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   let normalizedCourseCategory = courseCategoryLower || 'music';
   let normalizedInstrument = instrument;
   if (normalizedCourseCategory === 'art') {
-    normalizedInstrument = 'Art Classes'; // canonical name for art in fees table
+    normalizedInstrument = 'Art Classes';
   } else if (normalizedCourseCategory === 'technology') {
     normalizedInstrument = 'Web Design & Programming';
   } else if (normalizedCourseCategory === 'music') {
     normalizedInstrument = 'Instrumental & Music Theory';
-  } else if (normalizedCourseCategory === 'production') {
-    normalizedInstrument = getProductionFeeCourseName(registration.production_type);
-  } else if (normalizedCourseCategory === 'photography') {
-    normalizedInstrument = 'Photography & Videography';
+  } else if (normalizedCourseCategory === 'production' || normalizedCourseCategory === 'photography') {
+    normalizedCourseCategory = getTermlyFeeCourseType(
+      registration.course_category,
+      registration.production_type
+    );
+    normalizedInstrument = getTermlyFeeCourseName(registration.course_category, registration);
   }
 
   const termPeriod =
     paymentType === 'term'
       ? normalizeTermPeriod(registration.term_period)
       : null;
-  
-  // First try to find exact match with normalized learning mode and correct payment type
-  let exactFeeQuery = supabase
-    .from('fees')
-    .select('*')
-    .eq('course_type', normalizedCourseCategory)
-    .eq('course_name', normalizedInstrument)
-    .eq('mode', normalizedLearningMode)
-    .eq('payment_type', paymentType)
-    .eq('is_active', true);
-  if (paymentType === 'term' && termPeriod) {
-    exactFeeQuery = exactFeeQuery.ilike('duration', getTermDurationPattern(termPeriod));
+
+  const applyTermFeeFilters = (query: ReturnType<typeof supabase.from>) => {
+    let q = query
+      .eq('course_type', normalizedCourseCategory)
+      .eq('course_name', normalizedInstrument)
+      .eq('payment_type', paymentType)
+      .eq('is_active', true);
+    if (paymentType === 'term' && termPeriod) {
+      q = q.ilike('duration', getTermDurationPattern(termPeriod));
+    }
+    return q;
+  };
+
+  // Termly: try requested learning mode, then academy (term fees are usually academy-priced)
+  let exactFee: typeof fee = null;
+  let exactFeeError: typeof feeError = null;
+  if (paymentType === 'term') {
+    for (const mode of [normalizedLearningMode, TERMLY_FEE_MODE_ACADEMY]) {
+      const { data, error } = await applyTermFeeFilters(
+        supabase.from('fees').select('*').eq('mode', mode)
+      ).maybeSingle();
+      if (data && !error) {
+        exactFee = data;
+        break;
+      }
+    }
+  } else {
+    const result = await applyTermFeeFilters(
+      supabase.from('fees').select('*').eq('mode', normalizedLearningMode)
+    ).maybeSingle();
+    exactFee = result.data;
+    exactFeeError = result.error;
   }
-  const { data: exactFee, error: exactFeeError } = await exactFeeQuery.maybeSingle();
-  
+
   if (exactFee && !exactFeeError) {
     fee = exactFee;
     console.log('Found exact fee match with learning mode and payment type:', fee);
   } else {
     console.log('No exact fee match found, trying fallback options');
     
-    // Fallback 1: Try to find by course_type and normalized learning_mode with correct payment type
-    const { data: modeFee, error: modeFeeError } = await supabase
+    // Fallback 1: course + program name + mode (+ term for termly)
+    let modeFeeQuery = supabase
       .from('fees')
       .select('*')
       .eq('course_type', normalizedCourseCategory)
+      .eq('course_name', normalizedInstrument)
       .eq('mode', normalizedLearningMode)
       .eq('payment_type', paymentType)
-      .eq('is_active', true)
-      .maybeSingle();
-    
+      .eq('is_active', true);
+    if (paymentType === 'term' && termPeriod) {
+      modeFeeQuery = modeFeeQuery.ilike('duration', getTermDurationPattern(termPeriod));
+    }
+    let { data: modeFee, error: modeFeeError } = await modeFeeQuery.maybeSingle();
+    if ((!modeFee || modeFeeError) && paymentType === 'term') {
+      const academyTry = await applyTermFeeFilters(
+        supabase.from('fees').select('*').eq('mode', TERMLY_FEE_MODE_ACADEMY)
+      ).maybeSingle();
+      modeFee = academyTry.data;
+      modeFeeError = academyTry.error;
+    }
+
     if (modeFee && !modeFeeError) {
       fee = modeFee;
       console.log('Found fee by course_type and learning_mode with payment type:', fee);
     } else {
-      // Fallback 2: Try to find by course_type only with correct payment type
       let typeFeeQuery = supabase
         .from('fees')
         .select('*')
         .eq('course_type', normalizedCourseCategory)
+        .eq('course_name', normalizedInstrument)
         .eq('payment_type', paymentType)
         .eq('is_active', true);
       if (paymentType === 'term' && termPeriod) {
@@ -467,11 +503,11 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
             console.log('Found Technology 1-on-1 fee:', fee);
           }
         } else if (paymentType === 'term') {
-          // Fallback 4: For termly courses, try to find 1st-term fee for the course category
           const { data: termFee, error: termFeeError } = await supabase
             .from('fees')
             .select('*')
             .eq('course_type', normalizedCourseCategory)
+            .eq('course_name', normalizedInstrument)
             .eq('payment_type', 'term')
             .ilike('duration', getTermDurationPattern(termPeriod || '1st_term'))
             .eq('is_active', true)
@@ -558,17 +594,11 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
           let defaultCurrency = 'KSh';
           
           if (paymentType === 'term') {
-            // Termly courses (production, photography) - higher rates
-            if (normalizedCourseCategory === 'production') {
-              defaultPrice = getDefaultProductionTermPrice(
-                registration.production_type,
-                termPeriod || '1st_term'
-              );
-            } else if (normalizedCourseCategory === 'photography') {
-              defaultPrice = (termPeriod || '1st_term') === 'final_term' ? 42500 : 45500;
-            } else {
-              defaultPrice = 40000; // KES 40,000 for other termly courses
-            }
+            defaultPrice = getDefaultTermPrice(
+              registration.course_category,
+              registration,
+              termPeriod || '1st_term'
+            );
           } else if (learningMode === 'online') {
             defaultPrice = 44; // $44 USD
             defaultCurrency = '$';
@@ -758,38 +788,41 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     feeCourseName: fee.course_name
   });
 
-  // Get number of sessions per week from registration (default 1)
-  const sessionsPerWeek = registration.sessions_per_week ? parseInt(registration.sessions_per_week) : 1;
+  const isTermlyFee = fee.payment_type === 'term';
 
-  // Declare invoiceAmount
+  // Monthly/per-class use registration preference; termly uses program schedule from fee row
+  const sessionsPerWeek = isTermlyFee
+    ? (fee.sessions_per_week || 3)
+    : (registration.sessions_per_week ? parseInt(String(registration.sessions_per_week), 10) : 1);
+
   let invoiceAmount = 0;
-  
-  if (fee.payment_type === 'per_class') {
-    // For per_class payment type (Technology courses): price × sessions_per_week × 4 weeks
-    const numWeeks = 4; // Always 4 weeks for monthly billing
+
+  if (isTermlyFee) {
+    // Termly courses: one flat fee per term (not prorated by registration sessions_per_week)
+    invoiceAmount = fee.price;
+    console.log('Termly billing (flat term fee):', {
+      courseName: fee.course_name,
+      termPrice: fee.price,
+      programSessionsPerWeek: fee.sessions_per_week,
+    });
+  } else if (fee.payment_type === 'per_class') {
+    const numWeeks = 4;
     invoiceAmount = fee.price * sessionsPerWeek * numWeeks;
     console.log('Per-class billing calculation:', {
       pricePerClass: fee.price,
       sessionsPerWeek,
       numWeeks,
-      totalAmount: invoiceAmount
+      totalAmount: invoiceAmount,
     });
   } else if (fee && fee.sessions_per_week) {
-    // If the fee has a sessions_per_week column, use it for matching
-    // If the fee is for 1 session/week, multiply by sessionsPerWeek
     if (fee.sessions_per_week === 1) {
       invoiceAmount = fee.price * sessionsPerWeek;
+    } else if (fee.sessions_per_week === sessionsPerWeek) {
+      invoiceAmount = fee.price;
     } else {
-      // If the fee is for the same number of sessions as requested, use the fee as-is
-      if (fee.sessions_per_week === sessionsPerWeek) {
-        invoiceAmount = fee.price;
-      } else {
-        // If the fee is for a different number of sessions, scale proportionally
-        invoiceAmount = (fee.price / fee.sessions_per_week) * sessionsPerWeek;
-      }
+      invoiceAmount = (fee.price / fee.sessions_per_week) * sessionsPerWeek;
     }
   } else {
-    // Fallback: if no sessions_per_week info, multiply as before
     invoiceAmount = fee.price * sessionsPerWeek;
   }
   
@@ -806,7 +839,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     canApplyCredits = true;
   }
 
-  if (canApplyCredits) {
+  if (canApplyCredits && !isTermlyFee) {
     // Fetch unused, unexpired makeup credits for this student
     const { data: credits, error: creditsError } = await supabase
       .from('makeup_credits')
@@ -816,7 +849,6 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
       .gte('expires_at', periodStartStr);
     if (creditsError) throw creditsError;
     if (credits && credits.length > 0) {
-      // Each credit = 1 session, value = session price (fee.price / expected sessions per month/term)
       const sessionValue = Math.round((fee.price / sessionsPerWeek) * 100) / 100;
       creditsApplied = credits.length;
       creditsValue = Math.min(creditsApplied * sessionValue, invoiceAmount);
@@ -826,30 +858,48 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     }
   }
 
-  // Calculate number of weeks in the invoice period
-  // For monthly billing and per_class (Technology), use exactly 4 weeks (28 days) regardless of actual month length
   let numWeeks: number;
-  if (fee.payment_type === 'monthly' || fee.payment_type === 'per_class') {
-    numWeeks = 4; // Always 4 weeks for monthly billing and Technology per_class billing
-  } else {
-    // For term billing, calculate actual weeks
-    const daysDiff = Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24));
-    numWeeks = Math.ceil(daysDiff / 7);
-  }
-  const quantity = sessionsPerWeek * numWeeks;
-  
-  // Calculate unit price per session
+  let quantity: number;
   let unitPrice: number;
-  if (fee.payment_type === 'per_class') {
-    // For per_class, unit price is the fee price directly
-    unitPrice = fee.price;
+  let lineDescription: string;
+
+  const courseDisplayName = (() => {
+    if (registration.course_category === 'Art') return 'Art Classes';
+    if (registration.course_category === 'Production') {
+      return registration.production_type || 'Production';
+    }
+    if (registration.course_category === 'Photography') {
+      return 'Photography & Videography';
+    }
+    if (registration.course_category === 'Technology') {
+      return registration.technology_type || 'Technology';
+    }
+    return registration.instrument || 'Music Lessons';
+  })();
+
+  if (isTermlyFee) {
+    quantity = 1;
+    unitPrice = invoiceAmount;
+    const termLabel = getTermDisplayLabel(registration.term_period, fee.duration);
+    lineDescription = `${courseDisplayName} - ${termLabel} (term fee — ${getTermScheduleNote(fee)})`;
   } else {
-    // For monthly/term, calculate based on total amount and quantity
-    unitPrice = Math.round((invoiceAmount / quantity) * 100) / 100;
+    if (fee.payment_type === 'monthly' || fee.payment_type === 'per_class') {
+      numWeeks = 4;
+    } else {
+      const daysDiff = Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24));
+      numWeeks = Math.ceil(daysDiff / 7);
+    }
+    quantity = sessionsPerWeek * numWeeks;
+    if (fee.payment_type === 'per_class') {
+      unitPrice = fee.price;
+    } else {
+      unitPrice = Math.round((invoiceAmount / quantity) * 100) / 100;
+    }
+    lineDescription = `${courseDisplayName} - ${sessionsPerWeek} session${sessionsPerWeek > 1 ? 's' : ''} per week × ${numWeeks} weeks`;
   }
   
   // Apply partial month billing logic for subsequent invoices (only for monthly payment type, not Technology)
-  if (!isFirstInvoice && fee.payment_type === 'monthly' && courseCategory !== 'Technology') {
+  if (!isTermlyFee && !isFirstInvoice && fee.payment_type === 'monthly' && courseCategoryLower !== 'technology') {
     // For subsequent invoices, check if student enrolled mid-month in the first month
     const registrationDate = new Date(registration.created_at);
     const firstMonthStart = new Date(registrationDate.getFullYear(), registrationDate.getMonth(), 1);
@@ -887,32 +937,14 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   const applicationFee = isFirstInvoice ? 800 : 0;
   const totalAmount = invoiceAmount + applicationFee;
 
-  // Get the actual instrument/course name for display
-  const getCourseDisplayName = () => {
-    if (registration.course_category === 'Art') {
-      return 'Art Classes';
-    } else if (registration.course_category === 'Production') {
-      return registration.production_type || 'Production';
-    } else if (registration.course_category === 'Technology') {
-      return registration.technology_type || 'Technology';
-    } else {
-      return registration.instrument || 'Music Lessons';
-    }
-  };
-
-  const courseDisplayName = getCourseDisplayName();
-
-  // Build invoiceDetails for PDF with detailed breakdown
-  // IMPORTANT: Calculate amount as quantity × unitPrice to ensure correct totals
   const lineItemAmount = quantity * unitPrice;
-  
-  // Build line items array
+
   const lineItemsArray = [
     {
-      description: `${courseDisplayName} - ${sessionsPerWeek} session${sessionsPerWeek > 1 ? 's' : ''} per week × ${numWeeks} weeks`,
+      description: lineDescription,
       quantity,
       unitPrice,
-      amount: lineItemAmount, // Use calculated amount (quantity × unitPrice)
+      amount: lineItemAmount,
       lessonIds: [],
     },
     ...(isFirstInvoice ? [{
@@ -950,7 +982,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     status: 'pending',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    sessions_per_week: sessionsPerWeek,
+    sessions_per_week: isTermlyFee ? (fee.sessions_per_week || 3) : sessionsPerWeek,
     lessons_summary: invoiceDetails, // Store the detailed breakdown
   };
   
