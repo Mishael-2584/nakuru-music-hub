@@ -14,7 +14,7 @@ const CoursesTeaser = () => {
       category: "Music",
       students: 150,
       rating: 4.9,
-      price: "From KSh 4,800/month",
+      price: "From KSh 6,000/month",
       image: "/lovable-uploads/piano.jpg",
       features: ["One-on-one lessons", "Group sessions", "Performance opportunities", "ABRSM certification prep"]
     },
@@ -26,7 +26,7 @@ const CoursesTeaser = () => {
       category: "Music",
       students: 120,
       rating: 4.8,
-      price: "From KSh 4,800/month",
+      price: "From KSh 6,000/month",
       image: "/lovable-uploads/guitar.jpg",
       features: ["Beginner to advanced", "Multiple styles", "Song composition", "Recording techniques"]
     },
@@ -38,7 +38,7 @@ const CoursesTeaser = () => {
       category: "Music",
       students: 80,
       rating: 4.9,
-      price: "From KSh 4,800/month",
+      price: "From KSh 6,000/month",
       image: "/lovable-uploads/29861c9f-1df3-42f1-982f-ef38574fb617.png",
       features: ["Breath control", "Vocal range expansion", "Performance coaching", "Recording sessions"]
     },

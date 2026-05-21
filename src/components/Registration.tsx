@@ -40,7 +40,8 @@ const Registration = () => {
     medical_details: "",
     date_of_birth: '',
     sessions_per_week: 1,
-    home_lesson_duration: '', // For Music + Home only: '30_min' | '1_hour'
+    home_lesson_duration: '', // Music + Home: '30_min' | '1_hour'
+    term_period: '1st_term', // Termly Production / Photography
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,7 +111,7 @@ const Registration = () => {
   ];
 
   const productionTypes = [
-    "Music Production", "Live Sound", "Videography"
+    "Music Production", "Live Sound Engineering", "Videography"
   ];
 
   const technologyTypes = [
@@ -145,6 +146,10 @@ const Registration = () => {
     { value: "home", label: "Home Lesson" },
     { value: "online", label: "Online" }
   ];
+
+  const isTermlyCourseCategory = (category: string) =>
+    category === 'Production' || category === 'Photography' ||
+    ['production', 'photography'].includes(String(category || '').toLowerCase());
 
   const handleNext = () => {
     if (currentStep < 4) {
@@ -289,8 +294,8 @@ const Registration = () => {
         }
         break;
       case 'sessions_per_week':
-        const num = parseInt(value);
-        if (!num || num < 1 || num > 5) {
+        const sessionsNum = parseInt(value);
+        if (!sessionsNum || sessionsNum < 1 || sessionsNum > 5) {
           return { isValid: false, error: 'Number of classes per week must be between 1 and 5' };
         }
         break;
@@ -367,9 +372,11 @@ const Registration = () => {
             errors.push(validation.error);
           }
         }
-        const sessionsValidation = validateField('sessions_per_week', formData.sessions_per_week);
-        if (!sessionsValidation.isValid) {
-          errors.push(sessionsValidation.error);
+        if (!isTermlyCourseCategory(formData.course_category)) {
+          const sessionsValidation = validateField('sessions_per_week', formData.sessions_per_week);
+          if (!sessionsValidation.isValid) {
+            errors.push(sessionsValidation.error);
+          }
         }
         if (formData.course_category === 'Music' && formData.learning_mode === 'home' && !formData.home_lesson_duration) {
           errors.push('Please select home lesson duration (30 minutes or 1 hour).');
@@ -474,6 +481,9 @@ const Registration = () => {
         music_subcategory: formData.music_subcategory?.trim() || null,
         instrument: instrumentValue === "Other" ? formData.custom_instrument?.trim() : (instrumentValue?.trim() || "Not specified"),
         production_type: formData.production_type?.trim() || null,
+        term_period: isTermlyCourseCategory(formData.course_category)
+          ? (formData.term_period || '1st_term')
+          : null,
         technology_type: formData.technology_type?.trim() || null,
         experience: formData.proficiency_level || "beginner",
         proficiency_level: formData.proficiency_level || "beginner",
@@ -1192,10 +1202,10 @@ const Registration = () => {
 
         {formData.course_category === "Production" && (
           <div className="space-y-4">
-            <Label className="text-sm font-medium text-gray-700">Production Type *</Label>
+            <Label className="text-sm font-medium text-gray-700">Production Program *</Label>
             <Select value={formData.production_type} onValueChange={(value) => setFormData({...formData, production_type: value})}>
               <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
-                <SelectValue placeholder="Select production type" />
+                <SelectValue placeholder="Select program" />
               </SelectTrigger>
               <SelectContent>
                 {productionTypes.map((type) => (
@@ -1203,6 +1213,19 @@ const Registration = () => {
                     {type}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+            <Label className="text-sm font-medium text-gray-700">Term *</Label>
+            <Select
+              value={formData.term_period}
+              onValueChange={(value) => setFormData({ ...formData, term_period: value })}
+            >
+              <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
+                <SelectValue placeholder="Select term" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1st_term">1st Term (new students)</SelectItem>
+                <SelectItem value="final_term">Final Term (returning students)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1290,7 +1313,13 @@ const Registration = () => {
               })}
               className="grid gap-4"
             >
-              {learningModes.map((mode) => (
+              {(isTermlyCourseCategory(formData.course_category)
+                ? [
+                    { value: 'in-person', label: 'Physical (at the Academy)' },
+                    { value: 'online', label: 'Online' },
+                  ]
+                : learningModes
+              ).map((mode) => (
                 <div key={mode.value} className="relative">
                   <RadioGroupItem value={mode.value} id={mode.value} className="sr-only" />
                   <Label htmlFor={mode.value} className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
@@ -1376,22 +1405,25 @@ const Registration = () => {
         />
       </div>
 
-      <div className="space-y-4">
-        <Label htmlFor="sessions_per_week" className="text-sm font-medium text-gray-700">Number of Classes per Week *</Label>
-        <Select
-          value={String(formData.sessions_per_week)}
-          onValueChange={value => setFormData({ ...formData, sessions_per_week: parseInt(value, 10) })}
-        >
-          <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
-            <SelectValue placeholder="Select number of classes per week" />
-          </SelectTrigger>
-          <SelectContent>
-            {[1,2,3,4,5].map(num => (
-              <SelectItem key={num} value={String(num)}>{num}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {!isTermlyCourseCategory(formData.course_category) && (
+        <div className="space-y-4">
+          <Label htmlFor="sessions_per_week" className="text-sm font-medium text-gray-700">Number of Classes per Week *</Label>
+          <Select
+            value={String(formData.sessions_per_week)}
+            onValueChange={(value) => setFormData({ ...formData, sessions_per_week: parseInt(value, 10) })}
+          >
+            <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
+              <SelectValue placeholder="Select number of classes per week" />
+            </SelectTrigger>
+            <SelectContent>
+              {[1, 2, 3, 4, 5].map((num) => (
+                <SelectItem key={num} value={String(num)}>{num}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
     </div>
   );
 

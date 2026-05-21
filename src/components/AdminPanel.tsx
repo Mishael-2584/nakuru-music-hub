@@ -28,6 +28,7 @@ import ShopProductManager from './admin/ShopProductManager';
 import ShopOrderManager from './admin/ShopOrderManager';
 import ManualInvoiceManager from './admin/ManualInvoiceManager';
 import StudentAccountControl from './admin/StudentAccountControl';
+import { isTermlyCourseCategory } from '@/lib/termlyFeeUtils';
 
 interface Registration {
   id: string;
@@ -57,6 +58,7 @@ interface Registration {
   created_at: string;
   date_of_birth?: string;
   sessions_per_week?: number;
+  term_period?: string;
 }
 
 interface ContactMessage {
@@ -3659,9 +3661,6 @@ const AdminPanel = () => {
                           {student.goals && (<div className="p-3 bg-primary/5 rounded-lg border border-primary/10"><p className="text-sm font-medium text-primary mb-1">Learning Goals:</p><p className="text-sm text-muted-foreground">{student.goals}</p></div>)}
                           <div className="flex items-center gap-2"><span className="text-sm text-muted-foreground">Enrolled: {new Date(student.created_at).toLocaleDateString()}</span></div>
                           <div className="flex items-center gap-2"><span className="text-sm font-medium text-primary">Experience: {student.experience}</span></div>
-                          {student.sessions_per_week && (
-                            <div className="flex items-center gap-2"><span className="font-medium text-gray-600">Classes per Week:</span> <span className="text-gray-800">{student.sessions_per_week}</span></div>
-                          )}
                           </div>
                         )}
                       
@@ -3864,9 +3863,54 @@ const AdminPanel = () => {
                                     </div>
                                   )}
                                   {registration.course_category === 'Production' && (
+                                    <>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium text-gray-600">Production Type:</span>
+                                        <span className="text-gray-800">{registration.production_type}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium text-gray-600">Term:</span>
+                                        <Select
+                                          value={registration.term_period === 'final_term' ? 'final_term' : '1st_term'}
+                                          onValueChange={async (value) => {
+                                            await supabase.from('registrations').update({ term_period: value }).eq('id', registration.id);
+                                            await supabase.from('students').update({ term_period: value }).eq('registration_id', registration.id);
+                                            setRegistrations((prev) => prev.map((r) => r.id === registration.id ? { ...r, term_period: value } : r));
+                                            setActiveStudents((prev) => prev.map((s) => s.registration_id === registration.id ? { ...s, term_period: value } : s));
+                                            toast({ title: 'Updated', description: 'Term updated.' });
+                                          }}
+                                        >
+                                          <SelectTrigger className="h-8 w-36 border-gray-300">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="1st_term">1st Term</SelectItem>
+                                            <SelectItem value="final_term">Final Term</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    </>
+                                  )}
+                                  {registration.course_category === 'Photography' && (
                                     <div className="flex items-center gap-2">
-                                      <span className="font-medium text-gray-600">Production Type:</span>
-                                      <span className="text-gray-800">{registration.production_type}</span>
+                                      <span className="font-medium text-gray-600">Term:</span>
+                                      <Select
+                                        value={registration.term_period === 'final_term' ? 'final_term' : '1st_term'}
+                                        onValueChange={async (value) => {
+                                          await supabase.from('registrations').update({ term_period: value }).eq('id', registration.id);
+                                          await supabase.from('students').update({ term_period: value }).eq('registration_id', registration.id);
+                                          setRegistrations((prev) => prev.map((r) => r.id === registration.id ? { ...r, term_period: value } : r));
+                                          toast({ title: 'Updated', description: 'Term updated.' });
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-8 w-36 border-gray-300">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="1st_term">1st Term</SelectItem>
+                                          <SelectItem value="final_term">Final Term</SelectItem>
+                                        </SelectContent>
+                                      </Select>
                                     </div>
                                   )}
                                   <div className="flex items-center gap-2">
@@ -3903,46 +3947,44 @@ const AdminPanel = () => {
                                       <span className="text-gray-800">{registration.preferred_schedule}</span>
                                     </div>
                                   )}
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium text-gray-600">Classes per Week:</span>
-                                    <Select
-                                      value={String(registration.sessions_per_week || 1)}
-                                      onValueChange={async (value) => {
-                                        // Update in both registrations and students tables
-                                        const newVal = parseInt(value);
-                                        await supabase.from('registrations').update({ sessions_per_week: newVal }).eq('id', registration.id);
-                                        await supabase.from('students').update({ sessions_per_week: newVal }).eq('registration_id', registration.id);
-                                        
-                                        // Update local state for both tables
-                                        setRegistrations((prev) => prev.map((r) => r.id === registration.id ? { ...r, sessions_per_week: newVal } : r));
-                                        setActiveStudents((prev) => prev.map((s) => s.registration_id === registration.id ? { ...s, sessions_per_week: newVal } : s));
-                                        
-                                        toast({ title: 'Updated', description: 'Classes per week updated.' });
-                                      }}
-                                    >
-                                      <SelectTrigger className="h-8 w-24 border-gray-300">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {[1,2,3,4,5].map(num => (
-                                          <SelectItem key={num} value={String(num)}>{num}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
+                                  {!isTermlyCourseCategory(registration.course_category) && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-600">Classes per Week:</span>
+                                      <Select
+                                        value={String(registration.sessions_per_week || 1)}
+                                        onValueChange={async (value) => {
+                                          const newVal = parseInt(value);
+                                          await supabase.from('registrations').update({ sessions_per_week: newVal }).eq('id', registration.id);
+                                          await supabase.from('students').update({ sessions_per_week: newVal }).eq('registration_id', registration.id);
+                                          setRegistrations((prev) => prev.map((r) => r.id === registration.id ? { ...r, sessions_per_week: newVal } : r));
+                                          setActiveStudents((prev) => prev.map((s) => s.registration_id === registration.id ? { ...s, sessions_per_week: newVal } : s));
+                                          toast({ title: 'Updated', description: 'Classes per week updated.' });
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-8 w-24 border-gray-300">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {[1, 2, 3, 4, 5].map((num) => (
+                                            <SelectItem key={num} value={String(num)}>{num}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  )}
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium text-gray-600">Learning Mode:</span>
                                     <Select
-                                      value={registration.learning_mode || 'in-person'}
+                                      value={
+                                        isTermlyCourseCategory(registration.course_category)
+                                          ? (registration.learning_mode === 'online' ? 'online' : 'in-person')
+                                          : (registration.learning_mode || 'in-person')
+                                      }
                                       onValueChange={async (value) => {
-                                        // Update in both registrations and students tables
                                         await supabase.from('registrations').update({ learning_mode: value }).eq('id', registration.id);
                                         await supabase.from('students').update({ learning_mode: value }).eq('registration_id', registration.id);
-                                        
-                                        // Update local state for both tables
                                         setRegistrations((prev) => prev.map((r) => r.id === registration.id ? { ...r, learning_mode: value } : r));
                                         setActiveStudents((prev) => prev.map((s) => s.registration_id === registration.id ? { ...s, learning_mode: value } : s));
-                                        
                                         toast({ title: 'Updated', description: 'Learning mode updated.' });
                                       }}
                                     >
@@ -3950,10 +3992,20 @@ const AdminPanel = () => {
                                         <SelectValue />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        <SelectItem value="in-person">In-Person</SelectItem>
-                                        <SelectItem value="online">Online</SelectItem>
-                                        <SelectItem value="hybrid">Hybrid</SelectItem>
-                                        <SelectItem value="home-lessons">Home Lessons</SelectItem>
+                                        {isTermlyCourseCategory(registration.course_category) ? (
+                                          <>
+                                            <SelectItem value="in-person">Physical</SelectItem>
+                                            <SelectItem value="online">Online</SelectItem>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <SelectItem value="in-person">In-Person</SelectItem>
+                                            <SelectItem value="online">Online</SelectItem>
+                                            <SelectItem value="hybrid">Hybrid</SelectItem>
+                                            <SelectItem value="home">Home Lessons</SelectItem>
+                                            <SelectItem value="home-lessons">Home Lessons</SelectItem>
+                                          </>
+                                        )}
                                       </SelectContent>
                                     </Select>
                                   </div>
@@ -3978,44 +4030,42 @@ const AdminPanel = () => {
                                       </Select>
                                     </div>
                                   )}
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium text-gray-600">Instrument:</span>
-                                    <Select
-                                      value={registration.instrument || ''}
-                                      onValueChange={async (value) => {
-                                        // Update in both registrations and students tables
-                                        await supabase.from('registrations').update({ instrument: value }).eq('id', registration.id);
-                                        await supabase.from('students').update({ instrument: value }).eq('registration_id', registration.id);
-                                        
-                                        // Update local state for both tables
-                                        setRegistrations((prev) => prev.map((r) => r.id === registration.id ? { ...r, instrument: value } : r));
-                                        setActiveStudents((prev) => prev.map((s) => s.registration_id === registration.id ? { ...s, instrument: value } : s));
-                                        
-                                        toast({ title: 'Updated', description: 'Instrument updated.' });
-                                      }}
-                                    >
-                                      <SelectTrigger className="h-8 w-36 border-gray-300">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="Piano">Piano</SelectItem>
-                                        <SelectItem value="Drums">Drums</SelectItem>
-                                        <SelectItem value="Violin">Violin</SelectItem>
-                                        <SelectItem value="Saxophone">Saxophone</SelectItem>
-                                        <SelectItem value="Bass Guitar">Bass Guitar</SelectItem>
-                                        <SelectItem value="Acoustic Guitar">Acoustic Guitar</SelectItem>
-                                        <SelectItem value="Electric Guitar">Electric Guitar</SelectItem>
-                                        <SelectItem value="Flute">Flute</SelectItem>
-                                        <SelectItem value="Clarinet">Clarinet</SelectItem>
-                                        <SelectItem value="Cello">Cello</SelectItem>
-                                        <SelectItem value="Voice">Voice</SelectItem>
-                                        <SelectItem value="Music Theory">Music Theory</SelectItem>
-                                        <SelectItem value="Trumpet">Trumpet</SelectItem>
-                                        <SelectItem value="Trombone">Trombone</SelectItem>
-                                        <SelectItem value="Other">Other</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
+                                  {!isTermlyCourseCategory(registration.course_category) && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-600">Instrument:</span>
+                                      <Select
+                                        value={registration.instrument || ''}
+                                        onValueChange={async (value) => {
+                                          await supabase.from('registrations').update({ instrument: value }).eq('id', registration.id);
+                                          await supabase.from('students').update({ instrument: value }).eq('registration_id', registration.id);
+                                          setRegistrations((prev) => prev.map((r) => r.id === registration.id ? { ...r, instrument: value } : r));
+                                          setActiveStudents((prev) => prev.map((s) => s.registration_id === registration.id ? { ...s, instrument: value } : s));
+                                          toast({ title: 'Updated', description: 'Instrument updated.' });
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-8 w-36 border-gray-300">
+                                          <SelectValue placeholder="Select instrument" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="Piano">Piano</SelectItem>
+                                          <SelectItem value="Drums">Drums</SelectItem>
+                                          <SelectItem value="Violin">Violin</SelectItem>
+                                          <SelectItem value="Saxophone">Saxophone</SelectItem>
+                                          <SelectItem value="Bass Guitar">Bass Guitar</SelectItem>
+                                          <SelectItem value="Acoustic Guitar">Acoustic Guitar</SelectItem>
+                                          <SelectItem value="Electric Guitar">Electric Guitar</SelectItem>
+                                          <SelectItem value="Flute">Flute</SelectItem>
+                                          <SelectItem value="Clarinet">Clarinet</SelectItem>
+                                          <SelectItem value="Cello">Cello</SelectItem>
+                                          <SelectItem value="Voice">Voice</SelectItem>
+                                          <SelectItem value="Music Theory">Music Theory</SelectItem>
+                                          <SelectItem value="Trumpet">Trumpet</SelectItem>
+                                          <SelectItem value="Trombone">Trombone</SelectItem>
+                                          <SelectItem value="Other">Other</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
 

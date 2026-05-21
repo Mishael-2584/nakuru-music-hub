@@ -201,6 +201,7 @@ async function findFeeForRegistration(registration) {
       case 'home (nakuru & environs)':
         return 'Home (Nakuru & Environs)';
       case 'in-person':
+      case 'physical':
       case 'at the academy':
         return 'At the Academy';
       default:
@@ -210,17 +211,56 @@ async function findFeeForRegistration(registration) {
   
   const normalizedLearningMode = normalizeLearningMode(learningMode);
   console.log('Normalized learning mode:', normalizedLearningMode);
+
+  const normalizeTermPeriod = (value) => {
+    const v = String(value || '').toLowerCase();
+    if (v.includes('final')) return 'final_term';
+    return '1st_term';
+  };
+  const getTermDurationPattern = (term) => (term === 'final_term' ? '%final%' : '%1st%');
+  const getProductionFeeCourseName = (productionType) => {
+    const t = String(productionType || '').trim().toLowerCase();
+    if (t.includes('live sound')) return 'Live Sound Engineering';
+    if (t.includes('music production')) return 'Music Production';
+    return 'Music Production';
+  };
+  const getDefaultProductionTermPrice = (productionType, term) => {
+    const course = getProductionFeeCourseName(productionType);
+    if (course === 'Live Sound Engineering') {
+      return term === 'final_term' ? 26000 : 28000;
+    }
+    return term === 'final_term' ? 42500 : 45500;
+  };
+
+  const termPeriod =
+    paymentType === 'term' ? normalizeTermPeriod(registration.term_period) : null;
+
+  let normalizedCourseName = instrument;
+  if (courseCategoryLower === 'music') {
+    normalizedCourseName = 'Instrumental & Music Theory';
+  } else if (courseCategoryLower === 'production') {
+    normalizedCourseName = getProductionFeeCourseName(registration.production_type);
+  } else if (courseCategoryLower === 'photography') {
+    normalizedCourseName = 'Photography & Videography';
+  } else if (courseCategoryLower === 'art') {
+    normalizedCourseName = 'Art Classes';
+  } else if (courseCategoryLower === 'technology') {
+    normalizedCourseName = 'Web Design & Programming';
+  }
   
   // First try to find exact match with normalized learning mode and correct payment type
-  const { data: exactFee, error: exactFeeError } = await supabase
+  let exactFeeQuery = supabase
     .from('fees')
     .select('*')
     .eq('course_type', courseCategoryLower)
-    .eq('course_name', instrument)
+    .eq('course_name', normalizedCourseName)
     .eq('mode', normalizedLearningMode)
     .eq('payment_type', paymentType)
-    .eq('is_active', true)
-    .maybeSingle();
+    .eq('is_active', true);
+  if (paymentType === 'term' && termPeriod) {
+    exactFeeQuery = exactFeeQuery.ilike('duration', getTermDurationPattern(termPeriod));
+  }
+  const { data: exactFee, error: exactFeeError } = await exactFeeQuery.maybeSingle();
   
   if (exactFee && !exactFeeError) {
     console.log('Found exact fee match with learning mode and payment type:', exactFee);
@@ -247,13 +287,16 @@ async function findFeeForRegistration(registration) {
   }
   
   // Fallback 2: Try to find by course_type only with correct payment type
-  const { data: typeFee, error: typeFeeError } = await supabase
+  let typeFeeQuery = supabase
     .from('fees')
     .select('*')
     .eq('course_type', courseCategoryLower)
     .eq('payment_type', paymentType)
-    .eq('is_active', true)
-    .maybeSingle();
+    .eq('is_active', true);
+  if (paymentType === 'term' && termPeriod) {
+    typeFeeQuery = typeFeeQuery.ilike('duration', getTermDurationPattern(termPeriod));
+  }
+  const { data: typeFee, error: typeFeeError } = await typeFeeQuery.maybeSingle();
   
   if (typeFee && !typeFeeError) {
     console.log('Found fee by course_type only with payment type:', typeFee);
@@ -268,6 +311,7 @@ async function findFeeForRegistration(registration) {
       .select('*')
       .eq('course_type', courseCategoryLower)
       .eq('payment_type', 'term')
+      .ilike('duration', getTermDurationPattern(termPeriod || '1st_term'))
       .eq('is_active', true)
       .maybeSingle();
     
@@ -351,7 +395,10 @@ async function findFeeForRegistration(registration) {
   if (paymentType === 'term') {
     // Termly courses (production, photography) - higher rates
     if (courseCategoryLower === 'production') {
-      defaultPrice = 45500; // KES 45,500 for production term
+      defaultPrice = getDefaultProductionTermPrice(
+        registration.production_type,
+        termPeriod || '1st_term'
+      );
     } else if (courseCategoryLower === 'photography') {
       defaultPrice = 45500; // KES 45,500 for photography term
     } else {
@@ -371,7 +418,7 @@ async function findFeeForRegistration(registration) {
     const dur = registration.home_lesson_duration;
     defaultPrice = (dur === '30_min' || dur === '1_hour') ? (dur === '30_min' ? 6000 : 10000) : 10000; // 30 min = 6,000; 1 hr = 10,000
   } else {
-    defaultPrice = 4800; // KES 4,800 for academy lessons
+    defaultPrice = 6000; // KES 6,000 for academy lessons
   }
   
   const defaultFee = {

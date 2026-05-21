@@ -2,6 +2,12 @@ import { supabase } from '../integrations/supabase/client';
 import { generateQuotePDF } from './pdfGenerator';
 import { Invoice } from '../integrations/supabase/types';
 import { sendInvoiceEmail } from './emailService';
+import {
+  getProductionFeeCourseName,
+  getDefaultProductionTermPrice,
+  getTermDurationPattern,
+  normalizeTermPeriod,
+} from './termlyFeeUtils';
 
 export interface InvoiceLineItem {
   description: string;
@@ -335,6 +341,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   // Get student preferences from registration
   const learningMode = registration.learning_mode || 'in-person';
   const courseCategory = registration.course_category || 'Music';
+  const courseCategoryLower = String(courseCategory).toLowerCase();
   const instrument = registration.instrument;
   
   console.log('Looking for fee with preferences:', {
@@ -343,11 +350,11 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     learningMode
   });
   
-  // Determine payment type based on course category
+  // Determine payment type based on course category (case-insensitive)
   let paymentType = 'monthly'; // Default
-  if (courseCategory === 'production' || courseCategory === 'photography') {
+  if (courseCategoryLower === 'production' || courseCategoryLower === 'photography') {
     paymentType = 'term';
-  } else if (courseCategory === 'Technology') {
+  } else if (courseCategoryLower === 'technology') {
     paymentType = 'per_class'; // Technology courses use per_class billing
   }
   
@@ -362,6 +369,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
       case 'home (nakuru & environs)':
         return 'Home (Nakuru & Environs)';
       case 'in-person':
+      case 'physical':
       case 'at the academy':
         return 'At the Academy';
       default:
@@ -372,28 +380,38 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   const normalizedLearningMode = normalizeLearningMode(learningMode);
   console.log('Normalized learning mode:', normalizedLearningMode);
   
-  let normalizedCourseCategory = (courseCategory || '').toLowerCase();
+  let normalizedCourseCategory = courseCategoryLower || 'music';
   let normalizedInstrument = instrument;
   if (normalizedCourseCategory === 'art') {
-    normalizedCourseCategory = 'art';
     normalizedInstrument = 'Art Classes'; // canonical name for art in fees table
   } else if (normalizedCourseCategory === 'technology') {
-    normalizedCourseCategory = 'technology';
-    // For technology courses, always use 'Web Design & Programming' as the course name
-    // This ensures we find the correct Technology fee
     normalizedInstrument = 'Web Design & Programming';
+  } else if (normalizedCourseCategory === 'music') {
+    normalizedInstrument = 'Instrumental & Music Theory';
+  } else if (normalizedCourseCategory === 'production') {
+    normalizedInstrument = getProductionFeeCourseName(registration.production_type);
+  } else if (normalizedCourseCategory === 'photography') {
+    normalizedInstrument = 'Photography & Videography';
   }
+
+  const termPeriod =
+    paymentType === 'term'
+      ? normalizeTermPeriod(registration.term_period)
+      : null;
   
   // First try to find exact match with normalized learning mode and correct payment type
-  const { data: exactFee, error: exactFeeError } = await supabase
+  let exactFeeQuery = supabase
     .from('fees')
     .select('*')
     .eq('course_type', normalizedCourseCategory)
     .eq('course_name', normalizedInstrument)
     .eq('mode', normalizedLearningMode)
     .eq('payment_type', paymentType)
-    .eq('is_active', true)
-    .maybeSingle();
+    .eq('is_active', true);
+  if (paymentType === 'term' && termPeriod) {
+    exactFeeQuery = exactFeeQuery.ilike('duration', getTermDurationPattern(termPeriod));
+  }
+  const { data: exactFee, error: exactFeeError } = await exactFeeQuery.maybeSingle();
   
   if (exactFee && !exactFeeError) {
     fee = exactFee;
@@ -416,13 +434,16 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
       console.log('Found fee by course_type and learning_mode with payment type:', fee);
     } else {
       // Fallback 2: Try to find by course_type only with correct payment type
-      const { data: typeFee, error: typeFeeError } = await supabase
+      let typeFeeQuery = supabase
         .from('fees')
         .select('*')
         .eq('course_type', normalizedCourseCategory)
         .eq('payment_type', paymentType)
-        .eq('is_active', true)
-        .maybeSingle();
+        .eq('is_active', true);
+      if (paymentType === 'term' && termPeriod) {
+        typeFeeQuery = typeFeeQuery.ilike('duration', getTermDurationPattern(termPeriod));
+      }
+      const { data: typeFee, error: typeFeeError } = await typeFeeQuery.maybeSingle();
       
       if (typeFee && !typeFeeError) {
         fee = typeFee;
@@ -446,12 +467,13 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
             console.log('Found Technology 1-on-1 fee:', fee);
           }
         } else if (paymentType === 'term') {
-          // Fallback 4: For termly courses, try to find any term fee for the course category
+          // Fallback 4: For termly courses, try to find 1st-term fee for the course category
           const { data: termFee, error: termFeeError } = await supabase
             .from('fees')
             .select('*')
             .eq('course_type', normalizedCourseCategory)
             .eq('payment_type', 'term')
+            .ilike('duration', getTermDurationPattern(termPeriod || '1st_term'))
             .eq('is_active', true)
             .maybeSingle();
           
@@ -538,9 +560,12 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
           if (paymentType === 'term') {
             // Termly courses (production, photography) - higher rates
             if (normalizedCourseCategory === 'production') {
-              defaultPrice = 45500; // KES 45,500 for production term
+              defaultPrice = getDefaultProductionTermPrice(
+                registration.production_type,
+                termPeriod || '1st_term'
+              );
             } else if (normalizedCourseCategory === 'photography') {
-              defaultPrice = 45500; // KES 45,500 for photography term
+              defaultPrice = (termPeriod || '1st_term') === 'final_term' ? 42500 : 45500;
             } else {
               defaultPrice = 40000; // KES 40,000 for other termly courses
             }
@@ -551,7 +576,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
             const dur = registration.home_lesson_duration;
             defaultPrice = (dur === '30_min' || dur === '1_hour') ? (dur === '30_min' ? 6000 : 10000) : 10000; // 30 min = 6,000; 1 hr = 10,000
           } else {
-            defaultPrice = 4800; // KES 4,800 for academy lessons
+            defaultPrice = 6000; // KES 6,000 for academy lessons
           }
           
           fee = {
@@ -601,7 +626,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   }
 
   // Home lessons (Music only): use duration-based pricing — 30 min = KSh 6,000, 1 hour = KSh 10,000
-  const isHomeMusic = courseCategory === 'Music' && (learningMode === 'home' || learningMode === 'home-lessons' || normalizedLearningMode === 'Home (Nakuru & Environs)');
+  const isHomeMusic = courseCategoryLower === 'music' && (learningMode === 'home' || learningMode === 'home-lessons' || normalizedLearningMode === 'Home (Nakuru & Environs)');
   const homeDuration = registration.home_lesson_duration;
   if (isHomeMusic && (homeDuration === '30_min' || homeDuration === '1_hour')) {
     fee = { ...fee, price: homeDuration === '30_min' ? 6000 : 10000 };

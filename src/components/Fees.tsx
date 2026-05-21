@@ -20,7 +20,7 @@ const Fees = () => {
           name: "At the Academy",
           location: "",
           duration: "1 hour",
-          monthly: "KSh 4,800",
+          monthly: "KSh 6,000",
           icon: Home,
           features: ["One-on-one instruction", "Professional facilities", "All instruments available", "Flexible scheduling"],
           popular: true
@@ -60,7 +60,7 @@ const Fees = () => {
           name: "At the Academy",
           location: "",
           duration: "1 hour",
-          perClass: "KSh 1,500",
+          perClass: "KSh 1,800",
           icon: Home,
           features: ["No commitment required", "Pay as you go", "Professional facilities", "Trial friendly"]
         },
@@ -68,7 +68,7 @@ const Fees = () => {
           name: "Home Lesson", 
           location: "Nakuru CBD & Environs",
           duration: "30 minutes",
-          perClass: "KSh 1,600",
+          perClass: "KSh 1,700",
           icon: Home,
           features: ["Short focused sessions", "Perfect for busy schedules", "No commitment", "Quality instruction"]
         },
@@ -76,7 +76,7 @@ const Fees = () => {
           name: "Home Lesson",
           location: "Nakuru CBD & Environs",
           duration: "1 hour", 
-          perClass: "KSh 2,700",
+          perClass: "KSh 3,200",
           icon: Users,
           features: ["Home convenience", "Personal attention", "No travel needed", "Comfortable learning"]
         },
@@ -84,7 +84,7 @@ const Fees = () => {
           name: "Online",
           location: "Global",
           duration: "1 hour",
-          perClass: "$11/class", 
+          perClass: "$15/class", 
           icon: Globe,
           features: ["Global reach", "Flexible scheduling", "Digital tools", "Cost effective"],
           special: true
