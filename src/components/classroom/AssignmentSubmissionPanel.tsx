@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,20 +28,33 @@ import { PostFileUpload } from "@/components/PostFileUpload";
 import { useToast } from "@/hooks/use-toast";
 import AssignmentTimer from "./AssignmentTimer";
 
+interface EnrolledStudent {
+  id: string;
+  student_name: string;
+}
+
 interface AssignmentSubmissionPanelProps {
   post: any;
   isTeacher: boolean;
   submissions?: any[];
+  enrolledStudents?: EnrolledStudent[];
   currentStudentId?: string;
   onSubmit?: (postId: string, text: string, files: any[]) => void;
-  onGrade?: (submissionId: string, points: number, feedback: string) => void;
+  onGrade?: (
+    postId: string,
+    studentId: string,
+    points: number,
+    feedback: string,
+    submissionId?: string
+  ) => void;
   onLoadSubmissions?: (postId: string) => void;
 }
 
 export default function AssignmentSubmissionPanel({ 
   post, 
   isTeacher, 
-  submissions = [], 
+  submissions = [],
+  enrolledStudents = [],
   currentStudentId,
   onSubmit,
   onGrade,
@@ -60,8 +73,33 @@ export default function AssignmentSubmissionPanel({
 
   const isOverdue = post.due_date && new Date(post.due_date) < new Date();
   const userSubmission = submissions.find(s => s.student_id === currentStudentId);
-  const hasSubmitted = !!userSubmission;
-  const isGraded = userSubmission?.grade_points !== undefined && userSubmission?.grade_points !== null;
+  const isNoSubmissionGrade = !!userSubmission?.no_submission;
+  const hasSubmitted = !!userSubmission && !isNoSubmissionGrade;
+  const isGraded =
+    userSubmission?.grade_points !== undefined && userSubmission?.grade_points !== null;
+
+  const classRoster = useMemo(() => {
+    if (enrolledStudents.length > 0) {
+      return enrolledStudents.map((student) => ({
+        studentId: student.id,
+        studentName: student.student_name,
+        submission: submissions.find((s) => s.student_id === student.id),
+      }));
+    }
+    return submissions.map((submission) => ({
+      studentId: submission.student_id,
+      studentName: submission.author_name || 'Student',
+      submission,
+    }));
+  }, [enrolledStudents, submissions]);
+
+  const gradedCount = classRoster.filter(
+    (entry) =>
+      entry.submission?.grade_points !== undefined && entry.submission?.grade_points !== null
+  ).length;
+  const submittedCount = classRoster.filter(
+    (entry) => entry.submission && !entry.submission.no_submission
+  ).length;
 
   const handleSubmission = () => {
     // For quiz assignments, only text is required (no files)
@@ -107,9 +145,9 @@ export default function AssignmentSubmissionPanel({
     setShowConfirmDialog(false);
   };
 
-  const handleGrading = (submissionId: string) => {
-    const points = parseInt(gradePoints) || 0;
-    if (points < 0 || points > (post.max_points || 100)) {
+  const handleGrading = (studentId: string, submissionId?: string) => {
+    const points = parseInt(gradePoints, 10);
+    if (Number.isNaN(points) || points < 0 || points > (post.max_points || 100)) {
       toast({
         title: 'Invalid Points',
         description: `Points must be between 0 and ${post.max_points || 100}`,
@@ -118,10 +156,23 @@ export default function AssignmentSubmissionPanel({
       return;
     }
 
-    onGrade?.(submissionId, points, gradeFeedback);
+    onGrade?.(post.post_id, studentId, points, gradeFeedback, submissionId);
     setShowGradingForm(null);
     setGradePoints('');
     setGradeFeedback('');
+  };
+
+  const gradingFormKey = (studentId: string, submissionId?: string) =>
+    submissionId || `new-${studentId}`;
+
+  const openGradingForm = (
+    studentId: string,
+    submissionId?: string,
+    preset?: { points?: string; feedback?: string }
+  ) => {
+    setShowGradingForm(gradingFormKey(studentId, submissionId));
+    setGradePoints(preset?.points ?? '');
+    setGradeFeedback(preset?.feedback ?? '');
   };
 
   const handleTimerStart = () => {
@@ -172,7 +223,13 @@ export default function AssignmentSubmissionPanel({
               <div>
                 <h4 className="font-semibold text-gray-900">Your Work</h4>
                 <p className="text-sm text-gray-600">
-                  {isGraded ? 'Graded' : hasSubmitted ? 'Submitted' : 'Not submitted'}
+                  {isGraded
+                    ? isNoSubmissionGrade
+                      ? 'Graded (no submission)'
+                      : 'Graded'
+                    : hasSubmitted
+                      ? 'Submitted'
+                      : 'Not submitted'}
                 </p>
               </div>
             </div>
@@ -188,7 +245,7 @@ export default function AssignmentSubmissionPanel({
                   Awaiting Grade
                 </Badge>
               )}
-              {isOverdue && !hasSubmitted && (
+              {isOverdue && !hasSubmitted && !isGraded && (
                 <Badge variant="destructive">
                   <AlertTriangle className="h-3 w-3 mr-1" />
                   Overdue
@@ -210,7 +267,27 @@ export default function AssignmentSubmissionPanel({
             </div>
           )}
 
-          {hasSubmitted ? (
+          {isNoSubmissionGrade && isGraded ? (
+            <Card className="border-amber-200 bg-amber-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                  <h4 className="font-semibold text-amber-900">No submission received</h4>
+                </div>
+                <p className="text-sm text-amber-800 mb-3">
+                  Your teacher recorded a grade for this assignment even though you did not submit work.
+                </p>
+                <Badge className={`${getGradeColor(userSubmission.grade_points, post.max_points || 100)} border`}>
+                  {userSubmission.grade_points}/{post.max_points || 100} points
+                </Badge>
+                {userSubmission.grade_feedback && (
+                  <div className="mt-3 p-3 bg-white rounded-lg border border-amber-200 text-sm text-amber-900">
+                    {userSubmission.grade_feedback}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : hasSubmitted ? (
             /* Show Existing Submission */
             <Card className="bg-gray-50 border-gray-200">
               <CardContent className="p-4">
@@ -284,7 +361,7 @@ export default function AssignmentSubmissionPanel({
                 )}
               </CardContent>
             </Card>
-          ) : isOverdue ? (
+          ) : isOverdue && !isGraded ? (
             /* Show Overdue Message */
             <Card className="border-red-200 bg-red-50">
               <CardContent className="p-4 text-center">
@@ -361,9 +438,9 @@ export default function AssignmentSubmissionPanel({
                 <MessageSquare className="h-4 w-4 text-purple-600" />
               </div>
               <div>
-                <h4 className="font-semibold text-gray-900">Student Submissions</h4>
+                <h4 className="font-semibold text-gray-900">Class grades</h4>
                 <p className="text-sm text-gray-600">
-                  {submissions.filter(s => s.grade_points !== undefined && s.grade_points !== null).length} graded of {submissions.length} submitted
+                  {gradedCount} graded of {classRoster.length} student{classRoster.length !== 1 ? 's' : ''} ({submittedCount} submitted)
                 </p>
               </div>
             </div>
@@ -379,107 +456,139 @@ export default function AssignmentSubmissionPanel({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowSubmissions(!showSubmissions)}
+                onClick={() => {
+                  const next = !showSubmissions;
+                  setShowSubmissions(next);
+                  if (next) onLoadSubmissions?.(post.post_id);
+                }}
               >
-                {showSubmissions ? 'Hide' : 'Show'} Submissions ({submissions.length})
+                {showSubmissions ? 'Hide' : 'Show'} class roster ({classRoster.length})
               </Button>
             </div>
           </div>
 
           {showSubmissions && (
             <div className="space-y-3">
-              {submissions.length === 0 ? (
+              {classRoster.length === 0 ? (
                 <Card className="border-gray-200">
                   <CardContent className="p-6 text-center text-gray-500">
                     <MessageSquare className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                    <p>No submissions yet</p>
+                    <p>No students enrolled in this class</p>
                   </CardContent>
                 </Card>
               ) : (
-                submissions.map((submission) => (
-                  <Card key={submission.id} className="border-gray-200">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-gray-200 text-gray-700 text-sm">
-                              {submission.author_name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium text-gray-900">{submission.author_name}</div>
-                            <div className="text-xs text-gray-400">
-                              Submitted {formatDistanceToNow(new Date(submission.submitted_at), { addSuffix: true })}
+                classRoster.map(({ studentId, studentName, submission }) => {
+                  const hasStudentSubmission = !!submission && !submission.no_submission;
+                  const isGradedEntry =
+                    submission?.grade_points !== undefined && submission?.grade_points !== null;
+                  const formKey = gradingFormKey(studentId, submission?.id);
+
+                  return (
+                    <Card
+                      key={studentId}
+                      className={`border-gray-200 ${!hasStudentSubmission ? 'border-amber-200 bg-amber-50/40' : ''}`}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="bg-gray-200 text-gray-700 text-sm">
+                                {studentName.charAt(0)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium text-gray-900">{studentName}</div>
+                              <div className="text-xs text-gray-500">
+                                {hasStudentSubmission && submission.submitted_at
+                                  ? `Submitted ${formatDistanceToNow(new Date(submission.submitted_at), { addSuffix: true })}`
+                                  : submission?.no_submission
+                                    ? 'No submission — graded by teacher'
+                                    : 'No submission yet'}
+                              </div>
                             </div>
                           </div>
+
+                          {isGradedEntry ? (
+                            <Badge
+                              className={`${getGradeColor(submission.grade_points, post.max_points || 100)} border`}
+                            >
+                              {submission.grade_points}/{post.max_points || 100}
+                            </Badge>
+                          ) : hasStudentSubmission ? (
+                            <Badge variant="outline">Submitted · ungraded</Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-amber-300 text-amber-800">
+                              No submission
+                            </Badge>
+                          )}
                         </div>
-                        
-                        {submission.grade_points !== undefined && submission.grade_points !== null ? (
-                          <Badge className={`${getGradeColor(submission.grade_points, post.max_points || 100)} border`}>
-                            {submission.grade_points}/{post.max_points || 100}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline">Ungraded</Badge>
+
+                        {hasStudentSubmission && submission.submission_text && (
+                          <div className="mb-3 p-3 bg-gray-50 rounded-lg">
+                            <div className="text-sm text-gray-800 whitespace-pre-wrap">
+                              {submission.submission_text}
+                            </div>
+                          </div>
                         )}
-                      </div>
 
-                      {submission.submission_text && (
-                        <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-                          <div className="text-sm text-gray-800 whitespace-pre-wrap">
-                            {submission.submission_text}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Show submitted files */}
-                      {submission.files && submission.files.length > 0 && (
-                        <div className="mb-3">
-                          <div className="text-sm font-medium text-gray-700 mb-2">Attached Files:</div>
-                          <div className="space-y-1">
-                            {submission.files.map((file: any, index: number) => (
-                              <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                <div className="flex items-center gap-2">
-                                  <FileText className="h-4 w-4 text-gray-500" />
-                                  <span className="text-sm">{file.file_name}</span>
-                                </div>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-6 px-2 text-xs"
-                                  asChild
+                        {hasStudentSubmission && submission.files && submission.files.length > 0 && (
+                          <div className="mb-3">
+                            <div className="text-sm font-medium text-gray-700 mb-2">Attached files</div>
+                            <div className="space-y-1">
+                              {submission.files.map((file: any, index: number) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center justify-between p-2 bg-gray-50 rounded"
                                 >
-                                  <a
-                                    href={file.file_url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                  >
-                                    View
-                                  </a>
-                                </Button>
-                              </div>
-                            ))}
+                                  <div className="flex items-center gap-2">
+                                    <FileText className="h-4 w-4 text-gray-500" />
+                                    <span className="text-sm">{file.file_name}</span>
+                                  </div>
+                                  <Button variant="outline" size="sm" className="h-6 px-2 text-xs" asChild>
+                                    <a href={file.file_url} target="_blank" rel="noreferrer">
+                                      View
+                                    </a>
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Grading Section */}
-                      {submission.grade_points !== undefined && submission.grade_points !== null ? (
                         <div className="border-t border-gray-200 pt-3">
-                          <div className="text-sm text-gray-600">
-                            <div>Graded by: {submission.graded_by_name}</div>
-                            <div>Graded: {formatDistanceToNow(new Date(submission.graded_at), { addSuffix: true })}</div>
-                            {submission.grade_feedback && (
-                              <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
-                                <span className="font-medium">Feedback:</span> {submission.grade_feedback}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="border-t border-gray-200 pt-3">
-                          {showGradingForm === submission.id ? (
+                          {isGradedEntry ? (
+                            <div className="text-sm text-gray-600 space-y-1">
+                              {submission.graded_by_name && (
+                                <div>Graded by: {submission.graded_by_name}</div>
+                              )}
+                              {submission.graded_at && (
+                                <div>
+                                  Graded{' '}
+                                  {formatDistanceToNow(new Date(submission.graded_at), {
+                                    addSuffix: true,
+                                  })}
+                                </div>
+                              )}
+                              {submission.grade_feedback && (
+                                <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                                  <span className="font-medium">Feedback:</span> {submission.grade_feedback}
+                                </div>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="mt-2"
+                                onClick={() => openGradingForm(studentId, submission.id, {
+                                  points: String(submission.grade_points ?? ''),
+                                  feedback: submission.grade_feedback || '',
+                                })}
+                              >
+                                Edit grade
+                              </Button>
+                            </div>
+                          ) : showGradingForm === formKey ? (
                             <div className="space-y-3">
-                              <div className="grid grid-cols-2 gap-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                   <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Points (max {post.max_points || 100})
@@ -495,22 +604,24 @@ export default function AssignmentSubmissionPanel({
                                 </div>
                                 <div>
                                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Feedback (Optional)
+                                    Feedback (optional)
                                   </label>
                                   <Input
                                     value={gradeFeedback}
                                     onChange={(e) => setGradeFeedback(e.target.value)}
-                                    placeholder="Great work!"
+                                    placeholder={
+                                      hasStudentSubmission ? 'Great work!' : 'No submission received.'
+                                    }
                                   />
                                 </div>
                               </div>
-                              <div className="flex gap-2">
+                              <div className="flex flex-wrap gap-2">
                                 <Button
                                   size="sm"
-                                  onClick={() => handleGrading(submission.id)}
+                                  onClick={() => handleGrading(studentId, submission?.id)}
                                   className="bg-green-600 hover:bg-green-700"
                                 >
-                                  Save Grade
+                                  Save grade
                                 </Button>
                                 <Button
                                   variant="outline"
@@ -526,19 +637,36 @@ export default function AssignmentSubmissionPanel({
                               </div>
                             </div>
                           ) : (
-                            <Button
-                              size="sm"
-                              onClick={() => setShowGradingForm(submission.id)}
-                              className="bg-blue-600 hover:bg-blue-700"
-                            >
-                              Grade Submission
-                            </Button>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => openGradingForm(studentId, submission?.id)}
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                {hasStudentSubmission ? 'Grade submission' : 'Assign grade'}
+                              </Button>
+                              {!hasStudentSubmission && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-amber-300 text-amber-900 hover:bg-amber-100"
+                                  onClick={() =>
+                                    openGradingForm(studentId, undefined, {
+                                      points: '0',
+                                      feedback: 'No submission received.',
+                                    })
+                                  }
+                                >
+                                  Grade 0 (no submission)
+                                </Button>
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))
+                      </CardContent>
+                    </Card>
+                  );
+                })
               )}
             </div>
           )}

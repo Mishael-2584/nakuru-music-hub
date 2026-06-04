@@ -263,7 +263,7 @@ export const generateQuotePDF = async (
         <b>Admin Notes:</b> ${adminNotes}
       </div>
     ` : ''}
-    ${invoiceMeta && invoiceMeta.invoiceNumber && invoiceMeta.invoiceNumber !== 'first' ? `
+    ${invoiceMeta && invoiceMeta.invoiceNumber && invoiceMeta.invoiceNumber !== 'first' && !String(invoiceMeta.invoiceNumber).startsWith('FIRST') ? `
       <div style="margin: 18px 32px 0 32px; background: #fef3c7; padding: 10px 16px; border-radius: 8px; border-left: 4px solid #f59e0b; font-size: 12px; color: #92400e;">
         <b>⚠️ Automated Invoice:</b> This is an automated invoice kindly ignore if already paid.
       </div>

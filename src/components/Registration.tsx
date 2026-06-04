@@ -1359,7 +1359,7 @@ const Registration = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="30_min">30 minutes — KSh 6,000/month</SelectItem>
-                  <SelectItem value="1_hour">1 hour — KSh 10,000/month</SelectItem>
+                  <SelectItem value="1_hour">1 hour — KSh 12,000/month</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-sm text-gray-500">Choose how long each home lesson session will be. Billing is based on this selection.</p>
@@ -1482,7 +1482,7 @@ const Registration = () => {
               {formData.learning_mode === "home" && (
                 <div>
                   <span className="font-medium text-gray-600">Home lesson duration:</span>
-                  <p className="text-gray-800">{formData.home_lesson_duration === "30_min" ? "30 minutes (KSh 6,000/month)" : formData.home_lesson_duration === "1_hour" ? "1 hour (KSh 10,000/month)" : "—"}</p>
+                  <p className="text-gray-800">{formData.home_lesson_duration === "30_min" ? "30 minutes (KSh 6,000/month)" : formData.home_lesson_duration === "1_hour" ? "1 hour (KSh 12,000/month)" : "—"}</p>
                 </div>
               )}
               <div>

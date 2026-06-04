@@ -76,15 +76,13 @@ const VideoConferenceModal: React.FC<VideoConferenceModalProps> = ({
         setMeetingStatus('active');
       }
 
-      // Join the meeting
-      joinMeetingRoom(meetingRoom.meetingUrl, userName, {
+      await joinMeetingRoom(meetingRoom, userName, {
         isHost: userRole === 'teacher',
-        hostUrl: meetingRoom.meetingHostUrl,
       });
-      
+
       toast({
         title: "Joining Meeting",
-        description: "Opening video conference in a new tab...",
+        description: "Opening Zoom in a new tab...",
       });
     } catch (error) {
       console.error('Error joining meeting:', error);
@@ -242,12 +240,7 @@ const VideoConferenceModal: React.FC<VideoConferenceModalProps> = ({
 
                 <Button
                   variant="outline"
-                  onClick={() =>
-                    joinMeetingRoom(meetingRoom.meetingUrl, userName, {
-                      isHost: userRole === 'teacher',
-                      hostUrl: meetingRoom.meetingHostUrl,
-                    })
-                  }
+                  onClick={() => void handleJoinMeeting()}
                   className="flex items-center gap-2"
                 >
                   <ExternalLink className="w-4 h-4" />

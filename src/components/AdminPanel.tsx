@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { generateQuotePDF } from "@/lib/pdfGenerator";
 import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
-import { generateInvoiceForRegistration, generateInvoicePDFBlob } from "@/lib/invoiceUtils";
+import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
 import LearningModeDebugTest from './LearningModeDebugTest';
 import FeeDebug from './FeeDebug';
@@ -209,6 +209,8 @@ const AdminPanel = () => {
   const [showInvoiceHistoryModal, setShowInvoiceHistoryModal] = useState(false);
   const [invoiceHistory, setInvoiceHistory] = useState<any[]>([]);
   const [invoiceHistoryStudent, setInvoiceHistoryStudent] = useState<any>(null);
+  const [generatingPdfInvoiceId, setGeneratingPdfInvoiceId] = useState<string | null>(null);
+  const [generatingAllPdfs, setGeneratingAllPdfs] = useState(false);
   const [selectedHistoryInvoice, setSelectedHistoryInvoice] = useState<any>(null);
 
   // Portal messaging state
@@ -2893,13 +2895,85 @@ const AdminPanel = () => {
     setSelectedHistoryInvoice(inv);
   };
 
-  // Handler to download invoice PDF
-  const handleDownloadInvoicePDF = (inv: any) => {
-    if (inv && inv.pdf_url) {
-      window.open(inv.pdf_url, '_blank');
-    } else {
-      toast({ title: 'No PDF', description: 'No PDF available for this invoice.', variant: 'destructive' });
+  const patchInvoicePdfUrl = (invoiceId: string, pdfUrl: string) => {
+    setInvoiceHistory((prev) =>
+      prev.map((row) => (row.id === invoiceId ? { ...row, pdf_url: pdfUrl } : row))
+    );
+    if (selectedHistoryInvoice?.id === invoiceId) {
+      setSelectedHistoryInvoice({ ...selectedHistoryInvoice, pdf_url: pdfUrl });
     }
+  };
+
+  const handleDownloadInvoicePDF = async (inv: any, student?: any) => {
+    if (!inv?.id) return;
+
+    if (inv.pdf_url) {
+      const studentRecord = student || invoiceHistoryStudent;
+      if (studentRecord) {
+        await openInvoicePdfWithName(inv.pdf_url, studentRecord, inv);
+      } else {
+        window.open(inv.pdf_url, '_blank');
+      }
+      return;
+    }
+
+    const studentRecord = student || invoiceHistoryStudent;
+    if (!studentRecord?.id) {
+      toast({
+        title: 'Cannot generate PDF',
+        description: 'Student record not found.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setGeneratingPdfInvoiceId(inv.id);
+    try {
+      const pdfUrl = await ensureInvoicePDF(inv, studentRecord);
+      patchInvoicePdfUrl(inv.id, pdfUrl);
+      await openInvoicePdfWithName(pdfUrl, studentRecord, inv);
+      toast({ title: 'PDF ready', description: 'Invoice PDF generated and opened.' });
+    } catch (err: unknown) {
+      console.error('Generate invoice PDF error:', err);
+      toast({
+        title: 'PDF generation failed',
+        description: err instanceof Error ? err.message : 'Could not create PDF for this invoice.',
+        variant: 'destructive',
+      });
+    } finally {
+      setGeneratingPdfInvoiceId(null);
+    }
+  };
+
+  const handleGenerateAllMissingPdfs = async () => {
+    if (!invoiceHistoryStudent) return;
+    const missing = invoiceHistory.filter((inv) => !inv.pdf_url);
+    if (missing.length === 0) {
+      toast({ title: 'All set', description: 'Every invoice in this list already has a PDF.' });
+      return;
+    }
+
+    setGeneratingAllPdfs(true);
+    let success = 0;
+    let failed = 0;
+
+    for (const inv of missing) {
+      try {
+        const pdfUrl = await ensureInvoicePDF(inv, invoiceHistoryStudent);
+        patchInvoicePdfUrl(inv.id, pdfUrl);
+        success++;
+      } catch (err) {
+        console.error('Bulk PDF generation failed for invoice', inv.id, err);
+        failed++;
+      }
+    }
+
+    setGeneratingAllPdfs(false);
+    toast({
+      title: 'PDF generation complete',
+      description: `${success} created${failed ? `, ${failed} failed` : ''}.`,
+      variant: failed && !success ? 'destructive' : 'default',
+    });
   };
 
   if (isLoading) {
@@ -4042,7 +4116,7 @@ const AdminPanel = () => {
                                         </SelectTrigger>
                                         <SelectContent>
                                           <SelectItem value="30_min">30 min (KSh 6,000)</SelectItem>
-                                          <SelectItem value="1_hour">1 hour (KSh 10,000)</SelectItem>
+                                          <SelectItem value="1_hour">1 hour (KSh 12,000)</SelectItem>
                                         </SelectContent>
                                       </Select>
                                     </div>
@@ -5603,11 +5677,18 @@ const AdminPanel = () => {
                                   <Button size="sm" variant="ghost" onClick={() => handleOpenInvoiceHistory(student)}>
                                     View All Invoices
                                   </Button>
-                                  {inv.pdf_url && (
-                                    <Button size="sm" variant="outline" onClick={() => handleDownloadInvoicePDF(inv)}>
-                                      Download PDF
-                                    </Button>
-                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={generatingPdfInvoiceId === inv.id}
+                                    onClick={() => void handleDownloadInvoicePDF(inv, student)}
+                                  >
+                                    {generatingPdfInvoiceId === inv.id
+                                      ? 'Generating...'
+                                      : inv.pdf_url
+                                        ? 'Download PDF'
+                                        : 'Generate PDF'}
+                                  </Button>
                                   {inv.status !== 'paid' && (
                                     <Button 
                                       size="sm" 
@@ -5743,6 +5824,18 @@ const AdminPanel = () => {
             <DialogHeader>
               <DialogTitle>Invoice History for {invoiceHistoryStudent?.student_name}</DialogTitle>
             </DialogHeader>
+            <div className="flex flex-wrap gap-2 justify-end">
+              {invoiceHistory.some((inv) => !inv.pdf_url) && (
+                <Button
+                  size="sm"
+                  variant="default"
+                  disabled={generatingAllPdfs}
+                  onClick={() => void handleGenerateAllMissingPdfs()}
+                >
+                  {generatingAllPdfs ? 'Generating PDFs...' : 'Generate all missing PDFs'}
+                </Button>
+              )}
+            </div>
             <div className="space-y-4">
               <table className="min-w-full text-sm mb-4">
                 <thead>
@@ -5764,11 +5857,18 @@ const AdminPanel = () => {
                       <td>KES {inv.amount_due?.toLocaleString()}</td>
                       <td>{inv.due_date}</td>
                       <td>
-                        {inv.pdf_url ? (
-                          <Button size="sm" variant="outline" onClick={() => handleDownloadInvoicePDF(inv)}>Download PDF</Button>
-                        ) : (
-                          <span className="text-gray-400">No PDF</span>
-                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={generatingPdfInvoiceId === inv.id || generatingAllPdfs}
+                          onClick={() => void handleDownloadInvoicePDF(inv)}
+                        >
+                          {generatingPdfInvoiceId === inv.id
+                            ? 'Generating...'
+                            : inv.pdf_url
+                              ? 'Download PDF'
+                              : 'Generate PDF'}
+                        </Button>
                       </td>
                       <td>
                         <Button size="sm" variant="ghost" onClick={() => handleViewHistoryInvoice(inv)}>View</Button>
@@ -5798,9 +5898,18 @@ const AdminPanel = () => {
                   <div><b>Due Date:</b> {selectedHistoryInvoice.due_date}</div>
                   <div><b>Notes:</b> {selectedHistoryInvoice.notes || '-'}</div>
                   <div className="mt-2">
-                    {selectedHistoryInvoice.pdf_url && (
-                      <Button size="sm" variant="outline" onClick={() => handleDownloadInvoicePDF(selectedHistoryInvoice)}>Download PDF</Button>
-                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={generatingPdfInvoiceId === selectedHistoryInvoice.id}
+                      onClick={() => void handleDownloadInvoicePDF(selectedHistoryInvoice)}
+                    >
+                      {generatingPdfInvoiceId === selectedHistoryInvoice.id
+                        ? 'Generating...'
+                        : selectedHistoryInvoice.pdf_url
+                          ? 'Download PDF'
+                          : 'Generate PDF'}
+                    </Button>
                     {selectedHistoryInvoice.status !== 'paid' && (
                       <Button 
                         size="sm" 

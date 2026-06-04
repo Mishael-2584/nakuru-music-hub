@@ -17,10 +17,10 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Link } from 'react-router-dom';
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
-import { calculateStudentInvoice, InvoiceCalculationResult } from '../lib/invoiceUtils';
+import { calculateStudentInvoice, InvoiceCalculationResult, ensureInvoicePDF, openInvoicePdfWithName } from '../lib/invoiceUtils';
 import { Invoice } from '../integrations/supabase/types';
 import VideoConferenceModal from '../components/VideoConferenceModal';
-import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getMeetingDuration, getUserInvitedMeetings, joinMeetingByCode, InstantMeeting } from '../lib/videoConferencing';
+import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getMeetingDuration, getUserInvitedMeetings, joinMeetingByCode, joinInstantMeetingRoom, joinMeetingRoom, InstantMeeting } from '../lib/videoConferencing';
 import MessagingUI from '../components/MessagingUI';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import StudentAccountStatusBanner from '../components/StudentAccountStatusBanner';
@@ -309,6 +309,7 @@ const StudentDashboard = () => {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [invoiceDetails, setInvoiceDetails] = useState<InvoiceCalculationResult | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [generatingStudentPdfId, setGeneratingStudentPdfId] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
 
   // Profile photo upload state
@@ -2418,6 +2419,32 @@ const StudentDashboard = () => {
     setShowInvoiceModal(true);
   };
 
+  const handleDownloadInvoicePdf = async (invoice: any) => {
+    if (!studentProfile) return;
+    if (invoice.pdf_url) {
+      await openInvoicePdfWithName(invoice.pdf_url, studentProfile, invoice);
+      return;
+    }
+    setGeneratingStudentPdfId(invoice.id);
+    try {
+      const pdfUrl = await ensureInvoicePDF(invoice, studentProfile);
+      setInvoices((prev) => prev.map((row) => (row.id === invoice.id ? { ...row, pdf_url: pdfUrl } : row)));
+      if (selectedInvoice?.id === invoice.id) {
+        setSelectedInvoice({ ...selectedInvoice, pdf_url: pdfUrl });
+      }
+      await openInvoicePdfWithName(pdfUrl, studentProfile, invoice);
+    } catch (err) {
+      console.error('Student invoice PDF error:', err);
+      toast({
+        title: 'Could not open PDF',
+        description: err instanceof Error ? err.message : 'Please try again or contact the academy.',
+        variant: 'destructive',
+      });
+    } finally {
+      setGeneratingStudentPdfId(null);
+    }
+  };
+
   const handlePayment = async (invoice: any) => {
     try {
       // First, check the current live status of the invoice
@@ -4362,7 +4389,21 @@ const StudentDashboard = () => {
                                   {inv.status === 'paid' ? 'Paid' : inv.status === 'overdue' ? 'Overdue' : 'Pending'}
                                 </Badge>
                               </td>
-                              <td className="text-center">{inv.pdf_url ? <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer">Download</a> : '-'}</td>
+                              <td className="text-center">
+                                <Button
+                                  size="sm"
+                                  variant="link"
+                                  className="h-auto p-0"
+                                  disabled={generatingStudentPdfId === inv.id}
+                                  onClick={() => void handleDownloadInvoicePdf(inv)}
+                                >
+                                  {generatingStudentPdfId === inv.id
+                                    ? 'Preparing...'
+                                    : inv.pdf_url
+                                      ? 'Download'
+                                      : 'Get PDF'}
+                                </Button>
+                              </td>
                               <td className="text-center"><Button size="sm" variant="outline" onClick={() => handleViewInvoice(inv)}>View</Button></td>
                             </tr>
                           ))}
@@ -4406,10 +4447,18 @@ const StudentDashboard = () => {
                       <div className="text-right font-bold">Total: KES {invoiceDetails.total.toLocaleString()}</div>
                     </div>
                   ) : <p>No breakdown available.</p>}
-                  {selectedInvoice && selectedInvoice.pdf_url && (
-                    <a href={selectedInvoice.pdf_url} target="_blank" rel="noopener noreferrer">
-                      <Button variant="outline">Download PDF</Button>
-                    </a>
+                  {selectedInvoice && (
+                    <Button
+                      variant="outline"
+                      disabled={generatingStudentPdfId === selectedInvoice.id}
+                      onClick={() => void handleDownloadInvoicePdf(selectedInvoice)}
+                    >
+                      {generatingStudentPdfId === selectedInvoice.id
+                        ? 'Preparing PDF...'
+                        : selectedInvoice.pdf_url
+                          ? 'Download PDF'
+                          : 'Generate PDF'}
+                    </Button>
                   )}
                 </DialogContent>
               </Dialog>
@@ -4492,7 +4541,14 @@ const StudentDashboard = () => {
                             )}
                             <div className="flex gap-2">
                               <Button 
-                                onClick={() => window.open(meeting.meetingUrl, '_blank')}
+                                onClick={() => {
+                                  if (!studentProfile?.user_id) return;
+                                  void joinInstantMeetingRoom(
+                                    meeting,
+                                    studentProfile.user_id,
+                                    studentProfile.student_name
+                                  );
+                                }}
                                 className={`flex items-center gap-1 ${meeting.status === 'active' ? 'bg-red-600 hover:bg-red-700 animate-pulse' : 'bg-purple-600 hover:bg-purple-700'}`}
                                 size="sm"
                               >
@@ -4558,7 +4614,11 @@ const StudentDashboard = () => {
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => window.open(room.meetingUrl, '_blank')}
+                              onClick={() =>
+                                void joinMeetingRoom(room, studentProfile?.student_name || 'Student', {
+                                  isHost: false,
+                                })
+                              }
                             >
                               Open in New Tab
                             </Button>

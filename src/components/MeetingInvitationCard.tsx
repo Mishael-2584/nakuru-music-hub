@@ -20,6 +20,7 @@ import { useToast } from '../hooks/use-toast';
 import { 
   getInstantMeeting,
   joinInstantMeetingRoom,
+  upgradeInstantMeetingToZoom,
   canUserJoinInstantMeeting,
   InstantMeeting
 } from '../lib/videoConferencing';
@@ -69,7 +70,11 @@ const MeetingInvitationCard = ({
   const loadMeetingDetails = async () => {
     try {
       const meetingData = await getInstantMeeting(meetingId);
-      setMeeting(meetingData);
+      if (meetingData) {
+        setMeeting(await upgradeInstantMeetingToZoom(meetingData));
+      } else {
+        setMeeting(null);
+      }
     } catch (error) {
       console.error('Error loading meeting details:', error);
       toast({
@@ -429,7 +434,11 @@ const MeetingInvitationCard = ({
                 <Button size="sm" onClick={copyMeetingLink}>
                   <Copy className="w-3 h-3" />
                 </Button>
-                <Button size="sm" onClick={() => window.open(meeting.meetingUrl, '_blank')}>
+                <Button
+                  size="sm"
+                  onClick={() => void handleJoinMeeting()}
+                  disabled={!canJoin.canJoin || isJoining}
+                >
                   <ExternalLink className="w-3 h-3" />
                 </Button>
               </div>

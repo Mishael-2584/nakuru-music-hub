@@ -12,6 +12,18 @@ import {
   normalizeTermPeriod,
   TERMLY_FEE_MODE_ACADEMY,
 } from './termlyFeeUtils';
+import {
+  buildInvoiceDisplayNumber,
+  buildInvoiceDownloadFileName,
+  buildInvoiceStoragePath,
+} from './invoiceNaming';
+
+export {
+  sanitizeInvoiceFilePart,
+  buildInvoiceDisplayNumber,
+  buildInvoiceStoragePath,
+  buildInvoiceDownloadFileName,
+} from './invoiceNaming';
 
 export interface InvoiceLineItem {
   description: string;
@@ -132,6 +144,106 @@ async function getCachedExchangeRate(fromCurrency: string, toCurrency: string): 
   return rate;
 }
 
+const MUSIC_MONTHLY_SESSIONS_PER_MONTH = 4;
+
+/** Download/open a PDF using the student's name as the filename. */
+export async function openInvoicePdfWithName(
+  pdfUrl: string,
+  student: { student_name?: string | null },
+  invoice: { period_start?: string | null; period_end?: string | null }
+): Promise<void> {
+  const downloadName = buildInvoiceDownloadFileName(student, invoice);
+  try {
+    const res = await fetch(pdfUrl);
+    if (!res.ok) throw new Error('Failed to fetch PDF');
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = downloadName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 2000);
+  } catch {
+    const link = document.createElement('a');
+    link.href = pdfUrl;
+    link.download = downloadName;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+}
+
+type FeeRecord = {
+  id: string;
+  price: number;
+  duration?: string | null;
+  hours_per_session?: number | null;
+  mode?: string | null;
+  payment_type?: string | null;
+  sessions_per_week?: number | null;
+  currency?: string | null;
+  course_type?: string | null;
+  course_name?: string | null;
+  is_active?: boolean;
+};
+
+/** When several monthly music fees share the same mode, pick the row that matches the student's plan. */
+export function pickBestMusicMonthlyFee(
+  fees: FeeRecord[],
+  registration: { home_lesson_duration?: string | null; learning_mode?: string | null }
+): FeeRecord | null {
+  if (!fees.length) return null;
+  const lm = String(registration.learning_mode || '').toLowerCase();
+  const isHome = lm === 'home' || lm.includes('home');
+
+  if (isHome) {
+    if (registration.home_lesson_duration === '30_min') {
+      return fees.find((f) => (f.duration || '').toLowerCase().includes('30')) ?? fees[0];
+    }
+    if (registration.home_lesson_duration === '1_hour') {
+      return (
+        fees.find((f) => (f.duration || '').toLowerCase().includes('1 hour')) ?? fees[0]
+      );
+    }
+  }
+
+  return (
+    fees.find((f) => (f.duration || '').toLowerCase().includes('1 hour')) ||
+    fees.reduce((best, f) =>
+      (Number(f.hours_per_session) || 0) > (Number(best.hours_per_session) || 0) ? f : best
+    )
+  );
+}
+
+/** Published monthly rates (1 session/week plan); multiplied by registration sessions_per_week. */
+export function resolveMusicMonthlyTotalKes(
+  registration: {
+    learning_mode?: string | null;
+    home_lesson_duration?: string | null;
+    sessions_per_week?: number | string | null;
+  },
+  convertedOnlineMonthlyKes: number
+): number {
+  const lm = String(registration.learning_mode || '').toLowerCase();
+  const sessions = Math.max(
+    1,
+    registration.sessions_per_week ? parseInt(String(registration.sessions_per_week), 10) : 1
+  );
+
+  if (lm === 'home' || lm.includes('home')) {
+    const base = registration.home_lesson_duration === '1_hour' ? 12000 : 6000;
+    return base * sessions;
+  }
+  if (lm === 'online') {
+    return Math.round(convertedOnlineMonthlyKes * sessions);
+  }
+  return 6000 * sessions;
+}
+
 /**
  * Calculate invoice line items and totals for a student for a given period.
  * @param studentId - The student's UUID
@@ -237,7 +349,7 @@ export async function generateAndUploadInvoicePDF(invoice: any, student: any, is
   console.log('PDF Generation: invoice.due_date =', invoice.due_date);
   // Build invoiceMeta for the new PDF layout
   const invoiceMeta = {
-    invoiceNumber: isFirstInvoice ? 'first' : invoice.id || '',
+    invoiceNumber: buildInvoiceDisplayNumber(student, invoice, isFirstInvoice),
     periodStart: invoice.period_start || '',
     periodEnd: invoice.period_end || '',
     dueDate: invoice.due_date || '',
@@ -253,7 +365,7 @@ export async function generateAndUploadInvoicePDF(invoice: any, student: any, is
   // Generate PDF blob with new layout
   const pdfBlob = await generateQuotePDF(quoteData, invoice.amount_due, '', invoiceDetails, invoiceMeta);
   // Upload to Supabase Storage
-  const fileName = `invoices/${student.id}_${invoice.period_start}_${invoice.period_end}.pdf`;
+  const fileName = buildInvoiceStoragePath(student, invoice);
   const { data, error } = await supabase.storage.from('invoices').upload(fileName, pdfBlob, { upsert: true, contentType: 'application/pdf' });
   if (error) throw error;
   // Get public URL
@@ -284,7 +396,7 @@ export async function generateInvoicePDFBlob(invoice: any, student: any, isFirst
     additional_notes: ''
   };
   const invoiceMeta = {
-    invoiceNumber: isFirstInvoice ? 'first' : invoice.id || '',
+    invoiceNumber: buildInvoiceDisplayNumber(student, invoice, isFirstInvoice),
     periodStart: invoice.period_start || '',
     periodEnd: invoice.period_end || '',
     dueDate: invoice.due_date || '',
@@ -295,6 +407,89 @@ export async function generateInvoicePDFBlob(invoice: any, student: any, isFirst
     notes: invoice.notes || '',
   };
   return generateQuotePDF(quoteData, invoice.amount_due, '', invoiceDetails, invoiceMeta);
+}
+
+/** Build PDF line items when older invoices lack lessons_summary. */
+export function buildFallbackLessonsSummary(invoice: {
+  amount_due: number;
+  period_start?: string;
+  period_end?: string;
+  notes?: string | null;
+}) {
+  const amount = Number(invoice.amount_due) || 0;
+  const periodLabel =
+    invoice.period_start && invoice.period_end
+      ? `${invoice.period_start} to ${invoice.period_end}`
+      : 'billing period';
+
+  return {
+    lineItems: [
+      {
+        description: `Music lessons — ${periodLabel}`,
+        quantity: 1,
+        unitPrice: amount,
+        amount,
+        lessonIds: [] as string[],
+      },
+    ],
+    subtotal: amount,
+    tax: 0,
+    total: amount,
+    paymentTerms: 'Payment due within 7 days of invoice date',
+    validUntil: '',
+    serviceBreakdown: 'Music lessons as scheduled',
+    equipmentBreakdown: 'All necessary equipment and materials provided',
+    additionalInfo: invoice.notes || 'Please contact us if you have any questions about this invoice.',
+  };
+}
+
+/**
+ * Generate PDF for an invoice, upload to storage, save pdf_url on the row.
+ * Safe to call for historical invoices that never had a PDF.
+ */
+export async function ensureInvoicePDF(
+  invoice: Record<string, unknown>,
+  student: Record<string, unknown>
+): Promise<string> {
+  if (invoice.pdf_url && typeof invoice.pdf_url === 'string') {
+    return invoice.pdf_url;
+  }
+
+  const studentId = student.id as string;
+  const invoiceId = invoice.id as string;
+
+  const { data: earliest, error: earliestError } = await supabase
+    .from('invoices')
+    .select('id')
+    .eq('student_id', studentId)
+    .order('period_start', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (earliestError) {
+    console.warn('Could not determine first invoice:', earliestError);
+  }
+
+  const isFirstInvoice = earliest?.id === invoiceId;
+
+  const invoiceForPdf = {
+    ...invoice,
+    lessons_summary:
+      invoice.lessons_summary || buildFallbackLessonsSummary(invoice as Parameters<typeof buildFallbackLessonsSummary>[0]),
+  };
+
+  const pdfUrl = await generateAndUploadInvoicePDF(invoiceForPdf, student, isFirstInvoice);
+
+  const { error: updateError } = await supabase
+    .from('invoices')
+    .update({ pdf_url: pdfUrl, updated_at: new Date().toISOString() })
+    .eq('id', invoiceId);
+
+  if (updateError) {
+    throw new Error(`PDF created but failed to save link: ${updateError.message}`);
+  }
+
+  return pdfUrl;
 }
 
 // Add defensive check utility function
@@ -431,11 +626,19 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
       }
     }
   } else {
-    const result = await applyTermFeeFilters(
+    const { data: feeRows, error: feeRowsError } = await applyTermFeeFilters(
       supabase.from('fees').select('*').eq('mode', normalizedLearningMode)
-    ).maybeSingle();
-    exactFee = result.data;
-    exactFeeError = result.error;
+    );
+    if (feeRowsError) {
+      exactFeeError = feeRowsError;
+    } else if (feeRows?.length === 1) {
+      exactFee = feeRows[0];
+    } else if (feeRows && feeRows.length > 1 && normalizedCourseCategory === 'music' && paymentType === 'monthly') {
+      exactFee = pickBestMusicMonthlyFee(feeRows, registration);
+      console.log('Picked music monthly fee from multiple rows:', exactFee);
+    } else if (feeRows?.length) {
+      exactFee = feeRows[0];
+    }
   }
 
   if (exactFee && !exactFeeError) {
@@ -456,7 +659,13 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     if (paymentType === 'term' && termPeriod) {
       modeFeeQuery = modeFeeQuery.ilike('duration', getTermDurationPattern(termPeriod));
     }
-    let { data: modeFee, error: modeFeeError } = await modeFeeQuery.maybeSingle();
+    let { data: modeFeeRows, error: modeFeeError } = await modeFeeQuery;
+    let modeFee =
+      modeFeeRows?.length === 1
+        ? modeFeeRows[0]
+        : modeFeeRows && modeFeeRows.length > 1 && normalizedCourseCategory === 'music' && paymentType === 'monthly'
+          ? pickBestMusicMonthlyFee(modeFeeRows, registration)
+          : modeFeeRows?.[0] ?? null;
     if ((!modeFee || modeFeeError) && paymentType === 'term') {
       const academyTry = await applyTermFeeFilters(
         supabase.from('fees').select('*').eq('mode', TERMLY_FEE_MODE_ACADEMY)
@@ -604,7 +813,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
             defaultCurrency = '$';
           } else if (learningMode === 'home' || normalizedLearningMode === 'Home (Nakuru & Environs)') {
             const dur = registration.home_lesson_duration;
-            defaultPrice = (dur === '30_min' || dur === '1_hour') ? (dur === '30_min' ? 6000 : 10000) : 10000; // 30 min = 6,000; 1 hr = 10,000
+            defaultPrice = (dur === '30_min' || dur === '1_hour') ? (dur === '30_min' ? 6000 : 12000) : 12000; // 30 min = 6,000; 1 hr = 12,000
           } else {
             defaultPrice = 6000; // KES 6,000 for academy lessons
           }
@@ -655,11 +864,30 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     }
   }
 
-  // Home lessons (Music only): use duration-based pricing — 30 min = KSh 6,000, 1 hour = KSh 10,000
-  const isHomeMusic = courseCategoryLower === 'music' && (learningMode === 'home' || learningMode === 'home-lessons' || normalizedLearningMode === 'Home (Nakuru & Environs)');
+  const isHomeMusic =
+    courseCategoryLower === 'music' &&
+    (learningMode === 'home' ||
+      learningMode === 'home-lessons' ||
+      normalizedLearningMode === 'Home (Nakuru & Environs)');
   const homeDuration = registration.home_lesson_duration;
-  if (isHomeMusic && (homeDuration === '30_min' || homeDuration === '1_hour')) {
-    fee = { ...fee, price: homeDuration === '30_min' ? 6000 : 10000 };
+
+  // Music monthly: use published flat monthly totals (fixes legacy 5,600 academy row → 6,000)
+  if (courseCategoryLower === 'music' && fee.payment_type === 'monthly') {
+    const sessions = Math.max(
+      1,
+      registration.sessions_per_week ? parseInt(String(registration.sessions_per_week), 10) : 1
+    );
+    const monthlyTotal = resolveMusicMonthlyTotalKes(registration, fee.price);
+    fee = { ...fee, price: monthlyTotal / sessions, sessions_per_week: 1 };
+    console.log('Music monthly pricing applied:', {
+      monthlyTotal,
+      sessionsPerWeek: sessions,
+      feePricePerPlan: fee.price,
+      learningMode,
+      home_lesson_duration: homeDuration,
+    });
+  } else if (isHomeMusic && (homeDuration === '30_min' || homeDuration === '1_hour')) {
+    fee = { ...fee, price: homeDuration === '30_min' ? 6000 : 12000 };
     console.log('Home lesson duration pricing applied:', { home_lesson_duration: homeDuration, price: fee.price });
   }
 
@@ -895,7 +1123,11 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     } else {
       unitPrice = Math.round((invoiceAmount / quantity) * 100) / 100;
     }
-    lineDescription = `${courseDisplayName} - ${sessionsPerWeek} session${sessionsPerWeek > 1 ? 's' : ''} per week × ${numWeeks} weeks`;
+    if (fee.payment_type === 'monthly' && courseCategoryLower === 'music') {
+      lineDescription = `${courseDisplayName} — monthly tuition (${quantity} sessions @ KSh ${unitPrice.toLocaleString()} each)`;
+    } else {
+      lineDescription = `${courseDisplayName} - ${sessionsPerWeek} session${sessionsPerWeek > 1 ? 's' : ''} per week × ${numWeeks} weeks`;
+    }
   }
   
   // Apply partial month billing logic for subsequent invoices (only for monthly payment type, not Technology)
@@ -1009,6 +1241,13 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   }
 
   console.log('Invoice created successfully:', invoice);
+
+  try {
+    const pdfUrl = await ensureInvoicePDF(invoice as Record<string, unknown>, student as Record<string, unknown>);
+    (invoice as Invoice & { pdf_url?: string }).pdf_url = pdfUrl;
+  } catch (pdfError) {
+    console.warn('Invoice saved but PDF generation failed (can retry from admin):', pdfError);
+  }
 
   // Mark applied credits as used and associate with this invoice
   if (makeupCreditIds.length > 0 && invoice) {

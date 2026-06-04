@@ -261,7 +261,38 @@ async function findFeeForRegistration(registration) {
     normalizedCourseName = 'Web Design & Programming';
   }
 
-  const findTermFee = async (mode) => {
+  const pickBestMusicMonthlyFee = (fees, reg) => {
+    if (!fees?.length) return null;
+    const lm = String(reg.learning_mode || '').toLowerCase();
+    const isHome = lm === 'home' || lm.includes('home');
+    if (isHome) {
+      if (reg.home_lesson_duration === '30_min') {
+        return fees.find((f) => (f.duration || '').toLowerCase().includes('30')) || fees[0];
+      }
+      if (reg.home_lesson_duration === '1_hour') {
+        return fees.find((f) => (f.duration || '').toLowerCase().includes('1 hour')) || fees[0];
+      }
+    }
+    return (
+      fees.find((f) => (f.duration || '').toLowerCase().includes('1 hour')) ||
+      fees.reduce((best, f) =>
+        (Number(f.hours_per_session) || 0) > (Number(best.hours_per_session) || 0) ? f : best
+      )
+    );
+  };
+
+  const resolveMusicMonthlyTotalKes = (reg, onlineMonthlyKes) => {
+    const lm = String(reg.learning_mode || '').toLowerCase();
+    const sessions = Math.max(1, parseInt(String(reg.sessions_per_week || 1), 10) || 1);
+    if (lm === 'home' || lm.includes('home')) {
+      const base = reg.home_lesson_duration === '1_hour' ? 12000 : 6000;
+      return base * sessions;
+    }
+    if (lm === 'online') return Math.round(onlineMonthlyKes * sessions);
+    return 6000 * sessions;
+  };
+
+  const findFeesForMode = async (mode) => {
     let q = supabase
       .from('fees')
       .select('*')
@@ -273,22 +304,37 @@ async function findFeeForRegistration(registration) {
     if (paymentType === 'term' && termPeriod) {
       q = q.ilike('duration', getTermDurationPattern(termPeriod));
     }
-    return q.maybeSingle();
+    return q;
   };
 
   if (paymentType === 'term') {
     for (const mode of [normalizedLearningMode, TERMLY_FEE_MODE_ACADEMY]) {
-      const { data: exactFee, error: exactFeeError } = await findTermFee(mode);
+      const { data: exactFee, error: exactFeeError } = await findFeesForMode(mode).maybeSingle();
       if (exactFee && !exactFeeError) {
         console.log('Found term fee match:', exactFee);
         return convertCurrencyToKES(exactFee);
       }
     }
   } else {
-    const { data: exactFee, error: exactFeeError } = await findTermFee(normalizedLearningMode);
+    const { data: feeRows, error: exactFeeError } = await findFeesForMode(normalizedLearningMode);
+    let exactFee = null;
+    if (!exactFeeError && feeRows?.length === 1) {
+      exactFee = feeRows[0];
+    } else if (!exactFeeError && feeRows && feeRows.length > 1 && courseCategoryLower === 'music' && paymentType === 'monthly') {
+      exactFee = pickBestMusicMonthlyFee(feeRows, registration);
+      console.log('Picked music monthly fee from multiple rows:', exactFee);
+    } else if (feeRows?.length) {
+      exactFee = feeRows[0];
+    }
     if (exactFee && !exactFeeError) {
-      console.log('Found exact fee match with learning mode and payment type:', exactFee);
-      return convertCurrencyToKES(exactFee);
+      const converted = await convertCurrencyToKES(exactFee);
+      if (courseCategoryLower === 'music' && paymentType === 'monthly') {
+        const sessions = Math.max(1, parseInt(String(registration.sessions_per_week || 1), 10) || 1);
+        const monthlyTotal = resolveMusicMonthlyTotalKes(registration, converted.price);
+        return { ...converted, price: monthlyTotal / sessions, sessions_per_week: 1 };
+      }
+      console.log('Found exact fee match with learning mode and payment type:', converted);
+      return converted;
     }
   }
   
@@ -306,7 +352,13 @@ async function findFeeForRegistration(registration) {
   if (paymentType === 'term' && termPeriod) {
     modeFeeQuery = modeFeeQuery.ilike('duration', getTermDurationPattern(termPeriod));
   }
-  let { data: modeFee, error: modeFeeError } = await modeFeeQuery.maybeSingle();
+  let { data: modeFeeRows, error: modeFeeError } = await modeFeeQuery;
+  let modeFee =
+    modeFeeRows?.length === 1
+      ? modeFeeRows[0]
+      : modeFeeRows && modeFeeRows.length > 1 && courseCategoryLower === 'music' && paymentType === 'monthly'
+        ? pickBestMusicMonthlyFee(modeFeeRows, registration)
+        : modeFeeRows?.[0] ?? null;
   if ((!modeFee || modeFeeError) && paymentType === 'term') {
     const academyTry = await findTermFee(TERMLY_FEE_MODE_ACADEMY);
     modeFee = academyTry.data;
@@ -452,7 +504,7 @@ async function findFeeForRegistration(registration) {
     defaultCurrency = '$';
   } else if (String(learningMode).toLowerCase() === 'home') {
     const dur = registration.home_lesson_duration;
-    defaultPrice = (dur === '30_min' || dur === '1_hour') ? (dur === '30_min' ? 6000 : 10000) : 10000; // 30 min = 6,000; 1 hr = 10,000
+    defaultPrice = (dur === '30_min' || dur === '1_hour') ? (dur === '30_min' ? 6000 : 12000) : 12000; // 30 min = 6,000; 1 hr = 12,000
   } else {
     defaultPrice = 6000; // KES 6,000 for academy lessons
   }
@@ -521,15 +573,21 @@ function shouldCreateNewInvoice(period, now, isFirstInvoice) {
 }
 
 async function generateInvoicesForRegistration(registration, fee, student, summary) {
-  // Home lessons (Music only): use duration-based pricing — 30 min = KSh 6,000, 1 hour = KSh 10,000
   const courseCategory = registration.course_category || 'Music';
   const courseCategoryLower = String(courseCategory).toLowerCase();
   const learningMode = (registration.learning_mode || 'in-person').toLowerCase();
-  const isHomeMusic = courseCategoryLower === 'music' && (learningMode === 'home' || learningMode === 'home-lessons' || learningMode === 'home (nakuru & environs)');
-  const homeDuration = registration.home_lesson_duration;
-  if (isHomeMusic && (homeDuration === '30_min' || homeDuration === '1_hour')) {
-    fee = { ...fee, price: homeDuration === '30_min' ? 6000 : 10000 };
-    console.log('Home lesson duration pricing applied:', { home_lesson_duration: homeDuration, price: fee.price });
+
+  if (courseCategoryLower === 'music' && fee.payment_type === 'monthly') {
+    const sessions = Math.max(1, parseInt(String(registration.sessions_per_week || 1), 10) || 1);
+    const lm = learningMode;
+    let monthlyTotal = fee.price * sessions;
+    if (lm === 'home' || lm.includes('home')) {
+      monthlyTotal = (registration.home_lesson_duration === '1_hour' ? 12000 : 6000) * sessions;
+    } else if (lm !== 'online') {
+      monthlyTotal = 6000 * sessions;
+    }
+    fee = { ...fee, price: monthlyTotal };
+    console.log('Music monthly recurring amount:', monthlyTotal);
   }
 
   // Check if this is the first invoice for this student

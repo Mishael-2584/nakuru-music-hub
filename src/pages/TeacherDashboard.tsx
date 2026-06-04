@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
 import VideoConferenceModal from '../components/VideoConferenceModal';
-import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getUserInvitedMeetings, getUserInstantMeetings, InstantMeeting, openMeetingLink } from '../lib/videoConferencing';
+import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getUserInvitedMeetings, getUserInstantMeetings, InstantMeeting, openMeetingLink, joinBookingOnlineMeeting, joinInstantMeetingRoom } from '../lib/videoConferencing';
 import MessagingUI from '../components/MessagingUI';
 import InstantMeetManager from '../components/InstantMeetManager';
 
@@ -2784,7 +2784,12 @@ const TeacherDashboard = () => {
                                   <Button 
                                     size="sm" 
                                     variant="outline" 
-                                    onClick={() => window.open(booking.meeting_link, '_blank')}
+                                    onClick={() =>
+                                      void joinBookingOnlineMeeting(booking, {
+                                        isHost: true,
+                                        teacherName: profile?.name,
+                                      })
+                                    }
                                   >
                                     Join Meeting
                                   </Button>
@@ -2823,7 +2828,12 @@ const TeacherDashboard = () => {
                                   <Button 
                                     size="sm" 
                                     variant="outline" 
-                                    onClick={() => window.open(booking.meeting_link, '_blank')}
+                                    onClick={() =>
+                                      void joinBookingOnlineMeeting(booking, {
+                                        isHost: true,
+                                        teacherName: profile?.name,
+                                      })
+                                    }
                                   >
                                     Join Meeting
                                   </Button>
@@ -2980,7 +2990,14 @@ const TeacherDashboard = () => {
                               )}
                               <div className="flex gap-2">
                                 <Button 
-                                  onClick={() => window.open(meeting.meetingUrl, '_blank')}
+                                  onClick={() => {
+                                    if (!profile?.user_id) return;
+                                    void joinInstantMeetingRoom(
+                                      meeting,
+                                      profile.user_id,
+                                      profile.name || 'Teacher'
+                                    );
+                                  }}
                                   className={`flex items-center gap-1 ${
                                     meeting.status === 'active' 
                                       ? 'bg-red-600 hover:bg-red-700 animate-pulse' 

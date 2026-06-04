@@ -28,6 +28,7 @@ import {
 import { useToast } from '../hooks/use-toast';
 import {
   getUserInstantMeetings,
+  getInstantMeeting,
   joinInstantMeetingRoom,
   openMeetingLink,
   startInstantMeeting,
@@ -215,10 +216,14 @@ const InstantMeetManager = ({
   const handleStartMeeting = async (meetingId: string) => {
     try {
       await startInstantMeeting(meetingId);
+      const meeting = await getInstantMeeting(meetingId);
+      if (meeting) {
+        await handleJoinMeeting(meeting);
+      }
       await fetchMeetings();
       toast({
         title: "Meeting Started",
-        description: "Meeting is now live"
+        description: "Opening Zoom as host..."
       });
     } catch (error) {
       console.error('Error starting meeting:', error);

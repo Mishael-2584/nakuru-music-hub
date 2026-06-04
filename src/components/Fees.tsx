@@ -22,7 +22,7 @@ const Fees = () => {
           duration: "1 hour",
           monthly: "KSh 6,000",
           icon: Home,
-          features: ["One-on-one instruction", "Professional facilities", "All instruments available", "Flexible scheduling"],
+          features: ["One-on-one instruction", "Professional facilities", "4 sessions a month", "Flexible scheduling"],
           popular: true
         },
         {
@@ -31,15 +31,15 @@ const Fees = () => {
           duration: "30 minutes", 
           monthly: "KSh 6,000",
           icon: Home,
-          features: ["One-on-one instruction", "Professional facilities", "Perfect for beginners", "Focused sessions"]
+          features: ["One-on-one instruction", "Professional facilities", "4 sessions a month", "Perfect for beginners", "Focused sessions"]
         },
         {
           name: "Home Lesson",
           location: "Nakuru CBD & Environs",
           duration: "1 hour",
-          monthly: "KSh 10,000",
+          monthly: "KSh 12,000",
           icon: Users,
-          features: ["Convenient home lessons", "Personal attention", "Comfortable environment", "Travel included"]
+          features: ["Convenient home lessons", "Personal attention", "4 sessions a month", "Comfortable environment", "Travel included"]
         },
         {
           name: "Online",
@@ -47,7 +47,7 @@ const Fees = () => {
           duration: "1 hour",
           monthly: "$78/month",
           icon: Globe,
-          features: ["Global accessibility", "Flexible timing", "Digital resources", "Interactive sessions"],
+          features: ["Global accessibility", "Flexible timing", "4 sessions a month", "Digital resources", "Interactive sessions"],
           special: true
         }
       ]

@@ -1,5 +1,10 @@
 import { supabase } from '@/integrations/supabase/client';
 import { generateQuotePDF } from "./pdfGenerator";
+import {
+  buildInvoiceDisplayNumber,
+  buildInvoiceDownloadFileName,
+  buildInvoiceStoragePath,
+} from './invoiceNaming';
 
 interface RegistrationData {
   id: string;
@@ -986,7 +991,7 @@ export const sendInvoiceEmail = async (
     
     // Build invoiceMeta for PDF generation
     const invoiceMeta = {
-      invoiceNumber: options.isFirstInvoice ? 'first' : invoice.id || '',
+      invoiceNumber: buildInvoiceDisplayNumber(student, invoice, options.isFirstInvoice),
       periodStart: invoice.period_start || '',
       periodEnd: invoice.period_end || '',
       dueDate: invoice.due_date || '',
@@ -1038,6 +1043,21 @@ export const sendInvoiceEmail = async (
       invoiceDetails,
       invoiceMeta
     );
+
+    if (!invoice.pdf_url && invoice.id && student.id) {
+      try {
+        const fileName = buildInvoiceStoragePath(student, invoice);
+        await supabase.storage
+          .from('invoices')
+          .upload(fileName, pdfBlob, { upsert: true, contentType: 'application/pdf' });
+        const { publicUrl } = supabase.storage.from('invoices').getPublicUrl(fileName).data;
+        await supabase.from('invoices').update({ pdf_url: publicUrl }).eq('id', invoice.id);
+        invoice.pdf_url = publicUrl;
+      } catch (storeErr) {
+        console.warn('Invoice email sent but PDF was not stored:', storeErr);
+      }
+    }
+
     // Convert blob to base64 for email attachment
     const reader = new FileReader();
     const pdfBase64 = await new Promise<string>((resolve) => {
@@ -1111,7 +1131,7 @@ export const sendInvoiceEmail = async (
         html: `<!DOCTYPE html><html><body>${body}<br/><br/><p>Thank you for being part of Damon Music Academy!</p></body></html>`,
         attachments: [
           {
-            filename: `invoice-${student.student_name.replace(/\s+/g, '_')}-${Date.now()}.pdf`,
+            filename: buildInvoiceDownloadFileName(student, invoice),
             content: pdfBase64,
             contentType: 'application/pdf'
           }

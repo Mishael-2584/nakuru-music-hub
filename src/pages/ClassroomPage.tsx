@@ -64,6 +64,7 @@ type AssignmentSubmission = {
   student_id: string;
   submission_text: string;
   submitted_at: string;
+  no_submission?: boolean;
   grade_points?: number;
   grade_feedback?: string;
   graded_by?: string;
@@ -1247,47 +1248,73 @@ export default function ClassroomPage() {
     }
   };
 
-  const handleGradeSubmission = async (submissionId: string, points: number, feedback: string) => {
+  const handleGradeSubmission = async (
+    postId: string,
+    studentId: string,
+    points: number,
+    feedback: string,
+    submissionId?: string
+  ) => {
     if (!user) return;
-    
+
     try {
       const { data: teacher, error: teacherError } = await supabase
         .from('teachers')
         .select('id')
         .eq('user_id', user.id)
         .single();
-      
+
       if (teacherError || !teacher) {
         throw new Error('Teacher not found');
       }
-      
-      const { error: updateError } = await supabase
-        .from('assignment_submissions')
-        .update({
-          grade_points: points,
-          grade_feedback: feedback || null,
-          graded_by: teacher.id,
-          graded_at: new Date().toISOString()
-        })
-        .eq('id', submissionId);
-      
-      if (updateError) throw updateError;
-      
-      toast({ title: 'Success', description: 'Submission graded successfully' });
-      
-      const postId = Object.keys(submissions).find(key => 
-        submissions[key].some(s => s.id === submissionId)
-      );
-      
-      if (postId) {
-        await loadSubmissions(postId);
+
+      const gradePayload = {
+        grade_points: points,
+        grade_feedback: feedback || null,
+        graded_by: teacher.id,
+        graded_at: new Date().toISOString(),
+      };
+
+      if (submissionId) {
+        const { error: updateError } = await supabase
+          .from('assignment_submissions')
+          .update(gradePayload)
+          .eq('id', submissionId);
+
+        if (updateError) throw updateError;
+      } else {
+        const { error: upsertError } = await supabase
+          .from('assignment_submissions')
+          .upsert(
+            {
+              post_id: postId,
+              student_id: studentId,
+              submission_text: null,
+              submitted_at: null,
+              no_submission: true,
+              ...gradePayload,
+            },
+            { onConflict: 'post_id,student_id' }
+          );
+
+        if (upsertError) throw upsertError;
       }
+
+      toast({
+        title: 'Success',
+        description:
+          points === 0 && !submissionId
+            ? 'Recorded 0 — no submission'
+            : 'Grade saved successfully',
+      });
+
+      await loadSubmissions(postId);
     } catch (err) {
       console.error('Failed to grade submission:', err);
-      toast({ 
-        title: 'Error', 
-        description: `Failed to grade submission: ${err instanceof Error ? err.message : 'Unknown error'}`, 
-        variant: 'destructive' 
+      toast({
+        title: 'Error',
+        description: `Failed to save grade: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        variant: 'destructive',
       });
     }
   };
@@ -2223,6 +2250,7 @@ export default function ClassroomPage() {
                         post={post}
                         isTeacher={isTeacherOfClass}
                         submissions={submissions[post.post_id] || []}
+                        enrolledStudents={enrolledStudents}
                         currentStudentId={classroom.currentStudent?.id}
                         onSubmit={handleSubmitAssignment}
                         onGrade={handleGradeSubmission}

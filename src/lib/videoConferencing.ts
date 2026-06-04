@@ -163,17 +163,153 @@ export const createZoomMeeting = async (params: {
   };
 };
 
+/** True if URL is an old Jitsi Meet link (pre-Zoom migration). */
+export const isLegacyJitsiUrl = (url: string | null | undefined): boolean => {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return lower.includes('meet.jit.si') || lower.includes('jitsi');
+};
+
+/** Replace legacy Jitsi links with fresh Zoom URLs in the database. */
+export const upgradeInstantMeetingToZoom = async (
+  meeting: InstantMeeting
+): Promise<InstantMeeting> => {
+  if (!isLegacyJitsiUrl(meeting.meetingUrl)) {
+    return meeting;
+  }
+
+  const { supabase } = await import('../integrations/supabase/client');
+  const zoom = await createZoomMeeting({
+    topic: meeting.title,
+    startTime: meeting.scheduledStartTime,
+    duration: meeting.duration || 60,
+    agenda: meeting.description || meeting.title,
+  });
+
+  const { data, error } = await supabase
+    .from('instant_meetings')
+    .update({
+      meeting_url: zoom.joinUrl,
+      meeting_host_url: zoom.startUrl,
+      zoom_meeting_id: zoom.meetingId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', meeting.id)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to upgrade meeting to Zoom: ${error.message}`);
+  }
+
+  return mapInstantMeetingRow(data);
+};
+
+export const upgradeMeetingRoomToZoom = async (room: MeetingRoom): Promise<MeetingRoom> => {
+  if (!isLegacyJitsiUrl(room.meetingUrl)) {
+    return room;
+  }
+
+  const { supabase } = await import('../integrations/supabase/client');
+  const durationMinutes = Math.max(
+    15,
+    Math.round(
+      (new Date(room.endTime).getTime() - new Date(room.startTime).getTime()) / (1000 * 60)
+    ) || 60
+  );
+
+  const zoom = await createZoomMeeting({
+    topic: room.roomName.replace(/-/g, ' '),
+    startTime: room.startTime,
+    duration: durationMinutes,
+    agenda: room.notes || 'Damon Music Academy lesson',
+  });
+
+  const { data, error } = await supabase
+    .from('meeting_rooms')
+    .update({
+      meeting_url: zoom.joinUrl,
+      meeting_host_url: zoom.startUrl,
+      zoom_meeting_id: zoom.meetingId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', room.id)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to upgrade lesson room to Zoom: ${error.message}`);
+  }
+
+  const upgraded = mapMeetingRoomRow(data);
+
+  if (upgraded.bookingId) {
+    await supabase
+      .from('bookings')
+      .update({ meeting_link: zoom.joinUrl })
+      .eq('id', upgraded.bookingId);
+  }
+
+  return upgraded;
+};
+
 /** Open Zoom in a new tab — hosts use start URL (host controls + waiting room). */
 export const openMeetingLink = (
   joinUrl: string,
   options?: { isHost?: boolean; hostUrl?: string | null }
 ): void => {
+  if (isLegacyJitsiUrl(joinUrl)) {
+    throw new Error(
+      'This meeting still uses an old Jitsi link. Please try joining again — the app will upgrade it to Zoom automatically.'
+    );
+  }
+
   const url =
     options?.isHost && options.hostUrl ? options.hostUrl : joinUrl;
-  if (!url || (!url.includes('zoom.us') && !url.includes('zoom.com'))) {
-    console.warn('Opening non-Zoom meeting URL (legacy link):', url);
+  if (!url.includes('zoom.us') && !url.includes('zoom.com')) {
+    console.warn('Opening non-Zoom meeting URL:', url);
   }
   window.open(url, '_blank', 'noopener,noreferrer');
+};
+
+/** Join an online booking — upgrades legacy Jitsi links on the booking/meeting room. */
+export const joinBookingOnlineMeeting = async (
+  booking: {
+    id: string;
+    meeting_link: string;
+    booking_date: string;
+    start_time: string;
+    end_time: string;
+    student_name?: string;
+  },
+  options: { isHost: boolean; teacherName?: string }
+): Promise<void> => {
+  const { supabase } = await import('../integrations/supabase/client');
+  let joinUrl = booking.meeting_link;
+  let hostUrl: string | null | undefined;
+
+  const existingRoom = await getMeetingRoomByBooking(booking.id);
+  if (existingRoom) {
+    const upgraded = await upgradeMeetingRoomToZoom(existingRoom);
+    joinUrl = upgraded.meetingUrl;
+    hostUrl = upgraded.meetingHostUrl;
+  } else if (isLegacyJitsiUrl(joinUrl)) {
+    const startTime = `${booking.booking_date}T${booking.start_time}`;
+    const endTime = `${booking.booking_date}T${booking.end_time}`;
+    const zoom = await createZoomMeeting({
+      topic: `Lesson with ${booking.student_name || 'student'}`,
+      startTime,
+      duration: Math.max(15, getMeetingDuration(startTime, endTime) || 60),
+    });
+    joinUrl = zoom.joinUrl;
+    hostUrl = zoom.startUrl;
+    await supabase
+      .from('bookings')
+      .update({ meeting_link: zoom.joinUrl })
+      .eq('id', booking.id);
+  }
+
+  openMeetingLink(joinUrl, { isHost: options.isHost, hostUrl });
 };
 
 // Generate a unique meeting room name
@@ -320,13 +456,18 @@ export const updateMeetingRoomStatus = async (
   }
 };
 
-// Join meeting room (opens Zoom in new tab)
-export const joinMeetingRoom = (
-  meetingUrl: string,
+// Join meeting room (opens Zoom in new tab; upgrades legacy Jitsi first)
+export const joinMeetingRoom = async (
+  room: MeetingRoom,
   _userName: string,
-  options?: { isHost?: boolean; hostUrl?: string | null }
-): void => {
-  openMeetingLink(meetingUrl, options);
+  options?: { isHost?: boolean }
+): Promise<MeetingRoom> => {
+  const upgraded = await upgradeMeetingRoomToZoom(room);
+  openMeetingLink(upgraded.meetingUrl, {
+    isHost: options?.isHost,
+    hostUrl: upgraded.meetingHostUrl,
+  });
+  return upgraded;
 };
 
 // Check if meeting is currently active (within 15 minutes of start time)
@@ -792,12 +933,14 @@ export const joinInstantMeetingRoom = async (
     throw new Error(reason || 'Cannot join meeting');
   }
 
-  await joinInstantMeeting(meeting.id, userId, userName);
+  const zoomMeeting = await upgradeInstantMeetingToZoom(meeting);
 
-  const isHost = meeting.hostId === userId;
-  openMeetingLink(meeting.meetingUrl, {
+  await joinInstantMeeting(zoomMeeting.id, userId, userName);
+
+  const isHost = zoomMeeting.hostId === userId;
+  openMeetingLink(zoomMeeting.meetingUrl, {
     isHost,
-    hostUrl: meeting.meetingHostUrl,
+    hostUrl: zoomMeeting.meetingHostUrl,
   });
 };
 
