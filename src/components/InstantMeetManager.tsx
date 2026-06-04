@@ -365,7 +365,14 @@ const InstantMeetManager = ({
   const renderMeetingCard = (meeting: InstantMeeting) => {
     const activeParticipants = getActiveParticipants(meeting);
     const isHost = meeting.hostId === userId;
-    const canJoin = meeting.status === 'pending' || meeting.status === 'active';
+    const isUserInMeeting = activeParticipants.some((p) => p.userId === userId);
+    const canJoin =
+      (meeting.status === 'pending' || meeting.status === 'active') &&
+      !(isHost && meeting.status === 'pending');
+    // Host is auto-joined when they start — no join button while already in the room.
+    // Others who are in can re-open Zoom; those not in yet see Join Now.
+    const showReturnToMeeting =
+      meeting.status === 'active' && isUserInMeeting && !isHost;
     const canManage = isHost && (meeting.status === 'scheduled' || meeting.status === 'pending' || meeting.status === 'active');
     const canDelete = isHost; // Teachers can always delete their own meetings
 
@@ -435,8 +442,19 @@ const InstantMeetManager = ({
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2">
-            {canJoin && (
-              <Button 
+            {showReturnToMeeting && (
+              <Button
+                variant="outline"
+                onClick={() => handleJoinMeeting(meeting)}
+                className="flex items-center gap-1"
+                size="sm"
+              >
+                <Play className="w-4 h-4" />
+                Return to meeting
+              </Button>
+            )}
+            {canJoin && !showReturnToMeeting && (
+              <Button
                 onClick={() => handleJoinMeeting(meeting)}
                 className="flex items-center gap-1"
                 size="sm"

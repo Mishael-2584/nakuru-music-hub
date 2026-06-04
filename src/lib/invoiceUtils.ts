@@ -1124,7 +1124,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
       unitPrice = Math.round((invoiceAmount / quantity) * 100) / 100;
     }
     if (fee.payment_type === 'monthly' && courseCategoryLower === 'music') {
-      lineDescription = `${courseDisplayName} — monthly tuition (${quantity} sessions @ KSh ${unitPrice.toLocaleString()} each)`;
+      lineDescription = courseDisplayName;
     } else {
       lineDescription = `${courseDisplayName} - ${sessionsPerWeek} session${sessionsPerWeek > 1 ? 's' : ''} per week × ${numWeeks} weeks`;
     }

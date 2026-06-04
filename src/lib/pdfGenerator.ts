@@ -127,11 +127,20 @@ export const generateQuotePDF = async (
   const timelineLabel = quoteData?.timeline ? (TIMELINE_LABELS[quoteData.timeline] || quoteData.timeline) : '-';
   const serviceLabel = quoteData?.service_category ? (SERVICE_CATEGORY_LABELS[quoteData.service_category] || quoteData.service_category) : '';
 
-  // Determine course/instrument: from invoice line items, or quote-only use human-readable service label
+  // Course/instrument only (strip tuition/session breakdown from line descriptions)
+  const extractCourseFromLineDescription = (description: string): string => {
+    const trimmed = description.trim();
+    for (const sep of [' — ', ' - ']) {
+      if (trimmed.includes(sep)) {
+        return trimmed.split(sep)[0].trim();
+      }
+    }
+    return trimmed.replace(/\s*—\s*monthly tuition.*$/i, '').trim() || trimmed;
+  };
+
   let courseOrInstrument = '';
   if (invoiceDetails && invoiceDetails.lineItems && invoiceDetails.lineItems.length > 0) {
-    const firstItem = invoiceDetails.lineItems[0];
-    courseOrInstrument = firstItem.description.includes(' - ') ? firstItem.description.split(' - ')[0] : firstItem.description;
+    courseOrInstrument = extractCourseFromLineDescription(invoiceDetails.lineItems[0].description);
   } else {
     courseOrInstrument = serviceLabel || (quoteData?.service_category ?? '');
   }
@@ -179,7 +188,7 @@ export const generateQuotePDF = async (
       </div>
       <div style="text-align: right;">
         <div style="font-size: 28px; font-weight: bold; color: #1e40af; letter-spacing: 2px; margin-bottom: 2px;">${isQuoteOnly ? 'QUOTE' : 'INVOICE'}</div>
-        <div style="font-size: 15px; color: #64748b;">${isQuoteOnly ? 'Reference:' : 'Receipt:'} <b>${isQuoteOnly ? 'Quote' : (invoiceMeta?.invoiceNumber || '-')}</b></div>
+        <div style="font-size: 15px; color: #64748b;">${isQuoteOnly ? 'Reference:' : 'Invoice:'} <b>${isQuoteOnly ? 'Quote' : (invoiceMeta?.invoiceNumber || '-')}</b></div>
         <div style="font-size: 13px; color: #64748b;">Date: ${invoiceOrQuoteDate}</div>
         <div style="font-size: 13px; color: #1e293b; margin-top: 4px;">Course/Instrument: <b>${courseOrInstrument || '-'}</b></div>
       </div>
