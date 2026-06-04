@@ -1,11 +1,12 @@
 // Video Conferencing Service for Damon Music Academy
-// Handles meeting room creation, Jitsi Meet integration, and meeting management
-// Enhanced with Instant Meet capabilities
+// Zoom meetings via Supabase Edge Function (create-zoom-meeting)
 
 export interface MeetingRoom {
   id: string;
   roomName: string;
   meetingUrl: string;
+  meetingHostUrl?: string;
+  zoomMeetingId?: string;
   teacherId: string;
   studentId?: string;
   bookingId?: string;
@@ -19,30 +20,83 @@ export interface MeetingRoom {
   updatedAt: string;
 }
 
-// New interface for instant meetings
 export interface InstantMeeting {
   id: string;
   title: string;
   description?: string;
   meetingUrl: string;
+  meetingHostUrl?: string;
+  zoomMeetingId?: string;
   hostId: string;
   hostName: string;
   hostRole: 'teacher' | 'admin';
-  participants: string[]; // User IDs
+  participants: string[];
   maxParticipants: number;
-  duration: number; // minutes
+  duration: number;
   status: 'scheduled' | 'pending' | 'active' | 'completed' | 'cancelled';
   meetingCode: string;
   isPublic: boolean;
   allowRecording: boolean;
-  scheduledStartTime?: string; // Added for scheduled meetings
+  scheduledStartTime?: string;
   startedAt?: string;
   endedAt?: string;
-  actualDuration?: number; // minutes
+  actualDuration?: number;
   participantJoinLog: MeetingParticipantLog[];
   createdAt: string;
   updatedAt: string;
 }
+
+export interface ZoomMeetingResult {
+  joinUrl: string;
+  startUrl: string;
+  meetingId: string;
+  password?: string | null;
+}
+
+const mapMeetingRoomRow = (data: Record<string, unknown>): MeetingRoom => ({
+  id: data.id as string,
+  roomName: data.room_name as string,
+  meetingUrl: data.meeting_url as string,
+  meetingHostUrl: (data.meeting_host_url as string) || undefined,
+  zoomMeetingId: (data.zoom_meeting_id as string) || undefined,
+  teacherId: data.teacher_id as string,
+  studentId: (data.student_id as string) || undefined,
+  bookingId: (data.booking_id as string) || undefined,
+  lessonType: data.lesson_type as MeetingRoom['lessonType'],
+  startTime: data.start_time as string,
+  endTime: data.end_time as string,
+  status: data.status as MeetingRoom['status'],
+  notes: (data.notes as string) || undefined,
+  recordingUrl: (data.recording_url as string) || undefined,
+  createdAt: data.created_at as string,
+  updatedAt: data.updated_at as string,
+});
+
+const mapInstantMeetingRow = (data: Record<string, unknown>): InstantMeeting => ({
+  id: data.id as string,
+  title: data.title as string,
+  description: (data.description as string) || undefined,
+  meetingUrl: data.meeting_url as string,
+  meetingHostUrl: (data.meeting_host_url as string) || undefined,
+  zoomMeetingId: (data.zoom_meeting_id as string) || undefined,
+  hostId: data.host_id as string,
+  hostName: data.host_name as string,
+  hostRole: data.host_role as InstantMeeting['hostRole'],
+  participants: (data.participants as string[]) || [],
+  maxParticipants: data.max_participants as number,
+  duration: data.duration as number,
+  status: data.status as InstantMeeting['status'],
+  meetingCode: data.meeting_code as string,
+  isPublic: data.is_public as boolean,
+  allowRecording: data.allow_recording as boolean,
+  scheduledStartTime: (data.scheduled_start_time as string) || undefined,
+  startedAt: (data.started_at as string) || undefined,
+  endedAt: (data.ended_at as string) || undefined,
+  actualDuration: (data.actual_duration as number) || undefined,
+  participantJoinLog: (data.participant_join_log as MeetingParticipantLog[]) || [],
+  createdAt: data.created_at as string,
+  updatedAt: data.updated_at as string,
+});
 
 export interface MeetingParticipantLog {
   userId: string;
@@ -68,7 +122,58 @@ export const DEFAULT_VIDEO_SETTINGS: VideoCallSettings = {
   enableRecording: false, // Disabled by default for privacy
   enableChat: true,
   enableScreenShare: true,
-  maxParticipants: 4, // Teacher + Student + possible accompanist/parent
+  maxParticipants: 100,
+};
+
+/** Create a Zoom meeting through the Supabase Edge Function (credentials stay server-side). */
+export const createZoomMeeting = async (params: {
+  topic: string;
+  startTime?: string;
+  duration?: number;
+  agenda?: string;
+  alternativeHostEmails?: string[];
+}): Promise<ZoomMeetingResult> => {
+  const { supabase } = await import('../integrations/supabase/client');
+
+  const { data, error } = await supabase.functions.invoke('create-zoom-meeting', {
+    body: {
+      topic: params.topic,
+      startTime: params.startTime,
+      duration: params.duration ?? 60,
+      agenda: params.agenda,
+      alternativeHostEmails: params.alternativeHostEmails,
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to create Zoom meeting');
+  }
+  if (data?.error) {
+    throw new Error(data.error);
+  }
+  if (!data?.joinUrl || !data?.startUrl) {
+    throw new Error('Zoom meeting response missing join or start URL');
+  }
+
+  return {
+    joinUrl: data.joinUrl,
+    startUrl: data.startUrl,
+    meetingId: String(data.meetingId),
+    password: data.password,
+  };
+};
+
+/** Open Zoom in a new tab — hosts use start URL (host controls + waiting room). */
+export const openMeetingLink = (
+  joinUrl: string,
+  options?: { isHost?: boolean; hostUrl?: string | null }
+): void => {
+  const url =
+    options?.isHost && options.hostUrl ? options.hostUrl : joinUrl;
+  if (!url || (!url.includes('zoom.us') && !url.includes('zoom.com'))) {
+    console.warn('Opening non-Zoom meeting URL (legacy link):', url);
+  }
+  window.open(url, '_blank', 'noopener,noreferrer');
 };
 
 // Generate a unique meeting room name
@@ -84,36 +189,6 @@ export const generateMeetingRoomName = (
   const dateStr = date.replace(/[^a-zA-Z0-9]/g, '');
   
   return `damon-music-${sanitizedTeacher}-${sanitizedStudent}-${sanitizedType}-${dateStr}`;
-};
-
-// Generate Jitsi Meet URL with custom settings
-export const generateJitsiMeetUrl = (
-  roomName: string,
-  settings: VideoCallSettings = DEFAULT_VIDEO_SETTINGS
-): string => {
-  const baseUrl = 'https://meet.jit.si';
-  
-  // Jitsi Meet uses simple room URLs: https://meet.jit.si/RoomName
-  // Additional configuration can be passed via URL fragments
-  const url = `${baseUrl}/${encodeURIComponent(roomName)}`;
-  
-  // Add configuration via URL hash (fragment)
-  const config = {
-    startWithAudioMuted: false,
-    startWithVideoMuted: false,
-    prejoinPageEnabled: true,
-    disableAudioLevels: false,
-    enableNoisyMicDetection: true,
-    enableTalkWhileMuted: false,
-    // Music-specific optimizations
-    disableAP: true, // Disable audio processing for better music quality
-    disableAEC: true, // Disable echo cancellation for instruments
-    disableNS: true,  // Disable noise suppression for music
-    enableOpusRed: true, // Enable Opus RED for better audio
-    stereo: true, // Enable stereo audio for music
-  };
-  
-  return url;
 };
 
 // Create a meeting room for a booking
@@ -147,40 +222,35 @@ export const createMeetingRoom = async (
   };
   
   const mappedLessonType = mapLessonType(lessonType);
-  
   const roomName = generateMeetingRoomName(teacherName, studentName, lessonType, startTime);
-  const meetingUrl = generateJitsiMeetUrl(roomName);
-  
-  const meetingRoom: Omit<MeetingRoom, 'id' | 'createdAt' | 'updatedAt'> = {
-    roomName,
-    meetingUrl,
-    teacherId,
-    studentId,
-    bookingId,
-    lessonType: mappedLessonType,
+  const durationMinutes = Math.max(
+    15,
+    Math.round(
+      (new Date(endTime).getTime() - new Date(startTime).getTime()) / (1000 * 60)
+    ) || 60
+  );
+
+  const zoom = await createZoomMeeting({
+    topic: `${lessonType} lesson: ${teacherName} & ${studentName}`,
     startTime,
-    endTime,
+    duration: durationMinutes,
+    agenda: notes || `Damon Music Academy — ${lessonType}`,
+  });
+
+  const dbMeetingRoom = {
+    room_name: roomName,
+    meeting_url: zoom.joinUrl,
+    meeting_host_url: zoom.startUrl,
+    zoom_meeting_id: zoom.meetingId,
+    teacher_id: teacherId,
+    student_id: studentId,
+    booking_id: bookingId,
+    lesson_type: mappedLessonType,
+    start_time: startTime,
+    end_time: endTime,
     status: 'scheduled',
     notes,
   };
-
-
-
-  // Map camelCase to snake_case for database
-  const dbMeetingRoom = {
-    room_name: meetingRoom.roomName,
-    meeting_url: meetingRoom.meetingUrl,
-    teacher_id: meetingRoom.teacherId,
-    student_id: meetingRoom.studentId,
-    booking_id: meetingRoom.bookingId,
-    lesson_type: meetingRoom.lessonType,
-    start_time: meetingRoom.startTime,
-    end_time: meetingRoom.endTime,
-    status: meetingRoom.status,
-    notes: meetingRoom.notes,
-  };
-
-
 
   const { data, error } = await supabase
     .from('meeting_rooms')
@@ -192,7 +262,7 @@ export const createMeetingRoom = async (
     throw new Error(`Failed to create meeting room: ${error.message}`);
   }
 
-  return data;
+  return mapMeetingRoomRow(data);
 };
 
 // Get meeting room by booking ID
@@ -209,24 +279,8 @@ export const getMeetingRoomByBooking = async (bookingId: string): Promise<Meetin
     throw new Error(`Failed to get meeting room: ${error.message}`);
   }
 
-  // Map snake_case to camelCase for interface
   if (data) {
-    return {
-      id: data.id,
-      roomName: data.room_name,
-      meetingUrl: data.meeting_url,
-      teacherId: data.teacher_id,
-      studentId: data.student_id,
-      bookingId: data.booking_id,
-      lessonType: data.lesson_type,
-      startTime: data.start_time,
-      endTime: data.end_time,
-      status: data.status,
-      notes: data.notes,
-      recordingUrl: data.recording_url,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-    };
+    return mapMeetingRoomRow(data);
   }
 
   return null;
@@ -246,23 +300,7 @@ export const getUserMeetingRooms = async (userId: string, userRole: 'teacher' | 
     throw new Error(`Failed to get meeting rooms: ${error.message}`);
   }
 
-  // Map snake_case to camelCase for interface
-  return (data || []).map(room => ({
-    id: room.id,
-    roomName: room.room_name,
-    meetingUrl: room.meeting_url,
-    teacherId: room.teacher_id,
-    studentId: room.student_id,
-    bookingId: room.booking_id,
-    lessonType: room.lesson_type,
-    startTime: room.start_time,
-    endTime: room.end_time,
-    status: room.status,
-    notes: room.notes,
-    recordingUrl: room.recording_url,
-    createdAt: room.created_at,
-    updatedAt: room.updated_at,
-  }));
+  return (data || []).map((room) => mapMeetingRoomRow(room));
 };
 
 // Update meeting room status
@@ -282,11 +320,13 @@ export const updateMeetingRoomStatus = async (
   }
 };
 
-// Join meeting room (opens in new tab)
-export const joinMeetingRoom = (meetingUrl: string, userName: string): void => {
-  // Add user name to URL for display in meeting using correct Jitsi format
-  const urlWithUser = `${meetingUrl}#userInfo.displayName="${encodeURIComponent(userName)}"`;
-  window.open(urlWithUser, '_blank', 'width=1200,height=800');
+// Join meeting room (opens Zoom in new tab)
+export const joinMeetingRoom = (
+  meetingUrl: string,
+  _userName: string,
+  options?: { isHost?: boolean; hostUrl?: string | null }
+): void => {
+  openMeetingLink(meetingUrl, options);
 };
 
 // Check if meeting is currently active (within 15 minutes of start time)
@@ -379,12 +419,30 @@ export const generateMeetingCode = (): string => {
   return result;
 };
 
-/** Create a simple meeting URL without DB (e.g. when teacher has no user_id). Returns { meetingUrl, meetingCode } for trial classes. */
-export const createSimpleTrialMeeting = (hostName: string, title: string): { meetingUrl: string; meetingCode: string } => {
+/** Create Zoom links without DB (e.g. when teacher has no user_id). */
+export const createSimpleTrialMeeting = async (
+  hostName: string,
+  title: string,
+  scheduledStartTime?: string
+): Promise<{
+  meetingUrl: string;
+  meetingHostUrl: string;
+  meetingCode: string;
+  zoomMeetingId: string;
+}> => {
   const meetingCode = generateMeetingCode();
-  const roomName = generateInstantMeetingName(hostName, title);
-  const meetingUrl = generateJitsiMeetUrl(roomName, DEFAULT_VIDEO_SETTINGS);
-  return { meetingUrl, meetingCode };
+  const zoom = await createZoomMeeting({
+    topic: title,
+    startTime: scheduledStartTime,
+    duration: 60,
+    agenda: `Trial class — ${hostName}`,
+  });
+  return {
+    meetingUrl: zoom.joinUrl,
+    meetingHostUrl: zoom.startUrl,
+    meetingCode,
+    zoomMeetingId: zoom.meetingId,
+  };
 };
 
 // Create instant meeting
@@ -416,20 +474,22 @@ export const createInstantMeeting = async ({
   const { supabase } = await import('../integrations/supabase/client');
   
   const meetingCode = generateMeetingCode();
-  const roomName = generateInstantMeetingName(hostName, title);
-  const meetingUrl = generateJitsiMeetUrl(roomName, {
-    ...DEFAULT_VIDEO_SETTINGS,
-    enableRecording: allowRecording,
-    maxParticipants: Math.min(maxParticipants, 20) // Cap at 20 for performance
+
+  const zoom = await createZoomMeeting({
+    topic: title,
+    startTime: scheduledStartTime,
+    duration,
+    agenda: description || title,
   });
-  
-  // Determine initial status based on whether it's scheduled or instant
+
   const initialStatus = scheduledStartTime ? 'scheduled' : 'pending';
-  
+
   const instantMeeting = {
     title,
     description,
-    meeting_url: meetingUrl,
+    meeting_url: zoom.joinUrl,
+    meeting_host_url: zoom.startUrl,
+    zoom_meeting_id: zoom.meetingId,
     host_id: hostId,
     host_name: hostName,
     host_role: hostRole,
@@ -454,29 +514,7 @@ export const createInstantMeeting = async ({
     throw new Error(`Failed to create instant meeting: ${error.message}`);
   }
 
-  return {
-    id: data.id,
-    title: data.title,
-    description: data.description,
-    meetingUrl: data.meeting_url,
-    hostId: data.host_id,
-    hostName: data.host_name,
-    hostRole: data.host_role,
-    participants: data.participants,
-    maxParticipants: data.max_participants,
-    duration: data.duration,
-    status: data.status,
-    meetingCode: data.meeting_code,
-    isPublic: data.is_public,
-    allowRecording: data.allow_recording,
-    scheduledStartTime: data.scheduled_start_time,
-    startedAt: data.started_at,
-    endedAt: data.ended_at,
-    actualDuration: data.actual_duration,
-    participantJoinLog: data.participant_join_log || [],
-    createdAt: data.created_at,
-    updatedAt: data.updated_at
-  };
+  return mapInstantMeetingRow(data);
 };
 
 // Send meeting invitations
@@ -566,29 +604,7 @@ export const getInstantMeetingByCode = async (meetingCode: string): Promise<Inst
 
   if (!data) return null;
 
-  return {
-    id: data.id,
-    title: data.title,
-    description: data.description,
-    meetingUrl: data.meeting_url,
-    hostId: data.host_id,
-    hostName: data.host_name,
-    hostRole: data.host_role,
-    participants: data.participants,
-    maxParticipants: data.max_participants,
-    duration: data.duration,
-    status: data.status,
-    meetingCode: data.meeting_code,
-    isPublic: data.is_public,
-    allowRecording: data.allow_recording,
-    scheduledStartTime: data.scheduled_start_time,
-    startedAt: data.started_at,
-    endedAt: data.ended_at,
-    actualDuration: data.actual_duration,
-    participantJoinLog: data.participant_join_log || [],
-    createdAt: data.created_at,
-    updatedAt: data.updated_at
-  };
+  return mapInstantMeetingRow(data);
 };
 
 // Get instant meeting by ID
@@ -607,29 +623,7 @@ export const getInstantMeeting = async (meetingId: string): Promise<InstantMeeti
 
   if (!data) return null;
 
-  return {
-    id: data.id,
-    title: data.title,
-    description: data.description,
-    meetingUrl: data.meeting_url,
-    hostId: data.host_id,
-    hostName: data.host_name,
-    hostRole: data.host_role,
-    participants: data.participants,
-    maxParticipants: data.max_participants,
-    duration: data.duration,
-    status: data.status,
-    meetingCode: data.meeting_code,
-    isPublic: data.is_public,
-    allowRecording: data.allow_recording,
-    scheduledStartTime: data.scheduled_start_time,
-    startedAt: data.started_at,
-    endedAt: data.ended_at,
-    actualDuration: data.actual_duration,
-    participantJoinLog: data.participant_join_log || [],
-    createdAt: data.created_at,
-    updatedAt: data.updated_at
-  };
+  return mapInstantMeetingRow(data);
 };
 
 // Get user's instant meetings (hosted and invited)
@@ -661,29 +655,7 @@ export const getUserInstantMeetings = async (
     throw new Error(`Failed to get user instant meetings: ${error.message}`);
   }
 
-  const meetings = (data || []).map(meeting => ({
-    id: meeting.id,
-    title: meeting.title,
-    description: meeting.description,
-    meetingUrl: meeting.meeting_url,
-    hostId: meeting.host_id,
-    hostName: meeting.host_name,
-    hostRole: meeting.host_role,
-    participants: meeting.participants,
-    maxParticipants: meeting.max_participants,
-    duration: meeting.duration,
-    status: meeting.status,
-    meetingCode: meeting.meeting_code,
-    isPublic: meeting.is_public,
-    allowRecording: meeting.allow_recording,
-    scheduledStartTime: meeting.scheduled_start_time,
-    startedAt: meeting.started_at,
-    endedAt: meeting.ended_at,
-    actualDuration: meeting.actual_duration,
-    participantJoinLog: meeting.participant_join_log || [],
-    createdAt: meeting.created_at,
-    updatedAt: meeting.updated_at
-  }));
+  const meetings = (data || []).map((meeting) => mapInstantMeetingRow(meeting));
 
   console.log('[getUserInstantMeetings] Mapped meetings:', meetings);
   return meetings;
@@ -710,29 +682,7 @@ export const getUserInvitedMeetings = async (userId: string): Promise<InstantMee
     throw new Error(`Failed to get invited meetings: ${error.message}`);
   }
 
-  const meetings = (data || []).map(meeting => ({
-    id: meeting.id,
-    title: meeting.title,
-    description: meeting.description,
-    meetingUrl: meeting.meeting_url,
-    hostId: meeting.host_id,
-    hostName: meeting.host_name,
-    hostRole: meeting.host_role,
-    participants: meeting.participants,
-    maxParticipants: meeting.max_participants,
-    duration: meeting.duration,
-    status: meeting.status,
-    meetingCode: meeting.meeting_code,
-    isPublic: meeting.is_public,
-    allowRecording: meeting.allow_recording,
-    scheduledStartTime: meeting.scheduled_start_time,
-    startedAt: meeting.started_at,
-    endedAt: meeting.ended_at,
-    actualDuration: meeting.actual_duration,
-    participantJoinLog: meeting.participant_join_log || [],
-    createdAt: meeting.created_at,
-    updatedAt: meeting.updated_at
-  }));
+  const meetings = (data || []).map((meeting) => mapInstantMeetingRow(meeting));
 
   console.log('[getUserInvitedMeetings] Mapped meetings:', meetings);
   return meetings;
@@ -842,23 +792,13 @@ export const joinInstantMeetingRoom = async (
     throw new Error(reason || 'Cannot join meeting');
   }
 
-  // Record participation
   await joinInstantMeeting(meeting.id, userId, userName);
-  
-  // Debug: Log the meeting URL to console
-  console.log('Meeting URL:', meeting.meetingUrl);
-  
-  // Open meeting in new tab with correct Jitsi URL format
-  const urlWithUser = `${meeting.meetingUrl}#userInfo.displayName="${encodeURIComponent(userName)}"`;
-  console.log('Final URL with user:', urlWithUser);
-  
-  // Test if the base URL is valid
-  if (!meeting.meetingUrl.startsWith('https://meet.jit.si/')) {
-    console.error('Invalid Jitsi URL detected:', meeting.meetingUrl);
-    throw new Error('Invalid meeting URL format');
-  }
-  
-  window.open(urlWithUser, '_blank', 'width=1200,height=800');
+
+  const isHost = meeting.hostId === userId;
+  openMeetingLink(meeting.meetingUrl, {
+    isHost,
+    hostUrl: meeting.meetingHostUrl,
+  });
 };
 
 // Join meeting by code (for direct joining)

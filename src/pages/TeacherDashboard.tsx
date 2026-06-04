@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
 import VideoConferenceModal from '../components/VideoConferenceModal';
-import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getUserInvitedMeetings, getUserInstantMeetings, InstantMeeting } from '../lib/videoConferencing';
+import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getUserInvitedMeetings, getUserInstantMeetings, InstantMeeting, openMeetingLink } from '../lib/videoConferencing';
 import MessagingUI from '../components/MessagingUI';
 import InstantMeetManager from '../components/InstantMeetManager';
 
@@ -2901,7 +2901,12 @@ const TeacherDashboard = () => {
                               )}
                               <div className="flex gap-2">
                                 <Button 
-                                  onClick={() => window.open(meeting.meetingUrl, '_blank')}
+                                  onClick={() =>
+                                    openMeetingLink(meeting.meetingUrl, {
+                                      isHost: true,
+                                      hostUrl: meeting.meetingHostUrl,
+                                    })
+                                  }
                                   className={`flex items-center gap-1 ${
                                     meeting.status === 'active' 
                                       ? 'bg-red-600 hover:bg-red-700 animate-pulse' 
@@ -2910,7 +2915,7 @@ const TeacherDashboard = () => {
                                   size="sm"
                                 >
                                   <Video className="w-4 h-4" />
-                                  {meeting.status === 'active' ? '🚀 Join as Moderator' : 'Start Meeting'}
+                                  {meeting.status === 'active' ? '🚀 Join as Host' : 'Start as Host'}
                                 </Button>
                                 <Button 
                                   variant="outline"

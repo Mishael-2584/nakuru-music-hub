@@ -1196,12 +1196,12 @@ const StudentDashboard = () => {
 
     setIsJoiningMeeting(true);
     try {
-      const meeting = await joinMeetingByCode(joinMeetingCode.trim(), studentProfile.user_id);
+      const meeting = await joinMeetingByCode(
+        joinMeetingCode.trim(),
+        studentProfile.user_id,
+        studentProfile.student_name
+      );
       if (meeting) {
-        // Open the meeting in a new tab
-        const meetingUrl = `https://meet.jit.si/${meeting.meeting_code}`;
-        window.open(meetingUrl, '_blank');
-        
         toast({
           title: "Joined Meeting",
           description: `Successfully joined meeting: ${meeting.title}`,

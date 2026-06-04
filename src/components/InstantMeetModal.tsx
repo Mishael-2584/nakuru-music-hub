@@ -67,7 +67,7 @@ const InstantMeetModal = ({
     title: '',
     description: '',
     duration: 60,
-    maxParticipants: 10,
+    maxParticipants: 50,
     isPublic: false,
     allowRecording: false,
     isScheduled: false,
@@ -92,7 +92,7 @@ const InstantMeetModal = ({
         title: '',
         description: '',
         duration: 60,
-        maxParticipants: 10,
+        maxParticipants: 50,
         isPublic: false,
         allowRecording: false,
         isScheduled: false,
@@ -383,10 +383,10 @@ const InstantMeetModal = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="5">5 participants</SelectItem>
               <SelectItem value="10">10 participants</SelectItem>
-              <SelectItem value="15">15 participants</SelectItem>
-              <SelectItem value="20">20 participants</SelectItem>
+              <SelectItem value="25">25 participants</SelectItem>
+              <SelectItem value="50">50 participants</SelectItem>
+              <SelectItem value="100">100 participants</SelectItem>
             </SelectContent>
           </Select>
         </div>

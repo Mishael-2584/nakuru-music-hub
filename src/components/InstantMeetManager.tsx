@@ -29,6 +29,7 @@ import { useToast } from '../hooks/use-toast';
 import {
   getUserInstantMeetings,
   joinInstantMeetingRoom,
+  openMeetingLink,
   startInstantMeeting,
   endInstantMeeting,
   cancelInstantMeeting,
@@ -766,7 +767,15 @@ const InstantMeetManager = ({
                   <Button size="sm" onClick={() => copyMeetingLink(selectedMeeting.meetingUrl)}>
                     <Copy className="w-3 h-3" />
                   </Button>
-                  <Button size="sm" onClick={() => window.open(selectedMeeting.meetingUrl, '_blank')}>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      openMeetingLink(selectedMeeting.meetingUrl, {
+                        isHost: selectedMeeting.hostId === userId,
+                        hostUrl: selectedMeeting.meetingHostUrl,
+                      })
+                    }
+                  >
                     <ExternalLink className="w-3 h-3" />
                   </Button>
                 </div>

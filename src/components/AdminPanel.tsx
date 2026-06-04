@@ -1353,8 +1353,13 @@ const AdminPanel = () => {
       const { createInstantMeeting, createSimpleTrialMeeting } = await import('@/lib/videoConferencing');
       const meetingTitle = `Trial Class: ${selectedTrialBooking.instrument} with ${teacher.name}`;
       
-      let meeting: { meetingUrl: string; meetingCode: string };
-      
+      let meeting: {
+        meetingUrl: string;
+        meetingCode: string;
+        meetingHostUrl?: string;
+        zoomMeetingId?: string;
+      };
+
       if (teacher.user_id) {
         const meetingData = {
           title: meetingTitle,
@@ -1364,16 +1369,25 @@ const AdminPanel = () => {
           hostRole: 'teacher' as const,
           participants: [],
           duration: 60,
-          maxParticipants: 5,
+          maxParticipants: 20,
           isPublic: true,
           allowRecording: false,
           scheduledStartTime: scheduledDateTime.toISOString()
         };
-        meeting = await createInstantMeeting(meetingData);
+        const created = await createInstantMeeting(meetingData);
+        meeting = {
+          meetingUrl: created.meetingUrl,
+          meetingCode: created.meetingCode,
+          meetingHostUrl: created.meetingHostUrl,
+          zoomMeetingId: created.zoomMeetingId,
+        };
       } else {
-        // Teacher has no user_id (e.g. not yet linked to auth) – generate Jitsi URL without DB
-        meeting = createSimpleTrialMeeting(teacher.name, meetingTitle);
-        console.log('✅ Simple trial meeting URL created (teacher has no user_id)');
+        meeting = await createSimpleTrialMeeting(
+          teacher.name,
+          meetingTitle,
+          scheduledDateTime.toISOString()
+        );
+        console.log('✅ Simple trial Zoom meeting created (teacher has no user_id)');
       }
       
       console.log('✅ Meeting created successfully:', meeting);
@@ -1387,7 +1401,9 @@ const AdminPanel = () => {
           notes: scheduleData.notes,
           status: 'scheduled',
           meeting_url: meeting.meetingUrl,
-          meeting_code: meeting.meetingCode
+          meeting_code: meeting.meetingCode,
+          meeting_host_url: meeting.meetingHostUrl ?? null,
+          zoom_meeting_id: meeting.zoomMeetingId ?? null,
         })
         .eq('id', selectedTrialBooking.id);
 
@@ -1411,7 +1427,8 @@ const AdminPanel = () => {
               instrument: selectedTrialBooking.instrument,
               scheduled_datetime: scheduledDateTime.toISOString(),
               meeting_url: meeting.meetingUrl,
-              meeting_code: meeting.meetingCode
+              meeting_code: meeting.meetingCode,
+              meeting_host_url: meeting.meetingHostUrl,
             },
             is_read: false
           });

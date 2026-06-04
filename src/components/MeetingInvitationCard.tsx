@@ -19,7 +19,6 @@ import {
 import { useToast } from '../hooks/use-toast';
 import { 
   getInstantMeeting,
-  joinInstantMeeting,
   joinInstantMeetingRoom,
   canUserJoinInstantMeeting,
   InstantMeeting
@@ -95,32 +94,15 @@ const MeetingInvitationCard = ({
 
     setIsJoining(true);
     try {
-      // Record participation in the database
-      await joinInstantMeeting(meeting.id, currentUserId, currentUserName);
-      
-      // Mark message as read when joining
       if (!isRead && onMarkAsRead) {
         onMarkAsRead();
       }
-      
-      // Create the direct meeting URL with user info
-      const directMeetingUrl = `${meeting.meetingUrl}#userInfo.displayName="${encodeURIComponent(currentUserName)}"`;
-      
-      // Open meeting in new window/tab
-      const meetingWindow = window.open(
-        directMeetingUrl, 
-        '_blank', 
-        'width=1200,height=800,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes'
-      );
-      
-      if (!meetingWindow) {
-        // Fallback if popup blocked
-        window.location.href = directMeetingUrl;
-      }
-      
+
+      await joinInstantMeetingRoom(meeting, currentUserId, currentUserName);
+
       toast({
         title: "Joining Meeting",
-        description: "Opening meeting room... Please allow popups if prompted.",
+        description: "Opening Zoom in a new tab...",
         duration: 3000
       });
     } catch (error) {

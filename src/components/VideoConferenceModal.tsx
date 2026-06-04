@@ -77,7 +77,10 @@ const VideoConferenceModal: React.FC<VideoConferenceModalProps> = ({
       }
 
       // Join the meeting
-      joinMeetingRoom(meetingRoom.meetingUrl, userName);
+      joinMeetingRoom(meetingRoom.meetingUrl, userName, {
+        isHost: userRole === 'teacher',
+        hostUrl: meetingRoom.meetingHostUrl,
+      });
       
       toast({
         title: "Joining Meeting",
@@ -239,7 +242,12 @@ const VideoConferenceModal: React.FC<VideoConferenceModalProps> = ({
 
                 <Button
                   variant="outline"
-                  onClick={() => window.open(meetingRoom.meetingUrl, '_blank')}
+                  onClick={() =>
+                    joinMeetingRoom(meetingRoom.meetingUrl, userName, {
+                      isHost: userRole === 'teacher',
+                      hostUrl: meetingRoom.meetingHostUrl,
+                    })
+                  }
                   className="flex items-center gap-2"
                 >
                   <ExternalLink className="w-4 h-4" />
