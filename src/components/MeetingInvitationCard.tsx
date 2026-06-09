@@ -17,10 +17,10 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
+import { supabase } from '../integrations/supabase/client';
 import { 
   getInstantMeeting,
   joinInstantMeetingRoom,
-  upgradeInstantMeetingToZoom,
   canUserJoinInstantMeeting,
   InstantMeeting
 } from '../lib/videoConferencing';
@@ -54,26 +54,41 @@ const MeetingInvitationCard = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isJoining, setIsJoining] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  const [canJoin, setCanJoin] = useState({ canJoin: false, reason: '' });
+  const [canJoin, setCanJoin] = useState<{ canJoin: boolean; reason?: string }>({ canJoin: true });
 
   useEffect(() => {
     loadMeetingDetails();
-  }, [meetingId]);
 
-  useEffect(() => {
-    if (meeting) {
-      const joinStatus = canUserJoinInstantMeeting(meeting, currentUserId);
-      setCanJoin(joinStatus);
-    }
-  }, [meeting, currentUserId]);
+    const channel = supabase
+      .channel(`meeting-invite-${meetingId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'instant_meetings',
+          filter: `id=eq.${meetingId}`,
+        },
+        () => {
+          loadMeetingDetails();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [meetingId, currentUserId]);
 
   const loadMeetingDetails = async () => {
     try {
       const meetingData = await getInstantMeeting(meetingId);
       if (meetingData) {
-        setMeeting(await upgradeInstantMeetingToZoom(meetingData));
+        setMeeting(meetingData);
+        setCanJoin(canUserJoinInstantMeeting(meetingData, currentUserId));
       } else {
         setMeeting(null);
+        setCanJoin({ canJoin: false, reason: 'Meeting not found' });
       }
     } catch (error) {
       console.error('Error loading meeting details:', error);

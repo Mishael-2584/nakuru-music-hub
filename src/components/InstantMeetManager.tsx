@@ -388,6 +388,16 @@ const InstantMeetManager = ({
               <p className="text-sm text-muted-foreground">
                 {isHost ? 'Hosted by you' : `Hosted by ${meeting.hostName}`}
               </p>
+              {meeting.alternativeHostEmail && isHost && (
+                <p className="text-xs text-indigo-600 mt-0.5">
+                  You start this class as Zoom co-host ({meeting.alternativeHostEmail})
+                </p>
+              )}
+              {meeting.zoomHostEmail && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Academy Zoom license: {meeting.zoomHostEmail}
+                </p>
+              )}
               {meeting.description && (
                 <p className="text-sm text-gray-600 mt-1">{meeting.description}</p>
               )}

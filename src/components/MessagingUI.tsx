@@ -12,6 +12,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { MessageSquare, Send, Reply, Search, Filter, Video } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { supabase } from '../integrations/supabase/client';
+import MeetingInvitationCard from './MeetingInvitationCard';
 
 interface Message {
   id: string;
@@ -23,6 +24,7 @@ interface Message {
   recipient_id: string;
   type?: 'received' | 'sent';
   message_type?: string;
+  meeting_id?: string | null;
 }
 
 interface Conversation {
@@ -236,6 +238,24 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const markMessageAsRead = async (messageId: string) => {
+    try {
+      const { error } = await supabase
+        .from('portal_messages')
+        .update({ is_read: true })
+        .eq('id', messageId);
+
+      if (error) {
+        console.error('Error marking message as read:', error);
+        return;
+      }
+
+      await fetchMessages();
+    } catch (error) {
+      console.error('Error marking message as read:', error);
     }
   };
 
@@ -474,6 +494,31 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
 
   useEffect(() => {
     fetchMessages();
+  }, [currentUserId]);
+
+  // Realtime: show new meeting invitations immediately (no tab-switch refresh needed)
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const channel = supabase
+      .channel(`portal-messages-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'portal_messages',
+          filter: `recipient_id=eq.${currentUserId}`,
+        },
+        () => {
+          fetchMessages();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [currentUserId]);
 
   // Auto-scroll to bottom when new messages are added
@@ -754,78 +799,34 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
                  <div className="space-y-3">
                    {selectedConversation.messages.map(message => {
                      // Special rendering for meeting invitations
-                     if (message.message_type === 'meeting_invitation') {
+                     if (message.message_type === 'meeting_invitation' && message.meeting_id && message.type === 'received') {
                        return (
-                         <div
-                           key={message.id}
-                           className={`flex ${message.type === 'sent' ? 'justify-end' : 'justify-start'}`}
-                         >
-                           <div
-                             className={`max-w-xs lg:max-w-md rounded-lg ${message.type === 'sent' ? 'bg-blue-500 text-white' : ''}`}
-                           >
-                             {message.type === 'received' ? (
-                               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 shadow-sm">
-                                 <div className="flex items-center gap-2 mb-2">
-                                   <div className="p-1.5 bg-blue-600 rounded-full">
-                                     <Video className="w-4 h-4 text-white" />
-                                   </div>
-                                   <span className="font-bold text-blue-800">🎬 Meeting Invitation</span>
-                                 </div>
-                                 <div className="text-sm text-gray-700 space-y-1">
-                                   <p className="font-medium">🎉 You've been invited to a video meeting!</p>
-                                   <p className="text-xs text-blue-600 bg-blue-100 rounded px-2 py-1">
-                                     👨‍🏫 From: {getSenderName(message.sender_id)}
-                                   </p>
-                                 </div>
-                                 <div className="mt-2 pt-2 border-t border-blue-200">
-                                   <button 
-                                     className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-3 rounded-md transition-colors flex items-center justify-center gap-1"
-                                     onClick={() => {
-                                       // Extract meeting ID from the message and open MeetingInvitationCard
-                                       // Since we're in chat, we'll show a simple alert with meeting details
-                                       const messageLines = message.message.split('\n');
-                                       const titleMatch = message.message.match(/Title: (.+)/);
-                                       const hostMatch = message.message.match(/Host: (.+)/);
-                                       const codeMatch = message.message.match(/Meeting Code: ([A-Z0-9]+)/);
-                                       
-                                       const title = titleMatch ? titleMatch[1] : 'Meeting';
-                                       const host = hostMatch ? hostMatch[1] : 'Unknown';
-                                       const code = codeMatch ? codeMatch[1] : 'N/A';
-                                       
-                                       // Show meeting details in a more comprehensive way
-                                       const details = `Meeting Details:\n\n📋 Title: ${title}\n👨‍🏫 Host: ${host}\n🔑 Code: ${code}\n\n💡 To join: Look for the meeting invitation card in your messages or use the meeting code above.`;
-                                       
-                                       alert(details);
-                                       
-                                       // Also copy the meeting code for convenience
-                                       if (code !== 'N/A') {
-                                         navigator.clipboard.writeText(code);
-                                         toast({
-                                           title: "Meeting Details Shown",
-                                           description: `Meeting code ${code} also copied to clipboard`
-                                         });
-                                       }
-                                     }}
-                                   >
-                                     <Video className="w-4 h-4" />
-                                     📋 View Meeting Details
-                                   </button>
-                                 </div>
-                                 <p className="text-xs text-gray-500 mt-2">
-                                   {formatDate(message.created_at)}
-                                 </p>
-                               </div>
-                             ) : (
-                               <div className="px-3 py-2">
-                                 <div className="flex items-center gap-1 mb-1">
-                                   <Video className="w-3 h-3" />
-                                   <span className="text-xs font-medium">Meeting Invitation Sent</span>
-                                 </div>
-                                 <p className="text-xs opacity-70">
-                                   {formatDate(message.created_at)}
-                                 </p>
-                               </div>
-                             )}
+                         <div key={message.id} className="flex justify-start w-full">
+                           <div className="w-full max-w-md">
+                             <MeetingInvitationCard
+                               meetingId={message.meeting_id}
+                               subject={message.subject}
+                               message={message.message}
+                               senderName={getSenderName(message.sender_id)}
+                               sentAt={message.created_at}
+                               currentUserId={currentUserId}
+                               currentUserName={currentUserName}
+                               isRead={message.is_read}
+                               onMarkAsRead={() => markMessageAsRead(message.id)}
+                             />
+                           </div>
+                         </div>
+                       );
+                     }
+                     if (message.message_type === 'meeting_invitation' && message.type === 'sent') {
+                       return (
+                         <div key={message.id} className="flex justify-end">
+                           <div className="px-3 py-2 bg-blue-500 text-white rounded-lg max-w-xs">
+                             <div className="flex items-center gap-1 mb-1">
+                               <Video className="w-3 h-3" />
+                               <span className="text-xs font-medium">Meeting Invitation Sent</span>
+                             </div>
+                             <p className="text-xs opacity-70">{formatDate(message.created_at)}</p>
                            </div>
                          </div>
                        );

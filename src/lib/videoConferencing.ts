@@ -7,6 +7,8 @@ export interface MeetingRoom {
   meetingUrl: string;
   meetingHostUrl?: string;
   zoomMeetingId?: string;
+  zoomHostEmail?: string;
+  alternativeHostEmail?: string;
   teacherId: string;
   studentId?: string;
   bookingId?: string;
@@ -42,15 +44,49 @@ export interface InstantMeeting {
   endedAt?: string;
   actualDuration?: number;
   participantJoinLog: MeetingParticipantLog[];
+  zoomHostEmail?: string;
+  alternativeHostEmail?: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface ZoomMeetingResult {
+  zoomHostEmail?: string | null;
+  alternativeHostEmail?: string | null;
+  singleLicenseMode?: boolean;
+  teacherEmail?: string | null;
   joinUrl: string;
   startUrl: string;
   meetingId: string;
   password?: string | null;
+}
+
+/** Portal user email used for Zoom alternative-host matching. */
+export async function getPortalUserZoomEmail(userId: string): Promise<string | undefined> {
+  const { supabase } = await import('../integrations/supabase/client');
+  const { data: teacher } = await supabase
+    .from('teachers')
+    .select('zoom_email, email')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (teacher) {
+    return (teacher.zoom_email || teacher.email)?.trim() || undefined;
+  }
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('id', userId)
+    .maybeSingle();
+  return profile?.email?.trim() || undefined;
+}
+
+/** Start URL only works for the one licensed Zoom account; teachers use join URL as alternative hosts. */
+export function shouldUseZoomStartUrl(
+  portalUserEmail: string | undefined,
+  licensedZoomHostEmail: string | undefined | null
+): boolean {
+  if (!portalUserEmail || !licensedZoomHostEmail) return false;
+  return portalUserEmail.toLowerCase() === licensedZoomHostEmail.toLowerCase();
 }
 
 const mapMeetingRoomRow = (data: Record<string, unknown>): MeetingRoom => ({
@@ -59,6 +95,8 @@ const mapMeetingRoomRow = (data: Record<string, unknown>): MeetingRoom => ({
   meetingUrl: data.meeting_url as string,
   meetingHostUrl: (data.meeting_host_url as string) || undefined,
   zoomMeetingId: (data.zoom_meeting_id as string) || undefined,
+  zoomHostEmail: (data.zoom_host_email as string) || undefined,
+  alternativeHostEmail: (data.alternative_host_email as string) || undefined,
   teacherId: data.teacher_id as string,
   studentId: (data.student_id as string) || undefined,
   bookingId: (data.booking_id as string) || undefined,
@@ -94,6 +132,8 @@ const mapInstantMeetingRow = (data: Record<string, unknown>): InstantMeeting => 
   endedAt: (data.ended_at as string) || undefined,
   actualDuration: (data.actual_duration as number) || undefined,
   participantJoinLog: (data.participant_join_log as MeetingParticipantLog[]) || [],
+  zoomHostEmail: (data.zoom_host_email as string) || undefined,
+  alternativeHostEmail: (data.alternative_host_email as string) || undefined,
   createdAt: data.created_at as string,
   updatedAt: data.updated_at as string,
 });
@@ -132,6 +172,8 @@ export const createZoomMeeting = async (params: {
   duration?: number;
   agenda?: string;
   alternativeHostEmails?: string[];
+  /** Portal auth user id — meeting is created under this user's Zoom licensed email. */
+  hostUserId?: string;
 }): Promise<ZoomMeetingResult> => {
   const { supabase } = await import('../integrations/supabase/client');
 
@@ -142,6 +184,7 @@ export const createZoomMeeting = async (params: {
       duration: params.duration ?? 60,
       agenda: params.agenda,
       alternativeHostEmails: params.alternativeHostEmails,
+      hostUserId: params.hostUserId,
     },
   });
 
@@ -160,8 +203,23 @@ export const createZoomMeeting = async (params: {
     startUrl: data.startUrl,
     meetingId: String(data.meetingId),
     password: data.password,
+    zoomHostEmail: data.hostEmail ?? null,
+    alternativeHostEmail: data.alternativeHostEmail ?? null,
+    singleLicenseMode: data.singleLicenseMode ?? true,
+    teacherEmail: data.teacherEmail ?? null,
   };
 };
+
+/** Resolve a teacher's portal user id from teachers.id (for Zoom host on lesson rooms). */
+async function getTeacherUserId(teacherId: string): Promise<string | undefined> {
+  const { supabase } = await import('../integrations/supabase/client');
+  const { data } = await supabase
+    .from('teachers')
+    .select('user_id')
+    .eq('id', teacherId)
+    .maybeSingle();
+  return data?.user_id || undefined;
+}
 
 /** True if URL is an old Jitsi Meet link (pre-Zoom migration). */
 export const isLegacyJitsiUrl = (url: string | null | undefined): boolean => {
@@ -184,6 +242,7 @@ export const upgradeInstantMeetingToZoom = async (
     startTime: meeting.scheduledStartTime,
     duration: meeting.duration || 60,
     agenda: meeting.description || meeting.title,
+    hostUserId: meeting.hostId,
   });
 
   const { data, error } = await supabase
@@ -192,6 +251,8 @@ export const upgradeInstantMeetingToZoom = async (
       meeting_url: zoom.joinUrl,
       meeting_host_url: zoom.startUrl,
       zoom_meeting_id: zoom.meetingId,
+      zoom_host_email: zoom.zoomHostEmail,
+      alternative_host_email: zoom.alternativeHostEmail,
       updated_at: new Date().toISOString(),
     })
     .eq('id', meeting.id)
@@ -218,11 +279,14 @@ export const upgradeMeetingRoomToZoom = async (room: MeetingRoom): Promise<Meeti
     ) || 60
   );
 
+  const teacherUserId = await getTeacherUserId(room.teacherId);
+
   const zoom = await createZoomMeeting({
     topic: room.roomName.replace(/-/g, ' '),
     startTime: room.startTime,
     duration: durationMinutes,
     agenda: room.notes || 'Damon Music Academy lesson',
+    hostUserId: teacherUserId,
   });
 
   const { data, error } = await supabase
@@ -231,6 +295,8 @@ export const upgradeMeetingRoomToZoom = async (room: MeetingRoom): Promise<Meeti
       meeting_url: zoom.joinUrl,
       meeting_host_url: zoom.startUrl,
       zoom_meeting_id: zoom.meetingId,
+      zoom_host_email: zoom.zoomHostEmail,
+      alternative_host_email: zoom.alternativeHostEmail,
       updated_at: new Date().toISOString(),
     })
     .eq('id', room.id)
@@ -253,10 +319,10 @@ export const upgradeMeetingRoomToZoom = async (room: MeetingRoom): Promise<Meeti
   return upgraded;
 };
 
-/** Open Zoom in a new tab — hosts use start URL (host controls + waiting room). */
+/** Open Zoom in a new tab. Licensed host uses start URL; teachers use join URL as alternative hosts. */
 export const openMeetingLink = (
   joinUrl: string,
-  options?: { isHost?: boolean; hostUrl?: string | null }
+  options?: { isHost?: boolean; hostUrl?: string | null; isLicensedZoomHost?: boolean }
 ): void => {
   if (isLegacyJitsiUrl(joinUrl)) {
     throw new Error(
@@ -264,8 +330,9 @@ export const openMeetingLink = (
     );
   }
 
-  const url =
-    options?.isHost && options.hostUrl ? options.hostUrl : joinUrl;
+  const useStartUrl =
+    options?.isHost && options?.isLicensedZoomHost && options?.hostUrl;
+  const url = useStartUrl ? options.hostUrl! : joinUrl;
   if (!url.includes('zoom.us') && !url.includes('zoom.com')) {
     console.warn('Opening non-Zoom meeting URL:', url);
   }
@@ -281,35 +348,48 @@ export const joinBookingOnlineMeeting = async (
     start_time: string;
     end_time: string;
     student_name?: string;
+    teacher_id?: string;
   },
-  options: { isHost: boolean; teacherName?: string }
+  options: { isHost: boolean; teacherName?: string; teacherUserId?: string }
 ): Promise<void> => {
   const { supabase } = await import('../integrations/supabase/client');
   let joinUrl = booking.meeting_link;
   let hostUrl: string | null | undefined;
 
+  let licensedZoomEmail: string | undefined;
   const existingRoom = await getMeetingRoomByBooking(booking.id);
   if (existingRoom) {
     const upgraded = await upgradeMeetingRoomToZoom(existingRoom);
     joinUrl = upgraded.meetingUrl;
     hostUrl = upgraded.meetingHostUrl;
+    licensedZoomEmail = upgraded.zoomHostEmail;
   } else if (isLegacyJitsiUrl(joinUrl)) {
     const startTime = `${booking.booking_date}T${booking.start_time}`;
     const endTime = `${booking.booking_date}T${booking.end_time}`;
+    const teacherUserId =
+      options.teacherUserId ||
+      (booking.teacher_id ? await getTeacherUserId(booking.teacher_id) : undefined);
     const zoom = await createZoomMeeting({
       topic: `Lesson with ${booking.student_name || 'student'}`,
       startTime,
       duration: Math.max(15, getMeetingDuration(startTime, endTime) || 60),
+      hostUserId: teacherUserId,
     });
     joinUrl = zoom.joinUrl;
     hostUrl = zoom.startUrl;
+    licensedZoomEmail = zoom.zoomHostEmail ?? undefined;
     await supabase
       .from('bookings')
       .update({ meeting_link: zoom.joinUrl })
       .eq('id', booking.id);
   }
 
-  openMeetingLink(joinUrl, { isHost: options.isHost, hostUrl });
+  let isLicensedZoomHost = false;
+  if (options.isHost && options.teacherUserId) {
+    const email = await getPortalUserZoomEmail(options.teacherUserId);
+    isLicensedZoomHost = shouldUseZoomStartUrl(email, licensedZoomEmail);
+  }
+  openMeetingLink(joinUrl, { isHost: options.isHost, hostUrl, isLicensedZoomHost });
 };
 
 // Generate a unique meeting room name
@@ -366,11 +446,14 @@ export const createMeetingRoom = async (
     ) || 60
   );
 
+  const teacherUserId = await getTeacherUserId(teacherId);
+
   const zoom = await createZoomMeeting({
     topic: `${lessonType} lesson: ${teacherName} & ${studentName}`,
     startTime,
     duration: durationMinutes,
     agenda: notes || `Damon Music Academy — ${lessonType}`,
+    hostUserId: teacherUserId,
   });
 
   const dbMeetingRoom = {
@@ -378,6 +461,8 @@ export const createMeetingRoom = async (
     meeting_url: zoom.joinUrl,
     meeting_host_url: zoom.startUrl,
     zoom_meeting_id: zoom.meetingId,
+    zoom_host_email: zoom.zoomHostEmail,
+    alternative_host_email: zoom.alternativeHostEmail,
     teacher_id: teacherId,
     student_id: studentId,
     booking_id: bookingId,
@@ -460,12 +545,18 @@ export const updateMeetingRoomStatus = async (
 export const joinMeetingRoom = async (
   room: MeetingRoom,
   _userName: string,
-  options?: { isHost?: boolean }
+  options?: { isHost?: boolean; userId?: string }
 ): Promise<MeetingRoom> => {
   const upgraded = await upgradeMeetingRoomToZoom(room);
+  let isLicensedZoomHost = false;
+  if (options?.isHost && options.userId) {
+    const email = await getPortalUserZoomEmail(options.userId);
+    isLicensedZoomHost = shouldUseZoomStartUrl(email, upgraded.zoomHostEmail);
+  }
   openMeetingLink(upgraded.meetingUrl, {
     isHost: options?.isHost,
     hostUrl: upgraded.meetingHostUrl,
+    isLicensedZoomHost,
   });
   return upgraded;
 };
@@ -564,7 +655,8 @@ export const generateMeetingCode = (): string => {
 export const createSimpleTrialMeeting = async (
   hostName: string,
   title: string,
-  scheduledStartTime?: string
+  scheduledStartTime?: string,
+  hostUserId?: string
 ): Promise<{
   meetingUrl: string;
   meetingHostUrl: string;
@@ -577,6 +669,7 @@ export const createSimpleTrialMeeting = async (
     startTime: scheduledStartTime,
     duration: 60,
     agenda: `Trial class — ${hostName}`,
+    hostUserId,
   });
   return {
     meetingUrl: zoom.joinUrl,
@@ -621,6 +714,7 @@ export const createInstantMeeting = async ({
     startTime: scheduledStartTime,
     duration,
     agenda: description || title,
+    hostUserId: hostId,
   });
 
   const initialStatus = scheduledStartTime ? 'scheduled' : 'pending';
@@ -631,6 +725,8 @@ export const createInstantMeeting = async ({
     meeting_url: zoom.joinUrl,
     meeting_host_url: zoom.startUrl,
     zoom_meeting_id: zoom.meetingId,
+    zoom_host_email: zoom.zoomHostEmail,
+    alternative_host_email: zoom.alternativeHostEmail,
     host_id: hostId,
     host_name: hostName,
     host_role: hostRole,
@@ -938,9 +1034,12 @@ export const joinInstantMeetingRoom = async (
   await joinInstantMeeting(zoomMeeting.id, userId, userName);
 
   const isHost = zoomMeeting.hostId === userId;
+  const portalEmail = await getPortalUserZoomEmail(userId);
+  const isLicensedZoomHost = shouldUseZoomStartUrl(portalEmail, zoomMeeting.zoomHostEmail);
   openMeetingLink(zoomMeeting.meetingUrl, {
     isHost,
     hostUrl: zoomMeeting.meetingHostUrl,
+    isLicensedZoomHost,
   });
 };
 

@@ -39,6 +39,7 @@ interface VideoConferenceModalProps {
   meetingRoom: MeetingRoom | null;
   userName: string;
   userRole: 'teacher' | 'student';
+  currentUserId?: string;
 }
 
 const VideoConferenceModal: React.FC<VideoConferenceModalProps> = ({
@@ -46,7 +47,8 @@ const VideoConferenceModal: React.FC<VideoConferenceModalProps> = ({
   onClose,
   meetingRoom,
   userName,
-  userRole
+  userRole,
+  currentUserId,
 }) => {
   const { toast } = useToast();
   const [isActive, setIsActive] = useState(false);
@@ -54,16 +56,27 @@ const VideoConferenceModal: React.FC<VideoConferenceModalProps> = ({
   const [meetingStatus, setMeetingStatus] = useState<'scheduled' | 'active' | 'completed' | 'cancelled'>('scheduled');
   const [isLinkAvailable, setIsLinkAvailable] = useState(false);
 
+  const refreshMeetingState = () => {
+    if (!meetingRoom) return;
+    const active = isMeetingActive(meetingRoom.startTime, meetingRoom.endTime);
+    const status = getMeetingStatus(meetingRoom.startTime, meetingRoom.endTime);
+    const linkAvailable = isMeetingLinkAvailable(meetingRoom.startTime);
+    setIsActive(active);
+    setMeetingStatus(status);
+    setIsLinkAvailable(linkAvailable);
+  };
+
   useEffect(() => {
-    if (meetingRoom) {
-      const active = isMeetingActive(meetingRoom.startTime, meetingRoom.endTime);
-      const status = getMeetingStatus(meetingRoom.startTime, meetingRoom.endTime);
-      const linkAvailable = isMeetingLinkAvailable(meetingRoom.startTime);
-      setIsActive(active);
-      setMeetingStatus(status);
-      setIsLinkAvailable(linkAvailable);
-    }
+    refreshMeetingState();
   }, [meetingRoom]);
+
+  // Re-check link availability every minute while modal is open
+  useEffect(() => {
+    if (!open || !meetingRoom) return;
+    refreshMeetingState();
+    const interval = setInterval(refreshMeetingState, 60000);
+    return () => clearInterval(interval);
+  }, [open, meetingRoom]);
 
   const handleJoinMeeting = async () => {
     if (!meetingRoom) return;
@@ -78,11 +91,15 @@ const VideoConferenceModal: React.FC<VideoConferenceModalProps> = ({
 
       await joinMeetingRoom(meetingRoom, userName, {
         isHost: userRole === 'teacher',
+        userId: currentUserId,
       });
 
       toast({
         title: "Joining Meeting",
-        description: "Opening Zoom in a new tab...",
+        description:
+          userRole === 'teacher'
+            ? 'Opening Zoom — you join as co-host on the academy license.'
+            : 'Opening Zoom in a new tab...',
       });
     } catch (error) {
       console.error('Error joining meeting:', error);
@@ -200,6 +217,13 @@ const VideoConferenceModal: React.FC<VideoConferenceModalProps> = ({
               {meetingRoom.notes && (
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-700">{meetingRoom.notes}</p>
+                </div>
+              )}
+
+              {meetingRoom.meetingUrl && (
+                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <p className="text-xs font-semibold text-indigo-800 mb-1">Zoom meeting link</p>
+                  <p className="text-xs text-indigo-700 break-all font-mono">{meetingRoom.meetingUrl}</p>
                 </div>
               )}
             </CardContent>

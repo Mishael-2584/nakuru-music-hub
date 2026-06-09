@@ -283,11 +283,16 @@ const InstantMeetModal = ({
         );
       }
 
+      const zoomNote = meeting.alternativeHostEmail
+        ? ` You will join as co-host (${meeting.alternativeHostEmail}).`
+        : meeting.zoomHostEmail
+          ? ` Academy Zoom: ${meeting.zoomHostEmail}.`
+          : '';
       toast({
         title: formData.isScheduled ? "Meeting Scheduled!" : "Meeting Created!",
         description: formData.isScheduled 
-          ? `Meeting "${meeting.title}" has been scheduled and invitations sent.`
-          : `Meeting "${meeting.title}" has been created and invitations sent.`,
+          ? `Meeting "${meeting.title}" has been scheduled.${zoomNote}`
+          : `Meeting "${meeting.title}" has been created.${zoomNote}`,
       });
 
       onMeetingCreated?.(meeting);

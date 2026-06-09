@@ -289,15 +289,16 @@ export const generateQuotePDF = async (
 
   try {
     // Convert the HTML to canvas
+    // JPEG + moderate scale keeps PDFs small enough for Supabase storage (PNG at scale 2 can exceed limits)
     const canvas = await html2canvas(pdfContainer, {
-      scale: 2,
+      scale: 1.25,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: '#ffffff'
+      backgroundColor: '#ffffff',
+      logging: false,
     });
 
-    // Create PDF
-    const imgData = canvas.toDataURL('image/png');
+    const imgData = canvas.toDataURL('image/jpeg', 0.88);
     const pdf = new jsPDF('p', 'mm', 'a4');
     const imgWidth = 210;
     const pageHeight = 295;
@@ -306,13 +307,13 @@ export const generateQuotePDF = async (
 
     let position = 0;
 
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
     heightLeft -= pageHeight;
 
     while (heightLeft >= 0) {
       position = heightLeft - imgHeight;
       pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
     }
 

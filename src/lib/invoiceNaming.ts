@@ -31,7 +31,7 @@ export function buildInvoiceDisplayNumber(
   return `${prefix}-${name}`;
 }
 
-/** Supabase storage object path for lesson invoices. */
+/** Object key inside the `invoices` storage bucket (no bucket name prefix). */
 export function buildInvoiceStoragePath(
   student: { student_name?: string | null },
   invoice: { period_start?: string | null; period_end?: string | null }
@@ -40,7 +40,16 @@ export function buildInvoiceStoragePath(
   const start = (invoice.period_start || '').replace(/-/g, '');
   const end = (invoice.period_end || '').replace(/-/g, '');
   const periodSlug = start && end ? `${start}_to_${end}` : `undated_${Date.now()}`;
-  return `invoices/${name}_${periodSlug}.pdf`;
+  return `${name}_${periodSlug}.pdf`;
+}
+
+/** True when a stored pdf_url points at a missing bucket or legacy double-folder path. */
+export function isBrokenInvoicePdfUrl(pdfUrl: string | null | undefined): boolean {
+  if (!pdfUrl) return true;
+  if (pdfUrl.includes('Bucket not found')) return true;
+  // Legacy bug: bucket "invoices" + path "invoices/file.pdf"
+  if (/\/invoices\/invoices\//.test(pdfUrl)) return true;
+  return false;
 }
 
 /** Filename when the user downloads/opens the PDF in the browser. */

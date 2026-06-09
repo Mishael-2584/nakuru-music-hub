@@ -20,7 +20,7 @@ import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
 import { calculateStudentInvoice, InvoiceCalculationResult, ensureInvoicePDF, openInvoicePdfWithName } from '../lib/invoiceUtils';
 import { Invoice } from '../integrations/supabase/types';
 import VideoConferenceModal from '../components/VideoConferenceModal';
-import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getMeetingDuration, getUserInvitedMeetings, joinMeetingByCode, joinInstantMeetingRoom, joinMeetingRoom, InstantMeeting } from '../lib/videoConferencing';
+import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getMeetingDuration, getUserInvitedMeetings, joinMeetingByCode, joinInstantMeetingRoom, joinMeetingRoom, joinBookingOnlineMeeting, openMeetingLink, InstantMeeting } from '../lib/videoConferencing';
 import MessagingUI from '../components/MessagingUI';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import StudentAccountStatusBanner from '../components/StudentAccountStatusBanner';
@@ -347,6 +347,7 @@ const StudentDashboard = () => {
   useEffect(() => {
     if (studentProfile) {
       fetchMyBookings();
+      fetchMeetingRooms();
       fetchBookingStatus();
       // Ensure classrooms load when profile is available (on refresh)
       fetchStudentClassrooms();
@@ -421,6 +422,90 @@ const StudentDashboard = () => {
       });
     }
   }, [studentProfile]);
+
+  // Refresh meetings whenever the Video Conferencing tab is opened
+  useEffect(() => {
+    if (activeTab === 'video-conferencing' && studentProfile?.id) {
+      fetchMeetingRooms();
+      fetchMyBookings();
+    }
+  }, [activeTab, studentProfile?.id]);
+
+  // Refetch meetings when returning to this browser tab (fixes stale links without manual refresh)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!document.hidden && studentProfile?.id) {
+        fetchMeetingRooms();
+        if (activeTab === 'bookings' || activeTab === 'video-conferencing') {
+          fetchMyBookings();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [studentProfile?.id, activeTab]);
+
+  // Realtime: refresh meetings when teacher creates/starts a session or sends an invitation
+  useEffect(() => {
+    if (!studentProfile?.id || !studentProfile?.user_id) return;
+
+    const refreshMeetings = () => {
+      fetchMeetingRooms();
+      fetchMyBookings();
+    };
+
+    const channel = supabase
+      .channel(`student-meetings-${studentProfile.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'meeting_rooms', filter: `student_id=eq.${studentProfile.id}` },
+        refreshMeetings
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bookings', filter: `student_id=eq.${studentProfile.id}` },
+        refreshMeetings
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'portal_messages', filter: `recipient_id=eq.${studentProfile.user_id}` },
+        refreshMeetings
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'instant_meetings' },
+        (payload) => {
+          const row = (payload.new || payload.old) as { host_id?: string; participants?: string[] } | null;
+          if (!row) return;
+          const uid = studentProfile.user_id;
+          if (row.host_id === uid || row.participants?.includes(uid)) {
+            refreshMeetings();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [studentProfile?.id, studentProfile?.user_id]);
+
+  // Poll while video tab is open and a meeting may be starting soon
+  useEffect(() => {
+    if (activeTab !== 'video-conferencing' || !studentProfile?.id) return;
+
+    const hasPendingOrActive =
+      invitedMeetings.some((m) => m.status === 'pending' || m.status === 'active') ||
+      meetingRooms.some((r) => r.status === 'scheduled' || r.status === 'active');
+
+    if (!hasPendingOrActive) return;
+
+    const interval = setInterval(() => {
+      fetchMeetingRooms();
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [activeTab, studentProfile?.id, invitedMeetings.length, meetingRooms.length]);
 
   // Auto-refresh invoice status when switching to payments tab
   useEffect(() => {
@@ -1176,6 +1261,31 @@ const StudentDashboard = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleJoinOnlineLesson = async (booking: Booking) => {
+    if (booking.meeting_room) {
+      handleOpenVideoConference(booking);
+      return;
+    }
+    if (booking.meeting_link) {
+      try {
+        await joinBookingOnlineMeeting(booking, { isHost: false });
+      } catch (error) {
+        console.error('Join online lesson error:', error);
+        toast({
+          title: 'Could not join meeting',
+          description: error instanceof Error ? error.message : 'Please try again.',
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
+    toast({
+      title: 'No meeting link yet',
+      description: 'Your teacher has not created the video room for this lesson yet.',
+      variant: 'destructive',
+    });
   };
 
   // Handle opening video conference from meeting rooms list
@@ -2421,10 +2531,6 @@ const StudentDashboard = () => {
 
   const handleDownloadInvoicePdf = async (invoice: any) => {
     if (!studentProfile) return;
-    if (invoice.pdf_url) {
-      await openInvoicePdfWithName(invoice.pdf_url, studentProfile, invoice);
-      return;
-    }
     setGeneratingStudentPdfId(invoice.id);
     try {
       const pdfUrl = await ensureInvoicePDF(invoice, studentProfile);
@@ -3446,16 +3552,19 @@ const StudentDashboard = () => {
                               )}
                               
                               {/* Video Conference Button for Online Lessons */}
-                              {booking.mode === 'online' && booking.meeting_room && (
+                              {booking.mode === 'online' && (booking.meeting_room || booking.meeting_link) && (
                                 <Button 
                                   variant="outline" 
                                   size="sm"
-                                  onClick={() => handleOpenVideoConference(booking)}
-                                  className="flex items-center gap-1"
+                                  onClick={() => void handleJoinOnlineLesson(booking)}
+                                  className="flex items-center gap-1 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
                                 >
                                   <Video className="w-4 h-4" />
                                   Join Meeting
                                 </Button>
+                              )}
+                              {booking.mode === 'online' && !booking.meeting_room && !booking.meeting_link && (
+                                <span className="text-xs text-amber-600">Waiting for teacher to create meeting link</span>
                               )}
                               
                               <Button variant="outline" size="sm" onClick={() => { setSelectedBooking(booking); setShowBookingDetailsModal(true); }}>
@@ -4466,6 +4575,15 @@ const StudentDashboard = () => {
 
             {/* Video Conferencing Tab */}
             <TabsContent value="video-conferencing" className="space-y-6">
+              {invitedMeetings.some((m) => m.status === 'active') && (
+                <Alert className="border-red-300 bg-red-50">
+                  <Video className="h-4 w-4 text-red-600" />
+                  <AlertTitle className="text-red-800">Live meeting in progress</AlertTitle>
+                  <AlertDescription className="text-red-700">
+                    Your teacher has started a meeting. Use the <strong>Join Live Meeting</strong> button below — no need to refresh the page.
+                  </AlertDescription>
+                </Alert>
+              )}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -4539,7 +4657,13 @@ const StudentDashboard = () => {
                             {meeting.description && (
                               <p className="text-sm text-purple-600 mb-3 italic">"{meeting.description}"</p>
                             )}
-                            <div className="flex gap-2">
+                            {meeting.meetingUrl && (
+                              <div className="mb-3 p-2 bg-white rounded border border-purple-200">
+                                <p className="text-xs font-medium text-purple-800 mb-1">Zoom meeting link</p>
+                                <p className="text-xs text-purple-600 break-all font-mono">{meeting.meetingUrl}</p>
+                              </div>
+                            )}
+                            <div className="flex flex-wrap gap-2">
                               <Button 
                                 onClick={() => {
                                   if (!studentProfile?.user_id) return;
@@ -4553,8 +4677,19 @@ const StudentDashboard = () => {
                                 size="sm"
                               >
                                 <Video className="w-4 h-4" />
-                                {meeting.status === 'active' ? '🚀 Join Live Meeting' : 'Join Meeting'}
+                                {meeting.status === 'active' ? 'Join Live Meeting' : 'Join Meeting'}
                               </Button>
+                              {meeting.meetingUrl && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    openMeetingLink(meeting.meetingUrl, { isHost: false })
+                                  }
+                                >
+                                  Open Zoom
+                                </Button>
+                              )}
                               <Button 
                                 variant="outline"
                                 size="sm"
@@ -4566,6 +4701,19 @@ const StudentDashboard = () => {
                                 <Copy className="w-3 h-3 mr-1" />
                                 Copy Code
                               </Button>
+                              {meeting.meetingUrl && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(meeting.meetingUrl);
+                                    toast({ title: "Copied", description: "Meeting link copied to clipboard" });
+                                  }}
+                                >
+                                  <Copy className="w-3 h-3 mr-1" />
+                                  Copy Link
+                                </Button>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -4647,6 +4795,7 @@ const StudentDashboard = () => {
         meetingRoom={selectedMeetingRoom}
         userName={studentProfile?.student_name || 'Student'}
         userRole="student"
+        currentUserId={studentProfile?.user_id}
       />
 
       {/* Booking Modal */}

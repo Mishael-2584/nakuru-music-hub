@@ -16,6 +16,7 @@ import {
   buildInvoiceDisplayNumber,
   buildInvoiceDownloadFileName,
   buildInvoiceStoragePath,
+  isBrokenInvoicePdfUrl,
 } from './invoiceNaming';
 
 export {
@@ -23,6 +24,7 @@ export {
   buildInvoiceDisplayNumber,
   buildInvoiceStoragePath,
   buildInvoiceDownloadFileName,
+  isBrokenInvoicePdfUrl,
 } from './invoiceNaming';
 
 export interface InvoiceLineItem {
@@ -146,6 +148,49 @@ async function getCachedExchangeRate(fromCurrency: string, toCurrency: string): 
 
 const MUSIC_MONTHLY_SESSIONS_PER_MONTH = 4;
 
+/** Check whether a public invoice PDF URL actually returns a file. */
+export async function isInvoicePdfUrlAccessible(pdfUrl: string): Promise<boolean> {
+  if (isBrokenInvoicePdfUrl(pdfUrl)) return false;
+  try {
+    const res = await fetch(pdfUrl, { method: 'GET' });
+    if (!res.ok) return false;
+    const contentType = res.headers.get('content-type') || '';
+    return contentType.includes('pdf') || contentType.includes('octet-stream');
+  } catch {
+    return false;
+  }
+}
+
+/** Open invoice PDF preview in a new tab with a proper filename (not a random UUID). */
+export function openInvoicePdfPreview(
+  blob: Blob,
+  student: { student_name?: string | null },
+  invoice: { period_start?: string | null; period_end?: string | null }
+): void {
+  const fileName = buildInvoiceDownloadFileName(student, invoice);
+  const file = new File([blob], fileName, { type: 'application/pdf' });
+  const url = URL.createObjectURL(file);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  setTimeout(() => URL.revokeObjectURL(url), 120000);
+}
+
+/** Trigger a direct download with the student's name as the filename. */
+export function downloadInvoicePdfBlob(
+  blob: Blob,
+  student: { student_name?: string | null },
+  invoice: { period_start?: string | null; period_end?: string | null }
+): void {
+  const fileName = buildInvoiceDownloadFileName(student, invoice);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
 /** Download/open a PDF using the student's name as the filename. */
 export async function openInvoicePdfWithName(
   pdfUrl: string,
@@ -155,8 +200,11 @@ export async function openInvoicePdfWithName(
   const downloadName = buildInvoiceDownloadFileName(student, invoice);
   try {
     const res = await fetch(pdfUrl);
-    if (!res.ok) throw new Error('Failed to fetch PDF');
+    if (!res.ok) throw new Error(`Failed to fetch PDF (${res.status})`);
     const blob = await res.blob();
+    if (blob.type && blob.type.includes('json')) {
+      throw new Error('PDF link returned an error instead of a file');
+    }
     const objectUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = objectUrl;
@@ -165,15 +213,8 @@ export async function openInvoicePdfWithName(
     link.click();
     document.body.removeChild(link);
     setTimeout(() => URL.revokeObjectURL(objectUrl), 2000);
-  } catch {
-    const link = document.createElement('a');
-    link.href = pdfUrl;
-    link.download = downloadName;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  } catch (err) {
+    throw err instanceof Error ? err : new Error('Could not download invoice PDF');
   }
 }
 
@@ -366,8 +407,19 @@ export async function generateAndUploadInvoicePDF(invoice: any, student: any, is
   const pdfBlob = await generateQuotePDF(quoteData, invoice.amount_due, '', invoiceDetails, invoiceMeta);
   // Upload to Supabase Storage
   const fileName = buildInvoiceStoragePath(student, invoice);
-  const { data, error } = await supabase.storage.from('invoices').upload(fileName, pdfBlob, { upsert: true, contentType: 'application/pdf' });
-  if (error) throw error;
+  const { error } = await supabase.storage.from('invoices').upload(fileName, pdfBlob, {
+    upsert: true,
+    contentType: 'application/pdf',
+  });
+  if (error) {
+    const sizeMb = (pdfBlob.size / (1024 * 1024)).toFixed(2);
+    if (error.message?.toLowerCase().includes('maximum allowed size')) {
+      throw new Error(
+        `PDF is too large to upload (${sizeMb} MB). Run supabase db push to update the invoices bucket limit, then try again.`
+      );
+    }
+    throw error;
+  }
   // Get public URL
   const { publicUrl } = supabase.storage.from('invoices').getPublicUrl(fileName).data;
   return publicUrl;
@@ -451,8 +503,14 @@ export async function ensureInvoicePDF(
   invoice: Record<string, unknown>,
   student: Record<string, unknown>
 ): Promise<string> {
-  if (invoice.pdf_url && typeof invoice.pdf_url === 'string') {
-    return invoice.pdf_url;
+  const existingUrl =
+    invoice.pdf_url && typeof invoice.pdf_url === 'string' ? invoice.pdf_url : null;
+
+  if (existingUrl && !isBrokenInvoicePdfUrl(existingUrl)) {
+    const accessible = await isInvoicePdfUrlAccessible(existingUrl);
+    if (accessible) {
+      return existingUrl;
+    }
   }
 
   const studentId = student.id as string;

@@ -583,6 +583,64 @@ const TeacherDashboard = () => {
     }
   }, [profile, isTeacher, isApproved]);
 
+  // Refresh meetings when opening the Video Conferencing tab
+  useEffect(() => {
+    if (activeTab === 'video-conferencing' && profile?.id) {
+      fetchMeetingRooms();
+      fetchTeacherBookings();
+      refreshInstantMeetings();
+    }
+  }, [activeTab, profile?.id]);
+
+  // Refetch meetings when returning to the browser tab
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!document.hidden && profile?.id) {
+        fetchMeetingRooms();
+        if (activeTab === 'video-conferencing' || activeTab === 'bookings') {
+          fetchTeacherBookings();
+          refreshInstantMeetings();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [profile?.id, activeTab]);
+
+  // Realtime meeting updates for teacher
+  useEffect(() => {
+    if (!profile?.id || !profile?.user_id) return;
+
+    const refreshMeetings = () => {
+      fetchMeetingRooms();
+      fetchTeacherBookings();
+      refreshInstantMeetings();
+    };
+
+    const channel = supabase
+      .channel(`teacher-meetings-${profile.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'meeting_rooms', filter: `teacher_id=eq.${profile.id}` },
+        refreshMeetings
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'instant_meetings', filter: `host_id=eq.${profile.user_id}` },
+        refreshMeetings
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bookings', filter: `teacher_id=eq.${profile.id}` },
+        refreshMeetings
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id, profile?.user_id]);
+
   const fetchTeacherData = async (teacherId: string) => {
     console.log('[TeacherDashboard] fetchTeacherData called with teacherId:', teacherId);
     
@@ -1167,6 +1225,8 @@ const TeacherDashboard = () => {
                       title: "Meeting Room Created",
                       description: `Meeting room created successfully for ${studentName} on ${new Date(booking.booking_date).toLocaleDateString()}`,
                     });
+
+                    await fetchTeacherBookings();
                       
                     return meetingRoom;
     } catch (error) {
@@ -2788,6 +2848,7 @@ const TeacherDashboard = () => {
                                       void joinBookingOnlineMeeting(booking, {
                                         isHost: true,
                                         teacherName: profile?.name,
+                                        teacherUserId: profile?.user_id,
                                       })
                                     }
                                   >
@@ -2832,6 +2893,7 @@ const TeacherDashboard = () => {
                                       void joinBookingOnlineMeeting(booking, {
                                         isHost: true,
                                         teacherName: profile?.name,
+                                        teacherUserId: profile?.user_id,
                                       })
                                     }
                                   >

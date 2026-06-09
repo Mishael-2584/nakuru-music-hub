@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { generateQuotePDF } from "@/lib/pdfGenerator";
 import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
-import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName } from "@/lib/invoiceUtils";
+import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
 import LearningModeDebugTest from './LearningModeDebugTest';
 import FeeDebug from './FeeDebug';
@@ -2861,10 +2861,11 @@ const AdminPanel = () => {
       const { data: earlier } = await supabase.from('invoices').select('id').eq('student_id', student.id).lt('period_start', invoice.period_start).limit(1);
       const isFirstInvoice = !earlier || earlier.length === 0;
       const blob = await generateInvoicePDFBlob(invoice, student, !!isFirstInvoice);
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener,noreferrer');
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-      toast({ title: 'Preview opened', description: 'Invoice PDF opened in new tab.' });
+      openInvoicePdfPreview(blob, student, invoice);
+      toast({
+        title: 'Preview opened',
+        description: 'When you save from the preview tab, use the suggested filename (student name + period).',
+      });
     } catch (err: any) {
       console.error('Preview invoice error:', err);
       toast({ title: 'Error', description: err.message || 'Failed to preview invoice.', variant: 'destructive' });
@@ -2907,16 +2908,6 @@ const AdminPanel = () => {
   const handleDownloadInvoicePDF = async (inv: any, student?: any) => {
     if (!inv?.id) return;
 
-    if (inv.pdf_url) {
-      const studentRecord = student || invoiceHistoryStudent;
-      if (studentRecord) {
-        await openInvoicePdfWithName(inv.pdf_url, studentRecord, inv);
-      } else {
-        window.open(inv.pdf_url, '_blank');
-      }
-      return;
-    }
-
     const studentRecord = student || invoiceHistoryStudent;
     if (!studentRecord?.id) {
       toast({
@@ -2932,7 +2923,7 @@ const AdminPanel = () => {
       const pdfUrl = await ensureInvoicePDF(inv, studentRecord);
       patchInvoicePdfUrl(inv.id, pdfUrl);
       await openInvoicePdfWithName(pdfUrl, studentRecord, inv);
-      toast({ title: 'PDF ready', description: 'Invoice PDF generated and opened.' });
+      toast({ title: 'PDF ready', description: 'Invoice PDF downloaded.' });
     } catch (err: unknown) {
       console.error('Generate invoice PDF error:', err);
       toast({
