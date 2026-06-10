@@ -276,8 +276,8 @@ const Fees = () => {
       courses: [
         {
           name: "1-on-1 Classes",
-          duration: "1 hour per session",
-          perClass: "KSh 2,200",
+          duration: "1 session per week x 4 weeks",
+          monthly: "KSh 8,800",
           icon: Code,
           features: [
             "Personalized instruction",

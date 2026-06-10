@@ -278,6 +278,16 @@ const MeetingInvitationCard = ({
                 </div>
               )}
               
+              {meeting.meetingUrl && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50/80 p-3 text-xs">
+                  <p className="font-semibold text-blue-900 mb-1">Zoom link (live from academy account)</p>
+                  <p className="text-blue-800 break-all font-mono">{meeting.meetingUrl}</p>
+                  {meeting.zoomHostEmail && (
+                    <p className="text-blue-700 mt-1">Licensed host: {meeting.zoomHostEmail}</p>
+                  )}
+                </div>
+              )}
+
               {/* Meeting Details Grid */}
               <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 rounded-lg p-3">
                 <div className="flex items-center gap-2">
@@ -440,10 +450,16 @@ const MeetingInvitationCard = ({
               )}
             </div>
             
+            {meeting.zoomHostEmail && (
+              <div className="text-xs text-muted-foreground">
+                Zoom runs on the academy license ({meeting.zoomHostEmail}). Your teacher joins as co-host.
+              </div>
+            )}
+
             <div className="bg-gray-50 rounded-lg p-4">
-              <h4 className="font-medium mb-2">Meeting Link</h4>
+              <h4 className="font-medium mb-2">Zoom meeting link</h4>
               <div className="flex items-center gap-2">
-                <code className="flex-1 text-xs bg-white p-2 rounded border">
+                <code className="flex-1 text-xs bg-white p-2 rounded border break-all">
                   {meeting.meetingUrl}
                 </code>
                 <Button size="sm" onClick={copyMeetingLink}>

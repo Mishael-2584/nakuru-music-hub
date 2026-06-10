@@ -754,6 +754,24 @@ export const createInstantMeeting = async ({
   return mapInstantMeetingRow(data);
 };
 
+/** Parse academy meeting code from invitation message body (legacy messages without meeting_id). */
+export function parseMeetingCodeFromInvitationMessage(message: string): string | null {
+  const match = message.match(/Meeting Code:\s*([A-Z0-9]+)/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+/** Resolve instant_meetings.id from a portal message (meeting_id or embedded code). */
+export async function resolveMeetingIdFromInvitationMessage(
+  meetingId: string | null | undefined,
+  messageBody: string
+): Promise<string | null> {
+  if (meetingId) return meetingId;
+  const code = parseMeetingCodeFromInvitationMessage(messageBody);
+  if (!code) return null;
+  const meeting = await getInstantMeetingByCode(code);
+  return meeting?.id ?? null;
+}
+
 // Send meeting invitations
 export const sendMeetingInvitations = async (
   meetingId: string,

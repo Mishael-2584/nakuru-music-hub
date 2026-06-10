@@ -12,7 +12,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { MessageSquare, Send, Reply, Search, Filter, Video } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { supabase } from '../integrations/supabase/client';
-import MeetingInvitationCard from './MeetingInvitationCard';
+import MeetingInvitationMessage from './MeetingInvitationMessage';
 
 interface Message {
   id: string;
@@ -799,11 +799,11 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
                  <div className="space-y-3">
                    {selectedConversation.messages.map(message => {
                      // Special rendering for meeting invitations
-                     if (message.message_type === 'meeting_invitation' && message.meeting_id && message.type === 'received') {
+                     if (message.message_type === 'meeting_invitation' && message.type === 'received') {
                        return (
                          <div key={message.id} className="flex justify-start w-full">
                            <div className="w-full max-w-md">
-                             <MeetingInvitationCard
+                             <MeetingInvitationMessage
                                meetingId={message.meeting_id}
                                subject={message.subject}
                                message={message.message}
