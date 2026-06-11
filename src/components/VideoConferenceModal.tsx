@@ -222,8 +222,13 @@ const VideoConferenceModal: React.FC<VideoConferenceModalProps> = ({
 
               {meetingRoom.meetingUrl && (
                 <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-                  <p className="text-xs font-semibold text-indigo-800 mb-1">Zoom meeting link</p>
+                  <p className="text-xs font-semibold text-indigo-800 mb-1">
+                    {meetingRoom.meetingProvider === 'google_meet' ? 'Google Meet' : 'Zoom'} meeting link
+                  </p>
                   <p className="text-xs text-indigo-700 break-all font-mono">{meetingRoom.meetingUrl}</p>
+                  {meetingRoom.providerNote && (
+                    <p className="text-xs text-indigo-600 mt-1">{meetingRoom.providerNote}</p>
+                  )}
                 </div>
               )}
             </CardContent>

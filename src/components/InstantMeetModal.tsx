@@ -283,16 +283,22 @@ const InstantMeetModal = ({
         );
       }
 
-      const zoomNote = meeting.alternativeHostEmail
-        ? ` You will join as co-host (${meeting.alternativeHostEmail}).`
-        : meeting.zoomHostEmail
-          ? ` Academy Zoom: ${meeting.zoomHostEmail}.`
-          : '';
+      const providerNote =
+        meeting.meetingProvider === 'google_meet'
+          ? meeting.providerNote ||
+            ' Google Meet was used because another class is using academy Zoom at this time.'
+          : meeting.alternativeHostWarning
+            ? ` ${meeting.alternativeHostWarning}`
+            : meeting.alternativeHostEmail
+              ? ` You will join as co-host (${meeting.alternativeHostEmail}).`
+              : meeting.zoomHostEmail
+                ? ` Academy Zoom: ${meeting.zoomHostEmail}.`
+                : '';
       toast({
         title: formData.isScheduled ? "Meeting Scheduled!" : "Meeting Created!",
         description: formData.isScheduled 
-          ? `Meeting "${meeting.title}" has been scheduled.${zoomNote}`
-          : `Meeting "${meeting.title}" has been created.${zoomNote}`,
+          ? `Meeting "${meeting.title}" has been scheduled.${providerNote}`
+          : `Meeting "${meeting.title}" has been created.${providerNote}`,
       });
 
       onMeetingCreated?.(meeting);
@@ -317,6 +323,13 @@ const InstantMeetModal = ({
         } else if (error.message.includes('network') || error.message.includes('connection')) {
           errorTitle = "Connection Error";
           errorDescription = "Please check your internet connection and try again.";
+        } else if (error.message.includes('1115') || /alternative host/i.test(error.message)) {
+          errorTitle = "Zoom License Limit";
+          errorDescription =
+            "Alternative hosts must have a Licensed (Pro) seat on the academy Zoom account. Basic users are on the account but cannot be alternative hosts. Deploy the latest create-zoom-meeting function to auto-retry without co-host, or assign a Pro license.";
+        } else if (/Google Meet fallback|already in use for another class/i.test(error.message)) {
+          errorTitle = "Schedule Conflict";
+          errorDescription = error.message;
         }
       }
       

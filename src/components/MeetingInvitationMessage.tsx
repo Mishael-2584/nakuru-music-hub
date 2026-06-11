@@ -59,7 +59,7 @@ const MeetingInvitationMessage = ({
       <Card className="border-blue-200 bg-blue-50">
         <CardContent className="p-4 flex items-center gap-2">
           <Video className="w-5 h-5 text-blue-600 animate-pulse" />
-          <span className="text-sm text-blue-800">Loading meeting from Zoom...</span>
+          <span className="text-sm text-blue-800">Loading meeting details...</span>
         </CardContent>
       </Card>
     );

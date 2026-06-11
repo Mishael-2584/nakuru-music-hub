@@ -272,19 +272,21 @@ const Fees = () => {
     },
     {
       category: "💻 Web Design & Programming",
-      subtitle: "Flexible class sizes with competitive pricing",
+      subtitle: "Monthly plans · 4 sessions per month",
       courses: [
         {
           name: "1-on-1 Classes",
-          duration: "1 session per week x 4 weeks",
+          duration: "1 hour per session",
           monthly: "KSh 8,800",
+          sessionsPerMonth: 4,
           icon: Code,
           features: [
             "Personalized instruction",
             "Individual attention",
             "Customized learning pace",
             "Direct feedback and support",
-            "Flexible scheduling"
+            "Flexible scheduling",
+            "4 sessions a month"
           ],
           popular: true
         },
@@ -530,8 +532,11 @@ const Fees = () => {
                         <div>
                           <div className="text-2xl font-bold text-primary">{(course as any).monthly || (course as any).perClass || (course as any).perSession || (course as any).termly}</div>
                           <div className="text-sm text-muted-foreground mt-1">
-                            {(course as any).monthly ? "per month" : 
-                             (course as any).perClass ? "per class" : 
+                            {(course as any).monthly
+                              ? (course as any).sessionsPerMonth
+                                ? `per month (${(course as any).sessionsPerMonth} sessions)`
+                                : "per month"
+                              : (course as any).perClass ? "per class" : 
                              (course as any).perSession ? "per session" : 
                              "per term"}
                           </div>

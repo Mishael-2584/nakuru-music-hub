@@ -1,5 +1,7 @@
 // Video Conferencing Service for Damon Music Academy
-// Zoom meetings via Supabase Edge Function (create-zoom-meeting)
+// Zoom (primary) + Google Meet fallback when the academy Zoom license is in use
+
+export type MeetingProvider = 'zoom' | 'google_meet';
 
 export interface MeetingRoom {
   id: string;
@@ -9,6 +11,9 @@ export interface MeetingRoom {
   zoomMeetingId?: string;
   zoomHostEmail?: string;
   alternativeHostEmail?: string;
+  meetingProvider?: MeetingProvider;
+  googleCalendarEventId?: string;
+  providerNote?: string;
   teacherId: string;
   studentId?: string;
   bookingId?: string;
@@ -46,19 +51,47 @@ export interface InstantMeeting {
   participantJoinLog: MeetingParticipantLog[];
   zoomHostEmail?: string;
   alternativeHostEmail?: string;
+  alternativeHostWarning?: string | null;
+  meetingProvider?: MeetingProvider;
+  googleCalendarEventId?: string;
+  providerNote?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface ZoomMeetingResult {
+export interface VideoMeetingResult {
+  provider: MeetingProvider;
   zoomHostEmail?: string | null;
   alternativeHostEmail?: string | null;
+  alternativeHostWarning?: string | null;
+  providerNote?: string | null;
   singleLicenseMode?: boolean;
   teacherEmail?: string | null;
   joinUrl: string;
   startUrl: string;
   meetingId: string;
   password?: string | null;
+  googleCalendarEventId?: string | null;
+  overlappingZoomCount?: number;
+}
+
+/** @deprecated Use VideoMeetingResult */
+export type ZoomMeetingResult = VideoMeetingResult;
+
+export function isGoogleMeetUrl(url: string): boolean {
+  return /meet\.google\.com/i.test(url);
+}
+
+export function resolveMeetingProvider(
+  url: string,
+  stored?: MeetingProvider | null
+): MeetingProvider {
+  if (stored) return stored;
+  return isGoogleMeetUrl(url) ? 'google_meet' : 'zoom';
+}
+
+export function getMeetingProviderLabel(provider?: MeetingProvider | null): string {
+  return provider === 'google_meet' ? 'Google Meet' : 'Zoom';
 }
 
 /** Portal user email used for Zoom alternative-host matching. */
@@ -97,6 +130,9 @@ const mapMeetingRoomRow = (data: Record<string, unknown>): MeetingRoom => ({
   zoomMeetingId: (data.zoom_meeting_id as string) || undefined,
   zoomHostEmail: (data.zoom_host_email as string) || undefined,
   alternativeHostEmail: (data.alternative_host_email as string) || undefined,
+  meetingProvider: (data.meeting_provider as MeetingProvider) || undefined,
+  googleCalendarEventId: (data.google_calendar_event_id as string) || undefined,
+  providerNote: (data.provider_note as string) || undefined,
   teacherId: data.teacher_id as string,
   studentId: (data.student_id as string) || undefined,
   bookingId: (data.booking_id as string) || undefined,
@@ -134,6 +170,9 @@ const mapInstantMeetingRow = (data: Record<string, unknown>): InstantMeeting => 
   participantJoinLog: (data.participant_join_log as MeetingParticipantLog[]) || [],
   zoomHostEmail: (data.zoom_host_email as string) || undefined,
   alternativeHostEmail: (data.alternative_host_email as string) || undefined,
+  meetingProvider: (data.meeting_provider as MeetingProvider) || undefined,
+  googleCalendarEventId: (data.google_calendar_event_id as string) || undefined,
+  providerNote: (data.provider_note as string) || undefined,
   createdAt: data.created_at as string,
   updatedAt: data.updated_at as string,
 });
@@ -165,19 +204,19 @@ export const DEFAULT_VIDEO_SETTINGS: VideoCallSettings = {
   maxParticipants: 100,
 };
 
-/** Create a Zoom meeting through the Supabase Edge Function (credentials stay server-side). */
-export const createZoomMeeting = async (params: {
+/** Create Zoom or Google Meet (auto-fallback when Zoom license is busy). */
+export const createVideoMeeting = async (params: {
   topic: string;
   startTime?: string;
   duration?: number;
   agenda?: string;
   alternativeHostEmails?: string[];
-  /** Portal auth user id — meeting is created under this user's Zoom licensed email. */
   hostUserId?: string;
-}): Promise<ZoomMeetingResult> => {
+  forceProvider?: MeetingProvider;
+}): Promise<VideoMeetingResult> => {
   const { supabase } = await import('../integrations/supabase/client');
 
-  const { data, error } = await supabase.functions.invoke('create-zoom-meeting', {
+  const { data, error } = await supabase.functions.invoke('create-video-meeting', {
     body: {
       topic: params.topic,
       startTime: params.startTime,
@@ -185,30 +224,50 @@ export const createZoomMeeting = async (params: {
       agenda: params.agenda,
       alternativeHostEmails: params.alternativeHostEmails,
       hostUserId: params.hostUserId,
+      forceProvider: params.forceProvider,
     },
   });
 
   if (error) {
-    throw new Error(error.message || 'Failed to create Zoom meeting');
+    throw new Error(error.message || 'Failed to create video meeting');
   }
   if (data?.error) {
     throw new Error(data.error);
   }
-  if (!data?.joinUrl || !data?.startUrl) {
-    throw new Error('Zoom meeting response missing join or start URL');
+  if (!data?.joinUrl) {
+    throw new Error('Video meeting response missing join URL');
   }
 
+  const provider: MeetingProvider =
+    data.provider === 'google_meet' ? 'google_meet' : 'zoom';
+
   return {
+    provider,
     joinUrl: data.joinUrl,
-    startUrl: data.startUrl,
+    startUrl: data.startUrl || data.joinUrl,
     meetingId: String(data.meetingId),
-    password: data.password,
+    password: data.password ?? null,
     zoomHostEmail: data.hostEmail ?? null,
     alternativeHostEmail: data.alternativeHostEmail ?? null,
+    alternativeHostWarning: data.alternativeHostWarning ?? null,
+    providerNote: data.providerNote ?? null,
     singleLicenseMode: data.singleLicenseMode ?? true,
     teacherEmail: data.teacherEmail ?? null,
+    googleCalendarEventId: data.googleCalendarEventId ?? null,
+    overlappingZoomCount: data.overlappingZoomCount,
   };
 };
+
+/** Force Zoom only (legacy). Prefer createVideoMeeting for automatic Meet fallback. */
+export const createZoomMeeting = async (params: {
+  topic: string;
+  startTime?: string;
+  duration?: number;
+  agenda?: string;
+  alternativeHostEmails?: string[];
+  hostUserId?: string;
+}): Promise<VideoMeetingResult> =>
+  createVideoMeeting({ ...params, forceProvider: 'zoom' });
 
 /** Resolve a teacher's portal user id from teachers.id (for Zoom host on lesson rooms). */
 async function getTeacherUserId(teacherId: string): Promise<string | undefined> {
@@ -237,7 +296,7 @@ export const upgradeInstantMeetingToZoom = async (
   }
 
   const { supabase } = await import('../integrations/supabase/client');
-  const zoom = await createZoomMeeting({
+  const video = await createVideoMeeting({
     topic: meeting.title,
     startTime: meeting.scheduledStartTime,
     duration: meeting.duration || 60,
@@ -248,11 +307,14 @@ export const upgradeInstantMeetingToZoom = async (
   const { data, error } = await supabase
     .from('instant_meetings')
     .update({
-      meeting_url: zoom.joinUrl,
-      meeting_host_url: zoom.startUrl,
-      zoom_meeting_id: zoom.meetingId,
-      zoom_host_email: zoom.zoomHostEmail,
-      alternative_host_email: zoom.alternativeHostEmail,
+      meeting_url: video.joinUrl,
+      meeting_host_url: video.startUrl,
+      zoom_meeting_id: video.provider === 'zoom' ? video.meetingId : null,
+      zoom_host_email: video.zoomHostEmail,
+      alternative_host_email: video.alternativeHostEmail,
+      meeting_provider: video.provider,
+      google_calendar_event_id: video.googleCalendarEventId,
+      provider_note: video.providerNote,
       updated_at: new Date().toISOString(),
     })
     .eq('id', meeting.id)
@@ -281,7 +343,7 @@ export const upgradeMeetingRoomToZoom = async (room: MeetingRoom): Promise<Meeti
 
   const teacherUserId = await getTeacherUserId(room.teacherId);
 
-  const zoom = await createZoomMeeting({
+  const video = await createVideoMeeting({
     topic: room.roomName.replace(/-/g, ' '),
     startTime: room.startTime,
     duration: durationMinutes,
@@ -292,11 +354,14 @@ export const upgradeMeetingRoomToZoom = async (room: MeetingRoom): Promise<Meeti
   const { data, error } = await supabase
     .from('meeting_rooms')
     .update({
-      meeting_url: zoom.joinUrl,
-      meeting_host_url: zoom.startUrl,
-      zoom_meeting_id: zoom.meetingId,
-      zoom_host_email: zoom.zoomHostEmail,
-      alternative_host_email: zoom.alternativeHostEmail,
+      meeting_url: video.joinUrl,
+      meeting_host_url: video.startUrl,
+      zoom_meeting_id: video.provider === 'zoom' ? video.meetingId : null,
+      zoom_host_email: video.zoomHostEmail,
+      alternative_host_email: video.alternativeHostEmail,
+      meeting_provider: video.provider,
+      google_calendar_event_id: video.googleCalendarEventId,
+      provider_note: video.providerNote,
       updated_at: new Date().toISOString(),
     })
     .eq('id', room.id)
@@ -312,30 +377,36 @@ export const upgradeMeetingRoomToZoom = async (room: MeetingRoom): Promise<Meeti
   if (upgraded.bookingId) {
     await supabase
       .from('bookings')
-      .update({ meeting_link: zoom.joinUrl })
+      .update({ meeting_link: video.joinUrl })
       .eq('id', upgraded.bookingId);
   }
 
   return upgraded;
 };
 
-/** Open Zoom in a new tab. Licensed host uses start URL; teachers use join URL as alternative hosts. */
+/** Open video meeting in a new tab (Zoom or Google Meet). */
 export const openMeetingLink = (
   joinUrl: string,
-  options?: { isHost?: boolean; hostUrl?: string | null; isLicensedZoomHost?: boolean }
+  options?: {
+    isHost?: boolean;
+    hostUrl?: string | null;
+    isLicensedZoomHost?: boolean;
+    provider?: MeetingProvider;
+  }
 ): void => {
   if (isLegacyJitsiUrl(joinUrl)) {
     throw new Error(
-      'This meeting still uses an old Jitsi link. Please try joining again — the app will upgrade it to Zoom automatically.'
+      'This meeting still uses an old Jitsi link. Please try joining again — the app will upgrade it automatically.'
     );
   }
 
+  const provider = options?.provider ?? resolveMeetingProvider(joinUrl);
   const useStartUrl =
-    options?.isHost && options?.isLicensedZoomHost && options?.hostUrl;
+    provider === 'zoom' &&
+    options?.isHost &&
+    options?.isLicensedZoomHost &&
+    options?.hostUrl;
   const url = useStartUrl ? options.hostUrl! : joinUrl;
-  if (!url.includes('zoom.us') && !url.includes('zoom.com')) {
-    console.warn('Opening non-Zoom meeting URL:', url);
-  }
   window.open(url, '_blank', 'noopener,noreferrer');
 };
 
@@ -357,30 +428,33 @@ export const joinBookingOnlineMeeting = async (
   let hostUrl: string | null | undefined;
 
   let licensedZoomEmail: string | undefined;
+  let provider: MeetingProvider = resolveMeetingProvider(joinUrl);
   const existingRoom = await getMeetingRoomByBooking(booking.id);
   if (existingRoom) {
     const upgraded = await upgradeMeetingRoomToZoom(existingRoom);
     joinUrl = upgraded.meetingUrl;
     hostUrl = upgraded.meetingHostUrl;
     licensedZoomEmail = upgraded.zoomHostEmail;
+    provider = upgraded.meetingProvider ?? resolveMeetingProvider(joinUrl);
   } else if (isLegacyJitsiUrl(joinUrl)) {
     const startTime = `${booking.booking_date}T${booking.start_time}`;
     const endTime = `${booking.booking_date}T${booking.end_time}`;
     const teacherUserId =
       options.teacherUserId ||
       (booking.teacher_id ? await getTeacherUserId(booking.teacher_id) : undefined);
-    const zoom = await createZoomMeeting({
+    const video = await createVideoMeeting({
       topic: `Lesson with ${booking.student_name || 'student'}`,
       startTime,
       duration: Math.max(15, getMeetingDuration(startTime, endTime) || 60),
       hostUserId: teacherUserId,
     });
-    joinUrl = zoom.joinUrl;
-    hostUrl = zoom.startUrl;
-    licensedZoomEmail = zoom.zoomHostEmail ?? undefined;
+    joinUrl = video.joinUrl;
+    hostUrl = video.startUrl;
+    licensedZoomEmail = video.zoomHostEmail ?? undefined;
+    provider = video.provider;
     await supabase
       .from('bookings')
-      .update({ meeting_link: zoom.joinUrl })
+      .update({ meeting_link: video.joinUrl })
       .eq('id', booking.id);
   }
 
@@ -389,7 +463,7 @@ export const joinBookingOnlineMeeting = async (
     const email = await getPortalUserZoomEmail(options.teacherUserId);
     isLicensedZoomHost = shouldUseZoomStartUrl(email, licensedZoomEmail);
   }
-  openMeetingLink(joinUrl, { isHost: options.isHost, hostUrl, isLicensedZoomHost });
+  openMeetingLink(joinUrl, { isHost: options.isHost, hostUrl, isLicensedZoomHost, provider });
 };
 
 // Generate a unique meeting room name
@@ -448,7 +522,7 @@ export const createMeetingRoom = async (
 
   const teacherUserId = await getTeacherUserId(teacherId);
 
-  const zoom = await createZoomMeeting({
+  const video = await createVideoMeeting({
     topic: `${lessonType} lesson: ${teacherName} & ${studentName}`,
     startTime,
     duration: durationMinutes,
@@ -458,11 +532,14 @@ export const createMeetingRoom = async (
 
   const dbMeetingRoom = {
     room_name: roomName,
-    meeting_url: zoom.joinUrl,
-    meeting_host_url: zoom.startUrl,
-    zoom_meeting_id: zoom.meetingId,
-    zoom_host_email: zoom.zoomHostEmail,
-    alternative_host_email: zoom.alternativeHostEmail,
+    meeting_url: video.joinUrl,
+    meeting_host_url: video.startUrl,
+    zoom_meeting_id: video.provider === 'zoom' ? video.meetingId : null,
+    zoom_host_email: video.zoomHostEmail,
+    alternative_host_email: video.alternativeHostEmail,
+    meeting_provider: video.provider,
+    google_calendar_event_id: video.googleCalendarEventId,
+    provider_note: video.providerNote,
     teacher_id: teacherId,
     student_id: studentId,
     booking_id: bookingId,
@@ -557,6 +634,7 @@ export const joinMeetingRoom = async (
     isHost: options?.isHost,
     hostUrl: upgraded.meetingHostUrl,
     isLicensedZoomHost,
+    provider: upgraded.meetingProvider ?? resolveMeetingProvider(upgraded.meetingUrl),
   });
   return upgraded;
 };
@@ -661,10 +739,12 @@ export const createSimpleTrialMeeting = async (
   meetingUrl: string;
   meetingHostUrl: string;
   meetingCode: string;
-  zoomMeetingId: string;
+  zoomMeetingId?: string;
+  meetingProvider: MeetingProvider;
+  providerNote?: string | null;
 }> => {
   const meetingCode = generateMeetingCode();
-  const zoom = await createZoomMeeting({
+  const video = await createVideoMeeting({
     topic: title,
     startTime: scheduledStartTime,
     duration: 60,
@@ -672,10 +752,12 @@ export const createSimpleTrialMeeting = async (
     hostUserId,
   });
   return {
-    meetingUrl: zoom.joinUrl,
-    meetingHostUrl: zoom.startUrl,
+    meetingUrl: video.joinUrl,
+    meetingHostUrl: video.startUrl,
     meetingCode,
-    zoomMeetingId: zoom.meetingId,
+    zoomMeetingId: video.provider === 'zoom' ? video.meetingId : undefined,
+    meetingProvider: video.provider,
+    providerNote: video.providerNote,
   };
 };
 
@@ -709,7 +791,7 @@ export const createInstantMeeting = async ({
   
   const meetingCode = generateMeetingCode();
 
-  const zoom = await createZoomMeeting({
+  const video = await createVideoMeeting({
     topic: title,
     startTime: scheduledStartTime,
     duration,
@@ -722,11 +804,14 @@ export const createInstantMeeting = async ({
   const instantMeeting = {
     title,
     description,
-    meeting_url: zoom.joinUrl,
-    meeting_host_url: zoom.startUrl,
-    zoom_meeting_id: zoom.meetingId,
-    zoom_host_email: zoom.zoomHostEmail,
-    alternative_host_email: zoom.alternativeHostEmail,
+    meeting_url: video.joinUrl,
+    meeting_host_url: video.startUrl,
+    zoom_meeting_id: video.provider === 'zoom' ? video.meetingId : null,
+    zoom_host_email: video.zoomHostEmail,
+    alternative_host_email: video.alternativeHostEmail,
+    meeting_provider: video.provider,
+    google_calendar_event_id: video.googleCalendarEventId,
+    provider_note: video.providerNote,
     host_id: hostId,
     host_name: hostName,
     host_role: hostRole,
@@ -751,7 +836,10 @@ export const createInstantMeeting = async ({
     throw new Error(`Failed to create instant meeting: ${error.message}`);
   }
 
-  return mapInstantMeetingRow(data);
+  return {
+    ...mapInstantMeetingRow(data),
+    alternativeHostWarning: video.alternativeHostWarning ?? null,
+  };
 };
 
 /** Parse academy meeting code from invitation message body (legacy messages without meeting_id). */
@@ -1058,6 +1146,8 @@ export const joinInstantMeetingRoom = async (
     isHost,
     hostUrl: zoomMeeting.meetingHostUrl,
     isLicensedZoomHost,
+    provider:
+      zoomMeeting.meetingProvider ?? resolveMeetingProvider(zoomMeeting.meetingUrl),
   });
 };
 

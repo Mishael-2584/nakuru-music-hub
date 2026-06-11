@@ -22,9 +22,12 @@ import {
   getInstantMeeting,
   joinInstantMeetingRoom,
   canUserJoinInstantMeeting,
-  InstantMeeting
+  InstantMeeting,
+  getMeetingProviderLabel,
+  resolveMeetingProvider,
 } from '../lib/videoConferencing';
 import { formatMeetingTime } from '../lib/videoConferencing';
+import MeetingProviderBadge from './MeetingProviderBadge';
 
 interface MeetingInvitationCardProps {
   meetingId: string;
@@ -120,9 +123,10 @@ const MeetingInvitationCard = ({
 
       await joinInstantMeetingRoom(meeting, currentUserId, currentUserName);
 
+      const provider = meeting.meetingProvider ?? resolveMeetingProvider(meeting.meetingUrl);
       toast({
         title: "Joining Meeting",
-        description: "Opening Zoom in a new tab...",
+        description: `Opening ${getMeetingProviderLabel(provider)} in a new tab...`,
         duration: 3000
       });
     } catch (error) {
@@ -239,8 +243,14 @@ const MeetingInvitationCard = ({
                 <Video className="w-5 h-5 text-white" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-blue-800 text-lg">🎬 Meeting Invitation</span>
+                  <MeetingProviderBadge
+                    provider={
+                      meeting?.meetingProvider ??
+                      (meeting ? resolveMeetingProvider(meeting.meetingUrl) : 'zoom')
+                    }
+                  />
                   {!isRead && <Badge variant="destructive" className="text-xs animate-pulse">NEW</Badge>}
                 </div>
                 <p className="text-sm text-blue-600 font-medium">You've been invited by {senderName}</p>
@@ -280,10 +290,18 @@ const MeetingInvitationCard = ({
               
               {meeting.meetingUrl && (
                 <div className="rounded-lg border border-blue-200 bg-blue-50/80 p-3 text-xs">
-                  <p className="font-semibold text-blue-900 mb-1">Zoom link (live from academy account)</p>
+                  <p className="font-semibold text-blue-900 mb-1">
+                    {getMeetingProviderLabel(
+                      meeting.meetingProvider ?? resolveMeetingProvider(meeting.meetingUrl)
+                    )}{' '}
+                    link
+                  </p>
                   <p className="text-blue-800 break-all font-mono">{meeting.meetingUrl}</p>
-                  {meeting.zoomHostEmail && (
-                    <p className="text-blue-700 mt-1">Licensed host: {meeting.zoomHostEmail}</p>
+                  {meeting.providerNote && (
+                    <p className="text-blue-700 mt-1">{meeting.providerNote}</p>
+                  )}
+                  {meeting.zoomHostEmail && meeting.meetingProvider !== 'google_meet' && (
+                    <p className="text-blue-700 mt-1">Academy Zoom: {meeting.zoomHostEmail}</p>
                   )}
                 </div>
               )}
@@ -450,14 +468,22 @@ const MeetingInvitationCard = ({
               )}
             </div>
             
-            {meeting.zoomHostEmail && (
+            {meeting.providerNote && (
+              <div className="text-xs text-muted-foreground">{meeting.providerNote}</div>
+            )}
+            {meeting.zoomHostEmail && meeting.meetingProvider !== 'google_meet' && (
               <div className="text-xs text-muted-foreground">
-                Zoom runs on the academy license ({meeting.zoomHostEmail}). Your teacher joins as co-host.
+                Academy Zoom ({meeting.zoomHostEmail}). Teachers join via the meeting link.
               </div>
             )}
 
             <div className="bg-gray-50 rounded-lg p-4">
-              <h4 className="font-medium mb-2">Zoom meeting link</h4>
+              <h4 className="font-medium mb-2">
+                {getMeetingProviderLabel(
+                  meeting.meetingProvider ?? resolveMeetingProvider(meeting.meetingUrl)
+                )}{' '}
+                link
+              </h4>
               <div className="flex items-center gap-2">
                 <code className="flex-1 text-xs bg-white p-2 rounded border break-all">
                   {meeting.meetingUrl}

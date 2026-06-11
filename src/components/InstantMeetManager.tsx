@@ -26,6 +26,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
+import MeetingProviderBadge from './MeetingProviderBadge';
 import {
   getUserInstantMeetings,
   getInstantMeeting,
@@ -381,19 +382,23 @@ const InstantMeetManager = ({
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <h3 className="font-semibold text-lg">{meeting.title}</h3>
+                <MeetingProviderBadge provider={meeting.meetingProvider} />
                 {getStatusBadge(meeting.status)}
               </div>
               <p className="text-sm text-muted-foreground">
                 {isHost ? 'Hosted by you' : `Hosted by ${meeting.hostName}`}
               </p>
-              {meeting.alternativeHostEmail && isHost && (
+              {meeting.providerNote && (
+                <p className="text-xs text-green-700 mt-0.5">{meeting.providerNote}</p>
+              )}
+              {meeting.alternativeHostEmail && isHost && meeting.meetingProvider !== 'google_meet' && (
                 <p className="text-xs text-indigo-600 mt-0.5">
                   You start this class as Zoom co-host ({meeting.alternativeHostEmail})
                 </p>
               )}
-              {meeting.zoomHostEmail && (
+              {meeting.zoomHostEmail && meeting.meetingProvider !== 'google_meet' && (
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Academy Zoom license: {meeting.zoomHostEmail}
                 </p>
