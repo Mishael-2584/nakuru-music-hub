@@ -686,78 +686,130 @@ export const sendDeclinedEmail = async (registration: RegistrationData): Promise
   }
 };
 
-export const sendTeacherAcceptedEmail = async (teacher, tempPassword?: string) => {
+const teacherEmailShell = (
+  title: string,
+  headerGradient: string,
+  bodyHtml: { header: string; main: string }
+) => {
   const siteUrl = 'https://damonmusicacademy.co.ke';
   const logoUrl = `${siteUrl}/damon-logo.png`;
-  
-  // Create login credentials section
-  const loginCredentialsSection = tempPassword ? `
-    <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #2196f3;">
-      <h3 style="color: #1976d2; margin-top: 0;">🔐 Your Login Credentials</h3>
-      <p><strong>Login URL:</strong> <a href="https://damonmusicacademy.co.ke/auth" style="color: #1976d2;">https://damonmusicacademy.co.ke/auth</a></p>
-      <p><strong>Email:</strong> ${teacher.email}</p>
-      <p><strong>Password:</strong> ${tempPassword}</p>
-      <p style="font-size: 14px; color: #666; margin-top: 15px;">
-        <strong>Important:</strong> This is the password you created during signup. You can change it after your first login for security.
-      </p>
-    </div>
-  ` : '';
-
-  const emailHTML = `
+  return `
     <!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Teacher Application Approved - Damon Music Academy</title>
+      <title>${title}</title>
       <style>
         body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;background-color:#f8f9fa;}
-        .header{background:linear-gradient(135deg,#28a745 0%,#00c6ff 100%);color:white;padding:30px;text-align:center;border-radius:10px 10px 0 0;}
+        .header{background:${headerGradient};color:white;padding:30px;text-align:center;border-radius:10px 10px 0 0;}
         .content{background:white;padding:30px;border-radius:0 0 10px 10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);}
-        .next-steps{background:linear-gradient(135deg,#d4edda 0%,#c3e6cb 100%);padding:20px;border-radius:8px;margin:25px 0;border-left:4px solid #28a745;}
-        .contact-info{background:#e3f2fd;padding:20px;border-radius:8px;margin-top:25px;border-left:4px solid #2196f3;}
+        .panel{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:18px;margin:20px 0;}
+        .btn{display:inline-block;background:#2563eb;color:#fff!important;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;margin:16px 0;}
         .footer{text-align:center;margin-top:30px;padding-top:20px;border-top:1px solid #e9ecef;color:#6c757d;font-size:14px;}
       </style>
     </head>
     <body>
       <div class="header">
-        <img src="${logoUrl}" alt="Damon Music Academy Logo" style="height: 70px; margin-bottom: 20px;">
-        <h1>🎉 Congratulations, ${teacher.name}!</h1>
-        <h2>Your Teacher Application is Approved</h2>
+        <img src="${logoUrl}" alt="Damon Music Academy" style="height: 64px; margin-bottom: 16px;">
+        ${bodyHtml.header}
       </div>
       <div class="content">
-        <p>Dear ${teacher.name},</p>
-        <p>We are pleased to inform you that your application to become a teacher at Damon Music Academy has been <strong>approved</strong>!</p>
-        
-        ${loginCredentialsSection}
-        
-        <div class="next-steps">
-          <h3>✅ Next Steps</h3>
-          <ul>
-            <li><strong>Log in to your teacher portal</strong> using the credentials above</li>
-            <li><strong>Set up your availability</strong> by adding your time slots</li>
-            <li><strong>Update your profile</strong> with your teaching preferences</li>
-            <li><strong>Start managing your students</strong> and lesson schedules</li>
-          </ul>
-        </div>
-        
-        <div class="contact-info">
-          <h3>📞 Need Help? Contact Us</h3>
-          <p><strong>Phone:</strong> +254 701 195 460 / +254 713 490 535</p>
-          <p><strong>Email:</strong> <a href="mailto:info@damonmusicacademy.com">info@damonmusicacademy.com</a></p>
-          <p><strong>Address:</strong> Nakuru, Kenya</p>
-        </div>
-        
+        ${bodyHtml.main}
         <div class="footer">
-          <p>Welcome to the Damon Music Academy team!</p>
-          <p>We look forward to working with you to inspire the next generation of musicians and artists.</p>
           <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
+          <p>+254 701 195 460 · info@damonmusicacademy.com</p>
         </div>
       </div>
     </body>
     </html>
   `;
-  
+};
+
+/** Sent immediately after a teacher submits the signup form. */
+export const sendTeacherApplicationReceivedEmail = async (teacher: {
+  name: string;
+  email: string;
+  category?: string;
+  subjects?: string[];
+}) => {
+  const subjectsLine = teacher.subjects?.length
+    ? `<p><strong>Subjects applied for:</strong> ${teacher.subjects.join(', ')}</p>`
+    : '';
+
+  const emailHTML = teacherEmailShell('Application Received', 'linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%)', {
+    header: '<h1 style="margin:0;font-size:24px;">Application Received</h1><p style="margin:8px 0 0;opacity:0.95;">Thank you for applying to teach with us</p>',
+    main: `
+      <p>Dear ${teacher.name},</p>
+      <p>We have received your teacher application at <strong>Damon Music Academy</strong>. Our admin team will review your documents and experience, and we will email you once a decision has been made.</p>
+      <div class="panel">
+        <p style="margin:0 0 8px;"><strong>Category:</strong> ${teacher.category || '—'}</p>
+        ${subjectsLine}
+        <p style="margin:12px 0 0;font-size:14px;color:#64748b;">Typical review time is a few business days. No further action is needed right now.</p>
+      </div>
+      <p>If you have urgent questions, reply to this email or contact us at <a href="mailto:info@damonmusicacademy.com">info@damonmusicacademy.com</a>.</p>
+    `,
+  });
+
+  const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
+    body: {
+      to: teacher.email,
+      subject: 'We received your teacher application | Damon Music Academy',
+      html: emailHTML,
+      registration: teacher,
+    },
+  });
+  if (error) {
+    console.error('Teacher application received email error:', error);
+    return false;
+  }
+  return data && data.success;
+};
+
+export const sendTeacherAcceptedEmail = async (teacher, tempPassword?: string) => {
+  const loginUrl = 'https://damonmusicacademy.co.ke/auth';
+  const subjectsLine = teacher.subjects?.length
+    ? teacher.subjects.join(', ')
+    : '—';
+
+  const loginCredentialsSection = tempPassword ? `
+    <div class="panel" style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border-color:#93c5fd;">
+      <h3 style="color:#1d4ed8;margin-top:0;">Your portal login</h3>
+      <p><strong>Email:</strong> ${teacher.email}</p>
+      <p><strong>Password:</strong> ${tempPassword}</p>
+      <p style="font-size:14px;color:#475569;margin-bottom:0;">Use the password you created when you signed up. You can change it after your first login.</p>
+      <a href="${loginUrl}" class="btn">Open teacher portal</a>
+    </div>
+  ` : `
+    <div class="panel">
+      <p style="margin:0;">Sign in at <a href="${loginUrl}">${loginUrl}</a> with the email and password you used when applying.</p>
+      <a href="${loginUrl}" class="btn">Open teacher portal</a>
+    </div>
+  `;
+
+  const emailHTML = teacherEmailShell('Application Approved', 'linear-gradient(135deg,#16a34a 0%,#0ea5e9 100%)', {
+    header: `<h1 style="margin:0;font-size:24px;">Welcome to the team, ${teacher.name}!</h1><p style="margin:8px 0 0;opacity:0.95;">Your teacher application has been approved</p>`,
+    main: `
+      <p>Dear ${teacher.name},</p>
+      <p>Congratulations — you are now an approved teacher at <strong>Damon Music Academy</strong>. We are excited to have you on board.</p>
+      <div class="panel">
+        <p style="margin:0 0 8px;"><strong>Category:</strong> ${teacher.category || '—'}</p>
+        <p style="margin:0;"><strong>Subjects:</strong> ${subjectsLine}</p>
+      </div>
+      ${loginCredentialsSection}
+      <div class="panel">
+        <h3 style="margin-top:0;">Next steps</h3>
+        <ol style="margin:0;padding-left:20px;">
+          <li>Log in to your teacher portal</li>
+          <li>Add your weekly availability / time slots</li>
+          <li>Complete your profile and upload any remaining documents</li>
+          <li>Start managing lessons and video classes</li>
+        </ol>
+      </div>
+      <p>Need help getting started? Contact us at <a href="mailto:info@damonmusicacademy.com">info@damonmusicacademy.com</a> or call +254 701 195 460.</p>
+    `,
+  });
+
   const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
     body: {
       to: teacher.email,
@@ -774,35 +826,15 @@ export const sendTeacherAcceptedEmail = async (teacher, tempPassword?: string) =
 };
 
 export const sendTeacherDeclinedEmail = async (teacher) => {
-  const siteUrl = 'https://damonmusicacademy.co.ke';
-  const logoUrl = `${siteUrl}/damon-logo.png`;
-  const emailHTML = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Teacher Application Update - Damon Music Academy</title>
-      <style>body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;background-color:#f8f9fa;}.header{background:linear-gradient(135deg,#ff5858 0%,#f09819 100%);color:white;padding:30px;text-align:center;border-radius:10px 10px 0 0;}.content{background:white;padding:30px;border-radius:0 0 10px 10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);}.footer{text-align:center;margin-top:30px;padding-top:20px;border-top:1px solid #e9ecef;color:#6c757d;font-size:14px;}</style>
-    </head>
-    <body>
-      <div class="header">
-        <img src="${logoUrl}" alt="Damon Music Academy Logo" style="height: 70px; margin-bottom: 20px;">
-        <h1>Teacher Application Update</h1>
-      </div>
-      <div class="content">
-        <p>Dear ${teacher.name},</p>
-        <p>Thank you for your interest in joining Damon Music Academy. After careful review, we regret to inform you that your application was not successful at this time.</p>
-        <p>If you have any questions or would like feedback, please contact us at <a href="mailto:info@damonmusicacademy.com">info@damonmusicacademy.com</a>.</p>
-        <div class="footer">
-          <p>Thank you again for your interest in Damon Music Academy.</p>
-          <p>We wish you all the best in your teaching journey!</p>
-          <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
+  const emailHTML = teacherEmailShell('Application Update', 'linear-gradient(135deg,#f97316 0%,#ef4444 100%)', {
+    header: '<h1 style="margin:0;font-size:24px;">Application update</h1>',
+    main: `
+      <p>Dear ${teacher.name},</p>
+      <p>Thank you for your interest in teaching at <strong>Damon Music Academy</strong>. After reviewing your application, we are unable to offer a position at this time.</p>
+      <p>This may reflect current staffing needs rather than the quality of your application. You are welcome to apply again in the future.</p>
+      <p>Questions? Contact <a href="mailto:info@damonmusicacademy.com">info@damonmusicacademy.com</a>.</p>
+    `,
+  });
   const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
     body: {
       to: teacher.email,
@@ -819,35 +851,15 @@ export const sendTeacherDeclinedEmail = async (teacher) => {
 };
 
 export const sendTeacherRequestInfoEmail = async (teacher, message) => {
-  const siteUrl = 'https://damonmusicacademy.co.ke';
-  const logoUrl = `${siteUrl}/damon-logo.png`;
-  const emailHTML = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>More Information Needed - Damon Music Academy</title>
-      <style>body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;background-color:#f8f9fa;}.header{background:linear-gradient(135deg,#ffc107 0%,#ff9800 100%);color:white;padding:30px;text-align:center;border-radius:10px 10px 0 0;}.content{background:white;padding:30px;border-radius:0 0 10px 10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);}.footer{text-align:center;margin-top:30px;padding-top:20px;border-top:1px solid #e9ecef;color:#6c757d;font-size:14px;}</style>
-    </head>
-    <body>
-      <div class="header">
-        <img src="${logoUrl}" alt="Damon Music Academy Logo" style="height: 70px; margin-bottom: 20px;">
-        <h1>More Information Needed</h1>
-      </div>
-      <div class="content">
-        <p>Dear ${teacher.name},</p>
-        <p>Thank you for your application to become a teacher at Damon Music Academy. We need more information to process your application:</p>
-        <blockquote style="background:#f9f9f9;padding:15px;border-left:4px solid #ffc107;margin:20px 0;">${message}</blockquote>
-        <p>Please send the requested documents or details to <a href="mailto:info@damonmusicacademy.com">info@damonmusicacademy.com</a>.</p>
-        <div class="footer">
-          <p>If you have any questions, reply to this email or contact us at info@damonmusicacademy.com.</p>
-          <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
+  const emailHTML = teacherEmailShell('More Information Needed', 'linear-gradient(135deg,#f59e0b 0%,#f97316 100%)', {
+    header: '<h1 style="margin:0;font-size:24px;">More information needed</h1>',
+    main: `
+      <p>Dear ${teacher.name},</p>
+      <p>Thank you for applying to teach at <strong>Damon Music Academy</strong>. To continue reviewing your application, we need the following:</p>
+      <div class="panel" style="border-left:4px solid #f59e0b;">${message.replace(/\n/g, '<br>')}</div>
+      <p>Please reply to this email or contact <a href="mailto:info@damonmusicacademy.com">info@damonmusicacademy.com</a> with the requested items.</p>
+    `,
+  });
   const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
     body: {
       to: teacher.email,

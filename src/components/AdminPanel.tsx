@@ -28,6 +28,7 @@ import ShopProductManager from './admin/ShopProductManager';
 import ShopOrderManager from './admin/ShopOrderManager';
 import ManualInvoiceManager from './admin/ManualInvoiceManager';
 import StudentAccountControl from './admin/StudentAccountControl';
+import PendingTeacherApplicationCard from './admin/PendingTeacherApplicationCard';
 import { isTermlyCourseCategory } from '@/lib/termlyFeeUtils';
 
 interface Registration {
@@ -131,9 +132,6 @@ const AdminPanel = () => {
   const [pendingTeacherDocuments, setPendingTeacherDocuments] = useState<any[]>([]);
   const [approvedTeachers, setApprovedTeachers] = useState([]);
   const [teacherLoading, setTeacherLoading] = useState(false);
-  const [showRequestInfo, setShowRequestInfo] = useState(false);
-  const [requestInfoTeacher, setRequestInfoTeacher] = useState(null);
-  const [requestMessage, setRequestMessage] = useState("");
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [showQuoteDialog, setShowQuoteDialog] = useState(false);
   const [quoteAmount, setQuoteAmount] = useState("");
@@ -2294,12 +2292,15 @@ const AdminPanel = () => {
       await supabase.from("pending_teachers").delete().eq("id", teacher.id);
 
       // Send acceptance email with login credentials (using the original password)
-      const emailSent = await sendTeacherAcceptedEmail(teacher, teacher.password); // Pass original password
-      if (!emailSent) {
-        toast({ title: "Email Failed", description: "Could not send approval email to teacher.", variant: "destructive" });
-      }
+      const emailSent = await sendTeacherAcceptedEmail(teacher, teacher.password);
 
-      toast({ title: "Teacher Approved", description: `${teacher.name} has been approved and notified.` });
+      toast({
+        title: "Teacher Approved",
+        description: emailSent
+          ? `${teacher.name} was approved and a welcome email was sent to ${teacher.email}.`
+          : `${teacher.name} was approved, but the welcome email could not be sent — share login details manually.`,
+        variant: emailSent ? "default" : "destructive",
+      });
       
       // Refresh lists
       setPendingTeachers((prev) => prev.filter((t) => t.id !== teacher.id));
@@ -2330,20 +2331,18 @@ const AdminPanel = () => {
     }
   };
 
-  const handleRequestInfo = async () => {
+  const handleRequestInfo = async (teacher: { name: string; email: string }, message: string) => {
     setTeacherLoading(true);
     try {
-      // Send custom email
-      const emailSent = await sendTeacherRequestInfoEmail(requestInfoTeacher, requestMessage);
+      const emailSent = await sendTeacherRequestInfoEmail(teacher, message);
       if (!emailSent) {
         toast({ title: "Email Failed", description: "Could not send request info email to teacher.", variant: "destructive" });
+        return;
       }
-      toast({ title: "Request Sent", description: `Message sent to ${requestInfoTeacher.name}.` });
-      setShowRequestInfo(false);
-      setRequestInfoTeacher(null);
-      setRequestMessage("");
-    } catch (err) {
-      toast({ title: "Error", description: err.message || "Failed to send request.", variant: "destructive" });
+      toast({ title: "Request Sent", description: `Message emailed to ${teacher.name}.` });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to send request.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setTeacherLoading(false);
     }
@@ -4357,69 +4356,18 @@ const AdminPanel = () => {
                 ) : (
                   <div className="grid gap-4">
                     {pendingTeachers.map((teacher) => (
-                      <Card key={teacher.id} className="shadow border-0 bg-white/90">
-                        <CardContent className="p-6">
-                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                            <div>
-                              <div className="flex items-center gap-2 mb-2">
-                                <GraduationCap className="h-5 w-5 text-primary" />
-                                <span className="font-bold text-lg">{teacher.name}</span>
-                                <Badge className="ml-2">{teacher.category}</Badge>
-                              </div>
-                              <div className="text-sm text-muted-foreground mb-1">{teacher.email} • {teacher.phone}</div>
-                              <div className="text-sm mb-1">Experience: {teacher.experience}</div>
-                              <div className="text-sm mb-1">Subjects: {teacher.subjects?.join(", ")}</div>
-                              <div className="text-sm mb-1">Bio: {teacher.bio}</div>
-                              <div className="text-sm mb-1 flex flex-wrap gap-x-4 gap-y-1">
-                                {teacher.cv_file_path && (
-                                  <a
-                                    href={supabase.storage.from('teacher-cvs').getPublicUrl(teacher.cv_file_path).data.publicUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-primary underline font-medium"
-                                  >
-                                    Download CV
-                                  </a>
-                                )}
-                                {pendingTeacherDocuments
-                                  .filter((d) => d.pending_teacher_id === teacher.id)
-                                  .map((d) => (
-                                    <a
-                                      key={d.id}
-                                      href={supabase.storage.from('teacher-cvs').getPublicUrl(d.file_path).data.publicUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-primary underline font-medium"
-                                    >
-                                      Download {d.doc_type === 'id' ? 'ID' : d.doc_type === 'kra' ? 'KRA' : d.doc_type}
-                                    </a>
-                                  ))}
-                              </div>
-                              <div className="text-xs text-gray-400">Applied: {new Date(teacher.created_at).toLocaleString()}</div>
-                            </div>
-                            <div className="flex flex-col gap-2 min-w-[180px]">
-                              <Button size="sm" onClick={() => approveTeacher(teacher)} disabled={teacherLoading}>Approve</Button>
-                              <Button size="sm" variant="destructive" onClick={() => rejectTeacher(teacher)} disabled={teacherLoading}>Reject</Button>
-                              <Button size="sm" variant="outline" onClick={() => { setShowRequestInfo(true); setRequestInfoTeacher(teacher); }} disabled={teacherLoading}>Request More Info</Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                      <PendingTeacherApplicationCard
+                        key={teacher.id}
+                        teacher={teacher}
+                        documents={pendingTeacherDocuments}
+                        loading={teacherLoading}
+                        onApprove={approveTeacher}
+                        onReject={rejectTeacher}
+                        onRequestInfo={handleRequestInfo}
+                      />
                     ))}
                   </div>
                 )}
-                <Dialog open={showRequestInfo} onOpenChange={setShowRequestInfo}>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Request More Information</DialogTitle>
-                      <DialogDescription>Send a message to the teacher applicant for more documents or clarification.</DialogDescription>
-                    </DialogHeader>
-                    <Textarea value={requestMessage} onChange={e => setRequestMessage(e.target.value)} placeholder="Type your message here..." rows={4} />
-                    <DialogFooter>
-                      <Button onClick={handleRequestInfo} disabled={teacherLoading}>Send Request</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
               </TabsContent>
               <TabsContent value="approved" className="mt-6">
                 {teacherLoading ? (

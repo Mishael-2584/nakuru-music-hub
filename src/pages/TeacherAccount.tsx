@@ -225,7 +225,9 @@ const TeacherAccount = () => {
 
             <div className="border-t pt-4">
               <h3 className="font-semibold mb-2">Required Documents</h3>
-              <p className="text-sm text-muted-foreground mb-3">Attach: academic certificates, transcripts, ID (soft copy), and KRA PIN. Each must be uploaded before proceeding.</p>
+              <p className="text-sm text-muted-foreground mb-3">
+                Attach academic certificates, transcripts, and ID (soft copy). KRA PIN is optional.
+              </p>
               <div className="grid md:grid-cols-2 gap-4">
                 {['cv','certificate','transcript','id','kra'].map((t) => (
                   <div key={t} className="space-y-2">
