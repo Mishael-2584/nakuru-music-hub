@@ -12,6 +12,23 @@ import {
 } from "@/lib/teacherCategories";
 import { sendTeacherApplicationReceivedEmail } from "@/lib/emailService";
 
+function formatSignupError(err: unknown): string {
+  if (err && typeof err === "object") {
+    const e = err as { message?: string; details?: string; hint?: string; error?: string };
+    const parts = [e.message || e.error, e.details, e.hint].filter(Boolean);
+    if (parts.length > 0) return parts.join(" — ");
+  }
+  if (err instanceof Error) return err.message;
+  return "Submission failed. Please try again.";
+}
+
+function buildUploadFileName(email: string, type: string, originalName: string): string {
+  const safeEmail = email.replace(/[^a-zA-Z0-9]/g, "_");
+  const ext = originalName.split(".").pop() || "bin";
+  const unique = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  return `${safeEmail}_${unique}_${type}.${ext}`;
+}
+
 export default function TeacherSignup() {
   const [form, setForm] = useState({
     name: "",
@@ -32,8 +49,13 @@ export default function TeacherSignup() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const target = e.target;
+    const { name, value } = target;
+    const checked = "checked" in target ? target.checked : false;
+    const type = "type" in target ? target.type : undefined;
     if (name === "subjects") {
       setForm((prev) => ({
         ...prev,
@@ -76,60 +98,59 @@ export default function TeacherSignup() {
     }
 
     try {
-      const cvName = `${form.email.replace(/[^a-zA-Z0-9]/g, "_")}_${Date.now()}_cv.${cvFile.name.split(".").pop()}`;
+      const pendingId = crypto.randomUUID();
+
+      const cvName = buildUploadFileName(form.email, "cv", cvFile.name);
       const { data: cvUp, error: cvErr } = await supabase.storage
         .from("teacher-cvs")
-        .upload(cvName, cvFile, { upsert: true, contentType: cvFile.type });
+        .upload(cvName, cvFile, { upsert: true, contentType: cvFile.type || undefined });
       if (cvErr) throw cvErr;
       const cvFilePath = cvUp?.path || cvName;
 
-      const { data, error: insertError } = await supabase
-        .from("pending_teachers")
-        .insert([
-          {
-            name: form.name,
-            email: form.email,
-            phone: form.phone,
-            password: form.password,
-            bio: form.bio,
-            experience: form.experience,
-            category: form.category,
-            subjects: form.subjects,
-            status: "pending",
-            cv_file_path: cvFilePath,
-          },
-        ])
-        .select("id");
+      const { error: insertError } = await supabase.from("pending_teachers").insert([
+        {
+          id: pendingId,
+          name: form.name.trim(),
+          email: form.email.trim().toLowerCase(),
+          phone: form.phone.trim(),
+          password: form.password,
+          bio: form.bio.trim(),
+          experience: form.experience.trim(),
+          category: form.category,
+          subjects: form.subjects,
+          status: "pending",
+          cv_file_path: cvFilePath,
+        },
+      ]);
 
       if (insertError) throw insertError;
 
-      const pendingId = data?.[0]?.id;
+      const uploadOne = async (file: File, type: string) => {
+        const fname = buildUploadFileName(form.email, type, file.name);
+        const { data: up, error: upErr } = await supabase.storage
+          .from("teacher-cvs")
+          .upload(fname, file, { upsert: true, contentType: file.type || undefined });
+        if (upErr) throw upErr;
+        const { error: docErr } = await supabase.from("pending_teacher_documents").insert({
+          pending_teacher_id: pendingId,
+          doc_type: type,
+          file_path: up?.path || fname,
+          file_name: file.name,
+        });
+        if (docErr) throw docErr;
+      };
 
-      if (pendingId) {
-        const uploads: Promise<void>[] = [];
-        const uploadOne = async (file: File, type: string) => {
-          const fname = `${form.email.replace(/[^a-zA-Z0-9]/g, "_")}_${Date.now()}_${type}.${file.name.split(".").pop()}`;
-          const { data: up, error: upErr } = await supabase.storage
-            .from("teacher-cvs")
-            .upload(fname, file, { upsert: true, contentType: file.type });
-          if (upErr) throw upErr;
-          const { error: docErr } = await supabase.from("pending_teacher_documents").insert({
-            pending_teacher_id: pendingId,
-            doc_type: type,
-            file_path: up?.path || fname,
-            file_name: file.name,
-          });
-          if (docErr) throw docErr;
-        };
-
-        uploads.push(uploadOne(idFile, "id"));
-        if (kraFile) {
-          uploads.push(uploadOne(kraFile, "kra"));
-        }
-        Array.from(certFiles).forEach((f) => uploads.push(uploadOne(f, "certificate")));
-        Array.from(transcriptFiles).forEach((f) => uploads.push(uploadOne(f, "transcript")));
-        await Promise.all(uploads);
+      const uploads: Promise<void>[] = [uploadOne(idFile, "id")];
+      if (kraFile) {
+        uploads.push(uploadOne(kraFile, "kra"));
       }
+      for (const f of Array.from(certFiles)) {
+        uploads.push(uploadOne(f, "certificate"));
+      }
+      for (const f of Array.from(transcriptFiles)) {
+        uploads.push(uploadOne(f, "transcript"));
+      }
+      await Promise.all(uploads);
 
       void sendTeacherApplicationReceivedEmail({
         name: form.name,
@@ -140,8 +161,8 @@ export default function TeacherSignup() {
 
       setSubmitted(true);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Submission failed. Please try again.";
-      setError(message);
+      console.error("Teacher signup failed:", err);
+      setError(formatSignupError(err));
     } finally {
       setSubmitting(false);
     }
