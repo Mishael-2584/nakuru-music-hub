@@ -107,21 +107,18 @@ export default function TeacherSignup() {
       if (cvErr) throw cvErr;
       const cvFilePath = cvUp?.path || cvName;
 
-      const { error: insertError } = await supabase.from("pending_teachers").insert([
-        {
-          id: pendingId,
-          name: form.name.trim(),
-          email: form.email.trim().toLowerCase(),
-          phone: form.phone.trim(),
-          password: form.password,
-          bio: form.bio.trim(),
-          experience: form.experience.trim(),
-          category: form.category,
-          subjects: form.subjects,
-          status: "pending",
-          cv_file_path: cvFilePath,
-        },
-      ]);
+      const { error: insertError } = await supabase.rpc("submit_teacher_application", {
+        p_id: pendingId,
+        p_name: form.name,
+        p_email: form.email,
+        p_phone: form.phone,
+        p_password: form.password,
+        p_bio: form.bio,
+        p_experience: form.experience,
+        p_category: form.category,
+        p_subjects: form.subjects,
+        p_cv_file_path: cvFilePath,
+      });
 
       if (insertError) throw insertError;
 
@@ -131,11 +128,11 @@ export default function TeacherSignup() {
           .from("teacher-cvs")
           .upload(fname, file, { upsert: false, contentType: file.type || undefined });
         if (upErr) throw upErr;
-        const { error: docErr } = await supabase.from("pending_teacher_documents").insert({
-          pending_teacher_id: pendingId,
-          doc_type: type,
-          file_path: up?.path || fname,
-          file_name: file.name,
+        const { error: docErr } = await supabase.rpc("submit_teacher_document", {
+          p_pending_teacher_id: pendingId,
+          p_doc_type: type,
+          p_file_path: up?.path || fname,
+          p_file_name: file.name,
         });
         if (docErr) throw docErr;
       };
