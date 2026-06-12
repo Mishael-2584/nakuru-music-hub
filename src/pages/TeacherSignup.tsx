@@ -14,12 +14,71 @@ import { sendTeacherApplicationReceivedEmail } from "@/lib/emailService";
 
 function formatSignupError(err: unknown): string {
   if (err && typeof err === "object") {
-    const e = err as { message?: string; details?: string; hint?: string; error?: string };
-    const parts = [e.message || e.error, e.details, e.hint].filter(Boolean);
+    const e = err as {
+      message?: string;
+      details?: string;
+      hint?: string;
+      error?: string;
+      code?: string;
+    };
+    const msg = e.message || e.error || "";
+    if (msg.includes("row-level security") && msg.includes("pending_teachers")) {
+      return "Application could not be saved. Please log out of any student/admin account, refresh the page, and try again in a private/incognito window.";
+    }
+    const parts = [msg, e.details, e.hint].filter(Boolean);
     if (parts.length > 0) return parts.join(" — ");
   }
   if (err instanceof Error) return err.message;
   return "Submission failed. Please try again.";
+}
+
+type UploadedDoc = { doc_type: string; file_path: string; file_name: string };
+
+async function saveTeacherApplication(payload: {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  bio: string;
+  experience: string;
+  category: string;
+  subjects: string[];
+  cv_file_path: string;
+  documents: UploadedDoc[];
+}) {
+  const { data: edgeData, error: edgeError } = await supabase.functions.invoke(
+    "submit-teacher-application",
+    { body: payload }
+  );
+
+  if (!edgeError && edgeData?.success) {
+    return;
+  }
+
+  const { error: rpcError } = await supabase.rpc("submit_teacher_application", {
+    p_id: payload.id,
+    p_name: payload.name,
+    p_email: payload.email,
+    p_phone: payload.phone,
+    p_password: payload.password,
+    p_bio: payload.bio,
+    p_experience: payload.experience,
+    p_category: payload.category,
+    p_subjects: payload.subjects,
+    p_cv_file_path: payload.cv_file_path,
+  });
+  if (rpcError) throw rpcError;
+
+  for (const doc of payload.documents) {
+    const { error: docError } = await supabase.rpc("submit_teacher_document", {
+      p_pending_teacher_id: payload.id,
+      p_doc_type: doc.doc_type,
+      p_file_path: doc.file_path,
+      p_file_name: doc.file_name,
+    });
+    if (docError) throw docError;
+  }
 }
 
 function buildUploadFileName(email: string, type: string, originalName: string): string {
@@ -98,56 +157,51 @@ export default function TeacherSignup() {
     }
 
     try {
+      // Logged-in sessions (student/admin) can block public signup RLS — use anon for uploads + save
+      await supabase.auth.signOut({ scope: "local" });
+
       const pendingId = crypto.randomUUID();
+      const documents: UploadedDoc[] = [];
 
-      const cvName = buildUploadFileName(form.email, "cv", cvFile.name);
-      const { data: cvUp, error: cvErr } = await supabase.storage
-        .from("teacher-cvs")
-        .upload(cvName, cvFile, { upsert: false, contentType: cvFile.type || undefined });
-      if (cvErr) throw cvErr;
-      const cvFilePath = cvUp?.path || cvName;
-
-      const { error: insertError } = await supabase.rpc("submit_teacher_application", {
-        p_id: pendingId,
-        p_name: form.name,
-        p_email: form.email,
-        p_phone: form.phone,
-        p_password: form.password,
-        p_bio: form.bio,
-        p_experience: form.experience,
-        p_category: form.category,
-        p_subjects: form.subjects,
-        p_cv_file_path: cvFilePath,
-      });
-
-      if (insertError) throw insertError;
-
-      const uploadOne = async (file: File, type: string) => {
+      const uploadFile = async (file: File, type: string) => {
         const fname = buildUploadFileName(form.email, type, file.name);
         const { data: up, error: upErr } = await supabase.storage
           .from("teacher-cvs")
           .upload(fname, file, { upsert: false, contentType: file.type || undefined });
         if (upErr) throw upErr;
-        const { error: docErr } = await supabase.rpc("submit_teacher_document", {
-          p_pending_teacher_id: pendingId,
-          p_doc_type: type,
-          p_file_path: up?.path || fname,
-          p_file_name: file.name,
-        });
-        if (docErr) throw docErr;
+        return {
+          doc_type: type,
+          file_path: up?.path || fname,
+          file_name: file.name,
+        };
       };
 
-      const uploads: Promise<void>[] = [uploadOne(idFile, "id")];
+      const cvUpload = await uploadFile(cvFile, "cv");
+      const cvFilePath = cvUpload.file_path;
+      documents.push(await uploadFile(idFile, "id"));
       if (kraFile) {
-        uploads.push(uploadOne(kraFile, "kra"));
+        documents.push(await uploadFile(kraFile, "kra"));
       }
       for (const f of Array.from(certFiles)) {
-        uploads.push(uploadOne(f, "certificate"));
+        documents.push(await uploadFile(f, "certificate"));
       }
       for (const f of Array.from(transcriptFiles)) {
-        uploads.push(uploadOne(f, "transcript"));
+        documents.push(await uploadFile(f, "transcript"));
       }
-      await Promise.all(uploads);
+
+      await saveTeacherApplication({
+        id: pendingId,
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        phone: form.phone.trim(),
+        password: form.password,
+        bio: form.bio.trim(),
+        experience: form.experience.trim(),
+        category: form.category,
+        subjects: form.subjects,
+        cv_file_path: cvFilePath,
+        documents,
+      });
 
       void sendTeacherApplicationReceivedEmail({
         name: form.name,
