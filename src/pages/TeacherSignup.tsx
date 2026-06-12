@@ -103,7 +103,7 @@ export default function TeacherSignup() {
       const cvName = buildUploadFileName(form.email, "cv", cvFile.name);
       const { data: cvUp, error: cvErr } = await supabase.storage
         .from("teacher-cvs")
-        .upload(cvName, cvFile, { upsert: true, contentType: cvFile.type || undefined });
+        .upload(cvName, cvFile, { upsert: false, contentType: cvFile.type || undefined });
       if (cvErr) throw cvErr;
       const cvFilePath = cvUp?.path || cvName;
 
@@ -129,7 +129,7 @@ export default function TeacherSignup() {
         const fname = buildUploadFileName(form.email, type, file.name);
         const { data: up, error: upErr } = await supabase.storage
           .from("teacher-cvs")
-          .upload(fname, file, { upsert: true, contentType: file.type || undefined });
+          .upload(fname, file, { upsert: false, contentType: file.type || undefined });
         if (upErr) throw upErr;
         const { error: docErr } = await supabase.from("pending_teacher_documents").insert({
           pending_teacher_id: pendingId,
