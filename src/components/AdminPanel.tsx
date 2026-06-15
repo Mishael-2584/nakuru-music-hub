@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { generateQuotePDF } from "@/lib/pdfGenerator";
 import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
-import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview } from "@/lib/invoiceUtils";
+import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, resolveFinanceInvoiceForStudent } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
 import LearningModeDebugTest from './LearningModeDebugTest';
 import FeeDebug from './FeeDebug';
@@ -150,6 +150,7 @@ const AdminPanel = () => {
   });
   const [invoicePDFUrl, setInvoicePDFUrl] = useState<string | null>(null);
   const [studentInvoices, setStudentInvoices] = useState<Record<string, any>>({});
+  const [allStudentInvoices, setAllStudentInvoices] = useState<any[]>([]);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -2348,31 +2349,31 @@ const AdminPanel = () => {
     }
   };
 
-  // Fetch latest invoice for each active student
+  // Fetch invoices for finance tab (all rows + current-period map per student)
   useEffect(() => {
     const fetchStudentInvoices = async () => {
-      // Defensive check: filter out students with invalid IDs
       const validStudentIds = activeStudents.filter(s => isValidId(s.id)).map(s => s.id);
       if (validStudentIds.length === 0) {
-        console.log('No valid student IDs found for invoice fetching');
+        setAllStudentInvoices([]);
+        setStudentInvoices({});
         return;
       }
-      
+
       const { data, error } = await supabase
         .from('invoices')
         .select('*')
         .in('student_id', validStudentIds)
         .order('period_end', { ascending: false });
-      if (!error && data) {
-        // Group by student_id, pick latest
-        const latest: Record<string, any> = {};
-        for (const inv of data) {
-          if (!latest[inv.student_id] || new Date(inv.period_end) > new Date(latest[inv.student_id].period_end)) {
-            latest[inv.student_id] = inv;
-          }
-        }
-        setStudentInvoices(latest);
+      if (error || !data) return;
+
+      setAllStudentInvoices(data);
+      const period = getCalendarMonthPeriod();
+      const currentPeriod: Record<string, any> = {};
+      for (const studentId of validStudentIds) {
+        const match = findInvoiceForFinancePeriod(data, studentId, period);
+        if (match) currentPeriod[studentId] = match;
       }
+      setStudentInvoices(currentPeriod);
     };
     fetchStudentInvoices();
   }, [activeStudents]);
@@ -2691,25 +2692,17 @@ const AdminPanel = () => {
     return !error;
   };
 
-  // 2. Helper to get current period (month)
-  const getCurrentPeriod = () => {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
-    return { start, end };
-  };
+  // 2. Current finance period (local calendar month)
+  const getCurrentPeriod = () => getCalendarMonthPeriod();
 
-  // 3. Compute students needing invoice for current period
+  // 3. Students still needing an invoice for this month (no current-period or open invoice)
   useEffect(() => {
-    const { start, end } = getCurrentPeriod();
-    const needing = activeStudents.filter(student => {
-      const inv = Object.values(studentInvoices).find(
-        (inv: any) => inv.student_id === student.id && inv.period_start === start && inv.period_end === end
-      );
-      return !inv;
-    }).map(s => s.id);
+    const period = getCalendarMonthPeriod();
+    const needing = activeStudents
+      .filter((student) => !resolveFinanceInvoiceForStudent(allStudentInvoices, student.id, period).invoice)
+      .map((s) => s.id);
     setStudentsNeedingInvoice(needing);
-  }, [activeStudents, studentInvoices]);
+  }, [activeStudents, allStudentInvoices]);
 
   // 4. Handler to send invoice for a student (optional existingInvoice = send existing without creating)
   const handleSendInvoice = async (student: any, existingInvoice?: any) => {
@@ -2781,13 +2774,20 @@ const AdminPanel = () => {
         if (sent) {
           toast({ title: 'Invoice Sent', description: `Invoice sent to ${student.student_name}` });
         } else {
-          toast({ title: 'Invoice Created', description: `Invoice created but email failed to send.` });
+          toast({ title: 'Invoice Created', description: `Invoice saved but email failed to send.` });
         }
+
+        // Update UI immediately so status shows amount + Edit (not stuck on "Not Sent")
+        setAllStudentInvoices((prev) => {
+          const without = prev.filter((i) => i.id !== invoiceToSend.id);
+          return [invoiceToSend, ...without];
+        });
+        setStudentInvoices((prev) => ({ ...prev, [student.id]: invoiceToSend }));
       } else if (!existingInvoice) {
         toast({ title: 'No Invoice', description: 'No invoice available to send.' });
       }
 
-      // Refresh invoices
+      // Refresh full invoice list from server
       const validStudentIds = activeStudents.filter(s => isValidId(s.id)).map(s => s.id);
       if (validStudentIds.length > 0) {
         const { data, error } = await supabase
@@ -2796,13 +2796,14 @@ const AdminPanel = () => {
           .in('student_id', validStudentIds)
           .order('period_end', { ascending: false });
         if (!error && data) {
-          const latest: Record<string, any> = {};
-          for (const inv of data) {
-            if (!latest[inv.student_id] || new Date(inv.period_end) > new Date(latest[inv.student_id].period_end)) {
-              latest[inv.student_id] = inv;
-            }
+          setAllStudentInvoices(data);
+          const period = getCalendarMonthPeriod();
+          const currentPeriod: Record<string, any> = {};
+          for (const studentId of validStudentIds) {
+            const match = findInvoiceForFinancePeriod(data, studentId, period);
+            if (match) currentPeriod[studentId] = match;
           }
-          setStudentInvoices(latest);
+          setStudentInvoices(currentPeriod);
         }
       }
     } catch (err: any) {
@@ -2841,15 +2842,22 @@ const AdminPanel = () => {
       }
       const result = await generateInvoiceForRegistration(regId);
       invoice = result && !('existing' in result) ? (result as any) : ('existing' in result ? (result as { existing: any }).existing : null);
-      const validStudentIds = activeStudents.filter((s: any) => isValidId(s.id)).map((s: any) => s.id);
-      if (validStudentIds.length > 0) {
-        const { data: invData } = await supabase.from('invoices').select('*').in('student_id', validStudentIds).order('period_end', { ascending: false });
+      if (invoice) {
+        const validStudentIds = activeStudents.filter((s: any) => isValidId(s.id)).map((s: any) => s.id);
+        const { data: invData } = await supabase
+          .from('invoices')
+          .select('*')
+          .in('student_id', validStudentIds)
+          .order('period_end', { ascending: false });
         if (invData) {
-          const latest: Record<string, any> = {};
-          for (const inv of invData) {
-            if (!latest[inv.student_id] || new Date(inv.period_end) > new Date(latest[inv.student_id].period_end)) latest[inv.student_id] = inv;
+          setAllStudentInvoices(invData);
+          const p = getCalendarMonthPeriod();
+          const currentPeriod: Record<string, any> = {};
+          for (const studentId of validStudentIds) {
+            const match = findInvoiceForFinancePeriod(invData, studentId, p);
+            if (match) currentPeriod[studentId] = match;
           }
-          setStudentInvoices(latest);
+          setStudentInvoices(currentPeriod);
         }
       }
       }
@@ -5557,9 +5565,11 @@ const AdminPanel = () => {
                     </thead>
                     <tbody>
                       {paginatedFinancesStudents.map(student => {
-                        const { start, end } = getCurrentPeriod();
-                        const inv = Object.values(studentInvoices).find(
-                          (inv: any) => inv.student_id === student.id && inv.period_start === start && inv.period_end === end
+                        const period = getCalendarMonthPeriod();
+                        const { invoice: inv, isCurrentPeriod } = resolveFinanceInvoiceForStudent(
+                          allStudentInvoices,
+                          student.id,
+                          period
                         );
                         return (
                           <tr key={student.id}>
@@ -5575,7 +5585,13 @@ const AdminPanel = () => {
                             <td>{student.instrument || student.course_category}</td>
                             <td>
                               {inv ? (
-                                <ManualInvoiceManager
+                                <div className="space-y-1">
+                                  {!isCurrentPeriod && (
+                                    <span className="text-xs text-amber-700 block">
+                                      Open invoice ({inv.period_start} – {inv.period_end})
+                                    </span>
+                                  )}
+                                  <ManualInvoiceManager
                                   invoice={{ 
                                     ...inv, 
                                     students: { 
@@ -5586,9 +5602,28 @@ const AdminPanel = () => {
                                     } 
                                   }}
                                   onUpdate={() => {
-                                    fetchData();
+                                    void (async () => {
+                                      const validStudentIds = activeStudents.filter((s) => isValidId(s.id)).map((s) => s.id);
+                                      if (validStudentIds.length === 0) return;
+                                      const { data } = await supabase
+                                        .from('invoices')
+                                        .select('*')
+                                        .in('student_id', validStudentIds)
+                                        .order('period_end', { ascending: false });
+                                      if (data) {
+                                        setAllStudentInvoices(data);
+                                        const p = getCalendarMonthPeriod();
+                                        const currentPeriod: Record<string, any> = {};
+                                        for (const studentId of validStudentIds) {
+                                          const match = findInvoiceForFinancePeriod(data, studentId, p);
+                                          if (match) currentPeriod[studentId] = match;
+                                        }
+                                        setStudentInvoices(currentPeriod);
+                                      }
+                                    })();
                                   }}
                                 />
+                                </div>
                               ) : (
                                 <span className="text-red-500">Not Sent</span>
                               )}

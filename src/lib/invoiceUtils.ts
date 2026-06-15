@@ -27,6 +27,61 @@ export {
   isBrokenInvoicePdfUrl,
 } from './invoiceNaming';
 
+/** Local calendar date YYYY-MM-DD (avoids UTC shift from toISOString). */
+export function toLocalDateString(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Current calendar month billing window (matches invoice generation for monthly students). */
+export function getCalendarMonthPeriod(reference = new Date()): { start: string; end: string } {
+  const start = new Date(reference.getFullYear(), reference.getMonth(), 1);
+  const end = new Date(reference.getFullYear(), reference.getMonth() + 1, 0);
+  return { start: toLocalDateString(start), end: toLocalDateString(end) };
+}
+
+export function invoiceMatchesFinancePeriod(
+  invoice: { period_start?: string | null; period_end?: string | null },
+  period: { start: string; end: string }
+): boolean {
+  if (!invoice.period_start || !invoice.period_end) return false;
+  if (invoice.period_start === period.start && invoice.period_end === period.end) return true;
+  // Legacy rows saved with UTC-skewed dates: match same calendar month
+  const [sy, sm] = period.start.split('-').map(Number);
+  const [iy, im] = invoice.period_start.split('-').map(Number);
+  return sy === iy && sm === im;
+}
+
+export function findInvoiceForFinancePeriod<T extends { student_id: string; period_start: string; period_end: string }>(
+  invoices: T[],
+  studentId: string,
+  period: { start: string; end: string }
+): T | undefined {
+  return invoices.find(
+    (inv) => inv.student_id === studentId && invoiceMatchesFinancePeriod(inv, period)
+  );
+}
+
+/** Invoice to show in admin finances row (current month, or latest open invoice e.g. first term bill). */
+export function resolveFinanceInvoiceForStudent<
+  T extends { student_id: string; period_start: string; period_end: string; status?: string }
+>(invoices: T[], studentId: string, period: { start: string; end: string }): {
+  invoice: T | undefined;
+  isCurrentPeriod: boolean;
+} {
+  const current = findInvoiceForFinancePeriod(invoices, studentId, period);
+  if (current) return { invoice: current, isCurrentPeriod: true };
+
+  const open = invoices
+    .filter((inv) => inv.student_id === studentId && inv.status !== 'paid' && inv.status !== 'cancelled')
+    .sort((a, b) => new Date(b.period_start).getTime() - new Date(a.period_start).getTime())[0];
+
+  if (open) return { invoice: open, isCurrentPeriod: false };
+  return { invoice: undefined, isCurrentPeriod: false };
+}
+
 export interface InvoiceLineItem {
   description: string;
   quantity: number;
@@ -1009,20 +1064,17 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   } else {
     throw new Error('Unsupported payment type');
   }
-  const periodStartStr = periodStart.toISOString().slice(0, 10);
-  const periodEndStr = periodEnd.toISOString().slice(0, 10);
+  const periodStartStr = toLocalDateString(periodStart);
+  const periodEndStr = toLocalDateString(periodEnd);
 
   // Calculate due_date based on invoice type
   let dueDateObj: Date;
   if (isFirstInvoice) {
-    // First invoice: Due date is the last day of the enrollment month (regardless of payment type)
     dueDateObj = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate());
   } else {
-    // Subsequent invoices: Due date is 10th of the month after periodEnd at midnight GMT+3
-    // GMT+3 = UTC+3, so midnight GMT+3 on 10th = 21:00 UTC on 9th
-    dueDateObj = new Date(Date.UTC(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 9, 21, 0, 0, 0));
+    dueDateObj = new Date(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 10);
   }
-  const dueDateStr = dueDateObj.toISOString().slice(0, 10);
+  const dueDateStr = toLocalDateString(dueDateObj);
 
   // Check for existing invoice for this student/period (temporarily without registration_id)
   const { data: existingInvoice, error: existingError } = await supabase
