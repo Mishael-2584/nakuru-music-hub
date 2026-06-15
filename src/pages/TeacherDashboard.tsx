@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
 import VideoConferenceModal from '../components/VideoConferenceModal';
-import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getUserInvitedMeetings, getUserInstantMeetings, InstantMeeting, openMeetingLink, joinBookingOnlineMeeting, joinInstantMeetingRoom } from '../lib/videoConferencing';
+import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getUserInvitedMeetings, getUserInstantMeetings, InstantMeeting, joinBookingOnlineMeeting, joinInstantMeetingRoom } from '../lib/videoConferencing';
 import MessagingUI from '../components/MessagingUI';
 import InstantMeetManager from '../components/InstantMeetManager';
 
@@ -2933,6 +2933,12 @@ const TeacherDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
+                    <p className="text-sm text-muted-foreground rounded-lg border border-blue-100 bg-blue-50 p-3">
+                      Classes use the academy Zoom Pro account. Sign into Zoom with the same email as your teacher
+                      profile, then click <strong>Start class</strong> or <strong>Join class</strong>. No host key is
+                      needed in this app. If Zoom says &quot;waiting for host&quot;, create a new meeting or ask the
+                      academy admin (Pro license owner) to open the class first.
+                    </p>
                     {/* Teacher's Instant Meetings Section */}
                     {teacherInstantMeetings.length > 0 && (
                       <div className="mb-6">
@@ -2972,22 +2978,37 @@ const TeacherDashboard = () => {
                                 <p className="text-sm text-green-600 mb-3 italic">"{meeting.description}"</p>
                               )}
                               <div className="flex gap-2">
-                                <Button 
-                                  onClick={() =>
-                                    openMeetingLink(meeting.meetingUrl, {
-                                      isHost: true,
-                                      hostUrl: meeting.meetingHostUrl,
-                                    })
-                                  }
+                                <Button
+                                  onClick={async () => {
+                                    if (!profile?.user_id) return;
+                                    try {
+                                      if (meeting.status === 'pending') {
+                                        const { startInstantMeeting } = await import('../lib/videoConferencing');
+                                        await startInstantMeeting(meeting.id);
+                                      }
+                                      await joinInstantMeetingRoom(
+                                        meeting,
+                                        profile.user_id,
+                                        profile.name || 'Teacher'
+                                      );
+                                    } catch (err) {
+                                      toast({
+                                        title: 'Could not open meeting',
+                                        description:
+                                          err instanceof Error ? err.message : 'Please try again.',
+                                        variant: 'destructive',
+                                      });
+                                    }
+                                  }}
                                   className={`flex items-center gap-1 ${
-                                    meeting.status === 'active' 
-                                      ? 'bg-red-600 hover:bg-red-700 animate-pulse' 
+                                    meeting.status === 'active'
+                                      ? 'bg-red-600 hover:bg-red-700 animate-pulse'
                                       : 'bg-green-600 hover:bg-green-700'
                                   }`}
                                   size="sm"
                                 >
                                   <Video className="w-4 h-4" />
-                                  {meeting.status === 'active' ? '🚀 Join as Host' : 'Start as Host'}
+                                  {meeting.status === 'active' ? 'Join class' : 'Start class'}
                                 </Button>
                                 <Button 
                                   variant="outline"

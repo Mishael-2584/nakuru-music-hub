@@ -395,7 +395,7 @@ const InstantMeetManager = ({
               )}
               {meeting.alternativeHostEmail && isHost && meeting.meetingProvider !== 'google_meet' && (
                 <p className="text-xs text-indigo-600 mt-0.5">
-                  You start this class as Zoom co-host ({meeting.alternativeHostEmail})
+                  Sign into Zoom as {meeting.alternativeHostEmail} before joining.
                 </p>
               )}
               {meeting.zoomHostEmail && meeting.meetingProvider !== 'google_meet' && (
