@@ -17,7 +17,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Link } from 'react-router-dom';
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
-import { calculateStudentInvoice, InvoiceCalculationResult, ensureInvoicePDF, openInvoicePdfWithName } from '../lib/invoiceUtils';
+import { calculateStudentInvoice, InvoiceCalculationResult, ensureInvoicePDF, openInvoicePdfWithName, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, hasOutstandingBalance, isInvoiceFullyPaid, type InvoicePaymentRow } from '../lib/invoiceUtils';
 import { Invoice } from '../integrations/supabase/types';
 import VideoConferenceModal from '../components/VideoConferenceModal';
 import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getMeetingDuration, getUserInvitedMeetings, joinMeetingByCode, joinInstantMeetingRoom, joinMeetingRoom, joinBookingOnlineMeeting, openMeetingLink, InstantMeeting } from '../lib/videoConferencing';
@@ -337,6 +337,8 @@ const StudentDashboard = () => {
   const [showAllInvoices, setShowAllInvoices] = useState(false);
   const [hasPaidFirstInvoice, setHasPaidFirstInvoice] = useState(false);
   const [accessLockReason, setAccessLockReason] = useState<string | null>(null);
+  const [accountCreditBalance, setAccountCreditBalance] = useState(0);
+  const [invoicePayments, setInvoicePayments] = useState<InvoicePaymentRow[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -2333,24 +2335,7 @@ const StudentDashboard = () => {
     }).format(amount);
   };
 
-  const getEffectiveAmountDue = (invoice: any) => {
-    if (!invoice) return 0;
-    const manualRaw = invoice.manual_amount_due;
-    const manual = manualRaw !== null && manualRaw !== undefined ? Number(manualRaw) : null;
-    const base = invoice.amount_due !== null && invoice.amount_due !== undefined ? Number(invoice.amount_due) : 0;
-    if (manual !== null && !Number.isNaN(manual)) {
-      return manual;
-    }
-    return base;
-  };
-
-  const getOutstandingAmount = (invoice: any) => {
-    if (!invoice) return 0;
-    const due = getEffectiveAmountDue(invoice);
-    const paidRaw = invoice.amount_paid !== null && invoice.amount_paid !== undefined ? Number(invoice.amount_paid) : 0;
-    const paid = Number.isNaN(paidRaw) ? 0 : paidRaw;
-    return Math.max(0, due - paid);
-  };
+  const getOutstandingAmount = (invoice: any) => getInvoiceBalanceRemaining(invoice);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -2458,30 +2443,32 @@ const StudentDashboard = () => {
       .select('*')
       .eq('student_id', studentId)
       .order('period_start', { ascending: false });
+    const { data: creditData, error: creditError } = await supabase.rpc('get_student_credit_balance', {
+      p_student_id: studentId,
+    });
+    const { data: paymentsData, error: paymentsError } = await supabase
+      .from('payments')
+      .select('id, invoice_id, amount, cash_amount, credit_amount, payment_method, status, paid_date, mpesa_transaction_id, notes, created_at')
+      .eq('student_id', studentId)
+      .eq('status', 'completed')
+      .order('paid_date', { ascending: false });
         
     if (error) {
       console.error('Error fetching invoices:', error);
       toast({ title: 'Error', description: 'Failed to fetch invoices.', variant: 'destructive' });
       return;
     }
+    if (!creditError) {
+      setAccountCreditBalance(Number(creditData) || 0);
+    }
+    if (!paymentsError && paymentsData) {
+      setInvoicePayments(paymentsData as InvoicePaymentRow[]);
+    }
       
     if (!data || data.length === 0) {
-      console.warn('No invoices found for student:', studentId);
       setInvoices([]);
       return;
     }
-      
-    console.log('Fetched invoices data:', data);
-    console.log('Invoice count:', data.length);
-          data.forEach((inv, index) => {
-        console.log(`Invoice ${index + 1}:`, {
-          id: inv.id,
-          status: inv.status,
-          amount_due: inv.amount_due,
-          amount_paid: inv.amount_paid,
-          student_id: inv.student_id
-        });
-      });
     
     setInvoices(data);
       
@@ -3219,20 +3206,8 @@ const StudentDashboard = () => {
                   </CardHeader>
                   <CardContent>
                     {(() => {
-                      const pendingInvoices = invoices.filter(inv => inv.status === 'pending' || inv.status === 'overdue');
-                      const outstandingAmount = pendingInvoices.reduce((acc, inv) => acc + inv.amount_due, 0);
-                      
-                      console.log('Outstanding balance calculation:', {
-                        totalInvoices: invoices.length,
-                        pendingInvoices: pendingInvoices.length,
-                        pendingInvoicesData: pendingInvoices.map(inv => ({
-                          id: inv.id,
-                          status: inv.status,
-                          amount_due: inv.amount_due,
-                          amount_paid: inv.amount_paid
-                        })),
-                        outstandingAmount
-                      });
+                      const pendingInvoices = invoices.filter((inv) => hasOutstandingBalance(inv));
+                      const outstandingAmount = pendingInvoices.reduce((acc, inv) => acc + getOutstandingAmount(inv), 0);
                       
                       return (
                         <>
@@ -3242,6 +3217,11 @@ const StudentDashboard = () => {
                           <p className="text-xs text-muted-foreground">
                             {outstandingAmount > 0 ? 'Due payments' : 'No outstanding balance'}
                           </p>
+                          {accountCreditBalance > 0 && (
+                            <p className="text-xs text-blue-700 mt-1">
+                              Account credit: {formatCurrency(accountCreditBalance)}
+                            </p>
+                          )}
                           <div className="mt-2 text-xs text-gray-500">
                             Last updated: {new Date().toLocaleTimeString()}
                           </div>
@@ -3973,14 +3953,14 @@ const StudentDashboard = () => {
                     </div>
                   </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                       <Card>
                         <CardContent className="p-4">
                         <div className="text-2xl font-bold text-green-600">
                                                       {formatCurrency(
                               invoices
-                                .filter(inv => inv.status === 'paid')
-                                .reduce((acc, inv) => acc + inv.amount_due, 0)
+                                .filter(inv => inv.status === 'paid' || inv.payment_status === 'paid')
+                                .reduce((acc, inv) => acc + getInvoiceAmountPaid(inv), 0)
                             )}
                         </div>
                           <p className="text-sm text-gray-600">Total Paid</p>
@@ -3989,13 +3969,19 @@ const StudentDashboard = () => {
                       <Card>
                         <CardContent className="p-4">
                         <div className="text-2xl font-bold text-yellow-600">
-                                                      {formatCurrency(
-                              invoices
-                                .filter(inv => inv.status === 'pending' || inv.status === 'overdue')
-                                .reduce((acc, inv) => acc + inv.amount_due, 0)
-                            )}
+                          {formatCurrency(
+                            invoices
+                              .filter((inv) => hasOutstandingBalance(inv))
+                              .reduce((acc, inv) => acc + getOutstandingAmount(inv), 0)
+                          )}
                         </div>
                           <p className="text-sm text-gray-600">Outstanding</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4">
+                        <div className="text-2xl font-bold text-blue-600">{formatCurrency(accountCreditBalance)}</div>
+                          <p className="text-sm text-gray-600">Account Credit</p>
                         </CardContent>
                       </Card>
                       <Card>
@@ -4007,11 +3993,10 @@ const StudentDashboard = () => {
                     </div>
 
                     <div className="space-y-4">
-                    {                (showAllInvoices ? invoices : invoices.filter(inv => inv.status !== 'paid')).length > 0 ? (
-                  (showAllInvoices ? invoices : invoices.filter(inv => inv.status !== 'paid')).map(invoice => {
-                    const isPaid = invoice.status === 'paid';
-                        const isFullyPaid = invoice.amount_paid >= invoice.amount_due;
-                        const remainingAmount = Math.max(0, invoice.amount_due - (invoice.amount_paid || 0));
+                    {(showAllInvoices ? invoices : invoices.filter((inv) => !isInvoiceFullyPaid(inv))).length > 0 ? (
+                  (showAllInvoices ? invoices : invoices.filter((inv) => !isInvoiceFullyPaid(inv))).map((invoice) => {
+                    const isPaid = isInvoiceFullyPaid(invoice);
+                        const remainingAmount = getOutstandingAmount(invoice);
                         
                         return (
                           <div key={invoice.id} className={`flex items-center justify-between p-4 border rounded-lg ${isPaid ? 'bg-green-50 border-green-200' : 'bg-white'}`}>
@@ -4023,11 +4008,6 @@ const StudentDashboard = () => {
                                     ✓ PAID
                                   </Badge>
                                 )}
-                                {isFullyPaid && !isPaid && (
-                                  <Badge className="bg-blue-100 text-blue-800 text-xs">
-                                    PAYMENT COMPLETE
-                                  </Badge>
-                                )}
                               </div>
                               <p className="text-sm text-gray-600">Period: {formatDate(invoice.period_start)} - {formatDate(invoice.period_end)}</p>
                               <p className="text-sm text-gray-600">Please note: Monthly fees are payable upfront at the beginning of the month. Late payments may affect lesson scheduling.</p>
@@ -4036,12 +4016,28 @@ const StudentDashboard = () => {
                                   Partial payment received
                                 </p>
                               )}
+                              {invoicePayments.filter((p) => p.invoice_id === invoice.id).length > 0 && (
+                                <div className="mt-2 text-xs text-gray-600">
+                                  <p className="font-medium text-gray-700">Payments recorded:</p>
+                                  <ul className="list-disc list-inside mt-1 space-y-0.5">
+                                    {invoicePayments
+                                      .filter((p) => p.invoice_id === invoice.id)
+                                      .map((p) => (
+                                        <li key={p.id}>
+                                          {formatCurrency(Number(p.amount) || 0)}
+                                          {p.paid_date ? ` · ${p.paid_date}` : ''}
+                                          {p.payment_method ? ` · ${p.payment_method}` : ''}
+                                        </li>
+                                      ))}
+                                  </ul>
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-center space-x-4">
                               <div className="text-right">
-                                <div className="text-lg font-semibold">{formatCurrency(invoice.amount_due)}</div>
-                                {invoice.amount_paid > 0 && (
-                                  <div className="text-sm text-green-600">Paid: {formatCurrency(invoice.amount_paid)}</div>
+                                <div className="text-lg font-semibold">{formatCurrency(getEffectiveAmountDue(invoice))}</div>
+                                {getInvoiceAmountPaid(invoice) > 0 && (
+                                  <div className="text-sm text-green-600">Paid: {formatCurrency(getInvoiceAmountPaid(invoice))}</div>
                                 )}
                                 {remainingAmount > 0 && !isPaid && (
                                   <div className="text-sm text-red-600 font-medium">
@@ -4050,7 +4046,7 @@ const StudentDashboard = () => {
                                 )}
                           </div>
                               <Badge className={getStatusColor(invoice.payment_status)}>{invoice.payment_status}</Badge>
-                              {isPaid || isFullyPaid ? (
+                              {isPaid ? (
                                 <div className="flex flex-col items-center gap-1">
                                   <Badge variant="secondary" className="bg-green-100 text-green-800">
                                     ✓ Paid

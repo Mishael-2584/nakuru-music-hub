@@ -187,9 +187,16 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
         const isFirstInvoice = !otherInvoices || otherInvoices.length === 0;
         
         // Check if invoice has been paid (for credentials message logic)
-        const invoicePaid = updatedInvoiceData.payment_status === 'paid' || 
-                            updatedInvoiceData.status === 'paid' ||
-                            (updatedInvoiceData.amount_paid && updatedInvoiceData.amount_paid >= updatedInvoiceData.amount_due);
+        const effectiveDue =
+          updatedInvoiceData.manual_amount_due ??
+          updatedInvoiceData.manual_amount_override ??
+          updatedInvoiceData.amount_due ??
+          0;
+        const amountPaid = Number(updatedInvoiceData.amount_paid) || 0;
+        const invoicePaid =
+          updatedInvoiceData.payment_status === 'paid' ||
+          updatedInvoiceData.status === 'paid' ||
+          (amountPaid > 0 && amountPaid >= Number(effectiveDue));
         
         // Send updated invoice email to student with isUpdated flag
         // Only show credentials message if it's first invoice AND not paid yet

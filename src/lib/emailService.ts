@@ -1496,6 +1496,72 @@ export const sendApplicationConfirmationEmail = async (registration: Registratio
   }
 };
 
+export const sendPartialPaymentConfirmationEmail = async (
+  registration: { student_name: string; email: string; id?: string; receipt_number?: string; created_at?: string },
+  paymentAmount: number,
+  balanceRemaining: number,
+  invoicePeriod?: string
+): Promise<boolean> => {
+  try {
+    const formatKes = (n: number) =>
+      new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(n);
+
+    const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Partial Payment Received | Damon Music Academy</title>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; }
+        .header { background: linear-gradient(135deg, #f59e0b 0%, #00c6ff 100%); color: white; padding: 24px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        .confirm-box { background: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b; }
+        .footer { text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e9ecef; color: #6c757d; font-size: 14px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>Partial Payment Received</h1>
+        <p style="margin: 0; font-size: 16px;">Damon Music Academy</p>
+      </div>
+      <div class="content">
+        <p>Dear ${registration.student_name},</p>
+        <div class="confirm-box">
+          <p style="margin: 0 0 8px;"><strong>Thank you.</strong> We have received your partial payment.</p>
+          <p style="margin: 0;"><strong>Amount received:</strong> ${formatKes(paymentAmount)}</p>
+          ${invoicePeriod ? `<p style="margin: 8px 0 0;"><strong>Invoice period:</strong> ${invoicePeriod}</p>` : ''}
+          <p style="margin: 8px 0 0;"><strong>Balance remaining:</strong> ${formatKes(balanceRemaining)}</p>
+        </div>
+        <p>Please settle the remaining balance at your earliest convenience. Contact us at info@damonmusicacademy.co.ke or 0701 195 460 / 0713 490 535 if you have questions.</p>
+        <div class="footer">
+          <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
+        </div>
+      </div>
+    </body>
+    </html>
+    `;
+
+    const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
+      body: {
+        to: registration.email,
+        subject: 'Partial Payment Received | Damon Music Academy',
+        html,
+        registration,
+      },
+    });
+    if (error) {
+      console.error('Partial payment email error:', error);
+      return false;
+    }
+    return !!(data && data.success);
+  } catch (e) {
+    console.error('sendPartialPaymentConfirmationEmail:', e);
+    return false;
+  }
+};
+
 export const sendPaymentConfirmationEmail = async (
   registration: RegistrationData,
   tempPassword?: string | null,

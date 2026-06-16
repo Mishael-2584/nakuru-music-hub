@@ -12,7 +12,7 @@ import AdminEventsManager from "@/components/AdminEventsManager";
 import AdminNewsManager from "@/components/AdminNewsManager";
 import AdminGalleryManager from "@/components/AdminGalleryManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { sendAcceptedEmail, sendDeclinedEmail, sendTeacherAcceptedEmail, sendTeacherDeclinedEmail, sendTeacherRequestInfoEmail, sendQuoteEmail, sendInvoiceEmail, sendApplicationConfirmationEmail, sendPaymentConfirmationEmail } from "@/lib/emailService";
+import { sendAcceptedEmail, sendDeclinedEmail, sendTeacherAcceptedEmail, sendTeacherDeclinedEmail, sendTeacherRequestInfoEmail, sendQuoteEmail, sendInvoiceEmail, sendApplicationConfirmationEmail, sendPaymentConfirmationEmail, sendPartialPaymentConfirmationEmail } from "@/lib/emailService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,13 +20,14 @@ import { Label } from "@/components/ui/label";
 import { generateQuotePDF } from "@/lib/pdfGenerator";
 import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
-import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, resolveFinanceInvoiceForStudent } from "@/lib/invoiceUtils";
+import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchStudentCreditBalance, fetchInvoicePayments, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
 import LearningModeDebugTest from './LearningModeDebugTest';
 import FeeDebug from './FeeDebug';
 import ShopProductManager from './admin/ShopProductManager';
 import ShopOrderManager from './admin/ShopOrderManager';
 import ManualInvoiceManager from './admin/ManualInvoiceManager';
+import RecordInvoicePaymentDialog from './admin/RecordInvoicePaymentDialog';
 import StudentAccountControl from './admin/StudentAccountControl';
 import PendingTeacherApplicationCard from './admin/PendingTeacherApplicationCard';
 import { isTermlyCourseCategory } from '@/lib/termlyFeeUtils';
@@ -206,6 +207,12 @@ const AdminPanel = () => {
   const [studentsNeedingInvoice, setStudentsNeedingInvoice] = useState<string[]>([]);
   // Add state for invoice history modal
   const [showInvoiceHistoryModal, setShowInvoiceHistoryModal] = useState(false);
+  const [paymentDialogInvoice, setPaymentDialogInvoice] = useState<any>(null);
+  const [paymentDialogStudent, setPaymentDialogStudent] = useState<any>(null);
+  const [showRecordPaymentDialog, setShowRecordPaymentDialog] = useState(false);
+  const [historyInvoicePayments, setHistoryInvoicePayments] = useState<Record<string, any[]>>({});
+  const [invoiceHistoryStudentCredit, setInvoiceHistoryStudentCredit] = useState(0);
+  const [studentCreditBalances, setStudentCreditBalances] = useState<Record<string, number>>({});
   const [invoiceHistory, setInvoiceHistory] = useState<any[]>([]);
   const [invoiceHistoryStudent, setInvoiceHistoryStudent] = useState<any>(null);
   const [generatingPdfInvoiceId, setGeneratingPdfInvoiceId] = useState<string | null>(null);
@@ -638,6 +645,25 @@ const AdminPanel = () => {
       }
     })();
   }, [activeTab, user]);
+
+  useEffect(() => {
+    if (activeTab !== 'finances') return;
+    const ids = paginatedFinancesStudents.map((s) => s.id).filter((id) => isValidId(id));
+    if (ids.length === 0) return;
+    void (async () => {
+      const entries = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const bal = await fetchStudentCreditBalance(id);
+            return [id, bal] as const;
+          } catch {
+            return [id, 0] as const;
+          }
+        })
+      );
+      setStudentCreditBalances((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+    })();
+  }, [activeTab, financesPage, paginatedFinancesStudents]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -2378,155 +2404,137 @@ const AdminPanel = () => {
     fetchStudentInvoices();
   }, [activeStudents]);
 
+  // Refresh invoice lists after payment or manual edit
+  const refreshStudentInvoices = async () => {
+    const validStudentIds = activeStudents.filter((s) => isValidId(s.id)).map((s) => s.id);
+    if (validStudentIds.length === 0) return;
+    const { data } = await supabase
+      .from('invoices')
+      .select('*')
+      .in('student_id', validStudentIds)
+      .order('period_end', { ascending: false });
+    if (!data) return;
+    setAllStudentInvoices(data);
+    const period = getCalendarMonthPeriod();
+    const currentPeriod: Record<string, any> = {};
+    for (const studentId of validStudentIds) {
+      const match = findInvoiceForFinancePeriod(data, studentId, period);
+      if (match) currentPeriod[studentId] = match;
+    }
+    setStudentInvoices(currentPeriod);
+  };
+
+  const handleOpenRecordPayment = (invoice: any, student?: any) => {
+    setPaymentDialogInvoice(invoice);
+    setPaymentDialogStudent(student ?? invoiceHistoryStudent ?? null);
+    setShowRecordPaymentDialog(true);
+  };
+
+  const handlePaymentRecorded = async (result: RecordInvoicePaymentResult) => {
+    try {
+      const { data: invoiceData } = await supabase
+        .from('invoices')
+        .select('*, students(*)')
+        .eq('id', result.invoice_id)
+        .single();
+
+      const studentRow = invoiceData?.students;
+      let isFirstInvoice = false;
+      if (studentRow?.id) {
+        const { data: allInvs } = await supabase
+          .from('invoices')
+          .select('id, created_at')
+          .eq('student_id', studentRow.id)
+          .order('created_at', { ascending: true });
+        isFirstInvoice = !!allInvs?.length && allInvs[0].id === result.invoice_id;
+      }
+
+      if (studentRow?.registration_id) {
+        const { data: registration } = await supabase
+          .from('registrations')
+          .select('*')
+          .eq('id', studentRow.registration_id)
+          .single();
+
+        if (registration) {
+          const periodLabel = invoiceData?.period_start && invoiceData?.period_end
+            ? `${invoiceData.period_start} – ${invoiceData.period_end}`
+            : undefined;
+
+          if (result.became_paid) {
+            let tempPassword: string | null = null;
+            if (isFirstInvoice) {
+              try {
+                const { data: userData } = await supabase.functions.invoke('create-student-user', {
+                  body: {
+                    email: registration.email,
+                    student_name: registration.student_name,
+                    action: 'get_password',
+                  },
+                });
+                if (userData?.tempPassword) tempPassword = userData.tempPassword;
+              } catch {
+                /* optional */
+              }
+            }
+            await sendPaymentConfirmationEmail(registration, tempPassword, isFirstInvoice);
+          } else if (result.applied_to_invoice > 0) {
+            await sendPartialPaymentConfirmationEmail(
+              registration,
+              result.applied_to_invoice,
+              result.balance_remaining,
+              periodLabel
+            );
+          }
+        }
+      }
+
+      const parts = [
+        `KES ${result.applied_to_invoice.toLocaleString()} applied`,
+        result.balance_remaining > 0 ? `Balance: KES ${result.balance_remaining.toLocaleString()}` : 'Invoice fully paid',
+      ];
+      if (result.overpayment_credit > 0) {
+        parts.push(`KES ${result.overpayment_credit.toLocaleString()} added to account credit`);
+      }
+      toast({ title: 'Payment recorded', description: parts.join(' · ') });
+
+      if (result.student_id) {
+        try {
+          const bal = await fetchStudentCreditBalance(result.student_id);
+          setStudentCreditBalances((prev) => ({ ...prev, [result.student_id]: bal }));
+          setInvoiceHistoryStudentCredit(bal);
+        } catch {
+          /* optional */
+        }
+      }
+
+      await refreshStudentInvoices();
+      if (invoiceHistoryStudent) {
+        await fetchInvoiceHistory(invoiceHistoryStudent.id);
+        if (result.invoice_id) {
+          await loadInvoicePaymentHistory(result.invoice_id);
+        }
+      }
+      if (paymentDialogInvoice?.id === result.invoice_id) {
+        const { data: updated } = await supabase.from('invoices').select('*').eq('id', result.invoice_id).single();
+        if (updated) setPaymentDialogInvoice(updated);
+      }
+      fetchData();
+    } catch (error) {
+      console.error('handlePaymentRecorded:', error);
+      toast({
+        title: 'Payment saved',
+        description: 'Payment was recorded but follow-up steps may have failed. Refresh the page.',
+        variant: 'destructive',
+      });
+      await refreshStudentInvoices();
+    }
+  };
+
   // Handler to view invoice details
   const handleViewInvoice = (invoice: any) => {
     setSelectedInvoice(invoice);
     setShowInvoiceModal(true);
-  };
-
-  // Handler to mark invoice as paid
-  const handleMarkInvoicePaid = async (invoiceId: string) => {
-    try {
-      // First, fetch the invoice to check if it's the first invoice
-      const { data: invoiceData, error: fetchError } = await supabase
-        .from('invoices')
-        .select('*, students(*)')
-        .eq('id', invoiceId)
-        .single();
-
-      if (fetchError || !invoiceData) {
-        console.error('Error fetching invoice:', fetchError);
-        toast({
-          title: "Error",
-          description: "Failed to fetch invoice details",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Check if this is the student's first invoice
-      const { data: allStudentInvoices, error: invoicesError } = await supabase
-        .from('invoices')
-        .select('id, created_at')
-        .eq('student_id', invoiceData.student_id)
-        .order('created_at', { ascending: true });
-
-      const isFirstInvoice = allStudentInvoices && allStudentInvoices.length > 0 && allStudentInvoices[0].id === invoiceId;
-
-      // Update invoice status to paid
-      const { error } = await supabase
-        .from('invoices')
-        .update({ 
-          status: 'paid', 
-          paid_date: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', invoiceId);
-
-      if (error) {
-        console.error('Error marking invoice as paid:', error);
-        toast({
-          title: "Error",
-          description: "Failed to mark invoice as paid",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // If this is the first invoice, update the student's first_invoice_paid flag
-      if (isFirstInvoice && invoiceData.students) {
-        const { error: studentUpdateError } = await supabase
-          .from('students')
-          .update({
-            first_invoice_paid: true,
-            first_invoice_paid_date: new Date().toISOString(),
-            can_book_classes: true,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', invoiceData.student_id);
-
-        if (studentUpdateError) {
-          console.error('Error updating student first_invoice_paid:', studentUpdateError);
-        } else {
-          console.log('✅ Updated student first_invoice_paid to TRUE');
-        }
-      }
-    
-      // Fetch invoice and student data for email
-      const { data: invoice, error: invoiceError } = await supabase
-        .from('invoices')
-        .select('*, students(*)')
-        .eq('id', invoiceId)
-        .single();
-
-      if (invoiceError || !invoice) {
-        console.error('Error fetching invoice for payment confirmation:', invoiceError);
-        toast({
-          title: "Warning",
-          description: "Invoice marked as paid but could not send confirmation email.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Fetch registration data for email
-      const { data: registration, error: regError } = await supabase
-        .from('registrations')
-        .select('*')
-        .eq('id', invoice.students?.registration_id)
-        .single();
-
-      if (registration && !regError) {
-        // For first invoice only: get tempPassword for portal credentials in the email
-        let tempPassword: string | null = null;
-        if (isFirstInvoice) {
-          try {
-            const { data: userData, error: userError } = await supabase.functions.invoke('create-student-user', {
-              body: {
-                email: registration.email,
-                student_name: registration.student_name,
-                action: 'get_password'
-              }
-            });
-            if (!userError && userData && userData.tempPassword) {
-              tempPassword = userData.tempPassword;
-            }
-          } catch (passwordError) {
-            console.error('Error retrieving tempPassword:', passwordError);
-          }
-        }
-
-        // First payment: full enrollment + credentials email. Subsequent: short payment confirmation only.
-        const emailSent = await sendPaymentConfirmationEmail(registration, tempPassword, isFirstInvoice);
-        if (emailSent) {
-          toast({
-            title: "Payment Confirmed",
-            description: "Invoice marked as paid and confirmation email sent to student.",
-          });
-        } else {
-          toast({
-            title: "Payment Confirmed",
-            description: "Invoice marked as paid but could not send confirmation email.",
-            variant: "destructive",
-          });
-        }
-      } else {
-        toast({
-          title: "Payment Confirmed",
-          description: "Invoice marked as paid.",
-        });
-      }
-
-      // Refresh invoice data
-      fetchData();
-    } catch (error) {
-      console.error('Error in handleMarkInvoicePaid:', error);
-      toast({
-        title: "Error",
-        description: "An error occurred while processing payment",
-        variant: "destructive",
-      });
-    }
   };
 
   // Handler: Resend Invoice
@@ -2881,6 +2889,15 @@ const AdminPanel = () => {
     }
   };
 
+  const loadInvoicePaymentHistory = async (invoiceId: string) => {
+    try {
+      const rows = await fetchInvoicePayments(invoiceId);
+      setHistoryInvoicePayments((prev) => ({ ...prev, [invoiceId]: rows }));
+    } catch (e) {
+      console.error('loadInvoicePaymentHistory:', e);
+    }
+  };
+
   // Function to fetch all invoices for a student
   const fetchInvoiceHistory = async (studentId: string) => {
     const { data, error } = await supabase
@@ -2889,18 +2906,29 @@ const AdminPanel = () => {
       .eq('student_id', studentId)
       .order('period_start', { ascending: false });
     if (!error && data) setInvoiceHistory(data);
+    try {
+      const credit = await fetchStudentCreditBalance(studentId);
+      setInvoiceHistoryStudentCredit(credit);
+    } catch {
+      setInvoiceHistoryStudentCredit(0);
+    }
   };
 
   // Handler to open invoice history modal
   const handleOpenInvoiceHistory = async (student: any) => {
     setInvoiceHistoryStudent(student);
+    setSelectedHistoryInvoice(null);
+    setHistoryInvoicePayments({});
     await fetchInvoiceHistory(student.id);
     setShowInvoiceHistoryModal(true);
   };
 
   // Handler to view invoice from history
-  const handleViewHistoryInvoice = (inv: any) => {
+  const handleViewHistoryInvoice = async (inv: any) => {
     setSelectedHistoryInvoice(inv);
+    if (inv?.id && !historyInvoicePayments[inv.id]) {
+      await loadInvoicePaymentHistory(inv.id);
+    }
   };
 
   const patchInvoicePdfUrl = (invoiceId: string, pdfUrl: string) => {
@@ -5558,7 +5586,11 @@ const AdminPanel = () => {
                       <tr>
                         <th>Student</th>
                         <th>Course</th>
-                        <th>Status</th>
+                        <th>Invoice</th>
+                        <th>Due</th>
+                        <th>Paid</th>
+                        <th>Balance</th>
+                        <th>Credit</th>
                         <th>Due Date</th>
                         <th>Actions</th>
                       </tr>
@@ -5628,6 +5660,30 @@ const AdminPanel = () => {
                                 <span className="text-red-500">Not Sent</span>
                               )}
                             </td>
+                            <td>{inv ? `KES ${getEffectiveAmountDue(inv).toLocaleString()}` : '-'}</td>
+                            <td>{inv ? `KES ${getInvoiceAmountPaid(inv).toLocaleString()}` : '-'}</td>
+                            <td>
+                              {inv ? (
+                                <span className={getInvoiceBalanceRemaining(inv) > 0 ? 'text-amber-700 font-medium' : 'text-green-700'}>
+                                  KES {getInvoiceBalanceRemaining(inv).toLocaleString()}
+                                  {inv.payment_status === 'partial' && (
+                                    <Badge className="ml-1 bg-amber-100 text-amber-800 text-xs">partial</Badge>
+                                  )}
+                                  {inv.payment_status === 'paid' && (
+                                    <Badge className="ml-1 bg-green-100 text-green-800 text-xs">paid</Badge>
+                                  )}
+                                </span>
+                              ) : '-'}
+                            </td>
+                            <td>
+                              {(studentCreditBalances[student.id] ?? 0) > 0 ? (
+                                <span className="text-blue-700 font-medium">
+                                  KES {(studentCreditBalances[student.id] ?? 0).toLocaleString()}
+                                </span>
+                              ) : (
+                                '-'
+                              )}
+                            </td>
                             <td>{inv ? inv.due_date : '-'}</td>
                             <td className="flex gap-2">
                               {!inv ? (
@@ -5663,14 +5719,14 @@ const AdminPanel = () => {
                                         ? 'Download PDF'
                                         : 'Generate PDF'}
                                   </Button>
-                                  {inv.status !== 'paid' && (
+                                  {!isInvoiceFullyPaid(inv) && (
                                     <Button 
                                       size="sm" 
                                       variant="default" 
                                       className="bg-green-600 hover:bg-green-700 text-white"
-                                      onClick={() => handleMarkInvoicePaid(inv.id)}
+                                      onClick={() => handleOpenRecordPayment(inv, student)}
                                     >
-                                      Mark as Paid
+                                      Record Payment
                                     </Button>
                                   )}
                                 </>
@@ -5794,9 +5850,14 @@ const AdminPanel = () => {
           </DialogContent>
         </Dialog>
         <Dialog open={showInvoiceHistoryModal} onOpenChange={setShowInvoiceHistoryModal}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Invoice History for {invoiceHistoryStudent?.student_name}</DialogTitle>
+              {invoiceHistoryStudentCredit > 0 && (
+                <p className="text-sm text-blue-700">
+                  Account credit: KES {invoiceHistoryStudentCredit.toLocaleString()}
+                </p>
+              )}
             </DialogHeader>
             <div className="flex flex-wrap gap-2 justify-end">
               {invoiceHistory.some((inv) => !inv.pdf_url) && (
@@ -5816,7 +5877,9 @@ const AdminPanel = () => {
                   <tr>
                     <th>Period</th>
                     <th>Status</th>
-                    <th>Amount</th>
+                    <th>Due</th>
+                    <th>Paid</th>
+                    <th>Balance</th>
                     <th>Due Date</th>
                     <th>PDF</th>
                     <th>Details</th>
@@ -5827,8 +5890,15 @@ const AdminPanel = () => {
                   {invoiceHistory.map(inv => (
                     <tr key={inv.id}>
                       <td>{inv.period_start} - {inv.period_end}</td>
-                      <td>{inv.status}</td>
-                      <td>KES {inv.amount_due?.toLocaleString()}</td>
+                      <td>
+                        {inv.payment_status || inv.status}
+                        {inv.payment_status === 'partial' && (
+                          <Badge className="ml-1 bg-amber-100 text-amber-800 text-xs">partial</Badge>
+                        )}
+                      </td>
+                      <td>KES {getEffectiveAmountDue(inv).toLocaleString()}</td>
+                      <td>KES {getInvoiceAmountPaid(inv).toLocaleString()}</td>
+                      <td>KES {getInvoiceBalanceRemaining(inv).toLocaleString()}</td>
                       <td>{inv.due_date}</td>
                       <td>
                         <Button
@@ -5848,14 +5918,14 @@ const AdminPanel = () => {
                         <Button size="sm" variant="ghost" onClick={() => handleViewHistoryInvoice(inv)}>View</Button>
                       </td>
                       <td>
-                        {inv.status !== 'paid' && (
+                        {!isInvoiceFullyPaid(inv) && (
                           <Button 
                             size="sm" 
                             variant="default" 
                             className="bg-green-600 hover:bg-green-700 text-white"
-                            onClick={() => handleMarkInvoicePaid(inv.id)}
+                            onClick={() => handleOpenRecordPayment(inv, invoiceHistoryStudent ?? undefined)}
                           >
-                            Mark as Paid
+                            Record Payment
                           </Button>
                         )}
                       </td>
@@ -5867,10 +5937,29 @@ const AdminPanel = () => {
                 <div className="p-4 border rounded bg-gray-50">
                   <h4 className="font-semibold mb-2">Invoice Details</h4>
                   <div><b>Period:</b> {selectedHistoryInvoice.period_start} - {selectedHistoryInvoice.period_end}</div>
-                  <div><b>Status:</b> {selectedHistoryInvoice.status}</div>
-                  <div><b>Amount:</b> KES {selectedHistoryInvoice.amount_due?.toLocaleString()}</div>
+                  <div><b>Status:</b> {selectedHistoryInvoice.payment_status || selectedHistoryInvoice.status}</div>
+                  <div><b>Amount due:</b> KES {getEffectiveAmountDue(selectedHistoryInvoice).toLocaleString()}</div>
+                  <div><b>Paid:</b> KES {getInvoiceAmountPaid(selectedHistoryInvoice).toLocaleString()}</div>
+                  <div><b>Balance:</b> KES {getInvoiceBalanceRemaining(selectedHistoryInvoice).toLocaleString()}</div>
                   <div><b>Due Date:</b> {selectedHistoryInvoice.due_date}</div>
                   <div><b>Notes:</b> {selectedHistoryInvoice.notes || '-'}</div>
+                  {(historyInvoicePayments[selectedHistoryInvoice.id]?.length ?? 0) > 0 && (
+                    <div className="mt-3">
+                      <b>Payment history</b>
+                      <ul className="mt-1 space-y-1 text-sm">
+                        {historyInvoicePayments[selectedHistoryInvoice.id].map((p: any) => (
+                          <li key={p.id} className="border-b border-gray-200 pb-1">
+                            KES {(p.amount ?? 0).toLocaleString()}
+                            {p.credit_amount > 0 && ` (${Number(p.credit_amount).toLocaleString()} from credit)`}
+                            {' · '}{p.payment_method || 'cash'}
+                            {p.paid_date && ` · ${p.paid_date}`}
+                            {p.mpesa_transaction_id && ` · Ref: ${p.mpesa_transaction_id}`}
+                            {p.notes && ` — ${p.notes}`}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <div className="mt-2">
                     <Button
                       size="sm"
@@ -5884,14 +5973,16 @@ const AdminPanel = () => {
                           ? 'Download PDF'
                           : 'Generate PDF'}
                     </Button>
-                    {selectedHistoryInvoice.status !== 'paid' && (
+                    {!isInvoiceFullyPaid(selectedHistoryInvoice) && (
                       <Button 
                         size="sm" 
                         variant="default" 
                         className="bg-green-600 hover:bg-green-700 text-white ml-2"
-                        onClick={() => handleMarkInvoicePaid(selectedHistoryInvoice.id)}
+                        onClick={() =>
+                          handleOpenRecordPayment(selectedHistoryInvoice, invoiceHistoryStudent ?? undefined)
+                        }
                       >
-                        Mark as Paid
+                        Record Payment
                       </Button>
                     )}
                   </div>
@@ -5900,6 +5991,20 @@ const AdminPanel = () => {
             </div>
           </DialogContent>
         </Dialog>
+        <RecordInvoicePaymentDialog
+          open={showRecordPaymentDialog}
+          onOpenChange={(open) => {
+            setShowRecordPaymentDialog(open);
+            if (!open) {
+              setPaymentDialogInvoice(null);
+              setPaymentDialogStudent(null);
+            }
+          }}
+          invoice={paymentDialogInvoice}
+          studentName={paymentDialogStudent?.student_name}
+          recordedBy={user?.id ?? undefined}
+          onSuccess={handlePaymentRecorded}
+        />
 
         {/* Delete Classroom Modal */}
         <Dialog open={showDeleteClassroomModal} onOpenChange={setShowDeleteClassroomModal}>

@@ -66,7 +66,7 @@ export function findInvoiceForFinancePeriod<T extends { student_id: string; peri
 
 /** Invoice to show in admin finances row (current month, or latest open invoice e.g. first term bill). */
 export function resolveFinanceInvoiceForStudent<
-  T extends { student_id: string; period_start: string; period_end: string; status?: string }
+  T extends { student_id: string; period_start: string; period_end: string; status?: string | null } & InvoicePaymentFields
 >(invoices: T[], studentId: string, period: { start: string; end: string }): {
   invoice: T | undefined;
   isCurrentPeriod: boolean;
@@ -75,11 +75,156 @@ export function resolveFinanceInvoiceForStudent<
   if (current) return { invoice: current, isCurrentPeriod: true };
 
   const open = invoices
-    .filter((inv) => inv.student_id === studentId && inv.status !== 'paid' && inv.status !== 'cancelled')
+    .filter((inv) => inv.student_id === studentId && hasOutstandingBalance(inv))
     .sort((a, b) => new Date(b.period_start).getTime() - new Date(a.period_start).getTime())[0];
 
   if (open) return { invoice: open, isCurrentPeriod: false };
   return { invoice: undefined, isCurrentPeriod: false };
+}
+
+export type InvoicePaymentFields = {
+  amount_due?: number | null;
+  manual_amount_due?: number | null;
+  manual_amount_override?: number | null;
+  amount_paid?: number | null;
+  payment_status?: string | null;
+  status?: string | null;
+};
+
+/** Effective amount due (respects admin overrides). */
+export function getEffectiveAmountDue(invoice: InvoicePaymentFields | null | undefined): number {
+  if (!invoice) return 0;
+  const manualDue = invoice.manual_amount_due;
+  const manualOverride = invoice.manual_amount_override;
+  const base = invoice.amount_due ?? 0;
+  if (manualDue !== null && manualDue !== undefined && !Number.isNaN(Number(manualDue))) {
+    return Number(manualDue);
+  }
+  if (manualOverride !== null && manualOverride !== undefined && !Number.isNaN(Number(manualOverride))) {
+    return Number(manualOverride);
+  }
+  return Number(base) || 0;
+}
+
+export function getInvoiceAmountPaid(invoice: InvoicePaymentFields | null | undefined): number {
+  if (!invoice) return 0;
+  const paid = invoice.amount_paid;
+  if (paid === null || paid === undefined || Number.isNaN(Number(paid))) return 0;
+  return Number(paid);
+}
+
+export function getInvoiceBalanceRemaining(invoice: InvoicePaymentFields | null | undefined): number {
+  return Math.max(0, getEffectiveAmountDue(invoice) - getInvoiceAmountPaid(invoice));
+}
+
+export function isInvoiceFullyPaid(invoice: InvoicePaymentFields | null | undefined): boolean {
+  if (!invoice) return false;
+  if (invoice.payment_status === 'paid' || invoice.status === 'paid') return true;
+  return getInvoiceBalanceRemaining(invoice) <= 0 && getInvoiceAmountPaid(invoice) > 0;
+}
+
+/** True when invoice still owes money (ignores sent/partial status quirks). */
+export function hasOutstandingBalance(invoice: InvoicePaymentFields | null | undefined): boolean {
+  if (!invoice) return false;
+  const status = invoice.status ?? '';
+  if (status === 'paid' || status === 'cancelled' || status === 'excused') return false;
+  return getInvoiceBalanceRemaining(invoice) > 0;
+}
+
+export function formatInvoicePaymentSummary(invoice: InvoicePaymentFields | null | undefined): string {
+  const due = getEffectiveAmountDue(invoice);
+  const paid = getInvoiceAmountPaid(invoice);
+  const balance = getInvoiceBalanceRemaining(invoice);
+  return `Paid ${paid.toLocaleString()} / ${due.toLocaleString()} — Balance ${balance.toLocaleString()}`;
+}
+
+export interface RecordInvoicePaymentResult {
+  payment_id: string | null;
+  invoice_id: string;
+  applied_to_invoice: number;
+  overpayment_credit: number;
+  credit_used: number;
+  cash_applied: number;
+  balance_remaining: number;
+  payment_status: string;
+  amount_paid: number;
+  effective_due: number;
+  student_credit_balance: number;
+  became_paid: boolean;
+  student_id: string;
+}
+
+export async function recordInvoicePayment(params: {
+  invoiceId: string;
+  cashAmount: number;
+  creditAmount?: number;
+  paymentMethod?: string;
+  mpesaTransactionId?: string;
+  payerPhone?: string;
+  paidDate?: string;
+  notes?: string;
+  recordedBy?: string;
+}): Promise<RecordInvoicePaymentResult> {
+  const { data, error } = await supabase.rpc('record_invoice_payment', {
+    p_invoice_id: params.invoiceId,
+    p_cash_amount: params.cashAmount,
+    p_credit_amount: params.creditAmount ?? 0,
+    p_payment_method: params.paymentMethod ?? 'cash',
+    p_mpesa_transaction_id: params.mpesaTransactionId ?? null,
+    p_payer_phone: params.payerPhone ?? null,
+    p_paid_date: params.paidDate ?? toLocalDateString(new Date()),
+    p_notes: params.notes ?? null,
+    p_recorded_by: params.recordedBy ?? null,
+  });
+  if (error) {
+    const msg = error.message || '';
+    if (msg.includes('record_invoice_payment') || msg.includes('Could not find the function')) {
+      throw new Error(
+        'Payment recording is not available yet. Apply the database migration 20260523000001_partial_payments_and_credits.sql in Supabase, then try again.'
+      );
+    }
+    throw error;
+  }
+  return data as RecordInvoicePaymentResult;
+}
+
+export async function fetchStudentCreditBalance(studentId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('get_student_credit_balance', {
+    p_student_id: studentId,
+  });
+  if (error) {
+    const msg = error.message || '';
+    if (msg.includes('get_student_credit_balance') || msg.includes('Could not find the function')) {
+      return 0;
+    }
+    throw error;
+  }
+  return Number(data) || 0;
+}
+
+export interface InvoicePaymentRow {
+  id: string;
+  invoice_id?: string | null;
+  amount: number;
+  cash_amount?: number | null;
+  credit_amount?: number | null;
+  payment_method?: string | null;
+  status?: string | null;
+  paid_date?: string | null;
+  mpesa_transaction_id?: string | null;
+  notes?: string | null;
+  created_at?: string | null;
+}
+
+export async function fetchInvoicePayments(invoiceId: string): Promise<InvoicePaymentRow[]> {
+  const { data, error } = await supabase
+    .from('payments')
+    .select('id, invoice_id, amount, cash_amount, credit_amount, payment_method, status, paid_date, mpesa_transaction_id, notes, created_at')
+    .eq('invoice_id', invoiceId)
+    .eq('status', 'completed')
+    .order('paid_date', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as InvoicePaymentRow[];
 }
 
 export interface InvoiceLineItem {
