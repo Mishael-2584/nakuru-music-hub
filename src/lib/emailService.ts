@@ -1,10 +1,22 @@
 import { supabase } from '@/integrations/supabase/client';
-import { generateQuotePDF } from "./pdfGenerator";
+import { generateQuotePDF, generatePaymentReceiptPDF } from "./pdfGenerator";
 import {
   buildInvoiceDisplayNumber,
   buildInvoiceDownloadFileName,
   buildInvoiceStoragePath,
 } from './invoiceNaming';
+import { generateInvoicePDFBlob, resolveInvoicePdfPaymentStatus } from './invoiceUtils';
+
+const blobToBase64 = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(',')[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 
 interface RegistrationData {
   id: string;
@@ -1011,7 +1023,7 @@ export const sendInvoiceEmail = async (
       periodStart: invoice.period_start || '',
       periodEnd: invoice.period_end || '',
       dueDate: invoice.due_date || '',
-      paymentStatus: invoice.status ? invoice.status.toUpperCase() : 'PENDING',
+      paymentStatus: resolveInvoicePdfPaymentStatus(invoice),
       studentId: student.id || '',
       registrationId: student.registration_id || '',
       sessionsPerWeek: invoice.sessions_per_week || undefined,
@@ -1075,15 +1087,7 @@ export const sendInvoiceEmail = async (
     }
 
     // Convert blob to base64 for email attachment
-    const reader = new FileReader();
-    const pdfBase64 = await new Promise<string>((resolve) => {
-      reader.onload = () => {
-        const result = reader.result as string;
-        const base64 = result.split(',')[1];
-        resolve(base64);
-      };
-      reader.readAsDataURL(pdfBlob);
-    });
+    const pdfBase64 = await blobToBase64(pdfBlob);
     const paymentNote = 'Please note: Monthly fees are payable upfront at the beginning of the month. Late payments may affect lesson scheduling. Thank you for your cooperation.';
 
     const subject = options.subject || (options.isReminder
@@ -1506,11 +1510,45 @@ export const sendPartialPaymentConfirmationEmail = async (
   registration: { student_name: string; email: string; id?: string; receipt_number?: string; created_at?: string },
   paymentAmount: number,
   balanceRemaining: number,
-  invoicePeriod?: string
+  invoicePeriod?: string,
+  receiptContext?: {
+    invoice: any;
+    student: any;
+    paymentMethod?: string;
+    mpesaRef?: string;
+    paidDate?: string;
+    isFirstInvoice?: boolean;
+  }
 ): Promise<boolean> => {
   try {
     const formatKes = (n: number) =>
       new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(n);
+
+    const attachments: Array<{ filename: string; content: string; contentType: string }> = [];
+    if (receiptContext?.invoice && receiptContext?.student) {
+      const invoiceNumber = buildInvoiceDisplayNumber(
+        receiptContext.student,
+        receiptContext.invoice,
+        receiptContext.isFirstInvoice
+      );
+      const receiptPdf = await generatePaymentReceiptPDF({
+        studentName: registration.student_name,
+        studentEmail: registration.email,
+        studentPhone: receiptContext.student.phone || undefined,
+        amountPaid: paymentAmount,
+        balanceRemaining,
+        invoiceNumber,
+        invoicePeriod: invoicePeriod || '',
+        paymentMethod: receiptContext.paymentMethod || 'cash',
+        paidDate: receiptContext.paidDate || new Date().toLocaleDateString('en-KE'),
+        mpesaRef: receiptContext.mpesaRef,
+      });
+      attachments.push({
+        filename: `payment-receipt-${Date.now()}.pdf`,
+        content: await blobToBase64(receiptPdf),
+        contentType: 'application/pdf',
+      });
+    }
 
     const html = `
     <!DOCTYPE html>
@@ -1518,7 +1556,7 @@ export const sendPartialPaymentConfirmationEmail = async (
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Partial Payment Received | Damon Music Academy</title>
+      <title>Payment Receipt | Damon Music Academy</title>
       <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; }
         .header { background: linear-gradient(135deg, #f59e0b 0%, #00c6ff 100%); color: white; padding: 24px; text-align: center; border-radius: 10px 10px 0 0; }
@@ -1529,18 +1567,19 @@ export const sendPartialPaymentConfirmationEmail = async (
     </head>
     <body>
       <div class="header">
-        <h1>Partial Payment Received</h1>
+        <h1>Payment Receipt</h1>
         <p style="margin: 0; font-size: 16px;">Damon Music Academy</p>
       </div>
       <div class="content">
         <p>Dear ${registration.student_name},</p>
         <div class="confirm-box">
-          <p style="margin: 0 0 8px;"><strong>Thank you.</strong> We have received your partial payment.</p>
+          <p style="margin: 0 0 8px;"><strong>Thank you.</strong> We have received your payment.</p>
           <p style="margin: 0;"><strong>Amount received:</strong> ${formatKes(paymentAmount)}</p>
           ${invoicePeriod ? `<p style="margin: 8px 0 0;"><strong>Invoice period:</strong> ${invoicePeriod}</p>` : ''}
           <p style="margin: 8px 0 0;"><strong>Balance remaining:</strong> ${formatKes(balanceRemaining)}</p>
         </div>
-        <p>Please settle the remaining balance at your earliest convenience. Contact us at info@damonmusicacademy.co.ke or 0701 195 460 / 0713 490 535 if you have questions.</p>
+        <p>Your payment receipt is attached to this email. Please settle any remaining balance at your earliest convenience.</p>
+        <p>Contact us at info@damonmusicacademy.co.ke or 0701 195 460 / 0713 490 535 if you have questions.</p>
         <div class="footer">
           <p><strong>Damon Music Academy</strong> | Nakuru, Kenya</p>
         </div>
@@ -1552,9 +1591,10 @@ export const sendPartialPaymentConfirmationEmail = async (
     const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
       body: {
         to: registration.email,
-        subject: 'Partial Payment Received | Damon Music Academy',
+        subject: 'Payment Receipt | Damon Music Academy',
         html,
         registration,
+        attachments,
       },
     });
     if (error) {
@@ -1568,10 +1608,42 @@ export const sendPartialPaymentConfirmationEmail = async (
   }
 };
 
+export type PaidInvoiceEmailContext = {
+  invoice: any;
+  student: any;
+  isFirstInvoice?: boolean;
+};
+
+async function buildPaidInvoicePdfAttachment(
+  invoice: any,
+  student: any,
+  isFirstInvoice?: boolean
+): Promise<{ filename: string; content: string; contentType: string } | null> {
+  try {
+    const paidInvoice = {
+      ...invoice,
+      payment_status: 'paid',
+      status: 'paid',
+      amount_paid: invoice.amount_paid ?? invoice.amount_due,
+    };
+    const pdfBlob = await generateInvoicePDFBlob(paidInvoice, student, !!isFirstInvoice);
+    const fileName = buildInvoiceDownloadFileName(student, paidInvoice);
+    return {
+      filename: fileName,
+      content: await blobToBase64(pdfBlob),
+      contentType: 'application/pdf',
+    };
+  } catch (e) {
+    console.error('buildPaidInvoicePdfAttachment:', e);
+    return null;
+  }
+}
+
 export const sendPaymentConfirmationEmail = async (
   registration: RegistrationData,
   tempPassword?: string | null,
-  isFirstPayment: boolean = true
+  isFirstPayment: boolean = true,
+  paidInvoiceContext?: PaidInvoiceEmailContext
 ): Promise<boolean> => {
   try {
     console.log('📧 Sending payment confirmation email to:', registration.email, isFirstPayment ? '(first payment)' : '(subsequent payment)');
@@ -1579,6 +1651,16 @@ export const sendPaymentConfirmationEmail = async (
     if (!registration.id || !registration.receipt_number || !registration.student_name || !registration.email || !registration.created_at) {
       console.error('❌ Missing required fields for payment confirmation email');
       return false;
+    }
+
+    const attachments: Array<{ filename: string; content: string; contentType: string }> = [];
+    if (paidInvoiceContext?.invoice && paidInvoiceContext?.student) {
+      const attachment = await buildPaidInvoicePdfAttachment(
+        paidInvoiceContext.invoice,
+        paidInvoiceContext.student,
+        paidInvoiceContext.isFirstInvoice
+      );
+      if (attachment) attachments.push(attachment);
     }
 
     const siteUrl = 'https://damonmusicacademy.co.ke';
@@ -1610,6 +1692,7 @@ export const sendPaymentConfirmationEmail = async (
           <p>Dear ${registration.student_name},</p>
           <div class="confirm-box">
             <p style="margin: 0;"><strong>Thank you.</strong> We have received and confirmed your payment.</p>
+            ${attachments.length ? '<p style="margin: 8px 0 0;">Your paid invoice is attached to this email.</p>' : ''}
           </div>
           <p>We appreciate your continued commitment to Damon Music Academy. If you have any questions, contact us at info@damonmusicacademy.co.ke or 0701 195 460 / 0713 490 535.</p>
           <div class="footer">
@@ -1624,7 +1707,8 @@ export const sendPaymentConfirmationEmail = async (
           to: registration.email,
           subject: `Payment Received | Damon Music Academy`,
           html: shortHTML,
-          registration: registration
+          registration: registration,
+          attachments,
         }
       });
       if (error) {
@@ -1692,6 +1776,7 @@ export const sendPaymentConfirmationEmail = async (
           <div class="payment-confirmed">
             <h3>✅ Payment Confirmed</h3>
             <p><strong>Great news!</strong> Your payment has been successfully processed and your enrollment is now complete.</p>
+            ${attachments.length ? '<p>Your paid invoice is attached to this email.</p>' : ''}
             <ul>
               <li><strong>Enrollment fee:</strong> ✅ Paid</li>
               <li><strong>First month's tuition:</strong> ✅ Paid</li>
@@ -1768,7 +1853,8 @@ export const sendPaymentConfirmationEmail = async (
         to: registration.email,
         subject: `Payment Received - Enrollment Confirmed | Damon Music Academy`,
         html: emailHTML,
-        registration: registration
+        registration: registration,
+        attachments,
       }
     });
 

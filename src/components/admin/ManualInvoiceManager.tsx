@@ -11,6 +11,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/priceFormatter';
 import { sendInvoiceEmail } from '@/lib/emailService';
+import {
+  getEffectiveAmountDue,
+  getInvoiceAmountPaid,
+  invoiceHasRecordedPayments,
+  isInvoiceFullyPaid,
+} from '@/lib/invoiceUtils';
 
 interface InvoiceLineItem {
   description: string;
@@ -115,6 +121,15 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
   };
   
   const handleSaveOverride = async () => {
+    if (invoiceHasRecordedPayments(invoice) || isInvoiceFullyPaid(invoice)) {
+      toast({
+        title: 'Cannot edit',
+        description: 'This invoice has recorded payments. Amount cannot be changed after payment.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -240,6 +255,15 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
   };
 
   const handleClearOverride = async () => {
+    if (invoiceHasRecordedPayments(invoice) || isInvoiceFullyPaid(invoice)) {
+      toast({
+        title: 'Cannot restore',
+        description: 'This invoice has recorded payments. Amount cannot be changed after payment.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!confirm('Are you sure you want to restore the original invoice amount?')) {
       return;
     }
@@ -278,6 +302,14 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
   };
 
   const handleOpenDialog = () => {
+    if (invoiceHasRecordedPayments(invoice) || isInvoiceFullyPaid(invoice)) {
+      toast({
+        title: 'Cannot edit',
+        description: 'This invoice has recorded payments. Amount cannot be changed after payment.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setLineItems(getExistingLineItems());
     setOverrideReason(invoice.override_reason || '');
     setIsDialogOpen(true);
@@ -285,6 +317,8 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
 
   // Get effective amount - prioritize lessons_summary.total, then amount_due
   const getEffectiveAmount = () => {
+    const fromUtils = getEffectiveAmountDue(invoice);
+    if (fromUtils > 0) return fromUtils;
     if (invoice.lessons_summary?.total && invoice.lessons_summary.total > 0) {
       return invoice.lessons_summary.total;
     }
@@ -292,7 +326,8 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
   };
   
   const effectiveAmount = getEffectiveAmount();
-  const hasOverride = false; // Not using manual_amount_override column
+  const hasOverride = false;
+  const amountLocked = invoiceHasRecordedPayments(invoice) || isInvoiceFullyPaid(invoice);
 
   return (
     <>
@@ -320,7 +355,9 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
           size="sm"
           variant="outline"
           onClick={handleOpenDialog}
+          disabled={amountLocked}
           className="flex items-center gap-1"
+          title={amountLocked ? 'Locked after payment recorded' : 'Edit invoice amount'}
         >
           <DollarSign className="h-4 w-4" />
           Edit Amount

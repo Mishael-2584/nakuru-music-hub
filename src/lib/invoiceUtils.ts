@@ -91,6 +91,28 @@ export function filterInvoicesUpToCurrentMonth<T extends { period_start: string 
   return invoices.filter((inv) => !isFutureBillingPeriod(inv.period_start, reference));
 }
 
+/** Invoice history: only completed billing periods before the current calendar month. */
+export function filterPastInvoicesForHistory<T extends { period_end: string; status?: string | null }>(
+  invoices: T[],
+  reference = new Date()
+): T[] {
+  const currentMonthStart = new Date(reference.getFullYear(), reference.getMonth(), 1);
+  return invoices.filter((inv) => {
+    if (inv.status === 'cancelled') return false;
+    const periodEnd = parseLocalDateString(inv.period_end);
+    return periodEnd < currentMonthStart;
+  });
+}
+
+export function resolveInvoicePdfPaymentStatus(invoice: {
+  status?: string | null;
+  payment_status?: string | null;
+}): string {
+  if (invoice.payment_status === 'paid' || invoice.status === 'paid') return 'PAID';
+  if (invoice.payment_status === 'partial') return 'PARTIAL';
+  return 'PENDING';
+}
+
 export function computeNextBillingPeriod(params: {
   paymentType: BillingPaymentType;
   isFirstInvoice: boolean;
@@ -116,7 +138,8 @@ export function computeNextBillingPeriod(params: {
     }
   } else if (paymentType === 'term') {
     if (isFirstInvoice) {
-      periodStart = new Date(registrationCreatedAt);
+      // Current term: calendar month start, three months through current billing window
+      periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
       periodEnd = new Date(periodStart);
       periodEnd.setMonth(periodEnd.getMonth() + 3);
       periodEnd.setDate(periodEnd.getDate() - 1);
@@ -404,30 +427,64 @@ export function findInvoiceForFinancePeriod<T extends { student_id: string; peri
   return findInvoiceForCalendarMonth(invoices, studentId, period.start);
 }
 
-/** Invoice to show in admin finances row (current month, or latest open invoice e.g. first term bill). */
+export function getLatestBillableInvoiceForStudent<
+  T extends { student_id: string; period_start: string; period_end: string }
+>(invoices: T[], studentId: string, reference = new Date()): T | undefined {
+  return sortInvoicesByPeriodEndDesc(
+    invoices.filter(
+      (inv) => inv.student_id === studentId && !isFutureBillingPeriod(inv.period_start, reference)
+    )
+  )[0];
+}
+
+/** True when any payment has been recorded against this invoice. */
+export function invoiceHasRecordedPayments(invoice: InvoicePaymentFields | null | undefined): boolean {
+  if (!invoice) return false;
+  if (getInvoiceAmountPaid(invoice) > 0) return true;
+  if (invoice.payment_status === 'partial') return true;
+  return false;
+}
+
+/** Student has no invoice overlapping the current calendar month. */
+export function studentNeedsCurrentMonthInvoice<
+  T extends { student_id: string; period_start: string; period_end: string }
+>(invoices: T[], studentId: string, reference = new Date()): boolean {
+  const billable = invoices.filter(
+    (inv) => inv.student_id === studentId && !isFutureBillingPeriod(inv.period_start, reference)
+  );
+  return !findInvoiceForCalendarMonth(billable, studentId, reference);
+}
+
+/** Send Invoice is allowed unless the current calendar month is already fully paid. */
+export function canSendInvoiceEmail<
+  T extends { student_id: string; period_start: string; period_end: string } & InvoicePaymentFields
+>(invoices: T[], studentId: string, reference = new Date()): boolean {
+  const billable = invoices.filter(
+    (inv) => inv.student_id === studentId && !isFutureBillingPeriod(inv.period_start, reference)
+  );
+  const current = findInvoiceForCalendarMonth(billable, studentId, reference);
+  if (current && isInvoiceFullyPaid(current)) return false;
+  return true;
+}
+
+/** Invoice to show in admin finances row (latest billable invoice for the student). */
 export function resolveFinanceInvoiceForStudent<
-  T extends { student_id: string; period_start: string; period_end: string; status?: string | null } & InvoicePaymentFields
+  T extends { student_id: string; period_start: string; period_end: string } & InvoicePaymentFields
 >(invoices: T[], studentId: string, period: { start: string; end: string }): {
   invoice: T | undefined;
   isCurrentPeriod: boolean;
 } {
-  const current = findInvoiceForFinancePeriod(invoices, studentId, period);
-  if (current) return { invoice: current, isCurrentPeriod: true };
-
-  const open = invoices
-    .filter(
-      (inv) =>
-        inv.student_id === studentId &&
-        hasOutstandingBalance(inv) &&
-        !isFutureBillingPeriod(inv.period_start)
-    )
-    .sort(
-      (a, b) =>
-        parseLocalDateString(b.period_start).getTime() - parseLocalDateString(a.period_start).getTime()
-    )[0];
-
-  if (open) return { invoice: open, isCurrentPeriod: false };
-  return { invoice: undefined, isCurrentPeriod: false };
+  const invoice = getLatestBillableInvoiceForStudent(invoices, studentId);
+  const current = findInvoiceForCalendarMonth(
+    invoices.filter(
+      (inv) => inv.student_id === studentId && !isFutureBillingPeriod(inv.period_start)
+    ),
+    studentId
+  );
+  return {
+    invoice,
+    isCurrentPeriod: !!invoice && !!current && invoice.id === current.id,
+  };
 }
 
 export type InvoicePaymentFields = {
@@ -942,7 +999,7 @@ export async function generateAndUploadInvoicePDF(invoice: any, student: any, is
     periodStart: invoice.period_start || '',
     periodEnd: invoice.period_end || '',
     dueDate: invoice.due_date || '',
-    paymentStatus: invoice.status ? invoice.status.toUpperCase() : 'PENDING',
+    paymentStatus: resolveInvoicePdfPaymentStatus(invoice),
     studentId: student.id || '',
     registrationId: student.registration_id || '',
     sessionsPerWeek: invoice.sessions_per_week || undefined,
@@ -1000,7 +1057,7 @@ export async function generateInvoicePDFBlob(invoice: any, student: any, isFirst
     periodStart: invoice.period_start || '',
     periodEnd: invoice.period_end || '',
     dueDate: invoice.due_date || '',
-    paymentStatus: invoice.status ? invoice.status.toUpperCase() : 'PENDING',
+    paymentStatus: resolveInvoicePdfPaymentStatus(invoice),
     studentId: student.id || '',
     registrationId: student.registration_id || '',
     sessionsPerWeek: invoice.sessions_per_week || undefined,

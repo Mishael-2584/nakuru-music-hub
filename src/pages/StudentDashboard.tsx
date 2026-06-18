@@ -4062,13 +4062,9 @@ const StudentDashboard = () => {
                                 </div>
                               ) : (
                                 <div className="flex flex-col gap-2">
-                                  <Button 
-                                    size="sm" 
-                                    onClick={() => handlePayment(invoice)}
-                                    className="bg-blue-600 hover:bg-blue-700"
-                                  >
-                                    Pay {remainingAmount > 0 ? formatCurrency(remainingAmount) : 'Now'}
-                                  </Button>
+                                  <p className="text-xs text-muted-foreground max-w-[160px]">
+                                    Pay via M-Pesa or cash at the academy. Admin will record your payment here.
+                                  </p>
                                   <Button 
                                     variant="outline" 
                                     size="sm" 

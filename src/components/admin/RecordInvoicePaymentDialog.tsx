@@ -18,12 +18,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
-  fetchStudentCreditBalance,
   getEffectiveAmountDue,
   getInvoiceAmountPaid,
   getInvoiceBalanceRemaining,
+  isInvoiceFullyPaid,
   recordInvoicePayment,
   toLocalDateString,
   type RecordInvoicePaymentResult,
@@ -40,6 +39,7 @@ export interface RecordInvoicePaymentDialogProps {
     manual_amount_override?: number | null;
     amount_paid?: number | null;
     payment_status?: string | null;
+    status?: string | null;
     period_start?: string;
     period_end?: string;
   } | null;
@@ -59,57 +59,49 @@ const RecordInvoicePaymentDialog: React.FC<RecordInvoicePaymentDialogProps> = ({
   recordedBy,
   onSuccess,
 }) => {
-  const [cashAmount, setCashAmount] = useState('');
-  const [useCredit, setUseCredit] = useState(false);
-  const [creditAmount, setCreditAmount] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [mpesaRef, setMpesaRef] = useState('');
   const [payerPhone, setPayerPhone] = useState('');
   const [paidDate, setPaidDate] = useState(toLocalDateString(new Date()));
   const [notes, setNotes] = useState('');
-  const [creditBalance, setCreditBalance] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const balance = invoice ? getInvoiceBalanceRemaining(invoice) : 0;
   const effectiveDue = invoice ? getEffectiveAmountDue(invoice) : 0;
   const amountPaid = invoice ? getInvoiceAmountPaid(invoice) : 0;
+  const fullyPaid = invoice ? isInvoiceFullyPaid(invoice) : false;
 
   useEffect(() => {
     if (!open || !invoice) return;
-    setCashAmount(balance > 0 ? String(balance) : '');
-    setUseCredit(false);
-    setCreditAmount('');
+    setPaymentAmount(balance > 0 ? String(balance) : '');
     setPaymentMethod('cash');
     setMpesaRef('');
     setPayerPhone('');
     setPaidDate(toLocalDateString(new Date()));
     setNotes('');
     setError('');
-    void fetchStudentCreditBalance(invoice.student_id)
-      .then(setCreditBalance)
-      .catch(() => setCreditBalance(0));
   }, [open, invoice?.id, invoice?.amount_paid, balance]);
 
-  const parsedCash = Math.max(0, Number(cashAmount) || 0);
-  const parsedCredit = useCredit ? Math.max(0, Number(creditAmount) || 0) : 0;
-  const totalPayment = parsedCash + parsedCredit;
+  const parsedAmount = Math.max(0, Number(paymentAmount) || 0);
 
   const handlePayRemaining = () => {
-    const creditPart = useCredit ? Math.min(parsedCredit, creditBalance, balance) : 0;
-    const cashPart = Math.max(0, balance - creditPart);
-    setCashAmount(String(cashPart));
-    if (useCredit) setCreditAmount(String(creditPart));
+    if (balance > 0) setPaymentAmount(String(balance));
   };
 
   const handleSubmit = async () => {
     if (!invoice) return;
-    if (totalPayment <= 0) {
+    if (fullyPaid || balance <= 0) {
+      setError('This invoice is already fully paid.');
+      return;
+    }
+    if (parsedAmount <= 0) {
       setError('Enter a payment amount greater than zero.');
       return;
     }
-    if (parsedCredit > creditBalance) {
-      setError(`Only ${formatKes(creditBalance)} credit available.`);
+    if (parsedAmount > balance) {
+      setError(`Payment cannot exceed the remaining balance of ${formatKes(balance)}.`);
       return;
     }
 
@@ -118,8 +110,8 @@ const RecordInvoicePaymentDialog: React.FC<RecordInvoicePaymentDialogProps> = ({
     try {
       const result = await recordInvoicePayment({
         invoiceId: invoice.id,
-        cashAmount: parsedCash,
-        creditAmount: parsedCredit,
+        cashAmount: parsedAmount,
+        creditAmount: 0,
         paymentMethod,
         mpesaTransactionId: mpesaRef || undefined,
         payerPhone: payerPhone || undefined,
@@ -165,58 +157,28 @@ const RecordInvoicePaymentDialog: React.FC<RecordInvoicePaymentDialogProps> = ({
               <span>Balance remaining</span>
               <span className="font-semibold">{formatKes(balance)}</span>
             </div>
-            {creditBalance > 0 && (
-              <div className="flex justify-between text-blue-700">
-                <span>Account credit</span>
-                <span className="font-medium">{formatKes(creditBalance)}</span>
-              </div>
-            )}
-            {balance === 0 && (
+            {fullyPaid && (
               <p className="text-xs text-muted-foreground pt-1 border-t">
-                This invoice is fully paid. Any amount you record will be added to the student&apos;s account credit.
+                This invoice is fully paid. No further payments can be recorded against it.
               </p>
             )}
           </div>
 
-          {creditBalance > 0 && (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="use-credit"
-                checked={useCredit}
-                onCheckedChange={(v) => setUseCredit(!!v)}
-              />
-              <Label htmlFor="use-credit">Apply account credit</Label>
-            </div>
-          )}
-
-          {useCredit && creditBalance > 0 && (
-            <div>
-              <Label htmlFor="credit-amount">Credit to apply (KES)</Label>
-              <Input
-                id="credit-amount"
-                type="number"
-                min={0}
-                max={creditBalance}
-                value={creditAmount}
-                onChange={(e) => setCreditAmount(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-          )}
-
           <div>
-            <Label htmlFor="cash-amount">Cash received (KES)</Label>
+            <Label htmlFor="payment-amount">Payment amount (KES)</Label>
             <Input
-              id="cash-amount"
+              id="payment-amount"
               type="number"
               min={0}
-              value={cashAmount}
-              onChange={(e) => setCashAmount(e.target.value)}
+              max={balance}
+              value={paymentAmount}
+              onChange={(e) => setPaymentAmount(e.target.value)}
               placeholder="0"
+              disabled={fullyPaid || balance <= 0}
             />
           </div>
 
-          {balance > 0 && (
+          {balance > 0 && !fullyPaid && (
             <Button type="button" variant="outline" size="sm" onClick={handlePayRemaining}>
               Fill remaining balance ({formatKes(balance)})
             </Button>
@@ -281,19 +243,12 @@ const RecordInvoicePaymentDialog: React.FC<RecordInvoicePaymentDialogProps> = ({
             />
           </div>
 
-          {totalPayment > 0 && (
+          {parsedAmount > 0 && parsedAmount <= balance && (
             <p className="text-muted-foreground">
-              Total: {formatKes(totalPayment)}
-              {balance === 0 && (
-                <span className="text-blue-700 block">
-                  {formatKes(totalPayment)} will be added to account credit
-                </span>
-              )}
-              {totalPayment > balance && balance > 0 && (
-                <span className="text-blue-700 block">
-                  {formatKes(totalPayment - balance)} will be added to account credit
-                </span>
-              )}
+              Recording {formatKes(parsedAmount)}
+              {parsedAmount < balance
+                ? ` · Balance after payment: ${formatKes(balance - parsedAmount)}`
+                : ' · This will fully pay the invoice'}
             </p>
           )}
 
@@ -304,7 +259,10 @@ const RecordInvoicePaymentDialog: React.FC<RecordInvoicePaymentDialogProps> = ({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={() => void handleSubmit()} disabled={loading}>
+          <Button
+            onClick={() => void handleSubmit()}
+            disabled={loading || fullyPaid || balance <= 0}
+          >
             {loading ? 'Recording...' : 'Record payment'}
           </Button>
         </DialogFooter>

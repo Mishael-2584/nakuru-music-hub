@@ -219,7 +219,7 @@ function computeNextBillingPeriod({
     }
   } else if (paymentType === 'term') {
     if (isFirstInvoice) {
-      periodStart = new Date(registrationCreatedAt);
+      periodStart = new Date(reference.getFullYear(), reference.getMonth(), 1);
       periodEnd = new Date(periodStart);
       periodEnd.setMonth(periodEnd.getMonth() + 3);
       periodEnd.setDate(periodEnd.getDate() - 1);

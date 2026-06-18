@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { generateQuotePDF } from "@/lib/pdfGenerator";
 import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
-import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchStudentCreditBalance, fetchInvoicePayments, filterInvoicesUpToCurrentMonth, isInvoiceNotDue, resolveInvoiceAfterGeneration, previewFutureInvoices, voidFutureInvoices, fetchStudentInvoiceForPreview, type FutureInvoicePreviewRow, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
+import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, findInvoiceForCalendarMonth, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchInvoicePayments, filterInvoicesUpToCurrentMonth, filterPastInvoicesForHistory, isInvoiceNotDue, resolveInvoiceAfterGeneration, previewFutureInvoices, voidFutureInvoices, fetchStudentInvoiceForPreview, getLatestBillableInvoiceForStudent, canSendInvoiceEmail, studentNeedsCurrentMonthInvoice, type FutureInvoicePreviewRow, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
 import LearningModeDebugTest from './LearningModeDebugTest';
 import FeeDebug from './FeeDebug';
@@ -212,10 +212,8 @@ const AdminPanel = () => {
   const [paymentDialogStudent, setPaymentDialogStudent] = useState<any>(null);
   const [showRecordPaymentDialog, setShowRecordPaymentDialog] = useState(false);
   const [historyInvoicePayments, setHistoryInvoicePayments] = useState<Record<string, any[]>>({});
-  const [invoiceHistoryStudentCredit, setInvoiceHistoryStudentCredit] = useState(0);
-  const [studentCreditBalances, setStudentCreditBalances] = useState<Record<string, number>>({});
+  const [hiddenHistoryInvoiceCount, setHiddenHistoryInvoiceCount] = useState(0);
   const [invoiceHistory, setInvoiceHistory] = useState<any[]>([]);
-  const [hiddenFutureInvoiceCount, setHiddenFutureInvoiceCount] = useState(0);
   const [futureInvoicePreview, setFutureInvoicePreview] = useState<FutureInvoicePreviewRow[]>([]);
   const [futureInvoiceCleanupLoading, setFutureInvoiceCleanupLoading] = useState(false);
   const [invoiceHistoryStudent, setInvoiceHistoryStudent] = useState<any>(null);
@@ -704,25 +702,6 @@ const AdminPanel = () => {
       setFutureInvoiceCleanupLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (activeTab !== 'finances') return;
-    const ids = paginatedFinancesStudents.map((s) => s.id).filter((id) => isValidId(id));
-    if (ids.length === 0) return;
-    void (async () => {
-      const entries = await Promise.all(
-        ids.map(async (id) => {
-          try {
-            const bal = await fetchStudentCreditBalance(id);
-            return [id, bal] as const;
-          } catch {
-            return [id, 0] as const;
-          }
-        })
-      );
-      setStudentCreditBalances((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
-    })();
-  }, [activeTab, financesPage, paginatedFinancesStudents]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -2515,6 +2494,22 @@ const AdminPanel = () => {
         isFirstInvoice = !!allInvs?.length && allInvs[0].id === result.invoice_id;
       }
 
+      let paymentMethod = 'cash';
+      let mpesaRef: string | undefined;
+      let paidDate: string | undefined;
+      if (result.payment_id) {
+        const { data: paymentRow } = await supabase
+          .from('invoice_payments')
+          .select('payment_method, mpesa_transaction_id, paid_date')
+          .eq('id', result.payment_id)
+          .maybeSingle();
+        if (paymentRow) {
+          paymentMethod = paymentRow.payment_method || 'cash';
+          mpesaRef = paymentRow.mpesa_transaction_id || undefined;
+          paidDate = paymentRow.paid_date || undefined;
+        }
+      }
+
       if (studentRow?.registration_id) {
         const { data: registration } = await supabase
           .from('registrations')
@@ -2525,6 +2520,10 @@ const AdminPanel = () => {
         if (registration) {
           const periodLabel = invoiceData?.period_start && invoiceData?.period_end
             ? `${invoiceData.period_start} – ${invoiceData.period_end}`
+            : undefined;
+
+          const paidInvoiceContext = invoiceData && studentRow
+            ? { invoice: invoiceData, student: studentRow, isFirstInvoice }
             : undefined;
 
           if (result.became_paid) {
@@ -2543,13 +2542,26 @@ const AdminPanel = () => {
                 /* optional */
               }
             }
-            await sendPaymentConfirmationEmail(registration, tempPassword, isFirstInvoice);
+            await sendPaymentConfirmationEmail(
+              registration,
+              tempPassword,
+              isFirstInvoice,
+              paidInvoiceContext
+            );
           } else if (result.applied_to_invoice > 0) {
             await sendPartialPaymentConfirmationEmail(
               registration,
               result.applied_to_invoice,
               result.balance_remaining,
-              periodLabel
+              periodLabel,
+              paidInvoiceContext
+                ? {
+                    ...paidInvoiceContext,
+                    paymentMethod,
+                    mpesaRef,
+                    paidDate,
+                  }
+                : undefined
             );
           }
         }
@@ -2559,20 +2571,7 @@ const AdminPanel = () => {
         `KES ${result.applied_to_invoice.toLocaleString()} applied`,
         result.balance_remaining > 0 ? `Balance: KES ${result.balance_remaining.toLocaleString()}` : 'Invoice fully paid',
       ];
-      if (result.overpayment_credit > 0) {
-        parts.push(`KES ${result.overpayment_credit.toLocaleString()} added to account credit`);
-      }
       toast({ title: 'Payment recorded', description: parts.join(' · ') });
-
-      if (result.student_id) {
-        try {
-          const bal = await fetchStudentCreditBalance(result.student_id);
-          setStudentCreditBalances((prev) => ({ ...prev, [result.student_id]: bal }));
-          setInvoiceHistoryStudentCredit(bal);
-        } catch {
-          /* optional */
-        }
-      }
 
       await refreshStudentInvoices();
       if (invoiceHistoryStudent) {
@@ -2769,11 +2768,10 @@ const AdminPanel = () => {
   // 2. Current finance period (local calendar month)
   const getCurrentPeriod = () => getCalendarMonthPeriod();
 
-  // 3. Students still needing an invoice for this month (no current-period or open invoice)
+  // 3. Students still needing an invoice for the current calendar month
   useEffect(() => {
-    const period = getCalendarMonthPeriod();
     const needing = activeStudents
-      .filter((student) => !resolveFinanceInvoiceForStudent(allStudentInvoices, student.id, period).invoice)
+      .filter((student) => studentNeedsCurrentMonthInvoice(allStudentInvoices, student.id))
       .map((s) => s.id);
     setStudentsNeedingInvoice(needing);
   }, [activeStudents, allStudentInvoices]);
@@ -2787,24 +2785,61 @@ const AdminPanel = () => {
       return;
     }
 
+    if (!canSendInvoiceEmail(allStudentInvoices, student.id)) {
+      toast({
+        title: 'Already paid',
+        description: 'This student has paid for the current billing month. Send Invoice is not available until the next period.',
+      });
+      return;
+    }
+
     setSendingInvoiceIds(ids => [...ids, student.id]);
     try {
       let invoiceToSend: any = null;
       let isFirstInvoice = false;
 
+      const billableForStudent = filterInvoicesUpToCurrentMonth(allStudentInvoices).filter(
+        (row) => row.student_id === student.id
+      );
+      const currentMonthInvoice = findInvoiceForCalendarMonth(billableForStudent, student.id);
+      const latestInvoice = getLatestBillableInvoiceForStudent(allStudentInvoices, student.id);
+
       if (existingInvoice) {
-        // Send existing invoice only (no create)
+        if (isInvoiceFullyPaid(existingInvoice)) {
+          toast({
+            title: 'Already paid',
+            description: 'This invoice is fully paid. Nothing to send.',
+          });
+          return;
+        }
         invoiceToSend = existingInvoice;
-        const { data: allStudentInvoices } = await supabase
+        const { data: allStudentInvoicesRows } = await supabase
           .from('invoices')
           .select('id')
           .eq('student_id', student.id)
           .order('period_start', { ascending: true });
-        isFirstInvoice = !!allStudentInvoices?.length && allStudentInvoices[0].id === existingInvoice.id;
+        isFirstInvoice =
+          !!allStudentInvoicesRows?.length && allStudentInvoicesRows[0].id === existingInvoice.id;
+      } else if (currentMonthInvoice && !isInvoiceFullyPaid(currentMonthInvoice)) {
+        invoiceToSend = currentMonthInvoice;
+        const { data: earlier } = await supabase
+          .from('invoices')
+          .select('id')
+          .eq('student_id', student.id)
+          .lt('period_start', currentMonthInvoice.period_start)
+          .limit(1);
+        isFirstInvoice = !earlier?.length;
+      } else if (latestInvoice && !isInvoiceFullyPaid(latestInvoice)) {
+        invoiceToSend = latestInvoice;
+        const { data: earlier } = await supabase
+          .from('invoices')
+          .select('id')
+          .eq('student_id', student.id)
+          .lt('period_start', latestInvoice.period_start)
+          .limit(1);
+        isFirstInvoice = !earlier?.length;
       } else {
-        console.log('Send Invoice: student object', student);
         let regId = student.registration_id;
-        let reg = null;
 
         if (!regId || regId === 'undefined' || regId === undefined || regId === null) {
           const { data, error } = await supabase
@@ -2815,31 +2850,34 @@ const AdminPanel = () => {
             .eq('status', 'approved')
             .single();
           if (error || !data) {
-            toast({ title: 'Error', description: 'Could not find registration for student. ' + (error?.message || ''), variant: 'destructive' });
-            setSendingInvoiceIds(ids => ids.filter(id => id !== student.id));
+            toast({
+              title: 'Error',
+              description: 'Could not find registration for student. ' + (error?.message || ''),
+              variant: 'destructive',
+            });
             return;
           }
-          reg = data;
           regId = data.id;
         }
 
-        if (!regId || regId === 'undefined' || regId === undefined || regId === null) {
-          toast({ title: 'Error', description: 'Student is missing registration_id or it is invalid. Cannot send invoice.', variant: 'destructive' });
-          setSendingInvoiceIds(ids => ids.filter(id => id !== student.id));
+        if (!regId) {
+          toast({
+            title: 'Error',
+            description: 'Student is missing registration_id. Cannot create invoice.',
+            variant: 'destructive',
+          });
           return;
         }
 
-        const { generateInvoiceForRegistration } = await import('@/lib/invoiceUtils');
         const result = await generateInvoiceForRegistration(regId);
+        if (isInvoiceNotDue(result)) {
+          toast({ title: 'Invoice not due yet', description: result.message });
+          return;
+        }
         const resolved = await resolveInvoiceAfterGeneration(student.id, result);
         if (resolved.invoice) {
           invoiceToSend = resolved.invoice;
           isFirstInvoice = resolved.isFirstInvoice;
-          if (resolved.notice && !isInvoiceNotDue(result)) {
-            toast({ title: 'Using current invoice', description: resolved.notice });
-          }
-        } else if (isInvoiceNotDue(result)) {
-          toast({ title: 'Invoice not due yet', description: result.message });
         }
       }
 
@@ -2948,15 +2986,9 @@ const AdminPanel = () => {
       .eq('student_id', studentId)
       .order('period_start', { ascending: false });
     if (!error && data) {
-      const billable = filterInvoicesUpToCurrentMonth(data);
-      setInvoiceHistory(billable);
-      setHiddenFutureInvoiceCount(data.length - billable.length);
-    }
-    try {
-      const credit = await fetchStudentCreditBalance(studentId);
-      setInvoiceHistoryStudentCredit(credit);
-    } catch {
-      setInvoiceHistoryStudentCredit(0);
+      const past = filterPastInvoicesForHistory(data);
+      setInvoiceHistory(past);
+      setHiddenHistoryInvoiceCount(data.length - past.length);
     }
   };
 
@@ -2965,7 +2997,7 @@ const AdminPanel = () => {
     setInvoiceHistoryStudent(student);
     setSelectedHistoryInvoice(null);
     setHistoryInvoicePayments({});
-    setHiddenFutureInvoiceCount(0);
+    setHiddenHistoryInvoiceCount(0);
     await fetchInvoiceHistory(student.id);
     setShowInvoiceHistoryModal(true);
   };
@@ -5691,7 +5723,6 @@ const AdminPanel = () => {
                         <th>Due</th>
                         <th>Paid</th>
                         <th>Balance</th>
-                        <th>Credit</th>
                         <th>Due Date</th>
                         <th>Actions</th>
                       </tr>
@@ -5704,6 +5735,7 @@ const AdminPanel = () => {
                           student.id,
                           period
                         );
+                        const sendAllowed = canSendInvoiceEmail(allStudentInvoices, student.id);
                         return (
                           <tr key={student.id}>
                             <td>
@@ -5770,15 +5802,6 @@ const AdminPanel = () => {
                                 </span>
                               ) : '-'}
                             </td>
-                            <td>
-                              {(studentCreditBalances[student.id] ?? 0) > 0 ? (
-                                <span className="text-blue-700 font-medium">
-                                  KES {(studentCreditBalances[student.id] ?? 0).toLocaleString()}
-                                </span>
-                              ) : (
-                                '-'
-                              )}
-                            </td>
                             <td>{inv ? inv.due_date : '-'}</td>
                             <td className="flex gap-2">
                               {!inv ? (
@@ -5786,7 +5809,7 @@ const AdminPanel = () => {
                                   <Button size="sm" variant="outline" disabled={!!previewInvoiceLoading} onClick={() => handlePreviewInvoice(student)}>
                                     {previewInvoiceLoading === student.id ? 'Opening...' : 'Preview'}
                                   </Button>
-                                  <Button size="sm" variant="default" disabled={sendingInvoiceIds.includes(student.id)} onClick={() => handleSendInvoice(student)}>
+                                  <Button size="sm" variant="default" disabled={!sendAllowed || sendingInvoiceIds.includes(student.id)} onClick={() => handleSendInvoice(student)}>
                                     {sendingInvoiceIds.includes(student.id) ? 'Sending...' : 'Send Invoice'}
                                   </Button>
                                 </>
@@ -5794,7 +5817,7 @@ const AdminPanel = () => {
                                 <>
                                 <Button size="sm" variant="outline" onClick={() => handleViewInvoice(inv)}>View</Button>
                                 <Button size="sm" variant="outline" disabled={!!previewInvoiceLoading} onClick={() => handlePreviewInvoice(student, inv)}>Preview</Button>
-                                  {!inv.pdf_url && (
+                                  {!isInvoiceFullyPaid(inv) && sendAllowed && (
                                     <Button size="sm" variant="default" disabled={sendingInvoiceIds.includes(student.id)} onClick={() => handleSendInvoice(student, inv)}>
                                       {sendingInvoiceIds.includes(student.id) ? 'Sending...' : 'Send Invoice'}
                                     </Button>
@@ -5948,15 +5971,10 @@ const AdminPanel = () => {
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Invoice History for {invoiceHistoryStudent?.student_name}</DialogTitle>
-              {invoiceHistoryStudentCredit > 0 && (
-                <p className="text-sm text-blue-700">
-                  Account credit: KES {invoiceHistoryStudentCredit.toLocaleString()}
-                </p>
-              )}
-              {hiddenFutureInvoiceCount > 0 && (
-                <p className="text-sm text-amber-700">
-                  {hiddenFutureInvoiceCount} future-month invoice{hiddenFutureInvoiceCount === 1 ? '' : 's'} hidden
-                  (billing only runs through the current month).
+              {hiddenHistoryInvoiceCount > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {hiddenHistoryInvoiceCount} invoice{hiddenHistoryInvoiceCount === 1 ? '' : 's'} not shown
+                  (current month and future billing appear on Finances).
                 </p>
               )}
             </DialogHeader>
@@ -6051,7 +6069,6 @@ const AdminPanel = () => {
                         {historyInvoicePayments[selectedHistoryInvoice.id].map((p: any) => (
                           <li key={p.id} className="border-b border-gray-200 pb-1">
                             KES {(p.amount ?? 0).toLocaleString()}
-                            {p.credit_amount > 0 && ` (${Number(p.credit_amount).toLocaleString()} from credit)`}
                             {' · '}{p.payment_method || 'cash'}
                             {p.paid_date && ` · ${p.paid_date}`}
                             {p.mpesa_transaction_id && ` · Ref: ${p.mpesa_transaction_id}`}

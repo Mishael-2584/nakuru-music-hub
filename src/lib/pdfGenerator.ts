@@ -188,8 +188,15 @@ export const generateQuotePDF = async (
       </div>
       <div style="text-align: right;">
         <div style="font-size: 28px; font-weight: bold; color: #1e40af; letter-spacing: 2px; margin-bottom: 2px;">${isQuoteOnly ? 'QUOTE' : 'INVOICE'}</div>
+        ${invoiceMeta?.paymentStatus === 'PAID' ? `
+        <div style="display: inline-block; margin-bottom: 6px; padding: 6px 16px; background: #dcfce7; color: #166534; border: 2px solid #22c55e; border-radius: 6px; font-size: 18px; font-weight: bold; letter-spacing: 3px;">PAID</div>
+        ` : invoiceMeta?.paymentStatus === 'PARTIAL' ? `
+        <div style="display: inline-block; margin-bottom: 6px; padding: 4px 12px; background: #fef3c7; color: #92400e; border: 2px solid #f59e0b; border-radius: 6px; font-size: 14px; font-weight: bold; letter-spacing: 2px;">PARTIAL PAYMENT</div>
+        ` : ''}
         <div style="font-size: 15px; color: #64748b;">${isQuoteOnly ? 'Reference:' : 'Invoice:'} <b>${isQuoteOnly ? 'Quote' : (invoiceMeta?.invoiceNumber || '-')}</b></div>
         <div style="font-size: 13px; color: #64748b;">Date: ${invoiceOrQuoteDate}</div>
+        ${invoiceMeta?.periodStart && invoiceMeta?.periodEnd ? `<div style="font-size: 13px; color: #64748b;">Period: ${invoiceMeta.periodStart} – ${invoiceMeta.periodEnd}</div>` : ''}
+        ${invoiceMeta?.dueDate ? `<div style="font-size: 13px; color: #64748b;">Due: ${invoiceMeta.dueDate}</div>` : ''}
         <div style="font-size: 13px; color: #1e293b; margin-top: 4px;">Course/Instrument: <b>${courseOrInstrument || '-'}</b></div>
       </div>
     </div>
@@ -325,4 +332,92 @@ export const generateQuotePDF = async (
     // Clean up
     document.body.removeChild(pdfContainer);
   }
-}; 
+};
+
+export interface PaymentReceiptData {
+  studentName: string;
+  studentEmail: string;
+  studentPhone?: string;
+  amountPaid: number;
+  balanceRemaining: number;
+  invoiceNumber: string;
+  invoicePeriod: string;
+  paymentMethod: string;
+  paidDate: string;
+  mpesaRef?: string;
+}
+
+export const generatePaymentReceiptPDF = async (receipt: PaymentReceiptData): Promise<Blob> => {
+  const pdfContainer = document.createElement('div');
+  pdfContainer.style.width = '800px';
+  pdfContainer.style.padding = '40px';
+  pdfContainer.style.backgroundColor = '#ffffff';
+  pdfContainer.style.fontFamily = 'Arial, sans-serif';
+  pdfContainer.style.position = 'absolute';
+  pdfContainer.style.left = '-9999px';
+  pdfContainer.style.top = '0';
+
+  const formatKes = (n: number) =>
+    new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(n);
+
+  pdfContainer.innerHTML = `
+  <div style="max-width: 794px; margin: 0 auto; background: #fff; font-family: 'Arial', sans-serif; border: 1px solid #e5e7eb; border-radius: 10px; padding: 0 0 24px 0;">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 24px 32px 8px 32px; border-bottom: 2px solid #e5e7eb;">
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <div style="height: 70px; width: 70px; display: flex; align-items: center; justify-content: center; background: #fff; border-radius: 50%; border: 3px solid #1e40af;">
+          <img src="/damon-logo.png" alt="Logo" style="height: 54px; width: 54px; object-fit: contain; border-radius: 50%;" />
+        </div>
+        <div>
+          <div style="font-size: 22px; font-weight: bold; color: #1e293b;">Damon Music Academy</div>
+          <div style="font-size: 12px; color: #475569;">0701 195 460 | info@damonmusicacademy.co.ke</div>
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <div style="font-size: 28px; font-weight: bold; color: #16a34a; letter-spacing: 2px;">RECEIPT</div>
+        <div style="font-size: 13px; color: #64748b;">Date: ${receipt.paidDate}</div>
+      </div>
+    </div>
+    <div style="padding: 24px 32px;">
+      <div style="margin-bottom: 20px; font-size: 13px;">
+        <div style="font-weight: bold; margin-bottom: 4px;">Received from:</div>
+        <div>${receipt.studentName}</div>
+        <div>${receipt.studentEmail}</div>
+        ${receipt.studentPhone ? `<div>${receipt.studentPhone}</div>` : ''}
+      </div>
+      <div style="background: #f0fdf4; border: 2px solid #22c55e; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+        <div style="font-size: 14px; color: #166534; margin-bottom: 8px;">Payment received</div>
+        <div style="font-size: 32px; font-weight: bold; color: #15803d;">${formatKes(receipt.amountPaid)}</div>
+      </div>
+      <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+        <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #64748b;">Invoice</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600;">${receipt.invoiceNumber}</td></tr>
+        <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #64748b;">Billing period</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">${receipt.invoicePeriod}</td></tr>
+        <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #64748b;">Payment method</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">${receipt.paymentMethod}</td></tr>
+        ${receipt.mpesaRef ? `<tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #64748b;">M-Pesa reference</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">${receipt.mpesaRef}</td></tr>` : ''}
+        <tr><td style="padding: 8px 0; color: #64748b;">Balance remaining on invoice</td><td style="padding: 8px 0; text-align: right; font-weight: 600; color: ${receipt.balanceRemaining > 0 ? '#b45309' : '#15803d'};">${formatKes(receipt.balanceRemaining)}</td></tr>
+      </table>
+      <div style="margin-top: 24px; font-size: 11px; color: #64748b; text-align: center;">
+        Thank you for your payment. For queries contact 0701 195 460 or info@damonmusicacademy.co.ke
+      </div>
+    </div>
+  </div>
+  `;
+
+  document.body.appendChild(pdfContainer);
+  try {
+    const canvas = await html2canvas(pdfContainer, {
+      scale: 1.25,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+    });
+    const imgData = canvas.toDataURL('image/jpeg', 0.88);
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const imgWidth = 210;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+    return pdf.output('blob');
+  } finally {
+    document.body.removeChild(pdfContainer);
+  }
+};
