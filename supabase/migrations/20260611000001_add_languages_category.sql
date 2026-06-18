@@ -9,17 +9,28 @@ ALTER TABLE public.students
 COMMENT ON COLUMN public.registrations.language_type IS 'Language studied when course_category is Languages (e.g. English, Kiswahili)';
 COMMENT ON COLUMN public.students.language_type IS 'Language studied when course_category is Languages';
 
+-- Ensure fees columns exist (prod schema uses payment_frequency, not billing_period)
+ALTER TABLE public.fees
+  ADD COLUMN IF NOT EXISTS level text DEFAULT 'All Levels',
+  ADD COLUMN IF NOT EXISTS payment_frequency text DEFAULT 'monthly',
+  ADD COLUMN IF NOT EXISTS mode TEXT,
+  ADD COLUMN IF NOT EXISTS sessions_per_week INTEGER DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS hours_per_session DECIMAL(3,1) DEFAULT 1.0,
+  ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'KSh',
+  ADD COLUMN IF NOT EXISTS payment_type TEXT DEFAULT 'per_class';
+
 -- Per-session language fees (KES 1,500 / session)
+-- Column list matches 20250122000000_add_technology_courses.sql (payment_frequency, not billing_period).
 INSERT INTO public.fees (
   course_type, course_name, price, duration, description, level,
-  payment_type, mode, sessions_per_week, hours_per_session, currency, billing_period, is_active
+  payment_frequency, mode, sessions_per_week, hours_per_session, currency, payment_type, is_active
 )
 SELECT v.course_type, v.course_name, v.price, v.duration, v.description, v.level,
-       v.payment_type, v.mode, v.sessions_per_week, v.hours_per_session, v.currency, v.billing_period, v.is_active
+       v.payment_frequency, v.mode, v.sessions_per_week, v.hours_per_session, v.currency, v.payment_type, v.is_active
 FROM (VALUES
   ('languages', 'Language Lessons', 1500.00, '1 hour', '1-on-1 language class at the academy', 'All Levels', 'per_class', 'At the Academy', 1, 1.0, 'KSh', 'per_class', true),
   ('languages', 'Language Lessons', 1500.00, '1 hour', '1-on-1 language class online', 'All Levels', 'per_class', 'Online (Global)', 1, 1.0, 'KSh', 'per_class', true)
-) AS v(course_type, course_name, price, duration, description, level, payment_type, mode, sessions_per_week, hours_per_session, currency, billing_period, is_active)
+) AS v(course_type, course_name, price, duration, description, level, payment_frequency, mode, sessions_per_week, hours_per_session, currency, payment_type, is_active)
 WHERE NOT EXISTS (
   SELECT 1 FROM public.fees f
   WHERE f.course_type = v.course_type
