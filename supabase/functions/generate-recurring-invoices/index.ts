@@ -167,7 +167,84 @@ function addMonths(date, months) {
 }
 
 function formatDate(date) {
-  return date.toISOString().slice(0, 10);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function parseLocalDateString(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function getYearMonthKey(d) {
+  const date = typeof d === 'string' ? parseLocalDateString(d) : d;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function isFutureBillingPeriod(periodStart, reference = new Date()) {
+  return getYearMonthKey(periodStart) > getYearMonthKey(reference);
+}
+
+function filterInvoicesUpToCurrentMonth(invoices, reference = new Date()) {
+  return (invoices || []).filter((inv) => !isFutureBillingPeriod(inv.period_start, reference));
+}
+
+function getLatestInvoiceByPeriodEnd(invoices) {
+  return [...(invoices || [])].sort(
+    (a, b) => parseLocalDateString(b.period_end).getTime() - parseLocalDateString(a.period_end).getTime()
+  )[0];
+}
+
+function computeNextBillingPeriod({
+  paymentType,
+  isFirstInvoice,
+  registrationCreatedAt,
+  lastPeriodEnd,
+  reference = new Date(),
+}) {
+  let periodStart;
+  let periodEnd;
+
+  if (paymentType === 'monthly' || paymentType === 'per_class') {
+    if (isFirstInvoice) {
+      periodStart = new Date(reference.getFullYear(), reference.getMonth(), 1);
+      periodEnd = new Date(reference.getFullYear(), reference.getMonth() + 1, 0);
+    } else {
+      if (!lastPeriodEnd) return null;
+      const lastEnd = parseLocalDateString(lastPeriodEnd);
+      periodStart = new Date(lastEnd.getFullYear(), lastEnd.getMonth() + 1, 1);
+      periodEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0);
+    }
+  } else if (paymentType === 'term') {
+    if (isFirstInvoice) {
+      periodStart = new Date(registrationCreatedAt);
+      periodEnd = new Date(periodStart);
+      periodEnd.setMonth(periodEnd.getMonth() + 3);
+      periodEnd.setDate(periodEnd.getDate() - 1);
+    } else {
+      if (!lastPeriodEnd) return null;
+      const lastEnd = parseLocalDateString(lastPeriodEnd);
+      periodStart = new Date(lastEnd);
+      periodStart.setDate(periodStart.getDate() + 1);
+      periodEnd = new Date(periodStart);
+      periodEnd.setMonth(periodEnd.getMonth() + 3);
+      periodEnd.setDate(periodEnd.getDate() - 1);
+    }
+  } else {
+    return null;
+  }
+
+  const periodStartStr = formatDate(periodStart);
+  if (isFutureBillingPeriod(periodStartStr, reference)) {
+    return null;
+  }
+
+  return {
+    periodStart: new Date(periodStart),
+    periodEnd: new Date(periodEnd),
+  };
 }
 
 // Improved fee lookup function with fallbacks and real-time rates
@@ -599,75 +676,33 @@ async function generateInvoicesForRegistration(registration, fee, student, summa
   const { data: existingInvoices, error: existingInvoicesError } = await supabase
     .from('invoices')
     .select('*')
-    .eq('student_id', student.id)
-    .order('created_at', { ascending: true });
+    .eq('student_id', student.id);
   
   if (existingInvoicesError) throw existingInvoicesError;
   
-  const isFirstInvoice = !existingInvoices || existingInvoices.length === 0;
   const now = new Date();
-  let periods: Array<{ periodStart: Date; periodEnd: Date; dueDate: Date }> = [];
+  const billableExistingInvoices = filterInvoicesUpToCurrentMonth(existingInvoices, now);
+  const isFirstInvoice = billableExistingInvoices.length === 0;
+  const latestInvoice = getLatestInvoiceByPeriodEnd(billableExistingInvoices);
+  let periods = [];
 
-  if (fee.payment_type === 'monthly' || fee.payment_type === 'per_class') {
-    if (isFirstInvoice) {
-      // First invoice: Current month (regardless of start date) until 30th
-      const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
-      periods.push({
-        periodStart: new Date(periodStart),
-        periodEnd: new Date(periodEnd),
-        dueDate: new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate()) // First invoice: Due on last day of enrollment month
-      });
-    } else {
-      // Subsequent invoices: Generate for next month billing period
-      const lastInvoice = existingInvoices[existingInvoices.length - 1];
-      const lastPeriodEnd = new Date(lastInvoice.period_end);
-      
-      // Next billing period starts the month after the last invoice
-      const periodStart = new Date(lastPeriodEnd.getFullYear(), lastPeriodEnd.getMonth() + 1, 1);
-      const periodEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0);
-      
-      periods.push({
-        periodStart: new Date(periodStart),
-        periodEnd: new Date(periodEnd),
-        dueDate: new Date(Date.UTC(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 6, 21, 0, 0, 0)) // 7th of next month at midnight GMT+3
-      });
-    }
-  } else if (fee.payment_type === 'term') {
-    if (isFirstInvoice) {
-      // First term: From registration date to 3 months later
-      const periodStart = new Date(registration.created_at);
-      const periodEnd = new Date(periodStart);
-      periodEnd.setMonth(periodEnd.getMonth() + 3);
-      periodEnd.setDate(periodEnd.getDate() - 1);
-      periods.push({
-        periodStart: new Date(periodStart),
-        periodEnd: new Date(periodEnd),
-        dueDate: new Date(periodEnd) // Due at end of term
-      });
-    } else {
-      // Subsequent terms: Generate for any missing terms up to current date
-      const lastInvoice = existingInvoices[existingInvoices.length - 1];
-      const lastPeriodEnd = new Date(lastInvoice.period_end);
-      let periodStart = new Date(lastPeriodEnd);
-      periodStart.setDate(periodStart.getDate() + 1);
-      
-      while (periodStart <= now) {
-        const periodEnd = new Date(periodStart);
-        periodEnd.setMonth(periodEnd.getMonth() + 3);
-        periodEnd.setDate(periodEnd.getDate() - 1);
-        periods.push({
-          periodStart: new Date(periodStart),
-          periodEnd: new Date(periodEnd),
-          dueDate: new Date(periodEnd) // Due at end of term
-        });
-        // Next term
-        periodStart = new Date(periodEnd);
-        periodStart.setDate(periodStart.getDate() + 1);
-      }
-    }
-  } else {
-    throw new Error('Unsupported payment type');
+  const nextPeriod = computeNextBillingPeriod({
+    paymentType: fee.payment_type,
+    isFirstInvoice,
+    registrationCreatedAt: registration.created_at,
+    lastPeriodEnd: latestInvoice?.period_end ?? null,
+    reference: now,
+  });
+
+  if (nextPeriod) {
+    const dueDate = isFirstInvoice
+      ? new Date(nextPeriod.periodEnd.getFullYear(), nextPeriod.periodEnd.getMonth(), nextPeriod.periodEnd.getDate())
+      : new Date(Date.UTC(nextPeriod.periodEnd.getFullYear(), nextPeriod.periodEnd.getMonth() + 1, 6, 21, 0, 0, 0));
+    periods.push({
+      periodStart: nextPeriod.periodStart,
+      periodEnd: nextPeriod.periodEnd,
+      dueDate,
+    });
   }
 
   for (const period of periods) {
@@ -699,6 +734,11 @@ async function generateInvoicesForRegistration(registration, fee, student, summa
     // Check if it's time to create a new invoice based on timing rules
     const shouldCreateInvoice = shouldCreateNewInvoice(period, now, isFirstInvoice);
     if (!shouldCreateInvoice) {
+      summary.skipped++;
+      continue;
+    }
+
+    if (isFutureBillingPeriod(periodStartStr, now)) {
       summary.skipped++;
       continue;
     }

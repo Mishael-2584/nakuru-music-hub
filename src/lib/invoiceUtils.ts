@@ -48,6 +48,305 @@ export function getCalendarMonthPeriod(reference = new Date()): { start: string;
   return { start: toLocalDateString(start), end: toLocalDateString(end) };
 }
 
+/** Parse YYYY-MM-DD as local calendar date (avoids UTC shift from `new Date('YYYY-MM-DD')`). */
+export function parseLocalDateString(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** Year-month key for billing comparisons (YYYY-MM). */
+export function getYearMonthKey(d: Date | string): string {
+  const date = typeof d === 'string' ? parseLocalDateString(d) : d;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * True when an invoice period starts after the reference calendar month.
+ * Invoices should never be generated or shown as active billing beyond the current month.
+ */
+export function isFutureBillingPeriod(periodStart: string, reference = new Date()): boolean {
+  return getYearMonthKey(periodStart) > getYearMonthKey(reference);
+}
+
+export type BillingPaymentType = 'monthly' | 'per_class' | 'term';
+
+/** Sort invoices with the latest billing period first. */
+export function sortInvoicesByPeriodEndDesc<T extends { period_end: string }>(invoices: T[]): T[] {
+  return [...invoices].sort(
+    (a, b) => parseLocalDateString(b.period_end).getTime() - parseLocalDateString(a.period_end).getTime()
+  );
+}
+
+export function getLatestInvoiceByPeriodEnd<T extends { period_end: string }>(
+  invoices: T[]
+): T | undefined {
+  return sortInvoicesByPeriodEndDesc(invoices)[0];
+}
+
+/** Hide mistakenly generated future-month invoices from student/admin lists. */
+export function filterInvoicesUpToCurrentMonth<T extends { period_start: string }>(
+  invoices: T[],
+  reference = new Date()
+): T[] {
+  return invoices.filter((inv) => !isFutureBillingPeriod(inv.period_start, reference));
+}
+
+export function computeNextBillingPeriod(params: {
+  paymentType: BillingPaymentType;
+  isFirstInvoice: boolean;
+  registrationCreatedAt: string;
+  lastPeriodEnd?: string | null;
+  reference?: Date;
+}): { periodStart: Date; periodEnd: Date } | null {
+  const now = params.reference ?? new Date();
+  const { paymentType, isFirstInvoice, registrationCreatedAt, lastPeriodEnd } = params;
+
+  let periodStart: Date;
+  let periodEnd: Date;
+
+  if (paymentType === 'monthly' || paymentType === 'per_class') {
+    if (isFirstInvoice) {
+      periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    } else {
+      if (!lastPeriodEnd) return null;
+      const lastEnd = parseLocalDateString(lastPeriodEnd);
+      periodStart = new Date(lastEnd.getFullYear(), lastEnd.getMonth() + 1, 1);
+      periodEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0);
+    }
+  } else if (paymentType === 'term') {
+    if (isFirstInvoice) {
+      periodStart = new Date(registrationCreatedAt);
+      periodEnd = new Date(periodStart);
+      periodEnd.setMonth(periodEnd.getMonth() + 3);
+      periodEnd.setDate(periodEnd.getDate() - 1);
+    } else {
+      if (!lastPeriodEnd) return null;
+      const lastEnd = parseLocalDateString(lastPeriodEnd);
+      periodStart = new Date(lastEnd);
+      periodStart.setDate(periodStart.getDate() + 1);
+      periodEnd = new Date(periodStart);
+      periodEnd.setMonth(periodEnd.getMonth() + 3);
+      periodEnd.setDate(periodEnd.getDate() - 1);
+    }
+  } else {
+    return null;
+  }
+
+  if (isFutureBillingPeriod(toLocalDateString(periodStart), now)) {
+    return null;
+  }
+
+  return { periodStart, periodEnd };
+}
+
+export type InvoiceGenerationResult =
+  | Invoice
+  | { existing: Invoice }
+  | { notDue: true; message: string };
+
+export function isInvoiceNotDue(
+  result: Invoice | { existing: Invoice } | { notDue: true; message: string } | null | undefined
+): result is { notDue: true; message: string } {
+  return !!result && typeof result === 'object' && 'notDue' in result;
+}
+
+export function extractInvoiceFromGenerationResult(
+  result: InvoiceGenerationResult | null | undefined
+): Invoice | null {
+  if (!result) return null;
+  if (isInvoiceNotDue(result)) return null;
+  if ('existing' in result) return result.existing;
+  return result;
+}
+
+/** After generation, pick the invoice to use (including current-month fallback when next period is not due). */
+export async function resolveInvoiceAfterGeneration(
+  studentId: string,
+  result: InvoiceGenerationResult | null | undefined
+): Promise<{ invoice: Invoice | null; isFirstInvoice: boolean; notice?: string }> {
+  const direct = extractInvoiceFromGenerationResult(result);
+  if (direct) {
+    const { data: earlier } = await supabase
+      .from('invoices')
+      .select('id')
+      .eq('student_id', studentId)
+      .lt('period_start', direct.period_start)
+      .limit(1);
+    return { invoice: direct, isFirstInvoice: !earlier?.length };
+  }
+
+  if (isInvoiceNotDue(result)) {
+    const period = getCalendarMonthPeriod();
+    const { data } = await supabase.from('invoices').select('*').eq('student_id', studentId);
+    const billable = filterInvoicesUpToCurrentMonth(data || []);
+    const current = findInvoiceForFinancePeriod(billable, studentId, period);
+    if (current) {
+      const { data: earlier } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('student_id', studentId)
+        .lt('period_start', current.period_start)
+        .limit(1);
+      return {
+        invoice: current as Invoice,
+        isFirstInvoice: !earlier?.length,
+        notice: result.message,
+      };
+    }
+    return { invoice: null, notice: result.message };
+  }
+
+  return { invoice: null };
+}
+
+export type FutureInvoicePreviewRow = {
+  invoice_id: string;
+  student_id: string;
+  student_name: string | null;
+  period_start: string;
+  period_end: string;
+  amount_due: number;
+  status: string;
+  payment_status: string | null;
+  has_payments: boolean;
+  can_void: boolean;
+};
+
+export type VoidFutureInvoicesResult = {
+  dry_run: boolean;
+  future_count: number;
+  voidable_count?: number;
+  voided_count?: number;
+  skipped_count: number;
+  invoices?: FutureInvoicePreviewRow[];
+};
+
+function canVoidFutureInvoice(invoice: {
+  status?: string | null;
+  payment_status?: string | null;
+  has_payments?: boolean;
+}): boolean {
+  const status = invoice.status ?? 'pending';
+  if (status === 'paid' || status === 'cancelled') return false;
+  if (invoice.payment_status === 'paid') return false;
+  if (invoice.has_payments) return false;
+  return true;
+}
+
+async function listFutureInvoicesClientSide(): Promise<FutureInvoicePreviewRow[]> {
+  const { data: invoices, error } = await supabase
+    .from('invoices')
+    .select('id, student_id, period_start, period_end, amount_due, status, payment_status, students(student_name)')
+    .order('period_start', { ascending: false });
+
+  if (error) throw error;
+
+  const future = (invoices || []).filter(
+    (inv) => isFutureBillingPeriod(inv.period_start) && inv.status !== 'cancelled'
+  );
+  if (!future.length) return [];
+
+  const invoiceIds = future.map((inv) => inv.id);
+  const { data: payments } = await supabase
+    .from('payments')
+    .select('invoice_id')
+    .in('invoice_id', invoiceIds)
+    .eq('status', 'completed');
+
+  const paidInvoiceIds = new Set((payments || []).map((payment) => payment.invoice_id));
+
+  return future.map((inv) => {
+    const hasPayments = paidInvoiceIds.has(inv.id);
+    const studentJoin = inv.students as { student_name?: string } | { student_name?: string }[] | null;
+    const studentName = Array.isArray(studentJoin)
+      ? studentJoin[0]?.student_name ?? null
+      : studentJoin?.student_name ?? null;
+
+    return {
+      invoice_id: inv.id,
+      student_id: inv.student_id,
+      student_name: studentName,
+      period_start: inv.period_start,
+      period_end: inv.period_end,
+      amount_due: Number(inv.amount_due) || 0,
+      status: inv.status ?? 'pending',
+      payment_status: inv.payment_status ?? null,
+      has_payments: hasPayments,
+      can_void: canVoidFutureInvoice({ ...inv, has_payments: hasPayments }),
+    };
+  });
+}
+
+export async function previewFutureInvoices(): Promise<FutureInvoicePreviewRow[]> {
+  const { data, error } = await supabase.rpc('preview_future_invoices');
+  if (!error && data) {
+    return data as FutureInvoicePreviewRow[];
+  }
+
+  if (error?.message?.includes('preview_future_invoices')) {
+    return listFutureInvoicesClientSide();
+  }
+
+  throw error;
+}
+
+export async function voidFutureInvoices(options?: {
+  dryRun?: boolean;
+}): Promise<VoidFutureInvoicesResult> {
+  const dryRun = options?.dryRun ?? true;
+  const { data, error } = await supabase.rpc('void_future_invoices', { p_dry_run: dryRun });
+
+  if (!error && data) {
+    return data as VoidFutureInvoicesResult;
+  }
+
+  if (!error?.message?.includes('void_future_invoices')) {
+    throw error;
+  }
+
+  const invoices = await listFutureInvoicesClientSide();
+  const voidable = invoices.filter((row) => row.can_void);
+  const skippedCount = invoices.length - voidable.length;
+
+  if (dryRun) {
+    return {
+      dry_run: true,
+      future_count: invoices.length,
+      voidable_count: voidable.length,
+      skipped_count: skippedCount,
+      invoices,
+    };
+  }
+
+  const stamp = `[Voided: future billing period removed on ${toLocalDateString(new Date())}]`;
+  let voidedCount = 0;
+
+  for (const row of voidable) {
+    const { data: current, error: fetchError } = await supabase
+      .from('invoices')
+      .select('notes')
+      .eq('id', row.invoice_id)
+      .single();
+    if (fetchError) throw fetchError;
+
+    const notes = current?.notes ? `${current.notes} ${stamp}` : stamp;
+    const { error: updateError } = await supabase
+      .from('invoices')
+      .update({ status: 'cancelled', notes, updated_at: new Date().toISOString() })
+      .eq('id', row.invoice_id);
+    if (updateError) throw updateError;
+    voidedCount++;
+  }
+
+  return {
+    dry_run: false,
+    future_count: invoices.length,
+    voided_count: voidedCount,
+    skipped_count: skippedCount,
+  };
+}
+
 export function invoiceMatchesFinancePeriod(
   invoice: { period_start?: string | null; period_end?: string | null },
   period: { start: string; end: string }
@@ -81,8 +380,16 @@ export function resolveFinanceInvoiceForStudent<
   if (current) return { invoice: current, isCurrentPeriod: true };
 
   const open = invoices
-    .filter((inv) => inv.student_id === studentId && hasOutstandingBalance(inv))
-    .sort((a, b) => new Date(b.period_start).getTime() - new Date(a.period_start).getTime())[0];
+    .filter(
+      (inv) =>
+        inv.student_id === studentId &&
+        hasOutstandingBalance(inv) &&
+        !isFutureBillingPeriod(inv.period_start)
+    )
+    .sort(
+      (a, b) =>
+        parseLocalDateString(b.period_start).getTime() - parseLocalDateString(a.period_start).getTime()
+    )[0];
 
   if (open) return { invoice: open, isCurrentPeriod: false };
   return { invoice: undefined, isCurrentPeriod: false };
@@ -764,7 +1071,9 @@ const isValidId = (id: any) => id && id !== 'undefined' && id !== undefined && i
  * @param registrationId - The registration UUID
  * @returns The created Invoice object
  */
-export async function generateInvoiceForRegistration(registrationId: string): Promise<Invoice | null | { existing: Invoice }> {
+export async function generateInvoiceForRegistration(
+  registrationId: string
+): Promise<InvoiceGenerationResult | null> {
   // Defensive check for registration ID
   if (!isValidId(registrationId)) {
     console.error('Invalid registration ID for invoice generation:', registrationId);
@@ -1176,66 +1485,58 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     console.log('Home lesson duration pricing applied:', { home_lesson_duration: homeDuration, price: fee.price });
   }
 
-  // Determine billing period
   const now = new Date();
-  let periodStart: Date, periodEnd: Date;
-  
-  // Check if this is the first invoice for this student
+
   const { data: existingInvoices, error: existingInvoicesError } = await supabase
     .from('invoices')
     .select('*')
-    .eq('student_id', student.id)
-    .order('created_at', { ascending: true });
-  
+    .eq('student_id', student.id);
+
   if (existingInvoicesError) {
     console.error('Error checking existing invoices:', existingInvoicesError);
     throw existingInvoicesError;
   }
-  
-  const isFirstInvoice = !existingInvoices || existingInvoices.length === 0;
-  
+
+  const billableExistingInvoices = filterInvoicesUpToCurrentMonth(existingInvoices || [], now);
+  const isFirstInvoice = billableExistingInvoices.length === 0;
+  const latestInvoice = getLatestInvoiceByPeriodEnd(billableExistingInvoices);
+  const paymentType = fee.payment_type as BillingPaymentType;
+
   console.log('📅 Billing period calculation:', {
     isFirstInvoice,
     existingInvoicesCount: existingInvoices?.length || 0,
-    currentDate: now.toISOString().slice(0, 10),
-    paymentType: fee.payment_type
+    billableInvoicesCount: billableExistingInvoices.length,
+    latestPeriodEnd: latestInvoice?.period_end ?? null,
+    currentDate: toLocalDateString(now),
+    paymentType,
   });
-  
-  if (fee.payment_type === 'monthly' || fee.payment_type === 'per_class') {
-    if (isFirstInvoice) {
-      // First invoice: Full current month (1st to last day of enrollment month)
-      periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
-    } else {
-      // Subsequent invoices: Next month billing period
-      const lastInvoice = existingInvoices[existingInvoices.length - 1];
-      const lastPeriodEnd = new Date(lastInvoice.period_end);
-      
-      // Next billing period starts the month after the last invoice
-      periodStart = new Date(lastPeriodEnd.getFullYear(), lastPeriodEnd.getMonth() + 1, 1);
-      periodEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0);
+
+  const nextPeriod = computeNextBillingPeriod({
+    paymentType,
+    isFirstInvoice,
+    registrationCreatedAt: registration.created_at,
+    lastPeriodEnd: latestInvoice?.period_end ?? null,
+    reference: now,
+  });
+
+  if (!nextPeriod) {
+    const currentPeriod = getCalendarMonthPeriod(now);
+    const currentInvoice = findInvoiceForFinancePeriod(
+      billableExistingInvoices,
+      student.id,
+      currentPeriod
+    );
+    if (currentInvoice) {
+      return { existing: currentInvoice as Invoice };
     }
-  } else if (fee.payment_type === 'term') {
-    if (isFirstInvoice) {
-      // First term: From registration date to 3 months later
-      periodStart = new Date(registration.created_at);
-      periodEnd = new Date(periodStart);
-      periodEnd.setMonth(periodEnd.getMonth() + 3);
-      periodEnd.setDate(periodEnd.getDate() - 1);
-    } else {
-      // Subsequent terms: 3-month periods after the last term
-      const lastInvoice = existingInvoices[existingInvoices.length - 1];
-      const lastPeriodEnd = new Date(lastInvoice.period_end);
-      periodStart = new Date(lastPeriodEnd);
-      periodStart.setDate(periodStart.getDate() + 1);
-      periodEnd = new Date(periodStart);
-      periodEnd.setMonth(periodEnd.getMonth() + 3);
-      periodEnd.setDate(periodEnd.getDate() - 1);
-    }
-    // Due date should be 7th of the next month after periodEnd
-  } else {
-    throw new Error('Unsupported payment type');
+    return {
+      notDue: true,
+      message:
+        'No invoice is due yet. Billing only runs through the current calendar month; the next period will open when that month begins.',
+    };
   }
+
+  const { periodStart, periodEnd } = nextPeriod;
   const periodStartStr = toLocalDateString(periodStart);
   const periodEndStr = toLocalDateString(periodEnd);
 
@@ -1565,6 +1866,10 @@ export async function generateRecurringInvoices(): Promise<void> {
   for (const reg of registrations) {
     try {
       const result = await generateInvoiceForRegistration(reg.id);
+      if (isInvoiceNotDue(result)) {
+        summary.skipped++;
+        continue;
+      }
       if (result && 'existing' in result) {
         const invoice = result.existing;
         // Defensive check for student_id before fetching student

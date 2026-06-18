@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { filterInvoicesUpToCurrentMonth } from '@/lib/invoiceUtils';
 
 export interface StudentAccessStatus {
   canBook: boolean;
@@ -128,9 +129,9 @@ export function getAccountStatusMessage(student: StudentAccountInfo): {
  */
 export async function getUnpaidInvoiceCount(studentId: string): Promise<number> {
   try {
-    const { data, error, count } = await supabase
+    const { data, error } = await supabase
       .from('invoices')
-      .select('id', { count: 'exact', head: true })
+      .select('id, period_start')
       .eq('student_id', studentId)
       .in('status', ['pending', 'overdue']);
 
@@ -139,7 +140,7 @@ export async function getUnpaidInvoiceCount(studentId: string): Promise<number> 
       return 0;
     }
 
-    return count || 0;
+    return filterInvoicesUpToCurrentMonth(data || []).length;
   } catch (error) {
     console.error('Exception counting unpaid invoices:', error);
     return 0;

@@ -17,7 +17,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Link } from 'react-router-dom';
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
-import { calculateStudentInvoice, InvoiceCalculationResult, ensureInvoicePDF, openInvoicePdfWithName, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, hasOutstandingBalance, isInvoiceFullyPaid, type InvoicePaymentRow } from '../lib/invoiceUtils';
+import { calculateStudentInvoice, InvoiceCalculationResult, ensureInvoicePDF, openInvoicePdfWithName, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, hasOutstandingBalance, isInvoiceFullyPaid, filterInvoicesUpToCurrentMonth, type InvoicePaymentRow } from '../lib/invoiceUtils';
 import { Invoice } from '../integrations/supabase/types';
 import VideoConferenceModal from '../components/VideoConferenceModal';
 import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getMeetingDuration, getUserInvitedMeetings, joinMeetingByCode, joinInstantMeetingRoom, joinMeetingRoom, joinBookingOnlineMeeting, openMeetingLink, InstantMeeting } from '../lib/videoConferencing';
@@ -2470,7 +2470,7 @@ const StudentDashboard = () => {
       return;
     }
     
-    setInvoices(data);
+    setInvoices(filterInvoicesUpToCurrentMonth(data));
       
       if (showRefreshMessage) {
         toast({

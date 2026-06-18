@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { generateQuotePDF } from "@/lib/pdfGenerator";
 import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
-import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchStudentCreditBalance, fetchInvoicePayments, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
+import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchStudentCreditBalance, fetchInvoicePayments, filterInvoicesUpToCurrentMonth, isInvoiceNotDue, resolveInvoiceAfterGeneration, previewFutureInvoices, voidFutureInvoices, type FutureInvoicePreviewRow, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
 import LearningModeDebugTest from './LearningModeDebugTest';
 import FeeDebug from './FeeDebug';
@@ -215,6 +215,9 @@ const AdminPanel = () => {
   const [invoiceHistoryStudentCredit, setInvoiceHistoryStudentCredit] = useState(0);
   const [studentCreditBalances, setStudentCreditBalances] = useState<Record<string, number>>({});
   const [invoiceHistory, setInvoiceHistory] = useState<any[]>([]);
+  const [hiddenFutureInvoiceCount, setHiddenFutureInvoiceCount] = useState(0);
+  const [futureInvoicePreview, setFutureInvoicePreview] = useState<FutureInvoicePreviewRow[]>([]);
+  const [futureInvoiceCleanupLoading, setFutureInvoiceCleanupLoading] = useState(false);
   const [invoiceHistoryStudent, setInvoiceHistoryStudent] = useState<any>(null);
   const [generatingPdfInvoiceId, setGeneratingPdfInvoiceId] = useState<string | null>(null);
   const [generatingAllPdfs, setGeneratingAllPdfs] = useState(false);
@@ -646,6 +649,61 @@ const AdminPanel = () => {
       }
     })();
   }, [activeTab, user]);
+
+  useEffect(() => {
+    if (activeTab !== 'finances') return;
+    void (async () => {
+      try {
+        const rows = await previewFutureInvoices();
+        setFutureInvoicePreview(rows);
+      } catch (error) {
+        console.error('Failed to preview future invoices:', error);
+        setFutureInvoicePreview([]);
+      }
+    })();
+  }, [activeTab, allStudentInvoices]);
+
+  const handleVoidFutureInvoices = async () => {
+    const voidable = futureInvoicePreview.filter((row) => row.can_void);
+    if (voidable.length === 0) {
+      toast({
+        title: 'Nothing to clean up',
+        description: 'No voidable future-month invoices were found.',
+      });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Void ${voidable.length} future-month invoice${voidable.length === 1 ? '' : 's'}?\n\n` +
+        'Paid invoices or invoices with recorded payments will be skipped.\n' +
+        'This cannot be undone from the UI.'
+    );
+    if (!confirmed) return;
+
+    setFutureInvoiceCleanupLoading(true);
+    try {
+      const result = await voidFutureInvoices({ dryRun: false });
+      const voided = result.voided_count ?? 0;
+      const skipped = result.skipped_count ?? 0;
+      toast({
+        title: 'Future invoices voided',
+        description: `Voided ${voided} invoice${voided === 1 ? '' : 's'}` +
+          (skipped > 0 ? ` · skipped ${skipped} (paid or has payments)` : ''),
+      });
+      const rows = await previewFutureInvoices();
+      setFutureInvoicePreview(rows);
+      await refreshStudentInvoices();
+    } catch (error: any) {
+      console.error('Failed to void future invoices:', error);
+      toast({
+        title: 'Cleanup failed',
+        description: error?.message || 'Could not void future invoices.',
+        variant: 'destructive',
+      });
+    } finally {
+      setFutureInvoiceCleanupLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (activeTab !== 'finances') return;
@@ -1989,7 +2047,12 @@ const AdminPanel = () => {
           console.log('💰 Generating invoice for approved student...');
           const invoiceResult = await generateInvoiceForRegistration(id);
           
-          if (invoiceResult && !('existing' in invoiceResult)) {
+          if (isInvoiceNotDue(invoiceResult)) {
+            toast({
+              title: "Invoice Not Due",
+              description: invoiceResult.message,
+            });
+          } else if (invoiceResult && !('existing' in invoiceResult)) {
             // Fetch student data for email
             const { data: studentData, error: studentError } = await supabase
               .from('students')
@@ -2393,11 +2456,12 @@ const AdminPanel = () => {
         .order('period_end', { ascending: false });
       if (error || !data) return;
 
-      setAllStudentInvoices(data);
+      const billableInvoices = filterInvoicesUpToCurrentMonth(data);
+      setAllStudentInvoices(billableInvoices);
       const period = getCalendarMonthPeriod();
       const currentPeriod: Record<string, any> = {};
       for (const studentId of validStudentIds) {
-        const match = findInvoiceForFinancePeriod(data, studentId, period);
+        const match = findInvoiceForFinancePeriod(billableInvoices, studentId, period);
         if (match) currentPeriod[studentId] = match;
       }
       setStudentInvoices(currentPeriod);
@@ -2415,11 +2479,12 @@ const AdminPanel = () => {
       .in('student_id', validStudentIds)
       .order('period_end', { ascending: false });
     if (!data) return;
-    setAllStudentInvoices(data);
+    const billableInvoices = filterInvoicesUpToCurrentMonth(data);
+    setAllStudentInvoices(billableInvoices);
     const period = getCalendarMonthPeriod();
     const currentPeriod: Record<string, any> = {};
     for (const studentId of validStudentIds) {
-      const match = findInvoiceForFinancePeriod(data, studentId, period);
+      const match = findInvoiceForFinancePeriod(billableInvoices, studentId, period);
       if (match) currentPeriod[studentId] = match;
     }
     setStudentInvoices(currentPeriod);
@@ -2766,15 +2831,15 @@ const AdminPanel = () => {
 
         const { generateInvoiceForRegistration } = await import('@/lib/invoiceUtils');
         const result = await generateInvoiceForRegistration(regId);
-        if (result && !('existing' in result)) {
-          invoiceToSend = result as any;
-          const { data: earlier } = await supabase.from('invoices').select('id').eq('student_id', student.id).lt('period_start', invoiceToSend.period_start).limit(1);
-          isFirstInvoice = !earlier || earlier.length === 0;
-        } else if (result && 'existing' in result) {
-          // Invoice already exists (e.g. created by Preview): still send email for it
-          invoiceToSend = (result as { existing: any }).existing;
-          const { data: earlier } = await supabase.from('invoices').select('id').eq('student_id', student.id).lt('period_start', invoiceToSend.period_start).limit(1);
-          isFirstInvoice = !earlier || earlier.length === 0;
+        const resolved = await resolveInvoiceAfterGeneration(student.id, result);
+        if (resolved.invoice) {
+          invoiceToSend = resolved.invoice;
+          isFirstInvoice = resolved.isFirstInvoice;
+          if (resolved.notice && !isInvoiceNotDue(result)) {
+            toast({ title: 'Using current invoice', description: resolved.notice });
+          }
+        } else if (isInvoiceNotDue(result)) {
+          toast({ title: 'Invoice not due yet', description: result.message });
         }
       }
 
@@ -2805,11 +2870,12 @@ const AdminPanel = () => {
           .in('student_id', validStudentIds)
           .order('period_end', { ascending: false });
         if (!error && data) {
-          setAllStudentInvoices(data);
+          const billableInvoices = filterInvoicesUpToCurrentMonth(data);
+          setAllStudentInvoices(billableInvoices);
           const period = getCalendarMonthPeriod();
           const currentPeriod: Record<string, any> = {};
           for (const studentId of validStudentIds) {
-            const match = findInvoiceForFinancePeriod(data, studentId, period);
+            const match = findInvoiceForFinancePeriod(billableInvoices, studentId, period);
             if (match) currentPeriod[studentId] = match;
           }
           setStudentInvoices(currentPeriod);
@@ -2850,7 +2916,11 @@ const AdminPanel = () => {
         regId = regData.id;
       }
       const result = await generateInvoiceForRegistration(regId);
-      invoice = result && !('existing' in result) ? (result as any) : ('existing' in result ? (result as { existing: any }).existing : null);
+      const resolved = await resolveInvoiceAfterGeneration(student.id, result);
+      invoice = resolved.invoice;
+      if (resolved.notice && invoice && isInvoiceNotDue(result)) {
+        toast({ title: 'Current billing period', description: resolved.notice });
+      }
       if (invoice) {
         const validStudentIds = activeStudents.filter((s: any) => isValidId(s.id)).map((s: any) => s.id);
         const { data: invData } = await supabase
@@ -2859,11 +2929,12 @@ const AdminPanel = () => {
           .in('student_id', validStudentIds)
           .order('period_end', { ascending: false });
         if (invData) {
-          setAllStudentInvoices(invData);
+          const billableInvoices = filterInvoicesUpToCurrentMonth(invData);
+          setAllStudentInvoices(billableInvoices);
           const p = getCalendarMonthPeriod();
           const currentPeriod: Record<string, any> = {};
           for (const studentId of validStudentIds) {
-            const match = findInvoiceForFinancePeriod(invData, studentId, p);
+            const match = findInvoiceForFinancePeriod(billableInvoices, studentId, p);
             if (match) currentPeriod[studentId] = match;
           }
           setStudentInvoices(currentPeriod);
@@ -2906,7 +2977,11 @@ const AdminPanel = () => {
       .select('*')
       .eq('student_id', studentId)
       .order('period_start', { ascending: false });
-    if (!error && data) setInvoiceHistory(data);
+    if (!error && data) {
+      const billable = filterInvoicesUpToCurrentMonth(data);
+      setInvoiceHistory(billable);
+      setHiddenFutureInvoiceCount(data.length - billable.length);
+    }
     try {
       const credit = await fetchStudentCreditBalance(studentId);
       setInvoiceHistoryStudentCredit(credit);
@@ -2920,6 +2995,7 @@ const AdminPanel = () => {
     setInvoiceHistoryStudent(student);
     setSelectedHistoryInvoice(null);
     setHistoryInvoicePayments({});
+    setHiddenFutureInvoiceCount(0);
     await fetchInvoiceHistory(student.id);
     setShowInvoiceHistoryModal(true);
   };
@@ -5567,6 +5643,58 @@ const AdminPanel = () => {
                     </div>
                   </div>
 
+                  {futureInvoicePreview.length > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h4 className="text-lg font-semibold text-amber-900">Future invoice cleanup</h4>
+                          <p className="text-sm text-amber-800 mt-1">
+                            {futureInvoicePreview.length} future-month invoice
+                            {futureInvoicePreview.length === 1 ? '' : 's'} found
+                            ({futureInvoicePreview.filter((row) => row.can_void).length} can be voided).
+                            These were created by mistake and should not be billed yet.
+                          </p>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          disabled={futureInvoiceCleanupLoading || futureInvoicePreview.every((row) => !row.can_void)}
+                          onClick={() => void handleVoidFutureInvoices()}
+                        >
+                          {futureInvoiceCleanupLoading ? 'Cleaning up...' : 'Void future invoices'}
+                        </Button>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto border border-amber-100 rounded-md bg-white">
+                        <table className="min-w-full text-xs">
+                          <thead className="bg-amber-100/60">
+                            <tr>
+                              <th className="text-left p-2">Student</th>
+                              <th className="text-left p-2">Period</th>
+                              <th className="text-left p-2">Amount</th>
+                              <th className="text-left p-2">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {futureInvoicePreview.slice(0, 20).map((row) => (
+                              <tr key={row.invoice_id} className="border-t border-amber-50">
+                                <td className="p-2">{row.student_name || row.student_id}</td>
+                                <td className="p-2">{row.period_start} – {row.period_end}</td>
+                                <td className="p-2">KES {Number(row.amount_due).toLocaleString()}</td>
+                                <td className="p-2">
+                                  {row.can_void ? row.status : `${row.status} (skipped)`}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {futureInvoicePreview.length > 20 && (
+                          <p className="text-xs text-amber-700 p-2">
+                            Showing 20 of {futureInvoicePreview.length} future invoices.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-xl font-semibold">Invoice Management</h4>
@@ -5646,11 +5774,12 @@ const AdminPanel = () => {
                                         .in('student_id', validStudentIds)
                                         .order('period_end', { ascending: false });
                                       if (data) {
-                                        setAllStudentInvoices(data);
+                                        const billableInvoices = filterInvoicesUpToCurrentMonth(data);
+                                        setAllStudentInvoices(billableInvoices);
                                         const p = getCalendarMonthPeriod();
                                         const currentPeriod: Record<string, any> = {};
                                         for (const studentId of validStudentIds) {
-                                          const match = findInvoiceForFinancePeriod(data, studentId, p);
+                                          const match = findInvoiceForFinancePeriod(billableInvoices, studentId, p);
                                           if (match) currentPeriod[studentId] = match;
                                         }
                                         setStudentInvoices(currentPeriod);
@@ -5859,6 +5988,12 @@ const AdminPanel = () => {
               {invoiceHistoryStudentCredit > 0 && (
                 <p className="text-sm text-blue-700">
                   Account credit: KES {invoiceHistoryStudentCredit.toLocaleString()}
+                </p>
+              )}
+              {hiddenFutureInvoiceCount > 0 && (
+                <p className="text-sm text-amber-700">
+                  {hiddenFutureInvoiceCount} future-month invoice{hiddenFutureInvoiceCount === 1 ? '' : 's'} hidden
+                  (billing only runs through the current month).
                 </p>
               )}
             </DialogHeader>
