@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { GraduationCap, BookOpen, Layers, User, Lock } from "lucide-react";
+import { GraduationCap, BookOpen, Layers, User, Lock, Home } from "lucide-react";
 import {
   TEACHER_CATEGORY_SUBJECTS,
   TEACHER_CATEGORIES,
@@ -80,12 +81,13 @@ export default function TeacherSignup() {
     if (
       !cvFile ||
       !idFile ||
+      !kraFile ||
       !certFiles ||
       certFiles.length === 0 ||
       !transcriptFiles ||
       transcriptFiles.length === 0
     ) {
-      setError("Please attach CV, ID, transcripts and certificates.");
+      setError("Please attach CV, ID, KRA PIN, transcripts and certificates.");
       setSubmitting(false);
       return;
     }
@@ -139,7 +141,7 @@ export default function TeacherSignup() {
       };
 
       await saveDocument(idFile, "id");
-      if (kraFile) await saveDocument(kraFile, "kra");
+      await saveDocument(kraFile, "kra");
       for (const f of Array.from(certFiles)) await saveDocument(f, "certificate");
       for (const f of Array.from(transcriptFiles)) await saveDocument(f, "transcript");
 
@@ -161,22 +163,44 @@ export default function TeacherSignup() {
 
   const categorySubjects = TEACHER_CATEGORY_SUBJECTS[form.category];
 
+  const homeLink = (
+    <div className="absolute top-4 left-4 sm:top-6 sm:left-6">
+      <Link
+        to="/"
+        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-white/80 rounded-lg transition-colors duration-200 shadow-sm border border-gray-200/80 bg-white/70 backdrop-blur-sm"
+      >
+        <Home className="h-4 w-4" />
+        Back to Main Website
+      </Link>
+    </div>
+  );
+
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-16 px-2">
+      <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-16 px-2">
+        {homeLink}
         <Card className="max-w-xl w-full shadow-2xl border-0">
           <CardHeader className="text-center">
             <GraduationCap className="mx-auto h-12 w-12 text-primary mb-2" />
             <CardTitle className="text-2xl font-bold">Thank You for Applying!</CardTitle>
             <CardDescription>Your application is under review. We'll contact you soon.</CardDescription>
           </CardHeader>
+          <CardContent className="pb-6">
+            <Button asChild variant="outline" className="w-full">
+              <Link to="/">
+                <Home className="h-4 w-4 mr-2" />
+                Return to Main Website
+              </Link>
+            </Button>
+          </CardContent>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-16 px-2">
+    <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-16 px-2">
+      {homeLink}
       <Card className="max-w-xl w-full shadow-2xl border-0">
         <CardHeader className="text-center">
           <GraduationCap className="mx-auto h-12 w-12 text-primary mb-2" />
@@ -308,11 +332,12 @@ export default function TeacherSignup() {
             </div>
             <div>
               <label className="block font-medium mb-1">
-                KRA PIN <span className="text-muted-foreground text-sm font-normal">(optional)</span>
+                KRA PIN <span className="text-red-500">*</span>
               </label>
               <input
                 type="file"
                 accept="image/*,.pdf"
+                required
                 onChange={(e) => setKraFile(e.target.files?.[0] || null)}
                 className="block w-full border rounded p-2 bg-white"
               />
@@ -344,7 +369,7 @@ export default function TeacherSignup() {
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Required: CV, ID, transcripts and certificates. KRA PIN is optional but recommended if you have one.
+              Required: CV, ID, KRA PIN, transcripts and certificates.
             </p>
             {error && <div className="text-red-600 text-sm text-center">{error}</div>}
             <Button type="submit" disabled={submitting} className="w-full text-base font-semibold h-12 mt-2 shadow-lg">

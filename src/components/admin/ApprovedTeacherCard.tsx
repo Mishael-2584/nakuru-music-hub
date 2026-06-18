@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { GraduationCap, Eye, FileText } from 'lucide-react';
+import { GraduationCap, Eye, FileText, RefreshCw } from 'lucide-react';
 import {
   collectApprovedTeacherDocuments,
   type TeacherApplicationDocument,
@@ -32,9 +32,16 @@ interface ApprovedTeacherCardProps {
     file_path: string;
     file_name?: string | null;
   }[];
+  onRecoverDocuments?: (teacherId: string) => Promise<void>;
+  recovering?: boolean;
 }
 
-const ApprovedTeacherCard = ({ teacher, documents }: ApprovedTeacherCardProps) => {
+const ApprovedTeacherCard = ({
+  teacher,
+  documents,
+  onRecoverDocuments,
+  recovering = false,
+}: ApprovedTeacherCardProps) => {
   const teacherDocs = useMemo(
     () => collectApprovedTeacherDocuments(teacher, documents),
     [teacher, documents]
@@ -78,10 +85,25 @@ const ApprovedTeacherCard = ({ teacher, documents }: ApprovedTeacherCardProps) =
                 Application documents
               </p>
               {teacherDocs.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No documents on file. Documents uploaded before this fix may need to be re-uploaded
-                  by the teacher from their account page.
-                </p>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    No documents linked yet. If this teacher applied before the approval fix, their
+                    files may still exist in storage.
+                  </p>
+                  {onRecoverDocuments && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8"
+                      disabled={recovering}
+                      onClick={() => void onRecoverDocuments(teacher.id)}
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${recovering ? 'animate-spin' : ''}`} />
+                      {recovering ? 'Searching storage…' : 'Link documents from storage'}
+                    </Button>
+                  )}
+                </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {teacherDocs.map((doc) => (

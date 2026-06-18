@@ -55,6 +55,22 @@ export async function downloadTeacherDocument(filePath: string, fileName: string
   document.body.removeChild(link);
 }
 
+export async function recoverTeacherDocumentsFromStorage(
+  teacherId?: string
+): Promise<{ inserted: number; cv_updated: number }> {
+  const { data, error } = await supabase.rpc('recover_teacher_documents_from_storage', {
+    p_teacher_id: teacherId ?? null,
+  });
+
+  if (error) throw error;
+
+  const result = (data ?? {}) as { inserted?: number; cv_updated?: number };
+  return {
+    inserted: result.inserted ?? 0,
+    cv_updated: result.cv_updated ?? 0,
+  };
+}
+
 export function collectTeacherApplicationDocuments(
   teacher: { id: string; cv_file_path?: string | null },
   pendingDocs: {

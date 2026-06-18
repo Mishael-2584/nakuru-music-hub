@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X, Image, MessageSquare, Settings, Gift, Globe } from "lucide-react";
+import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X, Image, MessageSquare, Settings, Gift, Globe, RefreshCw } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +31,7 @@ import RecordInvoicePaymentDialog from './admin/RecordInvoicePaymentDialog';
 import StudentAccountControl from './admin/StudentAccountControl';
 import PendingTeacherApplicationCard from './admin/PendingTeacherApplicationCard';
 import ApprovedTeacherCard from './admin/ApprovedTeacherCard';
+import { recoverTeacherDocumentsFromStorage } from '@/lib/teacherDocuments';
 import { isTermlyCourseCategory } from '@/lib/termlyFeeUtils';
 
 interface Registration {
@@ -136,6 +137,7 @@ const AdminPanel = () => {
   const [teacherDocuments, setTeacherDocuments] = useState<any[]>([]);
   const [approvedTeachers, setApprovedTeachers] = useState([]);
   const [teacherLoading, setTeacherLoading] = useState(false);
+  const [recoveringTeacherId, setRecoveringTeacherId] = useState<string | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [showQuoteDialog, setShowQuoteDialog] = useState(false);
   const [quoteAmount, setQuoteAmount] = useState("");
@@ -2301,19 +2303,46 @@ const AdminPanel = () => {
           .from('teacher_documents')
           .select('*')
           .order('uploaded_at', { ascending: false });
-        if (!approvedDocsError) setTeacherDocuments(approvedDocs || []);
 
         console.log('🔍 Fetching approved teachers...');
         const { data: approved, error: approvedError } = await supabase
           .from("teachers")
           .select("*")
           .order("created_at", { ascending: false });
+
+        let resolvedDocs = approvedDocsError ? [] : (approvedDocs || []);
+        let resolvedApproved = approvedError ? [] : (approved || []);
+
+        const needsDocumentRecovery =
+          !approvedError &&
+          resolvedApproved.some((teacher) => {
+            const hasLinkedDocs = resolvedDocs.some((doc) => doc.teacher_id === teacher.id);
+            return !hasLinkedDocs && !teacher.cv_file_path;
+          });
+
+        if (needsDocumentRecovery) {
+          try {
+            const result = await recoverTeacherDocumentsFromStorage();
+            if (result.inserted > 0 || result.cv_updated > 0) {
+              const [{ data: refreshedDocs }, { data: refreshedTeachers }] = await Promise.all([
+                supabase.from('teacher_documents').select('*').order('uploaded_at', { ascending: false }),
+                supabase.from('teachers').select('*').order('created_at', { ascending: false }),
+              ]);
+              if (refreshedDocs) resolvedDocs = refreshedDocs;
+              if (refreshedTeachers) resolvedApproved = refreshedTeachers;
+            }
+          } catch (recoverErr) {
+            console.warn('Teacher document auto-recovery skipped:', recoverErr);
+          }
+        }
+
+        if (!approvedDocsError) setTeacherDocuments(resolvedDocs);
         
-        console.log('📊 Approved teachers result:', { data: approved, error: approvedError });
+        console.log('📊 Approved teachers result:', { data: resolvedApproved, error: approvedError });
         
         if (!approvedError) {
-          setApprovedTeachers(approved || []);
-          console.log('✅ Set approved teachers:', approved?.length || 0);
+          setApprovedTeachers(resolvedApproved);
+          console.log('✅ Set approved teachers:', resolvedApproved?.length || 0);
         } else {
           console.error('❌ Error fetching approved teachers:', approvedError);
         }
@@ -2493,6 +2522,36 @@ const AdminPanel = () => {
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setTeacherLoading(false);
+    }
+  };
+
+  const reloadTeacherDocuments = async () => {
+    const [{ data: approvedDocs }, { data: approved }] = await Promise.all([
+      supabase.from('teacher_documents').select('*').order('uploaded_at', { ascending: false }),
+      supabase.from('teachers').select('*').order('created_at', { ascending: false }),
+    ]);
+    if (approvedDocs) setTeacherDocuments(approvedDocs);
+    if (approved) setApprovedTeachers(approved);
+  };
+
+  const handleRecoverTeacherDocuments = async (teacherId?: string) => {
+    setRecoveringTeacherId(teacherId ?? 'all');
+    try {
+      const result = await recoverTeacherDocumentsFromStorage(teacherId);
+      await reloadTeacherDocuments();
+      toast({
+        title: result.inserted > 0 || result.cv_updated > 0 ? 'Documents linked' : 'No files found',
+        description:
+          result.inserted > 0 || result.cv_updated > 0
+            ? `Linked ${result.inserted} file(s) from storage${result.cv_updated > 0 ? ` and restored ${result.cv_updated} CV path(s).` : '.'}`
+            : 'No matching files were found in storage for this teacher.',
+        variant: result.inserted > 0 || result.cv_updated > 0 ? 'default' : 'destructive',
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not recover documents from storage.';
+      toast({ title: 'Recovery failed', description: msg, variant: 'destructive' });
+    } finally {
+      setRecoveringTeacherId(null);
     }
   };
 
@@ -4570,14 +4629,33 @@ const AdminPanel = () => {
                 ) : approvedTeachers.length === 0 ? (
                   <div className="text-center text-muted-foreground">No approved teachers yet.</div>
                 ) : (
-                  <div className="grid gap-4">
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm text-muted-foreground">
+                        Missing application documents? Link files still stored from signup.
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={recoveringTeacherId === 'all'}
+                        onClick={() => void handleRecoverTeacherDocuments()}
+                      >
+                        <RefreshCw className={`h-4 w-4 mr-2 ${recoveringTeacherId === 'all' ? 'animate-spin' : ''}`} />
+                        {recoveringTeacherId === 'all' ? 'Searching storage…' : 'Link all from storage'}
+                      </Button>
+                    </div>
+                    <div className="grid gap-4">
                     {approvedTeachers.map((teacher) => (
                       <ApprovedTeacherCard
                         key={teacher.id}
                         teacher={teacher}
                         documents={teacherDocuments}
+                        onRecoverDocuments={handleRecoverTeacherDocuments}
+                        recovering={recoveringTeacherId === teacher.id}
                       />
                     ))}
+                    </div>
                   </div>
                 )}
               </TabsContent>
