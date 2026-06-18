@@ -330,6 +330,40 @@ const Fees = () => {
           ]
         }
       ]
+    },
+    {
+      category: "🌍 Language Lessons",
+      subtitle: "1-on-1 instruction · flexible weekly schedule",
+      note: "English, Kiswahili, Luganda, Kinyarwanda, French, German & other native African languages",
+      courses: [
+        {
+          name: "At the Academy",
+          duration: "1 hour per session",
+          perSession: "KSh 1,500",
+          icon: Globe,
+          features: [
+            "English & Kiswahili",
+            "Luganda & Kinyarwanda",
+            "French & German",
+            "Other native African languages on request",
+            "Beginner to advanced — all ages",
+            "Choose 1–5 classes per week"
+          ]
+        },
+        {
+          name: "Online",
+          duration: "1 hour per session",
+          perSession: "KSh 1,500",
+          icon: Globe,
+          features: [
+            "Same languages & per-session rate",
+            "Live 1-on-1 video lessons",
+            "Conversation, reading & writing",
+            "Exam and travel preparation",
+            "Flexible scheduling"
+          ]
+        }
+      ]
     }
   ];
 
@@ -343,7 +377,8 @@ const Fees = () => {
     { value: "rsl-awards", label: "🎵 Music Production (RSL Awards)" },
     { value: "photography", label: "📸 Photography & Videography" },
     { value: "art", label: "🎨 Art Classes" },
-    { value: "programming", label: "💻 Web Design & Programming" }
+    { value: "programming", label: "💻 Web Design & Programming" },
+    { value: "languages", label: "🌍 Language Lessons" }
   ];
 
   // Filter and search logic
@@ -358,7 +393,8 @@ const Fees = () => {
         (selectedCategory === "rsl-awards" && category.category.includes("RSL Awards")) ||
         (selectedCategory === "photography" && category.category.includes("Photography")) ||
         (selectedCategory === "art" && category.category.includes("Art Classes")) ||
-        (selectedCategory === "programming" && category.category.includes("Web Design"));
+        (selectedCategory === "programming" && category.category.includes("Web Design")) ||
+        (selectedCategory === "languages" && category.category.includes("Language"));
 
       if (!categoryMatch) return false;
 
@@ -405,6 +441,7 @@ const Fees = () => {
   const getIconColor = (category: string) => {
     if (category.includes("Production") || category.includes("Photography")) return "from-purple-500 to-pink-500";
     if (category.includes("Web Design") || category.includes("Programming")) return "from-blue-500 to-cyan-500";
+    if (category.includes("Language")) return "from-teal-500 to-emerald-500";
     return "from-primary to-accent";
   };
 

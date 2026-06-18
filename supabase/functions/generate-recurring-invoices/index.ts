@@ -183,6 +183,8 @@ async function findFeeForRegistration(registration) {
     paymentType = 'term';
   } else if (courseCategoryLower === 'technology') {
     paymentType = 'per_class'; // Technology courses use per_class billing
+  } else if (courseCategoryLower === 'languages') {
+    paymentType = 'per_class';
   }
   
   console.log('Looking for fee with preferences:', {
@@ -258,7 +260,9 @@ async function findFeeForRegistration(registration) {
   } else if (courseCategoryLower === 'art') {
     normalizedCourseName = 'Art Classes';
   } else if (courseCategoryLower === 'technology') {
-    normalizedCourseName = 'Web Design & Programming';
+    normalizedCourseName = registration.technology_type || 'Web Design & Programming';
+  } else if (courseCategoryLower === 'languages') {
+    normalizedCourseName = 'Language Lessons';
   }
 
   const pickBestMusicMonthlyFee = (fees, reg) => {
@@ -493,12 +497,13 @@ async function findFeeForRegistration(registration) {
       defaultPrice = 40000; // KES 40,000 for other termly courses
     }
   } else if (courseCategoryLower === 'technology') {
-    // Technology courses - based on group size (default to 1-on-1)
     if (learningMode === 'online') {
-      defaultPrice = 2200; // KES 2,200 for 1-on-1 online technology per class
+      defaultPrice = 2200;
     } else {
-      defaultPrice = 2200; // KES 2,200 for 1-on-1 at academy technology per class
+      defaultPrice = 2200;
     }
+  } else if (courseCategoryLower === 'languages') {
+    defaultPrice = 1500;
   } else if (String(learningMode).toLowerCase() === 'online') {
     defaultPrice = 44; // $44 USD
     defaultCurrency = '$';
@@ -718,7 +723,7 @@ async function generateInvoicesForRegistration(registration, fee, student, summa
     }
     
     // Apply partial month billing logic for subsequent invoices (only for monthly payment type, not Technology)
-    if (!isFirstInvoice && fee.payment_type === 'monthly' && courseCategory !== 'Technology') {
+    if (!isFirstInvoice && fee.payment_type === 'monthly' && courseCategory !== 'Technology' && courseCategory !== 'Languages') {
       // For subsequent invoices, check if student enrolled mid-month in the first month
       const registrationDate = new Date(registration.created_at);
       

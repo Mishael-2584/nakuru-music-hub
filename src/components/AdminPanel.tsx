@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X, Image, MessageSquare, Settings, Gift } from "lucide-react";
+import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X, Image, MessageSquare, Settings, Gift, Globe } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,6 +46,7 @@ interface Registration {
   instrument: string;
   production_type?: string;
   technology_type?: string;
+  language_type?: string;
   experience: string;
   proficiency_level: string;
   learning_mode: string;
@@ -3863,6 +3864,7 @@ const AdminPanel = () => {
                               {registration.course_category === 'Music' && <Music className="h-6 w-6 text-primary" />}
                               {registration.course_category === 'Production' && <Mic className="h-6 w-6 text-accent" />}
                               {registration.course_category === 'Art' && <Palette className="h-6 w-6 text-secondary" />}
+                              {registration.course_category === 'Languages' && <Globe className="h-6 w-6 text-teal-600" />}
                             </div>
                             <div>
                               <h4 className="text-xl font-bold text-primary">{registration.student_name}</h4>
@@ -3909,6 +3911,7 @@ const AdminPanel = () => {
                               {registration.course_category === 'Music' ? registration.instrument : 
                                registration.course_category === 'Production' ? registration.production_type : 
                                registration.course_category === 'Technology' ? registration.technology_type : 
+                               registration.course_category === 'Languages' ? registration.language_type :
                                'Art Course'}
                             </span>
                           </div>

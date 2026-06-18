@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Piano, Guitar, Mic, Drum, Music, Brain, Wind, Volume2, Camera, Video, MonitorPlay, Code, Palette, Search, Filter, Headphones, BookOpen, Users, Award, Smartphone } from "lucide-react";
+import { Piano, Guitar, Mic, Drum, Music, Brain, Wind, Volume2, Camera, Video, MonitorPlay, Code, Palette, Search, Filter, Headphones, BookOpen, Users, Award, Smartphone, Globe } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
@@ -382,6 +382,29 @@ const CoursesEnhanced = () => {
         instruments: "All necessary development tools and software provided.",
         schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
       }
+    },
+    {
+      icon: Globe,
+      title: "Language Lessons",
+      description: "Learn English, Kiswahili, Luganda, Kinyarwanda, French, German, and other native African languages.",
+      category: "Languages",
+      color: "accent",
+      details: {
+        availability: "Available online and in-person at the academy",
+        duration: "Flexible sessions — choose 1–5 classes per week",
+        levels: "Beginner to advanced — all ages welcome",
+        features: [
+          "English & Kiswahili",
+          "Luganda & Kinyarwanda",
+          "French & German",
+          "Other native African languages on request",
+          "Conversation, reading & writing",
+          "Exam and travel preparation",
+          "1-on-1 personalised instruction"
+        ],
+        instruments: "Course materials provided; bring a notebook.",
+        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. KES 1,500 per session — enroll via the registration form."
+      }
     }
   ];
 
@@ -390,7 +413,8 @@ const CoursesEnhanced = () => {
     { id: "Music", name: "Music", count: courses.filter(c => c.category === "Music").length },
     { id: "Art", name: "Art", count: courses.filter(c => c.category === "Art").length },
     { id: "Production", name: "Production", count: courses.filter(c => c.category === "Production").length },
-    { id: "Technology", name: "Technology", count: courses.filter(c => c.category === "Technology").length }
+    { id: "Technology", name: "Technology", count: courses.filter(c => c.category === "Technology").length },
+    { id: "Languages", name: "Languages", count: courses.filter(c => c.category === "Languages").length }
   ];
 
   const filteredCourses = courses.filter(course => {
@@ -424,6 +448,8 @@ const CoursesEnhanced = () => {
         return 'bg-green-100 text-green-800 border-green-200';
       case 'Technology':
         return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'Languages':
+        return 'bg-teal-100 text-teal-800 border-teal-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }

@@ -18,6 +18,12 @@ import {
   buildInvoiceStoragePath,
   isBrokenInvoicePdfUrl,
 } from './invoiceNaming';
+import {
+  getLanguageDisplayName,
+  getLanguageFeeCourseName,
+  isLanguagesCategory,
+  LANGUAGE_SESSION_PRICE_KES,
+} from './languageCourseUtils';
 
 export {
   sanitizeInvoiceFilePart,
@@ -813,6 +819,8 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     paymentType = 'term';
   } else if (courseCategoryLower === 'technology') {
     paymentType = 'per_class'; // Technology courses use per_class billing
+  } else if (courseCategoryLower === 'languages') {
+    paymentType = 'per_class';
   }
   
   console.log('Determined payment type:', paymentType, 'for course category:', courseCategory);
@@ -842,7 +850,9 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   if (normalizedCourseCategory === 'art') {
     normalizedInstrument = 'Art Classes';
   } else if (normalizedCourseCategory === 'technology') {
-    normalizedInstrument = 'Web Design & Programming';
+    normalizedInstrument = registration.technology_type || 'Web Design & Programming';
+  } else if (normalizedCourseCategory === 'languages') {
+    normalizedInstrument = getLanguageFeeCourseName();
   } else if (normalizedCourseCategory === 'music') {
     normalizedInstrument = 'Instrumental & Music Theory';
   } else if (normalizedCourseCategory === 'production' || normalizedCourseCategory === 'photography') {
@@ -958,16 +968,31 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
             .from('fees')
             .select('*')
             .eq('course_type', 'technology')
-            .eq('course_name', 'Web Design & Programming')
+            .eq('course_name', registration.technology_type || 'Web Design & Programming')
             .eq('payment_type', 'per_class')
             .eq('is_active', true)
-            .order('price', { ascending: false }) // Get highest price (1-on-1) first
+            .order('price', { ascending: false })
             .limit(1)
             .maybeSingle();
           
           if (techFee && !techFeeError) {
             fee = techFee;
-            console.log('Found Technology 1-on-1 fee:', fee);
+            console.log('Found Technology per_class fee:', fee);
+          }
+        } else if (normalizedCourseCategory === 'languages' && paymentType === 'per_class') {
+          const { data: langFee, error: langFeeError } = await supabase
+            .from('fees')
+            .select('*')
+            .eq('course_type', 'languages')
+            .eq('course_name', getLanguageFeeCourseName())
+            .eq('payment_type', 'per_class')
+            .eq('mode', normalizedLearningMode)
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (langFee && !langFeeError) {
+            fee = langFee;
+            console.log('Found Languages per_class fee:', fee);
           }
         } else if (paymentType === 'term') {
           const { data: termFee, error: termFeeError } = await supabase
@@ -1066,6 +1091,8 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
               registration,
               termPeriod || '1st_term'
             );
+          } else if (isLanguagesCategory(registration.course_category)) {
+            defaultPrice = LANGUAGE_SESSION_PRICE_KES;
           } else if (learningMode === 'online') {
             defaultPrice = 44; // $44 USD
             defaultCurrency = '$';
@@ -1357,6 +1384,9 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     if (registration.course_category === 'Technology') {
       return registration.technology_type || 'Technology';
     }
+    if (isLanguagesCategory(registration.course_category)) {
+      return `${getLanguageDisplayName(registration.language_type)} Language Lessons`;
+    }
     return registration.instrument || 'Music Lessons';
   })();
 
@@ -1378,7 +1408,9 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
     } else {
       unitPrice = Math.round((invoiceAmount / quantity) * 100) / 100;
     }
-    if (fee.payment_type === 'monthly' && courseCategoryLower === 'music') {
+    if (isLanguagesCategory(registration.course_category) && fee.payment_type === 'per_class') {
+      lineDescription = `${courseDisplayName} @ KES ${LANGUAGE_SESSION_PRICE_KES.toLocaleString()} per session — ${sessionsPerWeek} session${sessionsPerWeek > 1 ? 's' : ''}/week × ${numWeeks} weeks`;
+    } else if (fee.payment_type === 'monthly' && courseCategoryLower === 'music') {
       lineDescription = courseDisplayName;
     } else {
       lineDescription = `${courseDisplayName} - ${sessionsPerWeek} session${sessionsPerWeek > 1 ? 's' : ''} per week × ${numWeeks} weeks`;
@@ -1386,7 +1418,7 @@ export async function generateInvoiceForRegistration(registrationId: string): Pr
   }
   
   // Apply partial month billing logic for subsequent invoices (only for monthly payment type, not Technology)
-  if (!isTermlyFee && !isFirstInvoice && fee.payment_type === 'monthly' && courseCategoryLower !== 'technology') {
+  if (!isTermlyFee && !isFirstInvoice && fee.payment_type === 'monthly' && courseCategoryLower !== 'technology' && courseCategoryLower !== 'languages') {
     // For subsequent invoices, check if student enrolled mid-month in the first month
     const registrationDate = new Date(registration.created_at);
     const firstMonthStart = new Date(registrationDate.getFullYear(), registrationDate.getMonth(), 1);

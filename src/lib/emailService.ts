@@ -19,6 +19,8 @@ interface RegistrationData {
   course_category: string;
   instrument: string;
   production_type?: string;
+  technology_type?: string;
+  language_type?: string;
   experience: string;
   proficiency_level: string;
   learning_mode: string;
@@ -63,6 +65,8 @@ export const sendConfirmationEmail = async (registration: RegistrationData): Pro
       introMessage = "Thank you for choosing us to explore your artistic talents!";
     } else if (registration.course_category === 'Production') {
       introMessage = "Thank you for choosing us to advance your production skills!";
+    } else if (registration.course_category === 'Languages') {
+      introMessage = "Thank you for choosing us for your language learning journey!";
     } else {
       introMessage = "Thank you for choosing Damon Music Academy!";
     }
@@ -1371,6 +1375,8 @@ export const sendApplicationConfirmationEmail = async (registration: Registratio
                 <span class="info-value">${(() => {
                   if (registration.course_category === 'Music') return registration.instrument;
                   if (registration.course_category === 'Production') return registration.production_type;
+                  if (registration.course_category === 'Technology') return registration.technology_type || 'Technology';
+                  if (registration.course_category === 'Languages') return registration.language_type || 'Language Lessons';
                   return 'Art Course';
                 })()}</span>
               </div>
@@ -1726,6 +1732,8 @@ export const sendPaymentConfirmationEmail = async (
               <div class="info-item"><span class="info-label">Subject/Instrument:</span><span class="info-value">${(() => {
                 if (registration.course_category === 'Music') return registration.instrument;
                 if (registration.course_category === 'Production') return registration.production_type;
+                if (registration.course_category === 'Technology') return registration.technology_type || 'Technology';
+                if (registration.course_category === 'Languages') return registration.language_type || 'Language Lessons';
                 return 'Art Course';
               })()}</span></div>
               <div class="info-item"><span class="info-label">Proficiency Level:</span><span class="info-value">${registration.proficiency_level}</span></div>

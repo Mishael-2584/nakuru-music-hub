@@ -10,7 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { sendApplicationConfirmationEmail } from '@/lib/emailService';
-import { Music, Users, Award, Star, ArrowRight, ArrowLeft, CheckCircle, MapPin, Phone, Mail, User, Calendar, Guitar, Mic, Palette, Video, Speaker, Music2, Users2, Code } from "lucide-react";
+import { LANGUAGE_OPTIONS } from '@/lib/languageCourseUtils';
+import { Music, Users, Award, Star, ArrowRight, ArrowLeft, CheckCircle, MapPin, Phone, Mail, User, Calendar, Guitar, Mic, Palette, Video, Speaker, Music2, Users2, Code, Globe } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Registration = () => {
@@ -29,6 +30,8 @@ const Registration = () => {
     custom_instrument: "",
     production_type: "",
     technology_type: "",
+    language_type: "",
+    custom_language: "",
     experience: "",
     goals: "",
     preferred_schedule: "",
@@ -245,7 +248,7 @@ const Registration = () => {
         break;
       
       case 'course_category':
-        if (!value || !['Music', 'Production', 'Art', 'Technology'].includes(value)) {
+        if (!value || !['Music', 'Production', 'Art', 'Technology', 'Languages'].includes(value)) {
           return { isValid: false, error: 'Please select a valid course category' };
         }
         break;
@@ -275,6 +278,15 @@ const Registration = () => {
       case 'technology_type':
         if (formData.course_category === 'Technology' && (!value || value.trim().length === 0)) {
           return { isValid: false, error: 'Please select a technology type' };
+        }
+        break;
+
+      case 'language_type':
+        if (formData.course_category === 'Languages' && (!value || value.trim().length === 0)) {
+          return { isValid: false, error: 'Please select a language' };
+        }
+        if (formData.course_category === 'Languages' && value === 'Other' && (!formData.custom_language || formData.custom_language.trim().length === 0)) {
+          return { isValid: false, error: 'Please specify your language' };
         }
         break;
       
@@ -359,6 +371,13 @@ const Registration = () => {
         
         if (formData.course_category === 'Technology') {
           const validation = validateField('technology_type', formData.technology_type);
+          if (!validation.isValid) {
+            errors.push(validation.error);
+          }
+        }
+
+        if (formData.course_category === 'Languages') {
+          const validation = validateField('language_type', formData.language_type);
           if (!validation.isValid) {
             errors.push(validation.error);
           }
@@ -468,6 +487,11 @@ const Registration = () => {
       let instrumentValue = formData.instrument;
       if (formData.course_category === 'Art') {
         instrumentValue = 'Art Classes'; // canonical name for art in fees table
+      } else if (formData.course_category === 'Languages') {
+        instrumentValue =
+          formData.language_type === 'Other'
+            ? formData.custom_language?.trim() || 'Language Lessons'
+            : formData.language_type?.trim() || 'Language Lessons';
       }
       const submissionData = {
         student_name: formData.student_name.trim(),
@@ -485,6 +509,12 @@ const Registration = () => {
           ? (formData.term_period || '1st_term')
           : null,
         technology_type: formData.technology_type?.trim() || null,
+        language_type:
+          formData.course_category === 'Languages'
+            ? (formData.language_type === 'Other'
+                ? formData.custom_language?.trim() || 'Other'
+                : formData.language_type?.trim() || null)
+            : null,
         experience: formData.proficiency_level || "beginner",
         proficiency_level: formData.proficiency_level || "beginner",
         learning_mode: formData.learning_mode || "in-person",
@@ -596,9 +626,13 @@ const Registration = () => {
           parent_name: "",
           parent_phone: "",
           course_category: "",
+          music_subcategory: "",
           instrument: "",
           custom_instrument: "",
           production_type: "",
+          technology_type: "",
+          language_type: "",
+          custom_language: "",
           experience: "",
           goals: "",
           preferred_schedule: "",
@@ -992,8 +1026,8 @@ const Registration = () => {
           <Label className="text-sm font-medium text-gray-700">Course Category *</Label>
           <RadioGroup 
             value={formData.course_category} 
-            onValueChange={(value) => setFormData({...formData, course_category: value, music_subcategory: "", instrument: "", production_type: "", technology_type: ""})}
-            className="grid md:grid-cols-4 gap-4"
+            onValueChange={(value) => setFormData({...formData, course_category: value, music_subcategory: "", instrument: "", production_type: "", technology_type: "", language_type: "", custom_language: ""})}
+            className="grid md:grid-cols-3 lg:grid-cols-5 gap-4"
           >
             <div className="relative">
               <RadioGroupItem value="Music" id="music" className="sr-only" />
@@ -1073,6 +1107,26 @@ const Registration = () => {
                   formData.course_category === "Technology" ? "text-primary" : "text-gray-800"
                 }`}>Technology</span>
                 <span className="text-sm text-gray-500 text-center mt-1">Web design & programming</span>
+              </Label>
+            </div>
+            <div className="relative">
+              <RadioGroupItem value="Languages" id="languages" className="sr-only" />
+              <Label htmlFor="languages" className={`flex flex-col items-center p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                formData.course_category === "Languages"
+                  ? "border-primary bg-primary/5 shadow-lg"
+                  : "border-gray-200 hover:border-primary"
+              }`}>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-all duration-200 ${
+                  formData.course_category === "Languages"
+                    ? "bg-gradient-to-r from-teal-500 to-cyan-500 scale-110"
+                    : "bg-gradient-to-r from-teal-500 to-cyan-500"
+                }`}>
+                  <Globe className="w-6 h-6 text-white" />
+                </div>
+                <span className={`font-medium transition-colors duration-200 ${
+                  formData.course_category === "Languages" ? "text-primary" : "text-gray-800"
+                }`}>Languages</span>
+                <span className="text-sm text-gray-500 text-center mt-1">KES 1,500 per session</span>
               </Label>
             </div>
           </RadioGroup>
@@ -1248,6 +1302,36 @@ const Registration = () => {
             </Select>
           </div>
         )}
+
+        {formData.course_category === "Languages" && (
+          <div className="space-y-4">
+            <Label className="text-sm font-medium text-gray-700">Language *</Label>
+            <Select
+              value={formData.language_type}
+              onValueChange={(value) => setFormData({ ...formData, language_type: value, custom_language: value === 'Other' ? formData.custom_language : '' })}
+            >
+              <SelectTrigger className="h-12 border-gray-300 focus:border-primary focus:ring-primary">
+                <SelectValue placeholder="Select language" />
+              </SelectTrigger>
+              <SelectContent>
+                {LANGUAGE_OPTIONS.map((lang) => (
+                  <SelectItem key={lang} value={lang}>
+                    {lang === 'Other' ? 'Other native African language' : lang}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {formData.language_type === 'Other' && (
+              <Input
+                placeholder="Specify language (e.g. Amharic, Yoruba)"
+                value={formData.custom_language}
+                onChange={(e) => setFormData({ ...formData, custom_language: e.target.value })}
+                className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
+              />
+            )}
+            <p className="text-sm text-gray-500">Language lessons are billed at KES 1,500 per session.</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1405,6 +1489,38 @@ const Registration = () => {
         />
       </div>
 
+      {(formData.course_category === "Languages" || formData.course_category === "Technology") && (
+        <div className="space-y-4">
+          <Label className="text-sm font-medium text-gray-700">Learning Mode *</Label>
+          <RadioGroup
+            value={formData.learning_mode}
+            onValueChange={(value) => setFormData({ ...formData, learning_mode: value })}
+            className="grid gap-4"
+          >
+            {[
+              { value: 'in-person', label: 'In Person at the Academy' },
+              { value: 'online', label: 'Online' },
+            ].map((mode) => (
+              <div key={mode.value} className="relative">
+                <RadioGroupItem value={mode.value} id={`lang-tech-${mode.value}`} className="sr-only" />
+                <Label
+                  htmlFor={`lang-tech-${mode.value}`}
+                  className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                    formData.learning_mode === mode.value
+                      ? 'border-primary bg-primary/5 shadow-md'
+                      : 'border-gray-200 hover:border-primary'
+                  }`}
+                >
+                  <span className={`font-medium ${formData.learning_mode === mode.value ? 'text-primary' : 'text-gray-800'}`}>
+                    {mode.label}
+                  </span>
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
+        </div>
+      )}
+
       {!isTermlyCourseCategory(formData.course_category) && (
         <div className="space-y-4">
           <Label htmlFor="sessions_per_week" className="text-sm font-medium text-gray-700">Number of Classes per Week *</Label>
@@ -1496,6 +1612,34 @@ const Registration = () => {
               <span className="font-medium text-gray-600">Production Type:</span>
               <p className="text-gray-800">{formData.production_type}</p>
             </div>
+          )}
+          {formData.course_category === "Technology" && (
+            <div>
+              <span className="font-medium text-gray-600">Technology Type:</span>
+              <p className="text-gray-800">{formData.technology_type}</p>
+            </div>
+          )}
+          {formData.course_category === "Languages" && (
+            <>
+              <div>
+                <span className="font-medium text-gray-600">Language:</span>
+                <p className="text-gray-800">
+                  {formData.language_type === 'Other' ? formData.custom_language : formData.language_type}
+                </p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Learning Mode:</span>
+                <p className="text-gray-800">{formData.learning_mode}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Sessions per week:</span>
+                <p className="text-gray-800">{formData.sessions_per_week}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Rate:</span>
+                <p className="text-gray-800">KES 1,500 per session</p>
+              </div>
+            </>
           )}
           <div>
             <span className="font-medium text-gray-600">Medical Conditions:</span>
@@ -1631,12 +1775,22 @@ const Registration = () => {
                formData.medical_condition && 
                (formData.medical_condition === "no" || (formData.medical_condition === "yes" && formData.medical_details.trim()));
       case 2:
-        return formData.course_category && 
-          (formData.course_category === "Music" ? formData.instrument : 
-           formData.course_category === "Production" ? formData.production_type : true);
+        if (!formData.course_category) return false;
+        if (formData.course_category === 'Music') return !!formData.instrument;
+        if (formData.course_category === 'Production') return !!formData.production_type;
+        if (formData.course_category === 'Technology') return !!formData.technology_type;
+        if (formData.course_category === 'Languages') {
+          return !!formData.language_type && (formData.language_type !== 'Other' || !!formData.custom_language.trim());
+        }
+        return true;
       case 3:
-        return formData.course_category === "Music" ? 
-          (formData.proficiency_level && formData.learning_mode && (formData.learning_mode !== "home" || (formData.home_lesson_duration === "30_min" || formData.home_lesson_duration === "1_hour"))) : true;
+        if (formData.course_category === 'Music') {
+          return formData.proficiency_level && formData.learning_mode && (formData.learning_mode !== 'home' || (formData.home_lesson_duration === '30_min' || formData.home_lesson_duration === '1_hour'));
+        }
+        if (formData.course_category === 'Languages' || formData.course_category === 'Technology') {
+          return !!formData.learning_mode && !!formData.sessions_per_week;
+        }
+        return true;
       case 4:
         return true;
       default:
