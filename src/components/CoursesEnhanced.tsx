@@ -6,6 +6,120 @@ import { Badge } from "@/components/ui/badge";
 import { Piano, Guitar, Mic, Drum, Music, Brain, Wind, Volume2, Camera, Video, MonitorPlay, Code, Palette, Search, Filter, Headphones, BookOpen, Users, Award, Smartphone, Globe } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import { LANGUAGE_OPTIONS, LANGUAGE_SESSION_PRICE_KES } from "@/lib/languageCourseUtils";
+
+const LANGUAGE_COURSE_DETAILS = {
+  availability: "Available online and in-person at the academy",
+  duration: "Flexible sessions — choose 1–5 classes per week",
+  levels: "Beginner to advanced — all ages welcome",
+  instruments: "Course materials provided; bring a notebook.",
+  schedule: `Mon-Fri: 7am-8pm, Sun: 8am-6pm. KES ${LANGUAGE_SESSION_PRICE_KES.toLocaleString()} per session — enroll via the registration form.`,
+};
+
+const LANGUAGE_COURSE_CONTENT: Record<
+  (typeof LANGUAGE_OPTIONS)[number],
+  { title: string; description: string; features: string[] }
+> = {
+  English: {
+    title: "English Lessons",
+    description: "Build fluency in English through conversation, reading, and writing.",
+    features: [
+      "Conversation & pronunciation",
+      "Reading comprehension & writing",
+      "Grammar for everyday and professional use",
+      "Exam preparation (IELTS, TOEFL)",
+      "Business & academic English",
+      "1-on-1 personalised instruction",
+    ],
+  },
+  Kiswahili: {
+    title: "Kiswahili Lessons",
+    description: "Master Kiswahili with personalised 1-on-1 instruction for all levels.",
+    features: [
+      "Conversation & pronunciation",
+      "Reading & writing in Kiswahili",
+      "Grammar fundamentals",
+      "Cultural context & idioms",
+      "Exam and travel preparation",
+      "1-on-1 personalised instruction",
+    ],
+  },
+  Luganda: {
+    title: "Luganda Lessons",
+    description: "Learn Luganda with tailored lessons in speaking, reading, and writing.",
+    features: [
+      "Conversation & pronunciation",
+      "Reading & writing in Luganda",
+      "Grammar fundamentals",
+      "Cultural context & everyday phrases",
+      "Travel and relocation preparation",
+      "1-on-1 personalised instruction",
+    ],
+  },
+  Kinyarwanda: {
+    title: "Kinyarwanda Lessons",
+    description: "Develop Kinyarwanda skills with flexible 1-on-1 sessions.",
+    features: [
+      "Conversation & pronunciation",
+      "Reading & writing in Kinyarwanda",
+      "Grammar fundamentals",
+      "Cultural context & idioms",
+      "Travel and relocation preparation",
+      "1-on-1 personalised instruction",
+    ],
+  },
+  French: {
+    title: "French Lessons",
+    description: "Learn French from beginner basics through advanced conversation.",
+    features: [
+      "Conversation & pronunciation",
+      "Reading & writing in French",
+      "Grammar & vocabulary building",
+      "DELF/DALF exam preparation",
+      "Travel and business French",
+      "1-on-1 personalised instruction",
+    ],
+  },
+  German: {
+    title: "German Lessons",
+    description: "Study German with structured lessons for school, work, or travel.",
+    features: [
+      "Conversation & pronunciation",
+      "Reading & writing in German",
+      "Grammar & vocabulary building",
+      "Goethe exam preparation",
+      "Travel and business German",
+      "1-on-1 personalised instruction",
+    ],
+  },
+  Other: {
+    title: "Other African Languages",
+    description: "Learn other native African languages tailored to your goals.",
+    features: [
+      "Native African languages on request",
+      "Custom curriculum for your language",
+      "Conversation, reading & writing",
+      "Exam and travel preparation",
+      "Flexible weekly schedule",
+      "1-on-1 personalised instruction",
+    ],
+  },
+};
+
+const languageCourses = LANGUAGE_OPTIONS.map((language) => {
+  const content = LANGUAGE_COURSE_CONTENT[language];
+  return {
+    icon: Globe,
+    title: content.title,
+    description: content.description,
+    category: "Languages",
+    color: "accent",
+    details: {
+      ...LANGUAGE_COURSE_DETAILS,
+      features: content.features,
+    },
+  };
+});
 
 const CoursesEnhanced = () => {
   const [openDialog, setOpenDialog] = useState<number | null>(null);
@@ -383,29 +497,7 @@ const CoursesEnhanced = () => {
         schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. Proceed to the enrollment form to view all up-to-date times and book your spot."
       }
     },
-    {
-      icon: Globe,
-      title: "Language Lessons",
-      description: "Learn English, Kiswahili, Luganda, Kinyarwanda, French, German, and other native African languages.",
-      category: "Languages",
-      color: "accent",
-      details: {
-        availability: "Available online and in-person at the academy",
-        duration: "Flexible sessions — choose 1–5 classes per week",
-        levels: "Beginner to advanced — all ages welcome",
-        features: [
-          "English & Kiswahili",
-          "Luganda & Kinyarwanda",
-          "French & German",
-          "Other native African languages on request",
-          "Conversation, reading & writing",
-          "Exam and travel preparation",
-          "1-on-1 personalised instruction"
-        ],
-        instruments: "Course materials provided; bring a notebook.",
-        schedule: "Mon-Fri: 7am-8pm, Sun: 8am-6pm. KES 1,500 per session — enroll via the registration form."
-      }
-    }
+    ...languageCourses,
   ];
 
   const categories = [

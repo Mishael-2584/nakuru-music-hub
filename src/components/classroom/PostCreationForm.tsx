@@ -10,7 +10,8 @@ import {
   X,
   Calendar,
   Hash,
-  Save
+  Save,
+  Pin
 } from "lucide-react";
 import { SimpleTextEditor } from "@/components/SimpleTextEditor";
 import { PostFileUpload } from "@/components/PostFileUpload";
@@ -28,6 +29,7 @@ interface PostCreationFormProps {
     timeLimitMinutes: number;
     attachments: any[];
     quizData?: QuizFormData;
+    isPinned?: boolean;
   }) => void;
   isSubmitting?: boolean;
 }
@@ -44,6 +46,7 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
   const [attachments, setAttachments] = useState<any[]>([]);
   const [isQuiz, setIsQuiz] = useState(false);
   const [quizData, setQuizData] = useState<QuizFormData | undefined>(undefined);
+  const [pinAnnouncement, setPinAnnouncement] = useState(false);
 
   const handleSubmit = () => {
     // For quizzes, content is not required
@@ -62,7 +65,8 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
       isTimed: postType === 'assignment' ? isTimed : false,
       timeLimitMinutes: postType === 'assignment' ? timeLimitMinutes : 0,
       attachments,
-      quizData: isQuiz ? { ...quizData, is_draft: false, status: 'published' } : undefined
+      quizData: isQuiz ? { ...quizData, is_draft: false, status: 'published' } : undefined,
+      isPinned: postType === 'general' ? pinAnnouncement : false,
     });
 
     // Reset form after submission
@@ -75,6 +79,7 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
     setAttachments([]);
     setIsQuiz(false);
     setQuizData(undefined);
+    setPinAnnouncement(false);
     setPostType('general');
     setIsVisible(false);
   };
@@ -89,6 +94,7 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
     setAttachments([]);
     setIsQuiz(false);
     setQuizData(undefined);
+    setPinAnnouncement(false);
     setPostType('general');
     setIsVisible(false);
   };
@@ -369,6 +375,28 @@ export default function PostCreationForm({ onSubmit, isSubmitting = false }: Pos
               className="min-h-[200px]"
               showPreview={true}
             />
+          </div>
+        )}
+
+        {postType === 'general' && !isQuiz && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={pinAnnouncement}
+                onChange={(e) => setPinAnnouncement(e.target.checked)}
+                className="mt-1 h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
+              />
+              <span>
+                <span className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                  <Pin className="h-4 w-4" />
+                  Pin this announcement to the top
+                </span>
+                <span className="block text-sm text-amber-800 mt-1">
+                  Pinned announcements stay fixed at the top of the classroom feed for all students.
+                </span>
+              </span>
+            </label>
           </div>
         )}
 

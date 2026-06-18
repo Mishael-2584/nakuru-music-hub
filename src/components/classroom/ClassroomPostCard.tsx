@@ -21,7 +21,9 @@ import {
   AlertCircle,
   Users,
   CalendarPlus,
-  Eye
+  Eye,
+  Pin,
+  PinOff
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -30,6 +32,7 @@ interface ClassroomPostCardProps {
   isTeacher: boolean;
   onEdit?: (postId: string, content: string) => void;
   onDelete?: (postId: string) => void;
+  onTogglePin?: (postId: string, pin: boolean) => void;
   onLoadComments?: (postId: string) => void;
   onExtendDeadline?: (postId: string, newDueDate: string) => void;
   onEditQuiz?: (postId: string) => void;
@@ -46,6 +49,7 @@ export default function ClassroomPostCard({
   isTeacher, 
   onEdit, 
   onDelete, 
+  onTogglePin,
   onLoadComments,
   onExtendDeadline,
   onEditQuiz,
@@ -161,10 +165,12 @@ export default function ClassroomPostCard({
     setNewDueDate('');
   };
 
+  const isAnnouncement = !post.is_assignment && !post.has_quiz;
+
   return (
     <Card className={`shadow-sm hover:shadow-md transition-all duration-200 border-0 bg-white ${
       post.is_assignment ? 'border-l-4 border-l-blue-600' : ''
-    }`}>
+    } ${post.is_pinned && isAnnouncement ? 'border-l-4 border-l-amber-500 bg-amber-50/40 ring-1 ring-amber-100' : ''}`}>
       {/* Ultra-Compact Single Row */}
       <CardContent className="p-3">
         <div className="flex items-center justify-between">
@@ -172,8 +178,14 @@ export default function ClassroomPostCard({
             {/* Title and Key Info in One Line */}
             <div className="flex items-center gap-3 mb-1">
               <h4 className="font-semibold text-gray-900 truncate text-sm">
-                {post.is_assignment ? post.assignment_title : 'Post'}
+                {post.is_assignment ? post.assignment_title : 'Announcement'}
               </h4>
+              {post.is_pinned && isAnnouncement && (
+                <Badge variant="outline" className="text-xs px-2 py-0 bg-amber-100 text-amber-800 border-amber-200">
+                  <Pin className="h-3 w-3 mr-1" />
+                  Pinned
+                </Badge>
+              )}
               {post.is_assignment && post.max_points && (
                 <span className="text-xs font-medium text-blue-600">{post.max_points} pts</span>
               )}
@@ -324,6 +336,21 @@ export default function ClassroomPostCard({
             )}
             {isTeacher && (
               <>
+                {isAnnouncement && onTogglePin && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onTogglePin(post.post_id, !post.is_pinned)}
+                    className={`h-6 w-6 p-0 ${
+                      post.is_pinned
+                        ? 'text-amber-600 hover:text-amber-700'
+                        : 'text-gray-400 hover:text-amber-600'
+                    }`}
+                    title={post.is_pinned ? 'Unpin announcement' : 'Pin announcement to top'}
+                  >
+                    {post.is_pinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
+                  </Button>
+                )}
                 <Button 
                   variant="ghost" 
                   size="sm"

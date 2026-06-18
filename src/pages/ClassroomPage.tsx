@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, BookOpen, CheckCircle, Users, GraduationCap, Clock, Hash, Edit3, Save, X, User, Mail, Phone } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle, Users, GraduationCap, Clock, Hash, Edit3, Save, X, User, Mail, Phone, Pin } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import ClassroomPostCard from "@/components/classroom/ClassroomPostCard";
@@ -47,7 +47,21 @@ type FeedPost = {
   quiz_is_draft?: boolean;
   quiz_scheduled_open_at?: string;
   quiz_status?: 'draft' | 'published' | 'closed';
+  is_pinned?: boolean;
+  pinned_at?: string | null;
 };
+
+function sortFeedPosts(posts: FeedPost[]) {
+  return [...posts].sort((a, b) => {
+    const aPinned = a.is_pinned ? 1 : 0;
+    const bPinned = b.is_pinned ? 1 : 0;
+    if (aPinned !== bPinned) return bPinned - aPinned;
+    if (a.is_pinned && b.is_pinned && a.pinned_at && b.pinned_at) {
+      return new Date(b.pinned_at).getTime() - new Date(a.pinned_at).getTime();
+    }
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+}
 
 type PostAttachment = {
   id?: string;
@@ -1056,6 +1070,7 @@ export default function ClassroomPage() {
     timeLimitMinutes: number;
     attachments: any[];
     quizData?: QuizFormData;
+    isPinned?: boolean;
   }) => {
     if (!classroom) return;
     setIsCreatingPost(true);
@@ -1142,6 +1157,16 @@ export default function ClassroomPage() {
               file_type: attachment.file_type
             });
           }
+        }
+      }
+
+      if (!data.isAssignment && !data.quizData && data.isPinned && postId) {
+        const { error: pinError } = await supabase.rpc('set_classroom_post_pinned', {
+          post_id_param: postId,
+          is_pinned_param: true,
+        });
+        if (pinError) {
+          console.error('Failed to pin announcement:', pinError);
         }
       }
       
@@ -1374,6 +1399,207 @@ export default function ClassroomPage() {
       toast({ title: "Error", description: "Failed to delete post", variant: "destructive" });
     }
   };
+
+  const handleTogglePin = async (postId: string, pin: boolean) => {
+    try {
+      const { error } = await supabase.rpc('set_classroom_post_pinned', {
+        post_id_param: postId,
+        is_pinned_param: pin,
+      });
+      if (error) throw error;
+
+      setFeed(prev => sortFeedPosts(
+        prev.map(post =>
+          post.post_id === postId
+            ? {
+                ...post,
+                is_pinned: pin,
+                pinned_at: pin ? new Date().toISOString() : null,
+              }
+            : post
+        )
+      ));
+
+      toast({
+        title: pin ? 'Announcement pinned' : 'Announcement unpinned',
+        description: pin
+          ? 'This announcement will stay at the top of the classroom feed.'
+          : 'This announcement has been removed from the top.',
+      });
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        title: 'Error',
+        description: err?.message || 'Failed to update pinned announcement',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const pinnedAnnouncements = useMemo(
+    () => feed.filter(post => post.is_pinned && !post.is_assignment && !post.has_quiz),
+    [feed]
+  );
+  const regularFeed = useMemo(
+    () => feed.filter(post => !(post.is_pinned && !post.is_assignment && !post.has_quiz)),
+    [feed]
+  );
+
+  const renderFeedPost = (post: FeedPost) => (
+    <ClassroomPostCard
+      key={post.post_id}
+      post={post}
+      isTeacher={isTeacherOfClass}
+      onEdit={handleEditPost}
+      onDelete={handleDeletePost}
+      onTogglePin={handleTogglePin}
+      onLoadComments={loadComments}
+      onExtendDeadline={handleExtendDeadline}
+      onEditQuiz={handleEditQuiz}
+      onPreviewQuiz={handlePreviewQuiz}
+      onManageQuiz={handleManageQuiz}
+      comments={postComments[post.post_id] || []}
+      userSubmission={submissions[post.post_id]?.find(s => s.student_id === classroom?.currentStudent?.id)}
+      quizSubmissionStatus={quizSubmissionStatuses[post.post_id]}
+    >
+      {post.is_assignment && (
+        <>
+          {isEnrolledStudent && post.has_quiz && (
+            <div className="border-t border-gray-100 pt-4 mt-4 mb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-purple-600 border-purple-200 bg-purple-50">
+                    🧠 Quiz Assignment
+                  </Badge>
+                  {post.quiz_time_limit && (
+                    <Badge variant="outline" className="text-orange-600 border-orange-200">
+                      ⏱️ {post.quiz_time_limit} min
+                    </Badge>
+                  )}
+                  {post.quiz_scheduled_open_at && new Date(post.quiz_scheduled_open_at) > new Date() && (
+                    <Badge variant="outline" className="text-yellow-600 border-yellow-200 bg-yellow-50">
+                      🔒 Opens {new Date(post.quiz_scheduled_open_at).toLocaleString()}
+                    </Badge>
+                  )}
+                  {quizSubmissionStatuses[post.post_id] && (
+                    <>
+                      <Badge
+                        variant="outline"
+                        className={`${
+                          quizSubmissionStatuses[post.post_id].is_passed
+                            ? 'text-green-600 border-green-200 bg-green-50'
+                            : 'text-red-600 border-red-200 bg-red-50'
+                        }`}
+                      >
+                        {quizSubmissionStatuses[post.post_id].is_passed ? '✅ Passed' : '❌ Failed'}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs px-2 py-0 bg-blue-50 text-blue-700 border-blue-200">
+                        Submitted
+                      </Badge>
+                    </>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {quizSubmissionStatuses[post.post_id] ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        window.open(`/quiz/${post.post_id}`, '_blank');
+                      }}
+                      className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                    >
+                      View Quiz
+                    </Button>
+                  ) : post.quiz_scheduled_open_at && new Date(post.quiz_scheduled_open_at) > new Date() ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled
+                      className="text-gray-500 border-gray-200 cursor-not-allowed"
+                      title={`Quiz opens on ${new Date(post.quiz_scheduled_open_at).toLocaleString()}`}
+                    >
+                      🔒 Quiz Locked
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => {
+                        window.open(`/quiz/${post.post_id}`, '_blank');
+                      }}
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                    >
+                      🧠 Start Quiz
+                    </Button>
+                  )}
+                  {isTeacherOfClass && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        await loadQuizData(post.post_id);
+                        const { data: quizData } = await supabase
+                          .from('quizzes')
+                          .select('id')
+                          .eq('post_id', post.post_id)
+                          .single();
+
+                        if (quizData?.id) {
+                          await loadQuizSubmissions(quizData.id);
+                        }
+                        setShowQuizManagement(true);
+                      }}
+                      className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                    >
+                      Manage Quiz
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <AssignmentSubmissionPanel
+            post={post}
+            isTeacher={isTeacherOfClass}
+            submissions={submissions[post.post_id] || []}
+            enrolledStudents={enrolledStudents}
+            currentStudentId={classroom?.currentStudent?.id}
+            onSubmit={handleSubmitAssignment}
+            onGrade={handleGradeSubmission}
+            onLoadSubmissions={loadSubmissions}
+          />
+        </>
+      )}
+
+      {(isEnrolledStudent || isTeacherOfClass) && (
+        <div className="border-t border-gray-100 pt-4 mt-4">
+          <div className="flex gap-3">
+            <Input
+              placeholder="Add a comment..."
+              value={newComment[post.post_id] || ''}
+              onChange={(e) => setNewComment(prev => ({ ...prev, [post.post_id]: e.target.value }))}
+              className="flex-1"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleAddComment(post.post_id);
+                }
+              }}
+            />
+            <Button
+              onClick={() => handleAddComment(post.post_id)}
+              disabled={!newComment[post.post_id]?.trim()}
+              size="sm"
+            >
+              Post
+            </Button>
+          </div>
+        </div>
+      )}
+    </ClassroomPostCard>
+  );
 
   const handleEditQuiz = async (postId: string) => {
     console.log('handleEditQuiz called with postId:', postId);
@@ -1613,10 +1839,10 @@ export default function ClassroomPage() {
         }
       }
       
-      const postsWithAttachments = posts.map(post => ({
+      const postsWithAttachments = sortFeedPosts(posts.map(post => ({
         ...post,
         attachments: attachmentsByPost[post.post_id] || []
-      }));
+      })));
       
       setFeed(postsWithAttachments);
       
@@ -2128,165 +2354,27 @@ export default function ClassroomPage() {
           {/* Feed */}
           <div className="space-y-6">
             {feed.length > 0 ? (
-              feed.map(post => (
-                <ClassroomPostCard
-                  key={post.post_id}
-                  post={post}
-                  isTeacher={isTeacherOfClass}
-                  onEdit={handleEditPost}
-                  onDelete={handleDeletePost}
-                  onLoadComments={loadComments}
-                  onExtendDeadline={handleExtendDeadline}
-                  onEditQuiz={handleEditQuiz}
-                  onPreviewQuiz={handlePreviewQuiz}
-                  onManageQuiz={handleManageQuiz}
-                  comments={postComments[post.post_id] || []}
-                  userSubmission={submissions[post.post_id]?.find(s => s.student_id === classroom?.currentStudent?.id)}
-                  quizSubmissionStatus={quizSubmissionStatuses[post.post_id]}
-                >
-                  {post.is_assignment && (
-                    <>
-                      {/* Quiz Actions - Moved to top for better visibility */}
-                      {isEnrolledStudent && post.has_quiz && (
-                        <div className="border-t border-gray-100 pt-4 mt-4 mb-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-purple-600 border-purple-200 bg-purple-50">
-                                🧠 Quiz Assignment
-                              </Badge>
-                              {post.quiz_time_limit && (
-                                <Badge variant="outline" className="text-orange-600 border-orange-200">
-                                  ⏱️ {post.quiz_time_limit} min
-                                </Badge>
-                              )}
-                              {post.quiz_scheduled_open_at && new Date(post.quiz_scheduled_open_at) > new Date() && (
-                                <Badge variant="outline" className="text-yellow-600 border-yellow-200 bg-yellow-50">
-                                  🔒 Opens {new Date(post.quiz_scheduled_open_at).toLocaleString()}
-                                </Badge>
-                              )}
-                      {quizSubmissionStatuses[post.post_id] && (
-                        <>
-                          <Badge 
-                            variant="outline" 
-                            className={`${
-                              quizSubmissionStatuses[post.post_id].is_passed 
-                                ? 'text-green-600 border-green-200 bg-green-50' 
-                                : 'text-red-600 border-red-200 bg-red-50'
-                            }`}
-                          >
-                            {quizSubmissionStatuses[post.post_id].is_passed ? '✅ Passed' : '❌ Failed'}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs px-2 py-0 bg-blue-50 text-blue-700 border-blue-200">
-                            Submitted
-                          </Badge>
-                        </>
-                      )}
-                            </div>
-                            <div className="flex gap-2">
-                              {quizSubmissionStatuses[post.post_id] ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    window.open(`/quiz/${post.post_id}`, '_blank');
-                                  }}
-                                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                                >
-                                  View Quiz
-                                </Button>
-                              ) : post.quiz_scheduled_open_at && new Date(post.quiz_scheduled_open_at) > new Date() ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  disabled
-                                  className="text-gray-500 border-gray-200 cursor-not-allowed"
-                                  title={`Quiz opens on ${new Date(post.quiz_scheduled_open_at).toLocaleString()}`}
-                                >
-                                  🔒 Quiz Locked
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="default"
-                                  size="sm"
-                                  onClick={() => {
-                                    window.open(`/quiz/${post.post_id}`, '_blank');
-                                  }}
-                                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-                                >
-                                  🧠 Start Quiz
-                                </Button>
-                              )}
-                              {isTeacherOfClass && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={async () => {
-                                    console.log('Manage Quiz clicked, isTeacherOfClass:', isTeacherOfClass);
-                                    await loadQuizData(post.post_id);
-                                    // Load quiz submissions after quiz data is loaded
-                                    // We need to get the quiz ID from the loaded data
-                                    const { data: quizData } = await supabase
-                                      .from('quizzes')
-                                      .select('id')
-                                      .eq('post_id', post.post_id)
-                                      .single();
-                                    
-                                    if (quizData?.id) {
-                                      await loadQuizSubmissions(quizData.id);
-                                    }
-                                    setShowQuizManagement(true);
-                                  }}
-                                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                                >
-                                  Manage Quiz
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <AssignmentSubmissionPanel
-                        post={post}
-                        isTeacher={isTeacherOfClass}
-                        submissions={submissions[post.post_id] || []}
-                        enrolledStudents={enrolledStudents}
-                        currentStudentId={classroom.currentStudent?.id}
-                        onSubmit={handleSubmitAssignment}
-                        onGrade={handleGradeSubmission}
-                        onLoadSubmissions={loadSubmissions}
-                      />
-                    </>
-                  )}
-                  
-                  {/* Comment Input */}
-                  {(isEnrolledStudent || isTeacherOfClass) && (
-                    <div className="border-t border-gray-100 pt-4 mt-4">
-                      <div className="flex gap-3">
-                        <Input
-                          placeholder="Add a comment..."
-                          value={newComment[post.post_id] || ''}
-                          onChange={(e) => setNewComment(prev => ({ ...prev, [post.post_id]: e.target.value }))}
-                          className="flex-1"
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              handleAddComment(post.post_id);
-                            }
-                          }}
-                        />
-                        <Button 
-                          onClick={() => handleAddComment(post.post_id)} 
-                          disabled={!newComment[post.post_id]?.trim()}
-                          size="sm"
-                        >
-                          Post
-                        </Button>
-                      </div>
+              <>
+                {pinnedAnnouncements.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-amber-800">
+                      <Pin className="h-4 w-4" />
+                      Pinned Announcements
                     </div>
-                  )}
-                </ClassroomPostCard>
-              ))
+                    {pinnedAnnouncements.map(renderFeedPost)}
+                  </div>
+                )}
+                {regularFeed.length > 0 && (
+                  <div className="space-y-6">
+                    {pinnedAnnouncements.length > 0 && (
+                      <div className="flex items-center gap-2 text-sm font-semibold text-gray-500 pt-2 border-t border-gray-100">
+                        Recent Posts
+                      </div>
+                    )}
+                    {regularFeed.map(renderFeedPost)}
+                  </div>
+                )}
+              </>
             ) : (
               <Card className="shadow-lg border-0 bg-white">
                 <CardContent className="p-12 text-center">

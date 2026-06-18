@@ -80,6 +80,8 @@ export interface Database {
           assignment_title: string | null;
           due_date: string | null;
           max_points: number | null;
+          is_pinned: boolean;
+          pinned_at: string | null;
         };
         Insert: {
           id?: string;
@@ -91,6 +93,8 @@ export interface Database {
           assignment_title?: string | null;
           due_date?: string | null;
           max_points?: number | null;
+          is_pinned?: boolean;
+          pinned_at?: string | null;
         };
         Update: {
           id?: string;
@@ -102,6 +106,8 @@ export interface Database {
           assignment_title?: string | null;
           due_date?: string | null;
           max_points?: number | null;
+          is_pinned?: boolean;
+          pinned_at?: string | null;
         };
       };
       classroom_comments: {
