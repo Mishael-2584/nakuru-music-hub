@@ -1417,6 +1417,19 @@ const AdminPanel = () => {
       
       const { createInstantMeeting, createSimpleTrialMeeting } = await import('@/lib/videoConferencing');
       const meetingTitle = `Trial Class: ${selectedTrialBooking.instrument} with ${teacher.name}`;
+
+      let trialParticipantIds: string[] = [];
+      const trialEmail = selectedTrialBooking.email?.trim();
+      if (trialEmail) {
+        const { data: trialStudentProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('email', trialEmail)
+          .maybeSingle();
+        if (trialStudentProfile?.id) {
+          trialParticipantIds = [trialStudentProfile.id];
+        }
+      }
       
       let meeting: {
         meetingUrl: string;
@@ -1432,10 +1445,10 @@ const AdminPanel = () => {
           hostId: teacher.user_id,
           hostName: teacher.name,
           hostRole: 'teacher' as const,
-          participants: [],
+          participants: trialParticipantIds,
           duration: 60,
           maxParticipants: 20,
-          isPublic: true,
+          isPublic: false,
           allowRecording: false,
           scheduledStartTime: scheduledDateTime.toISOString()
         };

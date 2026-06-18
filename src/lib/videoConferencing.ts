@@ -1004,18 +1004,52 @@ export const getUserInstantMeetings = async (
   return meetings;
 };
 
+// Check if an instant meeting has ended and should no longer appear in invited lists
+export const isInstantMeetingPast = (meeting: InstantMeeting): boolean => {
+  if (meeting.status === 'completed' || meeting.status === 'cancelled') {
+    return true;
+  }
+
+  const now = Date.now();
+  const graceMs = 30 * 60 * 1000;
+
+  if (meeting.endedAt && now > new Date(meeting.endedAt).getTime()) {
+    return true;
+  }
+
+  const startReference = meeting.startedAt || meeting.scheduledStartTime;
+  if (startReference) {
+    const endMs =
+      new Date(startReference).getTime() +
+      meeting.duration * 60 * 1000 +
+      graceMs;
+    if (now > endMs) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 // Get meetings where user is invited (for student dashboard)
 export const getUserInvitedMeetings = async (userId: string): Promise<InstantMeeting[]> => {
   const { supabase } = await import('../integrations/supabase/client');
   
   console.log('[getUserInvitedMeetings] Fetching invited meetings for user:', userId);
+
+  try {
+    await cleanupExpiredMeetings();
+  } catch (error) {
+    console.warn('[getUserInvitedMeetings] Cleanup skipped:', error);
+  }
   
   const { data, error } = await supabase
     .from('instant_meetings')
     .select('*')
-    .or(`participants.cs.{"${userId}"},is_public.eq.true`)
+    .contains('participants', [userId])
     .neq('host_id', userId)
     .in('status', ['scheduled', 'pending', 'active'])
+    .order('scheduled_start_time', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false });
 
   console.log('[getUserInvitedMeetings] Query result:', { data, error });
@@ -1025,7 +1059,9 @@ export const getUserInvitedMeetings = async (userId: string): Promise<InstantMee
     throw new Error(`Failed to get invited meetings: ${error.message}`);
   }
 
-  const meetings = (data || []).map((meeting) => mapInstantMeetingRow(meeting));
+  const meetings = (data || [])
+    .map((meeting) => mapInstantMeetingRow(meeting))
+    .filter((meeting) => !isInstantMeetingPast(meeting));
 
   console.log('[getUserInvitedMeetings] Mapped meetings:', meetings);
   return meetings;
@@ -1302,6 +1338,34 @@ export const cleanupExpiredMeetings = async (): Promise<void> => {
             })
             .eq('id', meeting.id);
         }
+      }
+    }
+  }
+
+  // Auto-complete scheduled meetings whose end time (+ grace) has passed
+  const { data: scheduledMeetings, error: scheduledFetchError } = await supabase
+    .from('instant_meetings')
+    .select('id, scheduled_start_time, duration')
+    .eq('status', 'scheduled');
+
+  if (!scheduledFetchError && scheduledMeetings) {
+    for (const meeting of scheduledMeetings) {
+      if (!meeting.scheduled_start_time) continue;
+
+      const endTimeWithGrace = new Date(
+        new Date(meeting.scheduled_start_time).getTime() +
+          (meeting.duration + 30) * 60 * 1000
+      );
+
+      if (now > endTimeWithGrace) {
+        await supabase
+          .from('instant_meetings')
+          .update({
+            status: 'completed',
+            ended_at: endTimeWithGrace.toISOString(),
+            updated_at: now.toISOString(),
+          })
+          .eq('id', meeting.id);
       }
     }
   }

@@ -38,6 +38,7 @@ import {
   deleteInstantMeeting,
   cleanupExpiredMeetings,
   getActiveParticipants,
+  isInstantMeetingPast,
   InstantMeeting,
   MeetingParticipantLog
 } from '../lib/videoConferencing';
@@ -164,6 +165,7 @@ const InstantMeetManager = ({
         participants: m.participants 
       })));
       filtered = filtered.filter(m => m.hostId !== userId && m.participants.includes(userId));
+      filtered = filtered.filter(m => !isInstantMeetingPast(m));
       console.log('Filtered by invited meetings:', filtered.length);
       console.log('Invited meetings:', filtered.map(m => ({ id: m.id, title: m.title, hostId: m.hostId, participants: m.participants })));
     }
