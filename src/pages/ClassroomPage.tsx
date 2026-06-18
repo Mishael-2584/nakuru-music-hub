@@ -731,7 +731,7 @@ export default function ClassroomPage() {
       console.log('Student found:', student);
 
       // Load submission answers using the same RPC function as students use
-      const { data: answersData, error: answersError } = await supabase.rpc('get_quiz_submission_answers', {
+      let { data: answersData, error: answersError } = await supabase.rpc('get_quiz_submission_answers', {
         submission_id_param: submissionId
       });
 

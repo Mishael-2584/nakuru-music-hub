@@ -1592,7 +1592,7 @@ export async function generateInvoiceForRegistration(
   const billableExistingInvoices = filterInvoicesUpToCurrentMonth(existingInvoices || [], now);
   const isFirstInvoice = billableExistingInvoices.length === 0;
   const latestInvoice = getLatestInvoiceByPeriodEnd(billableExistingInvoices);
-  const paymentType = fee.payment_type as BillingPaymentType;
+  paymentType = fee.payment_type as BillingPaymentType;
 
   const currentMonthInvoice = findInvoiceForCalendarMonth(billableExistingInvoices, student.id, now);
   if (currentMonthInvoice) {
