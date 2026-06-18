@@ -89,3 +89,41 @@ export function collectTeacherApplicationDocuments(
 
   return docs;
 }
+
+export function collectApprovedTeacherDocuments(
+  teacher: { id: string; cv_file_path?: string | null },
+  teacherDocs: {
+    id: string;
+    teacher_id: string;
+    doc_type: string;
+    file_path: string;
+    file_name?: string | null;
+  }[]
+): TeacherApplicationDocument[] {
+  const docs: TeacherApplicationDocument[] = [];
+
+  for (const doc of teacherDocs.filter((d) => d.teacher_id === teacher.id)) {
+    docs.push({
+      id: doc.id,
+      docType: doc.doc_type,
+      label: getTeacherDocTypeLabel(doc.doc_type),
+      filePath: doc.file_path,
+      fileName: doc.file_name || doc.file_path.split('/').pop() || doc.doc_type,
+    });
+  }
+
+  if (
+    teacher.cv_file_path &&
+    !docs.some((d) => d.docType === 'cv' && d.filePath === teacher.cv_file_path)
+  ) {
+    docs.unshift({
+      id: `cv-${teacher.id}`,
+      docType: 'cv',
+      label: getTeacherDocTypeLabel('cv'),
+      filePath: teacher.cv_file_path,
+      fileName: teacher.cv_file_path.split('/').pop() || 'cv.pdf',
+    });
+  }
+
+  return docs;
+}

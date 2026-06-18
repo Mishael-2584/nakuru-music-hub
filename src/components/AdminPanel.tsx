@@ -30,6 +30,7 @@ import ManualInvoiceManager from './admin/ManualInvoiceManager';
 import RecordInvoicePaymentDialog from './admin/RecordInvoicePaymentDialog';
 import StudentAccountControl from './admin/StudentAccountControl';
 import PendingTeacherApplicationCard from './admin/PendingTeacherApplicationCard';
+import ApprovedTeacherCard from './admin/ApprovedTeacherCard';
 import { isTermlyCourseCategory } from '@/lib/termlyFeeUtils';
 
 interface Registration {
@@ -132,6 +133,7 @@ const AdminPanel = () => {
   const navigate = useNavigate();
   const [pendingTeachers, setPendingTeachers] = useState([]);
   const [pendingTeacherDocuments, setPendingTeacherDocuments] = useState<any[]>([]);
+  const [teacherDocuments, setTeacherDocuments] = useState<any[]>([]);
   const [approvedTeachers, setApprovedTeachers] = useState([]);
   const [teacherLoading, setTeacherLoading] = useState(false);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
@@ -2295,6 +2297,12 @@ const AdminPanel = () => {
           .order('uploaded_at', { ascending: false });
         if (!docsError) setPendingTeacherDocuments(docs || []);
 
+        const { data: approvedDocs, error: approvedDocsError } = await supabase
+          .from('teacher_documents')
+          .select('*')
+          .order('uploaded_at', { ascending: false });
+        if (!approvedDocsError) setTeacherDocuments(approvedDocs || []);
+
         console.log('🔍 Fetching approved teachers...');
         const { data: approved, error: approvedError } = await supabase
           .from("teachers")
@@ -2365,11 +2373,62 @@ const AdminPanel = () => {
         subjects: teacher.subjects,
         status: "approved",
         user_id: userData.userId, // Set the user_id to link to auth.users
+        cv_file_path: teacher.cv_file_path || null,
         created_at: teacher.created_at || new Date().toISOString(),
       };
 
       const { data, error } = await supabase.from("teachers").insert([teacherData]);
       if (error) throw error;
+
+      const pendingDocs = pendingTeacherDocuments.filter(
+        (doc) => doc.pending_teacher_id === teacher.id
+      );
+      const docsToInsert: {
+        teacher_id: string;
+        doc_type: string;
+        file_path: string;
+        file_name: string | null;
+        status: string;
+      }[] = [];
+
+      if (teacher.cv_file_path) {
+        docsToInsert.push({
+          teacher_id: teacher.id,
+          doc_type: 'cv',
+          file_path: teacher.cv_file_path,
+          file_name: teacher.cv_file_path.split('/').pop() || 'cv.pdf',
+          status: 'approved',
+        });
+      }
+
+      for (const doc of pendingDocs) {
+        if (
+          doc.doc_type === 'cv' &&
+          teacher.cv_file_path &&
+          doc.file_path === teacher.cv_file_path
+        ) {
+          continue;
+        }
+        docsToInsert.push({
+          teacher_id: teacher.id,
+          doc_type: doc.doc_type,
+          file_path: doc.file_path,
+          file_name: doc.file_name || doc.file_path.split('/').pop() || doc.doc_type,
+          status: 'approved',
+        });
+      }
+
+      if (docsToInsert.length > 0) {
+        const { data: migratedDocs, error: migrateError } = await supabase
+          .from('teacher_documents')
+          .insert(docsToInsert)
+          .select('*');
+        if (migrateError) {
+          console.error('Failed to migrate teacher documents:', migrateError);
+        } else if (migratedDocs?.length) {
+          setTeacherDocuments((prev) => [...migratedDocs, ...prev]);
+        }
+      }
 
       // Remove from pending_teachers
       await supabase.from("pending_teachers").delete().eq("id", teacher.id);
@@ -2387,7 +2446,13 @@ const AdminPanel = () => {
       
       // Refresh lists
       setPendingTeachers((prev) => prev.filter((t) => t.id !== teacher.id));
-      setApprovedTeachers((prev) => [{ ...teacher, status: "approved" }, ...prev]);
+      setPendingTeacherDocuments((prev) =>
+        prev.filter((doc) => doc.pending_teacher_id !== teacher.id)
+      );
+      setApprovedTeachers((prev) => [
+        { ...teacher, status: "approved", cv_file_path: teacher.cv_file_path || null },
+        ...prev,
+      ]);
     } catch (err) {
       console.error('Error approving teacher:', err);
       toast({ title: "Error", description: err.message || "Failed to approve teacher.", variant: "destructive" });
@@ -4507,36 +4572,11 @@ const AdminPanel = () => {
                 ) : (
                   <div className="grid gap-4">
                     {approvedTeachers.map((teacher) => (
-                      <Card key={teacher.id} className="shadow border-0 bg-white/90">
-                        <CardContent className="p-6">
-                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                            <div>
-                              <div className="flex items-center gap-2 mb-2">
-                                <GraduationCap className="h-5 w-5 text-primary" />
-                                <span className="font-bold text-lg">{teacher.name}</span>
-                                <Badge className="ml-2">{teacher.category}</Badge>
-                              </div>
-                              <div className="text-sm text-muted-foreground mb-1">{teacher.email} • {teacher.phone}</div>
-                              <div className="text-sm mb-1">Experience: {teacher.experience}</div>
-                              <div className="text-sm mb-1">Subjects: {teacher.subjects?.join(", ")}</div>
-                              <div className="text-sm mb-1">Bio: {teacher.bio}</div>
-                              <div className="text-sm mb-1 flex flex-wrap gap-x-4 gap-y-1">
-                                {teacher.cv_file_path && (
-                                  <a
-                                    href={supabase.storage.from('teacher-cvs').getPublicUrl(teacher.cv_file_path).data.publicUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-primary underline font-medium"
-                                  >
-                                    Download CV
-                                  </a>
-                                )}
-                              </div>
-                              <div className="text-xs text-gray-400">Approved: {new Date(teacher.created_at).toLocaleString()}</div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                      <ApprovedTeacherCard
+                        key={teacher.id}
+                        teacher={teacher}
+                        documents={teacherDocuments}
+                      />
                     ))}
                   </div>
                 )}
