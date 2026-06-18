@@ -592,6 +592,14 @@ const TeacherDashboard = () => {
     }
   }, [activeTab, profile?.id]);
 
+  // Refresh messaging recipients when opening the Messages tab
+  useEffect(() => {
+    if (activeTab === 'messages' && profile?.id) {
+      fetchStudents();
+      fetchAdminProfiles();
+    }
+  }, [activeTab, profile?.id]);
+
   // Refetch meetings when returning to the browser tab
   useEffect(() => {
     const handleVisibility = () => {
@@ -837,38 +845,79 @@ const TeacherDashboard = () => {
     }
   };
 
-  // Fetch students who have booked sessions with this teacher
+  // Fetch students connected to this teacher via bookings, classrooms, or lessons
   const fetchStudents = async () => {
     if (!profile?.id) return;
     
     try {
-      // Get students who have bookings with this teacher
-      const { data: studentsData, error: studentsError } = await supabase
+      const studentMap = new Map<string, Student>();
+
+      const addStudent = (student: Student | null | undefined) => {
+        if (!student?.id || !student.user_id) return;
+        if (!studentMap.has(student.id)) {
+          studentMap.set(student.id, student);
+        }
+      };
+
+      const { data: directStudents, error: directError } = await supabase
         .from('students')
         .select(`
-          id, user_id, student_name, email, phone, instrument, 
-          learning_mode, age, proficiency_level, status, enrollment_date,
-          bookings!inner(teacher_id)
+          id, user_id, student_name, email, phone, instrument,
+          learning_mode, age, proficiency_level, status, enrollment_date
         `)
-        .eq('bookings.teacher_id', profile.id)
-        .not('user_id', 'is', null);
+        .not('user_id', 'is', null)
+        .order('student_name', { ascending: true });
 
-      if (studentsError) {
-        console.error('Error fetching students:', studentsError);
+      if (directError) {
+        console.error('Error fetching students for messaging:', directError);
       } else {
-        // Remove duplicates (students might have multiple bookings)
-        const uniqueStudents = studentsData?.reduce((acc: any[], student) => {
-          if (!acc.find(s => s.id === student.id)) {
-            // Remove the bookings data from the student object
-            const { bookings, ...studentData } = student;
-            acc.push(studentData);
-          }
-          return acc;
-        }, []) || [];
-        
-        setStudents(uniqueStudents);
-        console.log('[TeacherDashboard] Students with bookings loaded:', uniqueStudents.length);
+        directStudents?.forEach(addStudent);
       }
+
+      if (studentMap.size === 0) {
+        const { data: bookingRows, error: bookingError } = await supabase
+          .from('bookings')
+          .select(`
+            students!inner(
+              id, user_id, student_name, email, phone, instrument,
+              learning_mode, age, proficiency_level, status, enrollment_date
+            )
+          `)
+          .eq('teacher_id', profile.id);
+
+        if (bookingError) {
+          console.error('Error fetching students from bookings:', bookingError);
+        } else {
+          bookingRows?.forEach((row: { students: Student }) => addStudent(row.students));
+        }
+      }
+
+      if (studentMap.size === 0) {
+        const { data: enrollmentRows, error: enrollmentError } = await supabase
+          .from('classroom_enrollments')
+          .select(`
+            students!inner(
+              id, user_id, student_name, email, phone, instrument,
+              learning_mode, age, proficiency_level, status, enrollment_date
+            ),
+            classrooms!inner(teacher_id)
+          `)
+          .eq('classrooms.teacher_id', profile.id)
+          .in('status', ['enrolled', 'invited']);
+
+        if (enrollmentError) {
+          console.error('Error fetching students from classrooms:', enrollmentError);
+        } else {
+          enrollmentRows?.forEach((row: { students: Student }) => addStudent(row.students));
+        }
+      }
+
+      const uniqueStudents = Array.from(studentMap.values()).sort((a, b) =>
+        (a.student_name || a.email || '').localeCompare(b.student_name || b.email || '')
+      );
+
+      setStudents(uniqueStudents);
+      console.log('[TeacherDashboard] Messaging students loaded:', uniqueStudents.length);
     } catch (error) {
       console.error('Error fetching students:', error);
     }
@@ -2290,11 +2339,11 @@ const TeacherDashboard = () => {
                       const studentRecipients = students.map(student => ({
                         id: student.id,
                         user_id: student.user_id,
-                        name: student.student_name,
-                        email: student.email,
+                        name: student.student_name || student.email || 'Student',
+                        email: student.email || '',
                         type: 'student' as const,
-                        profile_photo_url: undefined // Students table doesn't have profile_photo_url
-                      })).filter(s => s.user_id); // Ensure user_id exists
+                        profile_photo_url: undefined
+                      })).filter(s => s.user_id);
                       
                       // Admins
                       const adminRecipients = adminProfiles.map(admin => ({

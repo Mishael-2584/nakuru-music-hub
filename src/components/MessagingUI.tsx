@@ -52,6 +52,19 @@ interface MessagingUIProps {
   userType: 'student' | 'teacher' | 'admin';
 }
 
+const normalizeSearchText = (value?: string | null) => (value || '').toLowerCase().trim();
+
+const recipientMatchesSearch = (recipient: Recipient, searchTerm: string) => {
+  const query = normalizeSearchText(searchTerm);
+  if (!query) return true;
+
+  return (
+    normalizeSearchText(recipient.name).includes(query) ||
+    normalizeSearchText(recipient.email).includes(query) ||
+    normalizeSearchText(recipient.type).includes(query)
+  );
+};
+
 const MessagingUI: React.FC<MessagingUIProps> = ({ 
   recipients, 
   currentUserId, 
@@ -469,12 +482,17 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
 
   const composeRecipients = recipients.filter(r => r.user_id !== currentUserId && r.type !== userType);
 
-  // Filter recipients for search
-  const filteredRecipients = composeRecipients.filter(recipient =>
-    recipient.name.toLowerCase().includes(recipientSearchTerm.toLowerCase()) ||
-    recipient.email.toLowerCase().includes(recipientSearchTerm.toLowerCase()) ||
-    recipient.type.toLowerCase().includes(recipientSearchTerm.toLowerCase())
+  const availableRecipients = composeRecipients.filter(
+    recipient => !selectedRecipients.some(selected => selected.user_id === recipient.user_id)
   );
+
+  const filteredRecipients = availableRecipients.filter(recipient =>
+    recipientMatchesSearch(recipient, recipientSearchTerm)
+  );
+
+  const displayedRecipients = recipientSearchTerm.trim()
+    ? filteredRecipients
+    : availableRecipients;
 
   const totalUnreadCount = conversations.reduce((total, conv) => total + conv.unreadCount, 0);
 
@@ -632,30 +650,42 @@ const MessagingUI: React.FC<MessagingUIProps> = ({
                       onFocus={() => setShowRecipientDropdown(true)}
                       className="w-full"
                     />
-                    {showRecipientDropdown && recipientSearchTerm && (
+                    {showRecipientDropdown && (
                       <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                        {filteredRecipients.filter(r => !selectedRecipients.find(sr => sr.user_id === r.user_id)).length > 0 ? (
-                          filteredRecipients
-                            .filter(r => !selectedRecipients.find(sr => sr.user_id === r.user_id))
-                            .map(recipient => (
+                        {displayedRecipients.length > 0 ? (
+                          displayedRecipients.map(recipient => (
                             <div
                               key={recipient.user_id}
                               className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
                               onClick={() => addRecipient(recipient)}
                             >
                               <div className="font-medium">{recipient.name}</div>
-                              <div className="text-sm text-gray-500">{recipient.email} ({recipient.type})</div>
+                              <div className="text-sm text-gray-500">
+                                {[recipient.email, recipient.type].filter(Boolean).join(' · ')}
+                              </div>
                             </div>
                           ))
                         ) : (
-                          <div className="px-4 py-2 text-gray-500">No more recipients found</div>
+                          <div className="px-4 py-3 text-sm text-gray-500">
+                            {composeRecipients.length === 0
+                              ? userType === 'teacher'
+                                ? 'No students available yet. Students appear here after they book a lesson or join your classroom.'
+                                : 'No recipients available.'
+                              : recipientSearchTerm.trim()
+                                ? `No recipients match "${recipientSearchTerm.trim()}".`
+                                : 'No recipients available.'}
+                          </div>
                         )}
                       </div>
                     )}
                   </div>
                   <p className="text-xs text-gray-500">
-                    {selectedRecipients.length === 0 
-                      ? 'Search and select one or more recipients' 
+                    {selectedRecipients.length === 0
+                      ? composeRecipients.length > 0
+                        ? 'Click the field to browse recipients or type to search by name or email'
+                        : userType === 'teacher'
+                          ? 'Students will appear here after they book with you or join your classroom'
+                          : 'Search and select one or more recipients'
                       : `${selectedRecipients.length} recipient${selectedRecipients.length > 1 ? 's' : ''} selected`}
                   </p>
                 </div>

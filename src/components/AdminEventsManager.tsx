@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Edit, Trash2, Users, ImageIcon, Calendar, MapPin } from "lucide-react";
+import { Plus, Edit, Trash2, Users, ImageIcon, Calendar, MapPin, Eye, EyeOff } from "lucide-react";
 import ImageUpload from "@/components/ui/image-upload";
 import RichTextEditor from "@/components/ui/RichTextEditor";
 
@@ -45,7 +45,7 @@ const AdminEventsManager = () => {
     location: "",
     max_attendees: "",
     registration_required: false,
-    status: "draft",
+    status: "published",
     is_featured: false,
     image_url: ""
   });
@@ -97,11 +97,33 @@ const AdminEventsManager = () => {
     }
   };
 
+  const slugifyTitle = (title: string) =>
+    title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+  const buildEventSlug = async (title: string, existingSlug?: string | null) => {
+    if (existingSlug) return existingSlug;
+
+    const baseSlug = slugifyTitle(title);
+    if (!baseSlug) return `event-${Date.now().toString(36)}`;
+
+    const { data: matches } = await supabase
+      .from('events')
+      .select('slug')
+      .like('slug', `${baseSlug}%`);
+
+    if (!matches?.length) return baseSlug;
+
+    const taken = new Set(matches.map((row) => row.slug));
+    if (!taken.has(baseSlug)) return baseSlug;
+
+    return `${baseSlug}-${Date.now().toString(36).slice(-4)}`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-      const slug = formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      const slug = await buildEventSlug(formData.title, editingEvent?.slug);
 
       const eventData = {
         title: formData.title,
@@ -115,7 +137,7 @@ const AdminEventsManager = () => {
         status: formData.status,
         is_featured: formData.is_featured,
         image_url: formData.image_url || null,
-        slug: slug,
+        slug,
       };
 
       let error;
@@ -145,7 +167,11 @@ const AdminEventsManager = () => {
 
       toast({
         title: "Success",
-        description: editingEvent ? "Event updated successfully" : "Event created successfully",
+        description: editingEvent
+          ? "Event updated successfully"
+          : formData.status === 'published'
+            ? "Event published — it will now appear on the public Events page."
+            : "Event saved as draft — change status to Published to show it on the website.",
       });
 
       resetForm();
@@ -208,6 +234,30 @@ const AdminEventsManager = () => {
     }
   };
 
+  const handlePublish = async (event: Event) => {
+    try {
+      const { error } = await supabase
+        .from('events')
+        .update({ status: 'published' })
+        .eq('id', event.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Event published",
+        description: `"${event.title}" is now visible on the public Events page.`,
+      });
+      fetchEvents();
+    } catch (error) {
+      console.error('Error publishing event:', error);
+      toast({
+        title: "Error",
+        description: "Failed to publish event",
+        variant: "destructive",
+      });
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       title: "",
@@ -218,7 +268,7 @@ const AdminEventsManager = () => {
       location: "",
       max_attendees: "",
       registration_required: false,
-      status: "draft",
+      status: "published",
       is_featured: false,
       image_url: ""
     });
@@ -338,10 +388,13 @@ const AdminEventsManager = () => {
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="published">Published</SelectItem>
+                      <SelectItem value="published">Published (visible on website)</SelectItem>
+                      <SelectItem value="draft">Draft (hidden from website)</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Only <strong>Published</strong> events appear on the public Events page.
+                  </p>
                 </div>
 
                 <div className="flex items-center space-x-2 pt-6">
@@ -387,8 +440,14 @@ const AdminEventsManager = () => {
                   <div className="flex items-center gap-2 mb-2">
                     <h3 className="text-lg font-semibold">{event.title}</h3>
                     <Badge variant={event.status === 'published' ? 'default' : 'secondary'}>
-                      {event.status}
+                      {event.status === 'published' ? 'Published' : 'Draft — hidden'}
                     </Badge>
+                    {event.status !== 'published' && (
+                      <Badge variant="outline" className="text-amber-700 border-amber-300 bg-amber-50">
+                        <EyeOff className="h-3 w-3 mr-1" />
+                        Not on website
+                      </Badge>
+                    )}
                     {event.is_featured && (
                       <Badge className="bg-yellow-500">Featured</Badge>
                     )}
@@ -427,6 +486,16 @@ const AdminEventsManager = () => {
                 <div className="flex items-center gap-2 ml-4">
                   {event.image_url && (
                     <ImageIcon className="h-4 w-4 text-green-500" />
+                  )}
+                  {event.status !== 'published' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePublish(event)}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      Publish
+                    </Button>
                   )}
                   <Button
                     variant="outline"
