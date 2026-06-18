@@ -177,10 +177,9 @@ export async function resolveInvoiceAfterGeneration(
   }
 
   if (isInvoiceNotDue(result)) {
-    const period = getCalendarMonthPeriod();
     const { data } = await supabase.from('invoices').select('*').eq('student_id', studentId);
     const billable = filterInvoicesUpToCurrentMonth(data || []);
-    const current = findInvoiceForFinancePeriod(billable, studentId, period);
+    const current = findInvoiceForCalendarMonth(billable, studentId);
     if (current) {
       const { data: earlier } = await supabase
         .from('invoices')
@@ -347,16 +346,54 @@ export async function voidFutureInvoices(options?: {
   };
 }
 
+/**
+ * True when an invoice's date range overlaps the reference calendar month.
+ * Handles non-standard periods (e.g. 2026-05-31 → 2026-06-29 still counts as June).
+ */
+export function invoiceOverlapsCalendarMonth(
+  invoice: { period_start?: string | null; period_end?: string | null },
+  reference: Date | string = new Date()
+): boolean {
+  if (!invoice.period_start || !invoice.period_end) return false;
+  const ref = typeof reference === 'string' ? parseLocalDateString(reference) : reference;
+  const { start, end } = getCalendarMonthPeriod(ref);
+  const monthStart = parseLocalDateString(start);
+  const monthEnd = parseLocalDateString(end);
+  const invStart = parseLocalDateString(invoice.period_start);
+  const invEnd = parseLocalDateString(invoice.period_end);
+  return invStart <= monthEnd && invEnd >= monthStart;
+}
+
+export function findInvoiceForCalendarMonth<
+  T extends { student_id: string; period_start: string; period_end: string }
+>(invoices: T[], studentId: string, reference: Date | string = new Date()): T | undefined {
+  return invoices.find(
+    (inv) => inv.student_id === studentId && invoiceOverlapsCalendarMonth(inv, reference)
+  );
+}
+
+/** Read-only: invoice for the current billing month (paid or unpaid). Never creates a row. */
+export async function fetchStudentInvoiceForPreview(studentId: string): Promise<Invoice | null> {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('*')
+    .eq('student_id', studentId)
+    .order('period_end', { ascending: false });
+
+  if (error) throw error;
+
+  const billable = filterInvoicesUpToCurrentMonth(data || []);
+  const current = findInvoiceForCalendarMonth(billable, studentId);
+  return (current as Invoice) ?? null;
+}
+
 export function invoiceMatchesFinancePeriod(
   invoice: { period_start?: string | null; period_end?: string | null },
   period: { start: string; end: string }
 ): boolean {
   if (!invoice.period_start || !invoice.period_end) return false;
   if (invoice.period_start === period.start && invoice.period_end === period.end) return true;
-  // Legacy rows saved with UTC-skewed dates: match same calendar month
-  const [sy, sm] = period.start.split('-').map(Number);
-  const [iy, im] = invoice.period_start.split('-').map(Number);
-  return sy === iy && sm === im;
+  return invoiceOverlapsCalendarMonth(invoice, period.start);
 }
 
 export function findInvoiceForFinancePeriod<T extends { student_id: string; period_start: string; period_end: string }>(
@@ -364,9 +401,7 @@ export function findInvoiceForFinancePeriod<T extends { student_id: string; peri
   studentId: string,
   period: { start: string; end: string }
 ): T | undefined {
-  return invoices.find(
-    (inv) => inv.student_id === studentId && invoiceMatchesFinancePeriod(inv, period)
-  );
+  return findInvoiceForCalendarMonth(invoices, studentId, period.start);
 }
 
 /** Invoice to show in admin finances row (current month, or latest open invoice e.g. first term bill). */
@@ -1502,6 +1537,24 @@ export async function generateInvoiceForRegistration(
   const latestInvoice = getLatestInvoiceByPeriodEnd(billableExistingInvoices);
   const paymentType = fee.payment_type as BillingPaymentType;
 
+  const currentMonthInvoice = findInvoiceForCalendarMonth(billableExistingInvoices, student.id, now);
+  if (currentMonthInvoice) {
+    return { existing: currentMonthInvoice as Invoice };
+  }
+
+  if (latestInvoice && isInvoiceFullyPaid(latestInvoice)) {
+    const nextPeriodCheck = computeNextBillingPeriod({
+      paymentType,
+      isFirstInvoice: false,
+      registrationCreatedAt: registration.created_at,
+      lastPeriodEnd: latestInvoice.period_end,
+      reference: now,
+    });
+    if (!nextPeriodCheck) {
+      return { existing: latestInvoice as Invoice };
+    }
+  }
+
   console.log('📅 Billing period calculation:', {
     isFirstInvoice,
     existingInvoicesCount: existingInvoices?.length || 0,
@@ -1520,14 +1573,8 @@ export async function generateInvoiceForRegistration(
   });
 
   if (!nextPeriod) {
-    const currentPeriod = getCalendarMonthPeriod(now);
-    const currentInvoice = findInvoiceForFinancePeriod(
-      billableExistingInvoices,
-      student.id,
-      currentPeriod
-    );
-    if (currentInvoice) {
-      return { existing: currentInvoice as Invoice };
+    if (latestInvoice) {
+      return { existing: latestInvoice as Invoice };
     }
     return {
       notDue: true,

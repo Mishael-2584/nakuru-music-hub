@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { generateQuotePDF } from "@/lib/pdfGenerator";
 import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
-import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchStudentCreditBalance, fetchInvoicePayments, filterInvoicesUpToCurrentMonth, isInvoiceNotDue, resolveInvoiceAfterGeneration, previewFutureInvoices, voidFutureInvoices, type FutureInvoicePreviewRow, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
+import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchStudentCreditBalance, fetchInvoicePayments, filterInvoicesUpToCurrentMonth, isInvoiceNotDue, resolveInvoiceAfterGeneration, previewFutureInvoices, voidFutureInvoices, fetchStudentInvoiceForPreview, type FutureInvoicePreviewRow, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
 import LearningModeDebugTest from './LearningModeDebugTest';
 import FeeDebug from './FeeDebug';
@@ -2889,7 +2889,7 @@ const AdminPanel = () => {
     }
   };
 
-  // Preview invoice (generate PDF and open in new tab; create invoice if needed)
+  // Preview invoice (read-only PDF — never creates a new billing row)
   const [previewInvoiceLoading, setPreviewInvoiceLoading] = useState<string | null>(null);
   const handlePreviewInvoice = async (student: any, existingInvoice?: any) => {
     if (!student || !isValidId(student.id)) {
@@ -2898,60 +2898,30 @@ const AdminPanel = () => {
     }
     setPreviewInvoiceLoading(student.id);
     try {
-      let invoice = existingInvoice ?? null;
+      const invoice = existingInvoice ?? (await fetchStudentInvoiceForPreview(student.id));
       if (!invoice) {
-      let regId = student.registration_id;
-      if (!regId) {
-        const { data: regData, error: regErr } = await supabase
-          .from('registrations')
-          .select('id')
-          .eq('student_name', student.student_name)
-          .eq('email', student.email)
-          .eq('status', 'approved')
-          .single();
-        if (regErr || !regData) {
-          toast({ title: 'Error', description: 'Could not find registration for this student.', variant: 'destructive' });
-          return;
-        }
-        regId = regData.id;
-      }
-      const result = await generateInvoiceForRegistration(regId);
-      const resolved = await resolveInvoiceAfterGeneration(student.id, result);
-      invoice = resolved.invoice;
-      if (resolved.notice && invoice && isInvoiceNotDue(result)) {
-        toast({ title: 'Current billing period', description: resolved.notice });
-      }
-      if (invoice) {
-        const validStudentIds = activeStudents.filter((s: any) => isValidId(s.id)).map((s: any) => s.id);
-        const { data: invData } = await supabase
-          .from('invoices')
-          .select('*')
-          .in('student_id', validStudentIds)
-          .order('period_end', { ascending: false });
-        if (invData) {
-          const billableInvoices = filterInvoicesUpToCurrentMonth(invData);
-          setAllStudentInvoices(billableInvoices);
-          const p = getCalendarMonthPeriod();
-          const currentPeriod: Record<string, any> = {};
-          for (const studentId of validStudentIds) {
-            const match = findInvoiceForFinancePeriod(billableInvoices, studentId, p);
-            if (match) currentPeriod[studentId] = match;
-          }
-          setStudentInvoices(currentPeriod);
-        }
-      }
-      }
-      if (!invoice) {
-        toast({ title: 'No invoice', description: 'No invoice available to preview.', variant: 'destructive' });
+        toast({
+          title: 'No current invoice',
+          description:
+            'There is no invoice for the current billing month. Use Send Invoice only when a new period is due.',
+        });
         return;
       }
-      const { data: earlier } = await supabase.from('invoices').select('id').eq('student_id', student.id).lt('period_start', invoice.period_start).limit(1);
+
+      const { data: earlier } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('student_id', student.id)
+        .lt('period_start', invoice.period_start)
+        .limit(1);
       const isFirstInvoice = !earlier || earlier.length === 0;
       const blob = await generateInvoicePDFBlob(invoice, student, !!isFirstInvoice);
       openInvoicePdfPreview(blob, student, invoice);
       toast({
         title: 'Preview opened',
-        description: 'When you save from the preview tab, use the suggested filename (student name + period).',
+        description: invoice.status === 'paid'
+          ? 'Showing the paid invoice for the current billing period.'
+          : 'When you save from the preview tab, use the suggested filename (student name + period).',
       });
     } catch (err: any) {
       console.error('Preview invoice error:', err);
@@ -5729,7 +5699,7 @@ const AdminPanel = () => {
                     <tbody>
                       {paginatedFinancesStudents.map(student => {
                         const period = getCalendarMonthPeriod();
-                        const { invoice: inv, isCurrentPeriod } = resolveFinanceInvoiceForStudent(
+                        const { invoice: inv } = resolveFinanceInvoiceForStudent(
                           allStudentInvoices,
                           student.id,
                           period
@@ -5748,13 +5718,7 @@ const AdminPanel = () => {
                             <td>{student.instrument || student.course_category}</td>
                             <td>
                               {inv ? (
-                                <div className="space-y-1">
-                                  {!isCurrentPeriod && (
-                                    <span className="text-xs text-amber-700 block">
-                                      Open invoice ({inv.period_start} – {inv.period_end})
-                                    </span>
-                                  )}
-                                  <ManualInvoiceManager
+                                <ManualInvoiceManager
                                   invoice={{ 
                                     ...inv, 
                                     students: { 
@@ -5787,7 +5751,6 @@ const AdminPanel = () => {
                                     })();
                                   }}
                                 />
-                                </div>
                               ) : (
                                 <span className="text-red-500">Not Sent</span>
                               )}
