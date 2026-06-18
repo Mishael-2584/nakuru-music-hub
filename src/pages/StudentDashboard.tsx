@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video, AlertTriangle, RefreshCw, Copy } from 'lucide-react';
+import { Calendar, CalendarDays, BookOpen, Clock, BarChart3, MessageSquare, CreditCard, User, LogOut, Bell, Music, FileText, Users, Calendar as CalendarIcon, Target, TrendingUp, Plus, Download, Eye, Edit, Trash2, Upload, Camera, Video, AlertTriangle, RefreshCw, Copy, ArrowRight } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar';
 import { useToast } from '../hooks/use-toast';
 import PasswordChangePrompt from '../components/PasswordChangePrompt';
@@ -108,6 +108,17 @@ interface Assignment {
   status: string;
   difficulty_level: string;
   assigned_by?: string;
+}
+
+interface LatestClassroomAssignment {
+  postId: string;
+  classroomId: string;
+  classroomName: string;
+  title: string;
+  dueDate?: string | null;
+  maxPoints?: number | null;
+  hasQuiz?: boolean;
+  createdAt: string;
 }
 
 interface LessonMaterial {
@@ -219,6 +230,7 @@ const StudentDashboard = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [latestAssignment, setLatestAssignment] = useState<LatestClassroomAssignment | null>(null);
   const [materials, setMaterials] = useState<LessonMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -682,6 +694,8 @@ const StudentDashboard = () => {
 
       // Fetch available time slots with the student data directly
       await fetchAvailableTimeSlotsWithData(studentProfileData);
+
+      await fetchLatestAssignment(student.id);
       
       // Learning mode change requests functionality has been removed
 
@@ -1341,6 +1355,86 @@ const StudentDashboard = () => {
   };
 
   // Classroom helpers
+  const fetchLatestAssignment = async (studentId: string) => {
+    try {
+      const { data: enrollments, error } = await supabase
+        .from('classroom_enrollments')
+        .select(`
+          classroom_id,
+          classrooms!inner(id, name, status)
+        `)
+        .eq('student_id', studentId);
+
+      if (error || !enrollments?.length) {
+        setLatestAssignment(null);
+        return;
+      }
+
+      const approvedClassrooms = enrollments.filter(
+        (enrollment: { classrooms?: { status?: string } }) => enrollment.classrooms?.status === 'approved'
+      );
+
+      if (!approvedClassrooms.length) {
+        setLatestAssignment(null);
+        return;
+      }
+
+      const feeds = await Promise.all(
+        approvedClassrooms.map(async (enrollment: { classroom_id: string; classrooms: { name: string } }) => {
+          const { data } = await supabase.rpc('get_classroom_feed', {
+            classroom_id_param: enrollment.classroom_id,
+          });
+          return {
+            classroomId: enrollment.classroom_id,
+            classroomName: enrollment.classrooms.name,
+            posts: (data || []) as Array<{
+              post_id: string;
+              is_assignment?: boolean;
+              assignment_title?: string;
+              due_date?: string;
+              max_points?: number;
+              has_quiz?: boolean;
+              created_at: string;
+            }>,
+          };
+        })
+      );
+
+      let latest: LatestClassroomAssignment | null = null;
+
+      for (const classroomFeed of feeds) {
+        for (const post of classroomFeed.posts) {
+          if (!post.is_assignment) continue;
+
+          if (
+            !latest ||
+            new Date(post.created_at).getTime() > new Date(latest.createdAt).getTime()
+          ) {
+            latest = {
+              postId: post.post_id,
+              classroomId: classroomFeed.classroomId,
+              classroomName: classroomFeed.classroomName,
+              title: post.assignment_title || 'Untitled Assignment',
+              dueDate: post.due_date,
+              maxPoints: post.max_points,
+              hasQuiz: post.has_quiz,
+              createdAt: post.created_at,
+            };
+          }
+        }
+      }
+
+      setLatestAssignment(latest);
+    } catch (err) {
+      console.error('Error fetching latest assignment:', err);
+      setLatestAssignment(null);
+    }
+  };
+
+  const openLatestAssignment = (assignment: LatestClassroomAssignment) => {
+    navigate(`/classrooms/${assignment.classroomId}?post=${assignment.postId}`);
+  };
+
   const fetchStudentClassrooms = async () => {
     if (!studentProfile) return;
     
@@ -3157,6 +3251,46 @@ const StudentDashboard = () => {
 
             {/* Dashboard Tab - Mobile responsive grid */}
             <TabsContent value="dashboard" className="space-y-4 sm:space-y-6">
+              {latestAssignment && !isSuspended && (
+                <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md">
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="rounded-full bg-blue-100 p-2 shrink-0">
+                          <FileText className="h-5 w-5 text-blue-700" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 mb-1">
+                            Latest assignment
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => openLatestAssignment(latestAssignment)}
+                            className="text-left text-lg sm:text-xl font-bold text-primary hover:underline underline-offset-2 truncate block max-w-full"
+                          >
+                            {latestAssignment.title}
+                          </button>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {latestAssignment.classroomName}
+                            {latestAssignment.dueDate && (
+                              <> · Due {new Date(latestAssignment.dueDate).toLocaleDateString()}</>
+                            )}
+                            {latestAssignment.hasQuiz && <> · Quiz</>}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        className="shrink-0"
+                        onClick={() => openLatestAssignment(latestAssignment)}
+                      >
+                        Open in classroom
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -3260,11 +3394,29 @@ const StudentDashboard = () => {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Recent Practice</CardTitle>
-                    <CardDescription>Your latest practice sessions</CardDescription>
+                    <CardTitle>Latest Assignment</CardTitle>
+                    <CardDescription>Most recent work from your classrooms</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-gray-500 text-center py-4">Practice tracking coming soon</p>
+                    {latestAssignment && !isSuspended ? (
+                      <button
+                        type="button"
+                        onClick={() => openLatestAssignment(latestAssignment)}
+                        className="w-full text-left p-4 bg-blue-50 rounded-lg border border-blue-100 hover:border-blue-300 hover:bg-blue-100/80 transition-colors"
+                      >
+                        <p className="font-semibold text-primary">{latestAssignment.title}</p>
+                        <p className="text-sm text-gray-600 mt-1">{latestAssignment.classroomName}</p>
+                        {latestAssignment.dueDate && (
+                          <p className="text-xs text-gray-500 mt-2">
+                            Due {new Date(latestAssignment.dueDate).toLocaleDateString()}
+                          </p>
+                        )}
+                      </button>
+                    ) : (
+                      <p className="text-gray-500 text-center py-4 text-sm">
+                        {isSuspended ? 'Assignments unavailable while account is suspended' : 'No assignments posted yet'}
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               </div>

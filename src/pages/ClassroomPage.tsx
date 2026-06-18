@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -100,6 +100,7 @@ type SubmissionAttachment = {
 export default function ClassroomPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -107,6 +108,7 @@ export default function ClassroomPage() {
   const [loading, setLoading] = useState(true);
   const [isTeacherOfClass, setIsTeacherOfClass] = useState(false);
   const [isEnrolledStudent, setIsEnrolledStudent] = useState(false);
+  const [highlightedPostId, setHighlightedPostId] = useState<string | null>(null);
 
   const [feed, setFeed] = useState<FeedPost[]>([]);
   const [submissions, setSubmissions] = useState<Record<string, AssignmentSubmission[]>>({});
@@ -1446,6 +1448,14 @@ export default function ClassroomPage() {
   );
 
   const renderFeedPost = (post: FeedPost) => (
+    <div
+      id={`classroom-post-${post.post_id}`}
+      className={
+        highlightedPostId === post.post_id
+          ? 'rounded-lg ring-2 ring-primary ring-offset-2 transition-shadow'
+          : undefined
+      }
+    >
     <ClassroomPostCard
       key={post.post_id}
       post={post}
@@ -1599,6 +1609,7 @@ export default function ClassroomPage() {
         </div>
       )}
     </ClassroomPostCard>
+    </div>
   );
 
   const handleEditQuiz = async (postId: string) => {
@@ -1784,6 +1795,26 @@ export default function ClassroomPage() {
       }
     })();
   }, [id, user?.id]);
+
+  const targetPostId = searchParams.get('post');
+
+  useEffect(() => {
+    if (!targetPostId || loading || feed.length === 0) return;
+
+    const scrollTimer = window.setTimeout(() => {
+      const element = document.getElementById(`classroom-post-${targetPostId}`);
+      if (!element) return;
+
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedPostId(targetPostId);
+
+      window.setTimeout(() => {
+        setHighlightedPostId((current) => (current === targetPostId ? null : current));
+      }, 4000);
+    }, 150);
+
+    return () => window.clearTimeout(scrollTimer);
+  }, [targetPostId, loading, feed]);
 
   const loadFeed = async (classroomId: string, currentStudent?: { id: string; user_id: string }) => {
     try {

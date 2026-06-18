@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X, Image, MessageSquare, Settings, Gift, Globe, RefreshCw } from "lucide-react";
+import { Users, Mail, Phone, Calendar, Music, LogOut, Guitar, Piano, Mic, Clock, BookOpen, Star, Shield, UserCog, Eye, Newspaper, Palette, ChevronDown, ChevronUp, GraduationCap, Quote, MapPin, DollarSign, FileText, CheckCircle, ArrowRight, ArrowLeft, X, Image, MessageSquare, Settings, Gift, Globe, RefreshCw, Lock, Unlock, Ban } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,7 +32,7 @@ import StudentAccountControl from './admin/StudentAccountControl';
 import PendingTeacherApplicationCard from './admin/PendingTeacherApplicationCard';
 import ApprovedTeacherCard from './admin/ApprovedTeacherCard';
 import { recoverTeacherDocumentsFromStorage } from '@/lib/teacherDocuments';
-import { isTermlyCourseCategory } from '@/lib/termlyFeeUtils';
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Registration {
   id: string;
@@ -167,6 +167,10 @@ const AdminPanel = () => {
   const [teacherChangeRequests, setTeacherChangeRequests] = useState<any[]>([]);
   const [activeStudents, setActiveStudents] = useState<Registration[]>([]);
   const [expandedStudentIds, setExpandedStudentIds] = useState<Set<string>>(new Set());
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
+  const [showBulkSuspendDialog, setShowBulkSuspendDialog] = useState(false);
+  const [bulkSuspensionReason, setBulkSuspensionReason] = useState('');
+  const [bulkStudentActionLoading, setBulkStudentActionLoading] = useState(false);
   const [expandedRequestIds, setExpandedRequestIds] = useState<Set<string>>(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [requestsPage, setRequestsPage] = useState(1);
@@ -485,6 +489,7 @@ const AdminPanel = () => {
     return activeStudents.filter(
       (s) =>
         (s.student_name && s.student_name.toLowerCase().includes(q)) ||
+        (s.email && s.email.toLowerCase().includes(q)) ||
         (s.instrument && s.instrument.toLowerCase().includes(q))
     );
   }, [activeStudents, searchTerm]);
@@ -493,6 +498,15 @@ const AdminPanel = () => {
     const start = (studentsPage - 1) * studentsPerPage;
     return filteredStudents.slice(start, start + studentsPerPage);
   }, [filteredStudents, studentsPage, studentsPerPage]);
+
+  const allStudentsOnPageSelected =
+    paginatedStudents.length > 0 &&
+    paginatedStudents.every((student) => selectedStudentIds.has(student.id));
+
+  const selectedStudents = useMemo(
+    () => activeStudents.filter((student) => selectedStudentIds.has(student.id)),
+    [activeStudents, selectedStudentIds]
+  );
 
   // Trials: filter and paginate
   const filteredTrials = useMemo(() => {
@@ -2822,6 +2836,126 @@ const AdminPanel = () => {
     });
   };
 
+  const toggleStudentSelection = (id: string, checked: boolean) => {
+    setSelectedStudentIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllStudentsOnPage = (checked: boolean) => {
+    setSelectedStudentIds((prev) => {
+      const next = new Set(prev);
+      paginatedStudents.forEach((student) => {
+        if (checked) next.add(student.id);
+        else next.delete(student.id);
+      });
+      return next;
+    });
+  };
+
+  const clearStudentSelection = () => setSelectedStudentIds(new Set());
+
+  const isStudentSuspended = (student: Registration) =>
+    Boolean(student.account_suspended || student.is_access_suspended);
+
+  const handleBulkActivateStudents = async () => {
+    const toActivate = selectedStudents.filter((student) => isStudentSuspended(student));
+    if (toActivate.length === 0) {
+      toast({
+        title: 'No suspended students selected',
+        description: 'Select one or more suspended students to activate.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!confirm(`Activate ${toActivate.length} selected student account(s)?`)) return;
+
+    setBulkStudentActionLoading(true);
+    try {
+      const results = await Promise.allSettled(
+        toActivate.map((student) =>
+          supabase.rpc('activate_student_account', { p_student_id: student.id })
+        )
+      );
+      const failed = results.filter((result) => result.status === 'rejected' || (result.status === 'fulfilled' && result.value.error));
+      toast({
+        title: failed.length ? 'Some activations failed' : 'Accounts activated',
+        description:
+          failed.length > 0
+            ? `${toActivate.length - failed.length} activated, ${failed.length} failed.`
+            : `${toActivate.length} student account(s) reactivated.`,
+        variant: failed.length ? 'destructive' : 'default',
+      });
+      clearStudentSelection();
+      await fetchData();
+    } finally {
+      setBulkStudentActionLoading(false);
+    }
+  };
+
+  const handleBulkSuspendStudents = async () => {
+    const reason = bulkSuspensionReason.trim();
+    if (!reason) {
+      toast({
+        title: 'Reason required',
+        description: 'Please provide a reason for suspending the selected accounts.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const toSuspend = selectedStudents.filter((student) => !isStudentSuspended(student));
+    if (toSuspend.length === 0) {
+      toast({
+        title: 'No active students selected',
+        description: 'Select one or more active students to suspend.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setBulkStudentActionLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
+      const results = await Promise.allSettled(
+        toSuspend.map((student) =>
+          supabase.rpc('suspend_student_account', {
+            p_student_id: student.id,
+            p_reason: reason,
+            p_suspended_by: user.id,
+          })
+        )
+      );
+      const failed = results.filter((result) => result.status === 'rejected' || (result.status === 'fulfilled' && result.value.error));
+      toast({
+        title: failed.length ? 'Some suspensions failed' : 'Accounts suspended',
+        description:
+          failed.length > 0
+            ? `${toSuspend.length - failed.length} suspended, ${failed.length} failed.`
+            : `${toSuspend.length} student account(s) suspended.`,
+        variant: failed.length ? 'destructive' : 'default',
+      });
+      setShowBulkSuspendDialog(false);
+      setBulkSuspensionReason('');
+      clearStudentSelection();
+      await fetchData();
+    } catch (err: unknown) {
+      toast({
+        title: 'Bulk suspend failed',
+        description: err instanceof Error ? err.message : 'Could not suspend selected students.',
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkStudentActionLoading(false);
+    }
+  };
+
   // Separate function to fetch students
   const fetchStudents = async () => {
     try {
@@ -3951,69 +4085,143 @@ const AdminPanel = () => {
                 className="max-w-sm bg-white/80 backdrop-blur-sm border-primary/20"
               />
             </div>
+
+            {selectedStudentIds.size > 0 && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <span className="text-sm font-medium">
+                  {selectedStudentIds.size} student{selectedStudentIds.size === 1 ? '' : 's'} selected
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={bulkStudentActionLoading}
+                  onClick={() => void handleBulkActivateStudents()}
+                  className="bg-green-50 text-green-700 border-green-300 hover:bg-green-100"
+                >
+                  <Unlock className="h-4 w-4 mr-1" />
+                  Activate selected
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={bulkStudentActionLoading}
+                  onClick={() => setShowBulkSuspendDialog(true)}
+                  className="bg-red-50 text-red-700 border-red-300 hover:bg-red-100"
+                >
+                  <Lock className="h-4 w-4 mr-1" />
+                  Suspend selected
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={bulkStudentActionLoading}
+                  onClick={clearStudentSelection}
+                >
+                  Clear selection
+                </Button>
+              </div>
+            )}
+
+            {paginatedStudents.length > 0 && (
+              <div className="flex items-center gap-2 px-1">
+                <Checkbox
+                  checked={allStudentsOnPageSelected}
+                  onCheckedChange={(checked) => toggleSelectAllStudentsOnPage(checked === true)}
+                  aria-label="Select all students on this page"
+                />
+                <span className="text-sm text-muted-foreground">Select all on this page</span>
+              </div>
+            )}
             
-            <div className="grid gap-4">
+            <div className="grid gap-2">
               {paginatedStudents.map((student) => {
-                const InstrumentIcon = getInstrumentIcon(student.instrument);
                 const isExpanded = expandedStudentIds.has(student.id);
+                const isSelected = selectedStudentIds.has(student.id);
+                const suspended = isStudentSuspended(student);
                 return (
-                  <Card key={student.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-shadow duration-300">
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start mb-4 cursor-pointer" onClick={() => toggleStudentExpand(student.id)}>
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
-                              <UserCog className="w-6 h-6 text-gray-400" />
-                            </div>
-                          <div>
-                            <h4 className="text-xl font-bold text-primary">{student.student_name}</h4>
-                            <p className="text-muted-foreground">Age: {student.age} • {student.instrument}</p>
-                            {student.date_of_birth && (
-                              <p className="text-xs text-gray-500">DOB: {new Date(student.date_of_birth).toLocaleDateString()}</p>
+                  <Card key={student.id} className="shadow border-0 bg-white/90 backdrop-blur-sm">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) => toggleStudentSelection(student.id, checked === true)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Select ${student.student_name}`}
+                        />
+                        <button
+                          type="button"
+                          className="flex flex-1 items-center justify-between gap-3 text-left min-w-0"
+                          onClick={() => toggleStudentExpand(student.id)}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <h4 className="font-semibold text-base truncate">{student.student_name}</h4>
+                            {suspended && (
+                              <Badge variant="destructive" className="shrink-0">
+                                Suspended
+                              </Badge>
                             )}
                           </div>
-                        </div>
-                        <Button size="sm" variant="destructive" onClick={e => { e.stopPropagation(); setStudentToDelete(student); setShowDeleteModal(true); }}>Delete</Button>
-                        </div>
-                      {isExpanded && (
-                        <div className="space-y-2 mt-2">
-                          <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{student.email}</span></div>
-                          <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{student.phone}</span></div>
-                          {student.date_of_birth && (<div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground" /><span className="text-sm">DOB: {new Date(student.date_of_birth).toLocaleDateString()}</span></div>)}
-                          {student.parent_name && (<div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /><span className="text-sm">Parent: {student.parent_name}</span></div>)}
-                          {student.parent_phone && (<div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" /><span className="text-sm">Parent Phone: {student.parent_phone}</span></div>)}
-                          <div className="flex items-center gap-2"><span className="text-sm">Course Category: {student.course_category}</span></div>
-                          <div className="flex items-center gap-2"><span className="text-sm">Instrument: {student.instrument}</span></div>
-                          {student.production_type && (<div className="flex items-center gap-2"><span className="text-sm">Production Type: {student.production_type}</span></div>)}
-                          {student.proficiency_level && (<div className="flex items-center gap-2"><span className="text-sm">Proficiency: {student.proficiency_level}</span></div>)}
-                          {student.learning_mode && (<div className="flex items-center gap-2"><span className="text-sm">Learning Mode: {student.learning_mode}</span></div>)}
-                          {student.owns_instrument !== undefined && (<div className="flex items-center gap-2"><span className="text-sm">Owns Instrument: {student.owns_instrument ? 'Yes' : 'No'}</span></div>)}
-                          {student.location && (<div className="flex items-center gap-2"><span className="text-sm">Location: {student.location}</span></div>)}
-                          {student.medical_condition && (<div className="flex items-center gap-2"><span className="text-sm">Medical Condition: {student.medical_condition}</span></div>)}
-                          {student.medical_details && (<div className="flex items-center gap-2"><span className="text-sm">Medical Details: {student.medical_details}</span></div>)}
-                          {student.preferred_schedule && (<div className="flex items-center gap-2"><span className="text-sm">Preferred Schedule: {student.preferred_schedule}</span></div>)}
-                          {student.goals && (<div className="p-3 bg-primary/5 rounded-lg border border-primary/10"><p className="text-sm font-medium text-primary mb-1">Learning Goals:</p><p className="text-sm text-muted-foreground">{student.goals}</p></div>)}
-                          <div className="flex items-center gap-2"><span className="text-sm text-muted-foreground">Enrolled: {new Date(student.created_at).toLocaleDateString()}</span></div>
-                          <div className="flex items-center gap-2"><span className="text-sm font-medium text-primary">Experience: {student.experience}</span></div>
-                          </div>
-                        )}
-                      
-                      {/* Account Control Section */}
-                      <div className="mt-4 pt-4 border-t border-gray-200">
-                        <StudentAccountControl
-                          student={{
-                            id: student.id,
-                            student_name: student.student_name,
-                            email: student.email,
-                            account_suspended: student.account_suspended || student.is_access_suspended || false,
-                            suspension_reason: student.suspension_reason,
-                            suspended_at: student.suspended_at,
-                            account_notes: student.account_notes
-                          }}
-                          onUpdate={() => {
-                            fetchData();
-                          }}
-                        />
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          )}
+                        </button>
                       </div>
+
+                      {isExpanded && (
+                        <div className="mt-4 space-y-4 border-t pt-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{student.email}</span></div>
+                            <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{student.phone}</span></div>
+                            <div className="flex items-center gap-2"><span className="text-sm">Age: {student.age}</span></div>
+                            {student.date_of_birth && (<div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground" /><span className="text-sm">DOB: {new Date(student.date_of_birth).toLocaleDateString()}</span></div>)}
+                            {student.parent_name && (<div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /><span className="text-sm">Parent: {student.parent_name}</span></div>)}
+                            {student.parent_phone && (<div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" /><span className="text-sm">Parent Phone: {student.parent_phone}</span></div>)}
+                            <div className="flex items-center gap-2"><span className="text-sm">Course Category: {student.course_category}</span></div>
+                            <div className="flex items-center gap-2"><span className="text-sm">Instrument: {student.instrument}</span></div>
+                            {student.production_type && (<div className="flex items-center gap-2"><span className="text-sm">Production Type: {student.production_type}</span></div>)}
+                            {student.proficiency_level && (<div className="flex items-center gap-2"><span className="text-sm">Proficiency: {student.proficiency_level}</span></div>)}
+                            {student.learning_mode && (<div className="flex items-center gap-2"><span className="text-sm">Learning Mode: {student.learning_mode}</span></div>)}
+                            {student.owns_instrument !== undefined && (<div className="flex items-center gap-2"><span className="text-sm">Owns Instrument: {student.owns_instrument ? 'Yes' : 'No'}</span></div>)}
+                            {student.location && (<div className="flex items-center gap-2"><span className="text-sm">Location: {student.location}</span></div>)}
+                            {student.medical_condition && (<div className="flex items-center gap-2"><span className="text-sm">Medical Condition: {student.medical_condition}</span></div>)}
+                            {student.medical_details && (<div className="flex items-center gap-2"><span className="text-sm">Medical Details: {student.medical_details}</span></div>)}
+                            {student.preferred_schedule && (<div className="flex items-center gap-2"><span className="text-sm">Preferred Schedule: {student.preferred_schedule}</span></div>)}
+                            {student.goals && (<div className="p-3 bg-primary/5 rounded-lg border border-primary/10"><p className="text-sm font-medium text-primary mb-1">Learning Goals:</p><p className="text-sm text-muted-foreground">{student.goals}</p></div>)}
+                            <div className="flex items-center gap-2"><span className="text-sm text-muted-foreground">Enrolled: {new Date(student.created_at).toLocaleDateString()}</span></div>
+                            <div className="flex items-center gap-2"><span className="text-sm font-medium text-primary">Experience: {student.experience}</span></div>
+                          </div>
+
+                          <StudentAccountControl
+                            student={{
+                              id: student.id,
+                              student_name: student.student_name,
+                              email: student.email,
+                              account_suspended: suspended,
+                              suspension_reason: student.suspension_reason,
+                              suspended_at: student.suspended_at,
+                              account_notes: student.account_notes
+                            }}
+                            onUpdate={() => {
+                              void fetchData();
+                            }}
+                          />
+
+                          <div className="flex justify-end">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                setStudentToDelete(student);
+                                setShowDeleteModal(true);
+                              }}
+                            >
+                              Delete student
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );
@@ -6095,6 +6303,54 @@ const AdminPanel = () => {
                 setStudentToDelete(null);
               }}>Delete</Button>
               <Button variant="outline" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={showBulkSuspendDialog} onOpenChange={setShowBulkSuspendDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <Ban className="h-5 w-5" />
+                Suspend {selectedStudentIds.size} selected student{selectedStudentIds.size === 1 ? '' : 's'}
+              </DialogTitle>
+              <DialogDescription>
+                This will suspend all selected active accounts. Already suspended students will be skipped.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+                <p className="font-semibold mb-1">Warning</p>
+                <p>Suspended students cannot access the portal or book classes until reactivated.</p>
+              </div>
+              <div>
+                <Label htmlFor="bulk-suspension-reason" className="text-sm font-semibold">
+                  Reason for suspension *
+                </Label>
+                <Textarea
+                  id="bulk-suspension-reason"
+                  value={bulkSuspensionReason}
+                  onChange={(e) => setBulkSuspensionReason(e.target.value)}
+                  placeholder="E.g., Non-payment of fees, violation of terms, etc."
+                  rows={3}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowBulkSuspendDialog(false)}
+                disabled={bulkStudentActionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void handleBulkSuspendStudents()}
+                disabled={bulkStudentActionLoading}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {bulkStudentActionLoading ? 'Suspending…' : 'Suspend selected'}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
