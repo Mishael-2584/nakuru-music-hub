@@ -121,13 +121,12 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
   };
   
   const handleSaveOverride = async () => {
-    if (invoiceHasRecordedPayments(invoice) || isInvoiceFullyPaid(invoice)) {
-      toast({
-        title: 'Cannot edit',
-        description: 'This invoice has recorded payments. Amount cannot be changed after payment.',
-        variant: 'destructive',
-      });
-      return;
+    const hasPayments = invoiceHasRecordedPayments(invoice) || isInvoiceFullyPaid(invoice);
+    if (hasPayments) {
+      const confirmed = confirm(
+        'This invoice has recorded payments. Saving will update the amount and recalculate the balance and payment status. Continue?'
+      );
+      if (!confirmed) return;
     }
 
     setIsSubmitting(true);
@@ -255,16 +254,12 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
   };
 
   const handleClearOverride = async () => {
-    if (invoiceHasRecordedPayments(invoice) || isInvoiceFullyPaid(invoice)) {
-      toast({
-        title: 'Cannot restore',
-        description: 'This invoice has recorded payments. Amount cannot be changed after payment.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    const hasPayments = invoiceHasRecordedPayments(invoice) || isInvoiceFullyPaid(invoice);
+    const confirmMessage = hasPayments
+      ? 'This invoice has recorded payments. Restoring the original amount will recalculate the balance and payment status. Continue?'
+      : 'Are you sure you want to restore the original invoice amount?';
 
-    if (!confirm('Are you sure you want to restore the original invoice amount?')) {
+    if (!confirm(confirmMessage)) {
       return;
     }
 
@@ -302,14 +297,6 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
   };
 
   const handleOpenDialog = () => {
-    if (invoiceHasRecordedPayments(invoice) || isInvoiceFullyPaid(invoice)) {
-      toast({
-        title: 'Cannot edit',
-        description: 'This invoice has recorded payments. Amount cannot be changed after payment.',
-        variant: 'destructive',
-      });
-      return;
-    }
     setLineItems(getExistingLineItems());
     setOverrideReason(invoice.override_reason || '');
     setIsDialogOpen(true);
@@ -327,7 +314,7 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
   
   const effectiveAmount = getEffectiveAmount();
   const hasOverride = false;
-  const amountLocked = invoiceHasRecordedPayments(invoice) || isInvoiceFullyPaid(invoice);
+  const hasPayments = invoiceHasRecordedPayments(invoice) || isInvoiceFullyPaid(invoice);
 
   return (
     <>
@@ -355,9 +342,8 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
           size="sm"
           variant="outline"
           onClick={handleOpenDialog}
-          disabled={amountLocked}
           className="flex items-center gap-1"
-          title={amountLocked ? 'Locked after payment recorded' : 'Edit invoice amount'}
+          title={hasPayments ? 'Edit invoice amount (has recorded payments)' : 'Edit invoice amount'}
         >
           <DollarSign className="h-4 w-4" />
           Edit Amount
@@ -386,6 +372,16 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
           </DialogHeader>
 
           <div className="overflow-y-auto px-4 sm:px-6 py-3 sm:py-4 space-y-3 sm:space-y-4 flex-1">
+            {hasPayments && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 sm:p-4 text-xs sm:text-sm text-amber-900">
+                <p className="font-semibold mb-1">Paid invoice correction</p>
+                <p className="leading-relaxed">
+                  This invoice already has payments recorded (KES {getInvoiceAmountPaid(invoice).toLocaleString()} paid).
+                  Saving changes will update the amount due and automatically recalculate the remaining balance and payment status.
+                </p>
+              </div>
+            )}
+
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 sm:p-4 text-xs sm:text-sm text-orange-800">
               <p className="font-semibold mb-1">⚠️ Important:</p>
               <p className="leading-relaxed">You're editing the invoice line items. The total will be automatically calculated. Add or remove rows as needed.</p>

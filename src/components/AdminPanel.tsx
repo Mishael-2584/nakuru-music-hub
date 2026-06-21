@@ -6449,6 +6449,53 @@ const AdminPanel = () => {
                   <div><b>Balance:</b> KES {getInvoiceBalanceRemaining(selectedHistoryInvoice).toLocaleString()}</div>
                   <div><b>Due Date:</b> {selectedHistoryInvoice.due_date}</div>
                   <div><b>Notes:</b> {selectedHistoryInvoice.notes || '-'}</div>
+                  {invoiceHistoryStudent && (
+                    <div className="mt-3 pt-3 border-t">
+                      <p className="text-sm font-semibold mb-2">Invoice amount</p>
+                      <ManualInvoiceManager
+                        invoice={{
+                          ...selectedHistoryInvoice,
+                          students: {
+                            student_name: invoiceHistoryStudent.student_name,
+                            email: invoiceHistoryStudent.email,
+                          },
+                        }}
+                        onUpdate={() => {
+                          void (async () => {
+                            if (!invoiceHistoryStudent?.id || !selectedHistoryInvoice?.id) return;
+                            await fetchInvoiceHistory(invoiceHistoryStudent.id);
+                            const { data: refreshed } = await supabase
+                              .from('invoices')
+                              .select('*')
+                              .eq('id', selectedHistoryInvoice.id)
+                              .single();
+                            if (refreshed) setSelectedHistoryInvoice(refreshed);
+                            const validStudentIds = activeStudents
+                              .filter((s) => isValidId(s.id))
+                              .map((s) => s.id);
+                            if (validStudentIds.length > 0) {
+                              const { data: allInv } = await supabase
+                                .from('invoices')
+                                .select('*')
+                                .in('student_id', validStudentIds)
+                                .order('period_end', { ascending: false });
+                              if (allInv) {
+                                const billableInvoices = filterInvoicesUpToCurrentMonth(allInv);
+                                setAllStudentInvoices(billableInvoices);
+                                const p = getCalendarMonthPeriod();
+                                const currentPeriod: Record<string, any> = {};
+                                for (const studentId of validStudentIds) {
+                                  const match = findInvoiceForFinancePeriod(billableInvoices, studentId, p);
+                                  if (match) currentPeriod[studentId] = match;
+                                }
+                                setStudentInvoices(currentPeriod);
+                              }
+                            }
+                          })();
+                        }}
+                      />
+                    </div>
+                  )}
                   {(historyInvoicePayments[selectedHistoryInvoice.id]?.length ?? 0) > 0 && (
                     <div className="mt-3">
                       <b>Payment history</b>
