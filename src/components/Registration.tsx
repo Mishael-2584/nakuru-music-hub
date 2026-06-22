@@ -1134,7 +1134,7 @@ const Registration = () => {
                 <span className={`font-medium transition-colors duration-200 ${
                   formData.course_category === "Languages" ? "text-primary" : "text-gray-800"
                 }`}>Languages</span>
-                <span className="text-sm text-gray-500 text-center mt-1">From $80/month (fully online)</span>
+                <span className="text-sm text-gray-500 text-center mt-1">Languages & cultural fluency</span>
               </Label>
             </div>
           </RadioGroup>
