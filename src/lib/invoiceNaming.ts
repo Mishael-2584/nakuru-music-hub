@@ -65,3 +65,24 @@ export function buildInvoiceDownloadFileName(
   }
   return `Invoice_${name}.pdf`;
 }
+
+/** Human-readable payment receipt reference. */
+export function buildPaymentReceiptNumber(
+  student: { student_name?: string | null },
+  payment: { id: string; paid_date?: string | null }
+): string {
+  const name = sanitizeInvoiceFilePart(student.student_name || 'Student');
+  const date = (payment.paid_date || '').replace(/-/g, '') || 'nodate';
+  const shortId = payment.id.replace(/-/g, '').slice(0, 6).toUpperCase();
+  return `RCP-${name}-${date}-${shortId}`;
+}
+
+/** Filename when admin downloads a payment receipt PDF. */
+export function buildPaymentReceiptDownloadFileName(
+  student: { student_name?: string | null },
+  payment: { id: string; paid_date?: string | null }
+): string {
+  const name = sanitizeInvoiceFilePart(student.student_name || 'Student');
+  const date = payment.paid_date || 'undated';
+  return `PaymentReceipt_${name}_${date}.pdf`;
+}

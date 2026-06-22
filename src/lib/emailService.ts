@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { generateQuotePDF, generatePaymentReceiptPDF } from "./pdfGenerator";
+import { buildPaymentReceiptData } from "./paymentReceiptUtils";
 import {
   buildInvoiceDisplayNumber,
   buildInvoiceDownloadFileName,
@@ -1518,6 +1519,28 @@ export const sendPartialPaymentConfirmationEmail = async (
     mpesaRef?: string;
     paidDate?: string;
     isFirstInvoice?: boolean;
+    payment?: {
+      id: string;
+      amount: number;
+      cash_amount?: number | null;
+      credit_amount?: number | null;
+      payment_method?: string | null;
+      paid_date?: string | null;
+      mpesa_transaction_id?: string | null;
+      notes?: string | null;
+      created_at?: string | null;
+    };
+    allPayments?: Array<{
+      id: string;
+      amount: number;
+      cash_amount?: number | null;
+      credit_amount?: number | null;
+      payment_method?: string | null;
+      paid_date?: string | null;
+      mpesa_transaction_id?: string | null;
+      notes?: string | null;
+      created_at?: string | null;
+    }>;
   }
 ): Promise<boolean> => {
   try {
@@ -1526,23 +1549,27 @@ export const sendPartialPaymentConfirmationEmail = async (
 
     const attachments: Array<{ filename: string; content: string; contentType: string }> = [];
     if (receiptContext?.invoice && receiptContext?.student) {
-      const invoiceNumber = buildInvoiceDisplayNumber(
-        receiptContext.student,
-        receiptContext.invoice,
-        receiptContext.isFirstInvoice
-      );
-      const receiptPdf = await generatePaymentReceiptPDF({
-        studentName: registration.student_name,
-        studentEmail: registration.email,
-        studentPhone: receiptContext.student.phone || undefined,
-        amountPaid: paymentAmount,
-        balanceRemaining,
-        invoiceNumber,
-        invoicePeriod: invoicePeriod || '',
-        paymentMethod: receiptContext.paymentMethod || 'cash',
-        paidDate: receiptContext.paidDate || new Date().toLocaleDateString('en-KE'),
-        mpesaRef: receiptContext.mpesaRef,
+      const paymentRow = receiptContext.payment ?? {
+        id: `email-${Date.now()}`,
+        amount: paymentAmount,
+        cash_amount: paymentAmount,
+        payment_method: receiptContext.paymentMethod || 'cash',
+        paid_date: receiptContext.paidDate || new Date().toISOString().slice(0, 10),
+        mpesa_transaction_id: receiptContext.mpesaRef || null,
+      };
+      const allPayments = receiptContext.allPayments?.length
+        ? receiptContext.allPayments
+        : [paymentRow];
+      const receiptData = buildPaymentReceiptData({
+        payment: paymentRow,
+        invoice: receiptContext.invoice,
+        student: receiptContext.student,
+        allPayments,
+        isFirstInvoice: receiptContext.isFirstInvoice,
       });
+      receiptData.studentName = registration.student_name;
+      receiptData.studentEmail = registration.email;
+      const receiptPdf = await generatePaymentReceiptPDF(receiptData);
       attachments.push({
         filename: `payment-receipt-${Date.now()}.pdf`,
         content: await blobToBase64(receiptPdf),

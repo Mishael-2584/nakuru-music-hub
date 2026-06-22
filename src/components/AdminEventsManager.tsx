@@ -8,6 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  formatEventDate,
+  getLocalDateString,
+  isEventUpcoming,
+  isEventVisibleOnWebsite,
+  normalizeEventDate,
+} from "@/lib/eventUtils";
 import { Plus, Edit, Trash2, Users, ImageIcon, Calendar, MapPin, Eye, EyeOff } from "lucide-react";
 import ImageUpload from "@/components/ui/image-upload";
 import RichTextEditor from "@/components/ui/RichTextEditor";
@@ -121,6 +128,20 @@ const AdminEventsManager = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const today = getLocalDateString();
+    const isPublished = formData.status === "published";
+    const hasUpcomingDate = isEventUpcoming(formData.event_date, today);
+
+    if (isPublished && !hasUpcomingDate) {
+      toast({
+        title: "Event date is in the past",
+        description:
+          "Published events only appear on the public Events page when the event date is today or later. Update the date to make this event visible.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     try {
       const slug = await buildEventSlug(formData.title, editingEvent?.slug);
@@ -169,7 +190,7 @@ const AdminEventsManager = () => {
         title: "Success",
         description: editingEvent
           ? "Event updated successfully"
-          : formData.status === 'published'
+          : isPublished
             ? "Event published — it will now appear on the public Events page."
             : "Event saved as draft — change status to Published to show it on the website.",
       });
@@ -192,7 +213,7 @@ const AdminEventsManager = () => {
       title: event.title,
       description: event.description || "",
       content: event.content || "",
-      event_date: event.event_date,
+      event_date: normalizeEventDate(event.event_date),
       event_time: event.event_time || "",
       location: event.location || "",
       max_attendees: event.max_attendees ? event.max_attendees.toString() : "",
@@ -235,6 +256,16 @@ const AdminEventsManager = () => {
   };
 
   const handlePublish = async (event: Event) => {
+    if (!isEventUpcoming(event.event_date)) {
+      toast({
+        title: "Event date is in the past",
+        description:
+          "Edit the event and set a future date before publishing — past-dated events are hidden from the public Events page.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('events')
@@ -393,7 +424,8 @@ const AdminEventsManager = () => {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Only <strong>Published</strong> events appear on the public Events page.
+                    Only <strong>Published</strong> events with a <strong>today or future</strong> event
+                    date appear on the public Events page.
                   </p>
                 </div>
 
@@ -445,7 +477,19 @@ const AdminEventsManager = () => {
                     {event.status !== 'published' && (
                       <Badge variant="outline" className="text-amber-700 border-amber-300 bg-amber-50">
                         <EyeOff className="h-3 w-3 mr-1" />
-                        Not on website
+                        Draft — not on website
+                      </Badge>
+                    )}
+                    {event.status === 'published' && !isEventVisibleOnWebsite(event) && (
+                      <Badge variant="outline" className="text-amber-700 border-amber-300 bg-amber-50">
+                        <EyeOff className="h-3 w-3 mr-1" />
+                        Hidden — past date
+                      </Badge>
+                    )}
+                    {event.status === 'published' && isEventVisibleOnWebsite(event) && (
+                      <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50">
+                        <Eye className="h-3 w-3 mr-1" />
+                        On website
                       </Badge>
                     )}
                     {event.is_featured && (
@@ -463,7 +507,7 @@ const AdminEventsManager = () => {
                   <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
-                      <span>{new Date(event.event_date).toLocaleDateString()}</span>
+                      <span>{formatEventDate(event.event_date)}</span>
                     </div>
                     {event.event_time && (
                       <span>{event.event_time}</span>

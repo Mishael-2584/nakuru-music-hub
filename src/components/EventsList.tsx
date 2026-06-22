@@ -5,6 +5,11 @@ import { Calendar, MapPin, Clock, Music2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import {
+  formatEventDate,
+  formatEventTime,
+  getLocalDateString,
+} from "@/lib/eventUtils";
 
 interface Event {
   id: string;
@@ -21,33 +26,6 @@ interface Event {
   registration_required: boolean | null;
   is_featured: boolean | null;
 }
-
-const getLocalDateString = (date = new Date()) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const formatEventDate = (dateStr: string) => {
-  const [year, month, day] = dateStr.split("T")[0].split("-").map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-};
-
-const formatEventTime = (timeStr: string) => {
-  const [hours, minutes] = timeStr.split(":");
-  const date = new Date();
-  date.setHours(Number(hours), Number(minutes), 0, 0);
-  return date.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-};
 
 const getEventSummary = (event: Event) => {
   if (event.description?.trim()) return event.description.trim();
@@ -115,7 +93,11 @@ const EventsList = () => {
         <div className="container mx-auto px-4">
           <div className="text-center">
             <h3 className="text-2xl font-bold mb-4">No Upcoming Events</h3>
-            <p className="text-muted-foreground">Check back soon for exciting musical events!</p>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              Check back soon for exciting musical events! Published events only appear here when
+              their event date is today or in the future — update the date in admin if an event is
+              missing.
+            </p>
           </div>
         </div>
       </section>

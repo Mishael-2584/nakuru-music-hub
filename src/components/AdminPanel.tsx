@@ -28,6 +28,7 @@ import ShopProductManager from './admin/ShopProductManager';
 import ShopOrderManager from './admin/ShopOrderManager';
 import ManualInvoiceManager from './admin/ManualInvoiceManager';
 import RecordInvoicePaymentDialog from './admin/RecordInvoicePaymentDialog';
+import { downloadPaymentReceiptPDF } from '@/lib/paymentReceiptUtils';
 import StudentAccountControl from './admin/StudentAccountControl';
 import PendingTeacherApplicationCard from './admin/PendingTeacherApplicationCard';
 import ApprovedTeacherCard from './admin/ApprovedTeacherCard';
@@ -228,6 +229,7 @@ const AdminPanel = () => {
   const [futureInvoiceCleanupLoading, setFutureInvoiceCleanupLoading] = useState(false);
   const [invoiceHistoryStudent, setInvoiceHistoryStudent] = useState<any>(null);
   const [generatingPdfInvoiceId, setGeneratingPdfInvoiceId] = useState<string | null>(null);
+  const [downloadingPaymentReceiptId, setDownloadingPaymentReceiptId] = useState<string | null>(null);
   const [generatingAllPdfs, setGeneratingAllPdfs] = useState(false);
   const [selectedHistoryInvoice, setSelectedHistoryInvoice] = useState<any>(null);
 
@@ -2650,18 +2652,24 @@ const AdminPanel = () => {
       let paymentMethod = 'cash';
       let mpesaRef: string | undefined;
       let paidDate: string | undefined;
+      let paymentRow: any = null;
       if (result.payment_id) {
-        const { data: paymentRow } = await supabase
-          .from('invoice_payments')
-          .select('payment_method, mpesa_transaction_id, paid_date')
+        const { data: paymentData } = await supabase
+          .from('payments')
+          .select('id, invoice_id, amount, cash_amount, credit_amount, payment_method, status, paid_date, mpesa_transaction_id, notes, created_at')
           .eq('id', result.payment_id)
           .maybeSingle();
-        if (paymentRow) {
-          paymentMethod = paymentRow.payment_method || 'cash';
-          mpesaRef = paymentRow.mpesa_transaction_id || undefined;
-          paidDate = paymentRow.paid_date || undefined;
+        if (paymentData) {
+          paymentRow = paymentData;
+          paymentMethod = paymentData.payment_method || 'cash';
+          mpesaRef = paymentData.mpesa_transaction_id || undefined;
+          paidDate = paymentData.paid_date || undefined;
         }
       }
+
+      const invoicePaymentsForReceipt = result.invoice_id
+        ? await fetchInvoicePayments(result.invoice_id)
+        : [];
 
       if (studentRow?.registration_id) {
         const { data: registration } = await supabase
@@ -2713,10 +2721,26 @@ const AdminPanel = () => {
                     paymentMethod,
                     mpesaRef,
                     paidDate,
+                    payment: paymentRow ?? undefined,
+                    allPayments: invoicePaymentsForReceipt,
                   }
                 : undefined
             );
           }
+        }
+      }
+
+      if (result.payment_id && paymentRow && invoiceData && studentRow) {
+        try {
+          await downloadPaymentReceiptPDF({
+            payment: paymentRow,
+            invoice: invoiceData,
+            student: studentRow,
+            allPayments: invoicePaymentsForReceipt,
+            isFirstInvoice,
+          });
+        } catch (receiptErr) {
+          console.error('Auto-download payment receipt failed:', receiptErr);
         }
       }
 
@@ -2746,6 +2770,42 @@ const AdminPanel = () => {
         variant: 'destructive',
       });
       await refreshStudentInvoices();
+    }
+  };
+
+  const handleDownloadPaymentReceipt = async (payment: any, invoice: any, student: any) => {
+    if (!payment?.id || !invoice?.id || !student?.id) return;
+    setDownloadingPaymentReceiptId(payment.id);
+    try {
+      let payments = historyInvoicePayments[invoice.id];
+      if (!payments?.length) {
+        payments = await fetchInvoicePayments(invoice.id);
+        setHistoryInvoicePayments((prev) => ({ ...prev, [invoice.id]: payments }));
+      }
+      const { data: earlier } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('student_id', student.id)
+        .lt('period_start', invoice.period_start)
+        .limit(1);
+      const isFirstInvoice = !earlier || earlier.length === 0;
+      await downloadPaymentReceiptPDF({
+        payment,
+        invoice,
+        student,
+        allPayments: payments,
+        isFirstInvoice,
+      });
+      toast({ title: 'Receipt downloaded', description: 'Payment receipt PDF saved to your downloads.' });
+    } catch (err: unknown) {
+      console.error('Download payment receipt error:', err);
+      toast({
+        title: 'Receipt download failed',
+        description: err instanceof Error ? err.message : 'Could not generate payment receipt PDF.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingPaymentReceiptId(null);
     }
   };
 
@@ -6523,14 +6583,33 @@ const AdminPanel = () => {
                   {(historyInvoicePayments[selectedHistoryInvoice.id]?.length ?? 0) > 0 && (
                     <div className="mt-3">
                       <b>Payment history</b>
-                      <ul className="mt-1 space-y-1 text-sm">
+                      <ul className="mt-1 space-y-2 text-sm">
                         {historyInvoicePayments[selectedHistoryInvoice.id].map((p: any) => (
-                          <li key={p.id} className="border-b border-gray-200 pb-1">
-                            KES {(p.amount ?? 0).toLocaleString()}
-                            {' · '}{p.payment_method || 'cash'}
-                            {p.paid_date && ` · ${p.paid_date}`}
-                            {p.mpesa_transaction_id && ` · Ref: ${p.mpesa_transaction_id}`}
-                            {p.notes && ` — ${p.notes}`}
+                          <li key={p.id} className="flex flex-col gap-2 border-b border-gray-200 pb-2 sm:flex-row sm:items-center sm:justify-between">
+                            <span>
+                              KES {(p.amount ?? 0).toLocaleString()}
+                              {' · '}{p.payment_method || 'cash'}
+                              {p.paid_date && ` · ${p.paid_date}`}
+                              {p.mpesa_transaction_id && ` · Ref: ${p.mpesa_transaction_id}`}
+                              {p.notes && ` — ${p.notes}`}
+                            </span>
+                            {invoiceHistoryStudent && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="shrink-0"
+                                disabled={downloadingPaymentReceiptId === p.id}
+                                onClick={() =>
+                                  void handleDownloadPaymentReceipt(
+                                    p,
+                                    selectedHistoryInvoice,
+                                    invoiceHistoryStudent
+                                  )
+                                }
+                              >
+                                {downloadingPaymentReceiptId === p.id ? 'Generating...' : 'Download receipt'}
+                              </Button>
+                            )}
                           </li>
                         ))}
                       </ul>

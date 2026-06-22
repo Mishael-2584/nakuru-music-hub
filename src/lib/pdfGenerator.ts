@@ -338,13 +338,20 @@ export interface PaymentReceiptData {
   studentName: string;
   studentEmail: string;
   studentPhone?: string;
-  amountPaid: number;
-  balanceRemaining: number;
+  receiptNumber: string;
   invoiceNumber: string;
   invoicePeriod: string;
+  amountDue: number;
+  amountPaid: number;
+  cashAmount?: number;
+  creditAmount?: number;
+  totalPaidOnInvoice: number;
+  balanceRemaining: number;
+  isPartialPayment: boolean;
   paymentMethod: string;
   paidDate: string;
   mpesaRef?: string;
+  notes?: string;
 }
 
 export const generatePaymentReceiptPDF = async (receipt: PaymentReceiptData): Promise<Blob> => {
@@ -374,6 +381,8 @@ export const generatePaymentReceiptPDF = async (receipt: PaymentReceiptData): Pr
       </div>
       <div style="text-align: right;">
         <div style="font-size: 28px; font-weight: bold; color: #16a34a; letter-spacing: 2px;">RECEIPT</div>
+        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">${receipt.isPartialPayment ? 'Partial payment' : 'Payment in full'}</div>
+        <div style="font-size: 13px; color: #64748b;">Receipt #: ${receipt.receiptNumber}</div>
         <div style="font-size: 13px; color: #64748b;">Date: ${receipt.paidDate}</div>
       </div>
     </div>
@@ -385,16 +394,21 @@ export const generatePaymentReceiptPDF = async (receipt: PaymentReceiptData): Pr
         ${receipt.studentPhone ? `<div>${receipt.studentPhone}</div>` : ''}
       </div>
       <div style="background: #f0fdf4; border: 2px solid #22c55e; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-        <div style="font-size: 14px; color: #166534; margin-bottom: 8px;">Payment received</div>
+        <div style="font-size: 14px; color: #166534; margin-bottom: 8px;">This payment received</div>
         <div style="font-size: 32px; font-weight: bold; color: #15803d;">${formatKes(receipt.amountPaid)}</div>
       </div>
       <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-        <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #64748b;">Invoice</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600;">${receipt.invoiceNumber}</td></tr>
+        <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #64748b;">Invoice reference</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600;">${receipt.invoiceNumber}</td></tr>
         <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #64748b;">Billing period</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">${receipt.invoicePeriod}</td></tr>
+        <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #64748b;">Invoice amount due</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600;">${formatKes(receipt.amountDue)}</td></tr>
+        <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #64748b;">Total paid on invoice (after this payment)</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600;">${formatKes(receipt.totalPaidOnInvoice)}</td></tr>
         <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #64748b;">Payment method</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">${receipt.paymentMethod}</td></tr>
+        ${receipt.cashAmount != null && receipt.cashAmount > 0 ? `<tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #64748b;">Cash / M-Pesa portion</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatKes(receipt.cashAmount)}</td></tr>` : ''}
+        ${receipt.creditAmount != null && receipt.creditAmount > 0 ? `<tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #64748b;">Account credit applied</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatKes(receipt.creditAmount)}</td></tr>` : ''}
         ${receipt.mpesaRef ? `<tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #64748b;">M-Pesa reference</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">${receipt.mpesaRef}</td></tr>` : ''}
-        <tr><td style="padding: 8px 0; color: #64748b;">Balance remaining on invoice</td><td style="padding: 8px 0; text-align: right; font-weight: 600; color: ${receipt.balanceRemaining > 0 ? '#b45309' : '#15803d'};">${formatKes(receipt.balanceRemaining)}</td></tr>
+        <tr><td style="padding: 8px 0; color: #64748b; font-weight: 600;">Balance remaining on invoice</td><td style="padding: 8px 0; text-align: right; font-weight: 700; color: ${receipt.balanceRemaining > 0 ? '#b45309' : '#15803d'};">${formatKes(receipt.balanceRemaining)}</td></tr>
       </table>
+      ${receipt.notes ? `<div style="margin-top: 16px; padding: 12px; background: #f8fafc; border-radius: 6px; font-size: 12px; color: #475569;"><strong>Notes:</strong> ${receipt.notes}</div>` : ''}
       <div style="margin-top: 24px; font-size: 11px; color: #64748b; text-align: center;">
         Thank you for your payment. For queries contact 0701 195 460 or info@damonmusicacademy.co.ke
       </div>
