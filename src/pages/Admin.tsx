@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import AdminPanel from "@/components/AdminPanel";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { LogOut, UserCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -145,7 +146,9 @@ const Admin = () => {
       </header>
       <main>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <AdminPanel />
+          <ErrorBoundary fallbackTitle="Admin panel failed to load">
+            <AdminPanel />
+          </ErrorBoundary>
         </div>
       </main>
     </div>

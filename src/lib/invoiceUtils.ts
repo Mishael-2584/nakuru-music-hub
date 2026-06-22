@@ -52,14 +52,17 @@ export function getCalendarMonthPeriod(reference = new Date()): { start: string;
 }
 
 /** Parse YYYY-MM-DD as local calendar date (avoids UTC shift from `new Date('YYYY-MM-DD')`). */
-export function parseLocalDateString(dateStr: string): Date {
-  const [y, m, d] = dateStr.split('-').map(Number);
+export function parseLocalDateString(dateStr?: string | null): Date {
+  if (!dateStr) return new Date(Number.NaN);
+  const [y, m, d] = dateStr.split('T')[0].split('-').map(Number);
   return new Date(y, m - 1, d);
 }
 
 /** Year-month key for billing comparisons (YYYY-MM). */
-export function getYearMonthKey(d: Date | string): string {
+export function getYearMonthKey(d: Date | string | null | undefined): string {
+  if (!d) return '';
   const date = typeof d === 'string' ? parseLocalDateString(d) : d;
+  if (Number.isNaN(date.getTime())) return '';
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
@@ -74,10 +77,14 @@ export function isFutureBillingPeriod(periodStart: string, reference = new Date(
 export type BillingPaymentType = 'monthly' | 'per_class' | 'term';
 
 /** Sort invoices with the latest billing period first. */
-export function sortInvoicesByPeriodEndDesc<T extends { period_end: string }>(invoices: T[]): T[] {
-  return [...invoices].sort(
-    (a, b) => parseLocalDateString(b.period_end).getTime() - parseLocalDateString(a.period_end).getTime()
-  );
+export function sortInvoicesByPeriodEndDesc<T extends { period_end?: string | null }>(invoices: T[]): T[] {
+  return [...invoices].sort((a, b) => {
+    const aTime = parseLocalDateString(a.period_end).getTime();
+    const bTime = parseLocalDateString(b.period_end).getTime();
+    const safeA = Number.isNaN(aTime) ? 0 : aTime;
+    const safeB = Number.isNaN(bTime) ? 0 : bTime;
+    return safeB - safeA;
+  });
 }
 
 export function getLatestInvoiceByPeriodEnd<T extends { period_end: string }>(
@@ -87,11 +94,11 @@ export function getLatestInvoiceByPeriodEnd<T extends { period_end: string }>(
 }
 
 /** Hide mistakenly generated future-month invoices from student/admin lists. */
-export function filterInvoicesUpToCurrentMonth<T extends { period_start: string }>(
+export function filterInvoicesUpToCurrentMonth<T extends { period_start?: string | null }>(
   invoices: T[],
   reference = new Date()
 ): T[] {
-  return invoices.filter((inv) => !isFutureBillingPeriod(inv.period_start, reference));
+  return invoices.filter((inv) => inv.period_start && !isFutureBillingPeriod(inv.period_start, reference));
 }
 
 /** Invoice history: only completed billing periods before the current calendar month. */

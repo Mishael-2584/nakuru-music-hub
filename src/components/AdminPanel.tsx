@@ -3835,7 +3835,8 @@ const AdminPanel = () => {
         </div>
 
         {/* Events Tab */}
-        <div style={{ display: activeTab === 'events' ? 'block' : 'none' }}>
+        {activeTab === 'events' && (
+        <div>
           <Tabs defaultValue="events" className="w-full">
             <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
               <TabsTrigger value="events">
@@ -3855,6 +3856,7 @@ const AdminPanel = () => {
             </TabsContent>
           </Tabs>
         </div>
+        )}
 
 
 
@@ -4816,7 +4818,8 @@ const AdminPanel = () => {
 
 
         {/* Messages Tab */}
-        <div style={{ display: activeTab === 'messages' ? 'block' : 'none' }}>
+        {activeTab === 'messages' && (
+        <div>
           <div className="space-y-6">
             <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Messaging System
@@ -4876,6 +4879,7 @@ const AdminPanel = () => {
                 </Card>
           </div>
         </div>
+        )}
 
         {/* Teachers Tab */}
         {activeTab === 'teachers' && (
@@ -5962,13 +5966,14 @@ const AdminPanel = () => {
           <a href={invoicePDFUrl} download={`invoice-${selectedQuote?.id}.pdf`} className="mt-2 inline-block text-blue-600 underline">Download Invoice PDF</a>
         )}
 
-        {/* Gallery Tab */}
-        <div style={{ display: activeTab === 'gallery' ? 'block' : 'none' }}>
+        {activeTab === 'gallery' && (
+        <div>
           <AdminGalleryManager />
         </div>
+        )}
 
-        {/* Shop Manager Tab */}
-        <div style={{ display: activeTab === 'shop' ? 'block' : 'none' }}>
+        {activeTab === 'shop' && (
+        <div>
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
@@ -5990,9 +5995,10 @@ const AdminPanel = () => {
             </Tabs>
           </div>
         </div>
+        )}
 
-        {/* Finances Tab */}
-        <div style={{ display: activeTab === 'finances' ? 'block' : 'none' }}>
+        {activeTab === 'finances' && (
+        <div>
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
@@ -6309,13 +6315,14 @@ const AdminPanel = () => {
             </Tabs>
           </div>
         </div>
+        )}
 
         {/* Learning Mode Requests Tab - Removed */}
 
         {/* Learning Mode Request Review Modal - Removed */}
 
-        {/* Debug Tab - REMOVE IN PRODUCTION */}
-        <div style={{ display: activeTab === 'debug' ? 'block' : 'none' }}>
+        {activeTab === 'debug' && (
+        <div>
           <div className="space-y-6">
             <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
               <div className="flex">
@@ -6330,6 +6337,7 @@ const AdminPanel = () => {
             <FeeDebug />
           </div>
         </div>
+        )}
 
         <Dialog open={showExcuseModal} onOpenChange={setShowExcuseModal}>
           <DialogContent>

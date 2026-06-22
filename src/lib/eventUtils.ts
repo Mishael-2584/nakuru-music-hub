@@ -6,18 +6,26 @@ export const getLocalDateString = (date = new Date()) => {
 };
 
 /** Normalize a DB date value to YYYY-MM-DD for date inputs and comparisons. */
-export const normalizeEventDate = (dateStr: string) => dateStr.split("T")[0];
+export const normalizeEventDate = (dateStr?: string | null) => {
+  if (!dateStr) return "";
+  return dateStr.split("T")[0];
+};
 
-export const isEventUpcoming = (eventDate: string, today = getLocalDateString()) =>
-  normalizeEventDate(eventDate) >= today;
+export const isEventUpcoming = (eventDate?: string | null, today = getLocalDateString()) => {
+  const normalized = normalizeEventDate(eventDate);
+  return !!normalized && normalized >= today;
+};
 
 export const isEventVisibleOnWebsite = (
-  event: { status: string; event_date: string },
+  event: { status: string; event_date?: string | null },
   today = getLocalDateString()
 ) => event.status === "published" && isEventUpcoming(event.event_date, today);
 
-export const formatEventDate = (dateStr: string) => {
-  const [year, month, day] = normalizeEventDate(dateStr).split("-").map(Number);
+export const formatEventDate = (dateStr?: string | null) => {
+  const normalized = normalizeEventDate(dateStr);
+  if (!normalized) return "Date not set";
+
+  const [year, month, day] = normalized.split("-").map(Number);
   return new Date(year, month - 1, day).toLocaleDateString(undefined, {
     weekday: "long",
     year: "numeric",
