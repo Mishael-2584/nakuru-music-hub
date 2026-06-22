@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { sendApplicationConfirmationEmail } from '@/lib/emailService';
-import { LANGUAGE_OPTIONS } from '@/lib/languageCourseUtils';
+import { LANGUAGE_OPTIONS, LANGUAGE_PACKAGES, LANGUAGE_PATHWAYS, LANGUAGE_PROGRAM_INTRO, LANGUAGE_PRICING_NOTE, LANGUAGE_LEARNING_MODE, formatLanguageMonthlyPrice, getLanguagePathwayLabel, getLanguagePackageLabel } from '@/lib/languageCourseUtils';
 import { Music, Users, Award, Star, ArrowRight, ArrowLeft, CheckCircle, MapPin, Phone, Mail, User, Calendar, Guitar, Mic, Palette, Video, Speaker, Music2, Users2, Code, Globe } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -32,6 +32,8 @@ const Registration = () => {
     technology_type: "",
     language_type: "",
     custom_language: "",
+    language_pathway: "conversational",
+    language_package: "individual",
     experience: "",
     goals: "",
     preferred_schedule: "",
@@ -515,9 +517,13 @@ const Registration = () => {
                 ? formData.custom_language?.trim() || 'Other'
                 : formData.language_type?.trim() || null)
             : null,
+        language_pathway: formData.course_category === 'Languages' ? formData.language_pathway : null,
+        language_package: formData.course_category === 'Languages' ? formData.language_package : null,
         experience: formData.proficiency_level || "beginner",
         proficiency_level: formData.proficiency_level || "beginner",
-        learning_mode: formData.learning_mode || "in-person",
+        learning_mode: formData.course_category === 'Languages'
+          ? LANGUAGE_LEARNING_MODE
+          : (formData.learning_mode || "in-person"),
         home_lesson_duration: (formData.learning_mode === "home" && formData.course_category === "Music" && formData.home_lesson_duration) ? formData.home_lesson_duration : null,
         owns_instrument: Boolean(formData.owns_instrument),
         location: formData.location?.trim() || null,
@@ -633,6 +639,8 @@ const Registration = () => {
           technology_type: "",
           language_type: "",
           custom_language: "",
+          language_pathway: "conversational",
+          language_package: "individual",
           experience: "",
           goals: "",
           preferred_schedule: "",
@@ -1026,7 +1034,7 @@ const Registration = () => {
           <Label className="text-sm font-medium text-gray-700">Course Category *</Label>
           <RadioGroup 
             value={formData.course_category} 
-            onValueChange={(value) => setFormData({...formData, course_category: value, music_subcategory: "", instrument: "", production_type: "", technology_type: "", language_type: "", custom_language: ""})}
+            onValueChange={(value) => setFormData({...formData, course_category: value, music_subcategory: "", instrument: "", production_type: "", technology_type: "", language_type: "", custom_language: "", language_pathway: "conversational", language_package: "individual", learning_mode: value === "Languages" ? LANGUAGE_LEARNING_MODE : formData.learning_mode, sessions_per_week: value === "Languages" ? 1 : formData.sessions_per_week})}
             className="grid md:grid-cols-3 lg:grid-cols-5 gap-4"
           >
             <div className="relative">
@@ -1126,7 +1134,7 @@ const Registration = () => {
                 <span className={`font-medium transition-colors duration-200 ${
                   formData.course_category === "Languages" ? "text-primary" : "text-gray-800"
                 }`}>Languages</span>
-                <span className="text-sm text-gray-500 text-center mt-1">KES 1,500 per session</span>
+                <span className="text-sm text-gray-500 text-center mt-1">From $80/month (fully online)</span>
               </Label>
             </div>
           </RadioGroup>
@@ -1305,6 +1313,12 @@ const Registration = () => {
 
         {formData.course_category === "Languages" && (
           <div className="space-y-4">
+            <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm text-teal-900">
+              <p className="font-medium mb-1">Fully remote language program</p>
+              <p>{LANGUAGE_PROGRAM_INTRO}</p>
+              <p className="mt-2 text-xs text-teal-800">{LANGUAGE_PRICING_NOTE}</p>
+            </div>
+
             <Label className="text-sm font-medium text-gray-700">Language *</Label>
             <Select
               value={formData.language_type}
@@ -1329,7 +1343,53 @@ const Registration = () => {
                 className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
               />
             )}
-            <p className="text-sm text-gray-500">Language lessons are billed at KES 1,500 per session.</p>
+
+            <Label className="text-sm font-medium text-gray-700">Learning pathway *</Label>
+            <RadioGroup
+              value={formData.language_pathway}
+              onValueChange={(value) => setFormData({ ...formData, language_pathway: value })}
+              className="grid gap-3"
+            >
+              {LANGUAGE_PATHWAYS.map((pathway) => (
+                <div key={pathway.value} className="relative">
+                  <RadioGroupItem value={pathway.value} id={`pathway-${pathway.value}`} className="sr-only" />
+                  <Label
+                    htmlFor={`pathway-${pathway.value}`}
+                    className={`flex flex-col p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                      formData.language_pathway === pathway.value
+                        ? 'border-primary bg-primary/5 shadow-md'
+                        : 'border-gray-200 hover:border-primary'
+                    }`}
+                  >
+                    <span className="font-medium">{pathway.label}</span>
+                    <span className="text-sm text-gray-500 mt-1">{pathway.description}</span>
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+
+            <Label className="text-sm font-medium text-gray-700">Package *</Label>
+            <RadioGroup
+              value={formData.language_package}
+              onValueChange={(value) => setFormData({ ...formData, language_package: value })}
+              className="grid gap-3"
+            >
+              {LANGUAGE_PACKAGES.map((pkg) => (
+                <div key={pkg.value} className="relative">
+                  <RadioGroupItem value={pkg.value} id={`pkg-${pkg.value}`} className="sr-only" />
+                  <Label
+                    htmlFor={`pkg-${pkg.value}`}
+                    className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                      formData.language_package === pkg.value
+                        ? 'border-primary bg-primary/5 shadow-md'
+                        : 'border-gray-200 hover:border-primary'
+                    }`}
+                  >
+                    <span className="font-medium">{pkg.label}</span>
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
           </div>
         )}
       </div>
@@ -1483,13 +1543,13 @@ const Registration = () => {
           id="preferred_schedule"
           value={formData.preferred_schedule}
           onChange={(e) => setFormData({...formData, preferred_schedule: e.target.value})}
-          placeholder="e.g., Weekday evenings, Saturday mornings, Flexible"
+          placeholder="e.g., Weekday evenings, Sunday mornings, Flexible"
           className="h-12 border-gray-300 focus:border-primary focus:ring-primary"
           required
         />
       </div>
 
-      {(formData.course_category === "Languages" || formData.course_category === "Technology") && (
+      {(formData.course_category === "Technology") && (
         <div className="space-y-4">
           <Label className="text-sm font-medium text-gray-700">Learning Mode *</Label>
           <RadioGroup
@@ -1521,6 +1581,13 @@ const Registration = () => {
         </div>
       )}
 
+      {formData.course_category === "Languages" && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          <p className="font-medium">Delivery: Fully online (remote only)</p>
+          <p className="mt-1">Language lessons are delivered remotely with flexible scheduling across time zones. Onsite and hybrid options are not available for this program.</p>
+        </div>
+      )}
+
       {!isTermlyCourseCategory(formData.course_category) && (
         <div className="space-y-4">
           <Label htmlFor="sessions_per_week" className="text-sm font-medium text-gray-700">Number of Classes per Week *</Label>
@@ -1532,11 +1599,16 @@ const Registration = () => {
               <SelectValue placeholder="Select number of classes per week" />
             </SelectTrigger>
             <SelectContent>
-              {[1, 2, 3, 4, 5].map((num) => (
+              {(formData.course_category === 'Languages' ? [1, 2] : [1, 2, 3, 4, 5]).map((num) => (
                 <SelectItem key={num} value={String(num)}>{num}</SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {formData.course_category === 'Languages' && (
+            <p className="text-sm font-medium text-primary">
+              Estimated monthly tuition: {formatLanguageMonthlyPrice(formData.language_package, formData.sessions_per_week)}
+            </p>
+          )}
         </div>
       )}
 
@@ -1628,16 +1700,24 @@ const Registration = () => {
                 </p>
               </div>
               <div>
-                <span className="font-medium text-gray-600">Learning Mode:</span>
-                <p className="text-gray-800">{formData.learning_mode}</p>
+                <span className="font-medium text-gray-600">Pathway:</span>
+                <p className="text-gray-800">{getLanguagePathwayLabel(formData.language_pathway)}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Package:</span>
+                <p className="text-gray-800">{getLanguagePackageLabel(formData.language_package)}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Delivery:</span>
+                <p className="text-gray-800">Fully online (remote only)</p>
               </div>
               <div>
                 <span className="font-medium text-gray-600">Sessions per week:</span>
                 <p className="text-gray-800">{formData.sessions_per_week}</p>
               </div>
               <div>
-                <span className="font-medium text-gray-600">Rate:</span>
-                <p className="text-gray-800">KES 1,500 per session</p>
+                <span className="font-medium text-gray-600">Monthly tuition:</span>
+                <p className="text-gray-800">{formatLanguageMonthlyPrice(formData.language_package, formData.sessions_per_week)}</p>
               </div>
             </>
           )}
@@ -1780,14 +1860,20 @@ const Registration = () => {
         if (formData.course_category === 'Production') return !!formData.production_type;
         if (formData.course_category === 'Technology') return !!formData.technology_type;
         if (formData.course_category === 'Languages') {
-          return !!formData.language_type && (formData.language_type !== 'Other' || !!formData.custom_language.trim());
+          return !!formData.language_type
+            && (formData.language_type !== 'Other' || !!formData.custom_language.trim())
+            && !!formData.language_pathway
+            && !!formData.language_package;
         }
         return true;
       case 3:
         if (formData.course_category === 'Music') {
           return formData.proficiency_level && formData.learning_mode && (formData.learning_mode !== 'home' || (formData.home_lesson_duration === '30_min' || formData.home_lesson_duration === '1_hour'));
         }
-        if (formData.course_category === 'Languages' || formData.course_category === 'Technology') {
+        if (formData.course_category === 'Languages') {
+          return !!formData.sessions_per_week && (formData.sessions_per_week === 1 || formData.sessions_per_week === 2);
+        }
+        if (formData.course_category === 'Technology') {
           return !!formData.learning_mode && !!formData.sessions_per_week;
         }
         return true;

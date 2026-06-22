@@ -22,7 +22,7 @@ import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
 import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, findInvoiceForCalendarMonth, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchInvoicePayments, filterInvoicesUpToCurrentMonth, filterPastInvoicesForHistory, isInvoiceNotDue, resolveInvoiceAfterGeneration, previewFutureInvoices, voidFutureInvoices, fetchStudentInvoiceForPreview, getLatestBillableInvoiceForStudent, canSendInvoiceEmail, studentNeedsCurrentMonthInvoice, type FutureInvoicePreviewRow, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
-import LearningModeDebugTest from './LearningModeDebugTest';
+import { getLanguagePathwayLabel, getLanguagePackageLabel, formatLanguageMonthlyPrice } from '@/lib/languageCourseUtils';
 import FeeDebug from './FeeDebug';
 import ShopProductManager from './admin/ShopProductManager';
 import ShopOrderManager from './admin/ShopOrderManager';
@@ -49,6 +49,8 @@ interface Registration {
   production_type?: string;
   technology_type?: string;
   language_type?: string;
+  language_pathway?: string;
+  language_package?: string;
   experience: string;
   proficiency_level: string;
   learning_mode: string;
@@ -4474,8 +4476,28 @@ const AdminPanel = () => {
                                 <div className="space-y-2 text-sm">
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium text-gray-600">Mode:</span>
-                                    <Badge variant="outline" className="text-xs">{registration.learning_mode}</Badge>
+                                    {registration.course_category === 'Languages' ? (
+                                      <Badge variant="outline" className="text-xs">Fully online (remote only)</Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-xs">{registration.learning_mode}</Badge>
+                                    )}
                                   </div>
+                                  {registration.course_category === 'Languages' && (
+                                    <>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium text-gray-600">Pathway:</span>
+                                        <Badge variant="outline" className="text-xs">{getLanguagePathwayLabel(registration.language_pathway)}</Badge>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium text-gray-600">Package:</span>
+                                        <Badge variant="outline" className="text-xs">{getLanguagePackageLabel(registration.language_package)}</Badge>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium text-gray-600">Monthly tuition:</span>
+                                        <span className="text-gray-800">{formatLanguageMonthlyPrice(registration.language_package, registration.sessions_per_week)}</span>
+                                      </div>
+                                    </>
+                                  )}
                                   {registration.course_category === 'Music' && (
                                     <div className="flex items-center gap-2">
                                       <span className="font-medium text-gray-600">Owns Instrument:</span>
@@ -4508,13 +4530,14 @@ const AdminPanel = () => {
                                           <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                          {[1, 2, 3, 4, 5].map((num) => (
+                                          {(registration.course_category === 'Languages' ? [1, 2] : [1, 2, 3, 4, 5]).map((num) => (
                                             <SelectItem key={num} value={String(num)}>{num}</SelectItem>
                                           ))}
                                         </SelectContent>
                                       </Select>
                                     </div>
                                   )}
+                                  {registration.course_category !== 'Languages' && (
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium text-gray-600">Learning Mode:</span>
                                     <Select
@@ -4552,6 +4575,7 @@ const AdminPanel = () => {
                                       </SelectContent>
                                     </Select>
                                   </div>
+                                  )}
                                   {(registration.course_category === 'Music' && (registration.learning_mode === 'home' || registration.learning_mode === 'home-lessons')) && (
                                     <div className="flex items-center gap-2">
                                       <span className="font-medium text-gray-600">Home duration:</span>

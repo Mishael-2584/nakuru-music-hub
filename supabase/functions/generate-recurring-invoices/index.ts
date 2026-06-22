@@ -8,6 +8,24 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+const LANGUAGE_FEE_MODE = 'Online (Global)';
+const LANGUAGE_PRICING = {
+  individual: { 1: 80, 2: 120 },
+  family_group: { 1: 120, 2: 176 },
+};
+
+function getLanguageFeeCourseName(languagePackage) {
+  return languagePackage === 'family_group'
+    ? 'Language Lessons - Family/Group'
+    : 'Language Lessons - Individual';
+}
+
+function getLanguageMonthlyDefault(languagePackage, sessionsPerWeek) {
+  const pkg = languagePackage === 'family_group' ? 'family_group' : 'individual';
+  const spw = Number(sessionsPerWeek) === 2 ? 2 : 1;
+  return LANGUAGE_PRICING[pkg][spw];
+}
+
 // Real-time currency conversion using Exchange Rate API
 async function getExchangeRate(fromCurrency, toCurrency) {
   try {
@@ -261,7 +279,7 @@ async function findFeeForRegistration(registration) {
   } else if (courseCategoryLower === 'technology') {
     paymentType = 'per_class'; // Technology courses use per_class billing
   } else if (courseCategoryLower === 'languages') {
-    paymentType = 'per_class';
+    paymentType = 'monthly';
   }
   
   console.log('Looking for fee with preferences:', {
@@ -288,7 +306,9 @@ async function findFeeForRegistration(registration) {
     }
   };
   
-  const normalizedLearningMode = normalizeLearningMode(learningMode);
+  const normalizedLearningMode = courseCategoryLower === 'languages'
+    ? LANGUAGE_FEE_MODE
+    : normalizeLearningMode(learningMode);
   console.log('Normalized learning mode:', normalizedLearningMode);
 
   const normalizeTermPeriod = (value) => {
@@ -339,7 +359,7 @@ async function findFeeForRegistration(registration) {
   } else if (courseCategoryLower === 'technology') {
     normalizedCourseName = registration.technology_type || 'Web Design & Programming';
   } else if (courseCategoryLower === 'languages') {
-    normalizedCourseName = 'Language Lessons';
+    normalizedCourseName = getLanguageFeeCourseName(registration.language_package);
   }
 
   const pickBestMusicMonthlyFee = (fees, reg) => {
@@ -384,6 +404,10 @@ async function findFeeForRegistration(registration) {
       .eq('is_active', true);
     if (paymentType === 'term' && termPeriod) {
       q = q.ilike('duration', getTermDurationPattern(termPeriod));
+    }
+    if (courseCategoryLower === 'languages' && paymentType === 'monthly') {
+      const spw = Number(registration.sessions_per_week) === 2 ? 2 : 1;
+      q = q.eq('sessions_per_week', spw);
     }
     return q;
   };
@@ -580,7 +604,8 @@ async function findFeeForRegistration(registration) {
       defaultPrice = 2200;
     }
   } else if (courseCategoryLower === 'languages') {
-    defaultPrice = 1500;
+    defaultPrice = getLanguageMonthlyDefault(registration.language_package, registration.sessions_per_week);
+    defaultCurrency = '$';
   } else if (String(learningMode).toLowerCase() === 'online') {
     defaultPrice = 44; // $44 USD
     defaultCurrency = '$';

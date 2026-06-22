@@ -6,14 +6,21 @@ import { Badge } from "@/components/ui/badge";
 import { Piano, Guitar, Mic, Drum, Music, Brain, Wind, Volume2, Camera, Video, MonitorPlay, Code, Palette, Search, Filter, Headphones, BookOpen, Users, Award, Smartphone, Globe } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
-import { LANGUAGE_OPTIONS, LANGUAGE_SESSION_PRICE_KES } from "@/lib/languageCourseUtils";
+import {
+  LANGUAGE_OPTIONS,
+  LANGUAGE_PROGRAM_INTRO,
+  LANGUAGE_PROGRAM_HIGHLIGHTS,
+  LANGUAGE_PRICING,
+  LANGUAGE_PRICING_NOTE,
+  formatLanguageMonthlyPrice,
+} from "@/lib/languageCourseUtils";
 
 const LANGUAGE_COURSE_DETAILS = {
-  availability: "Available online and in-person at the academy",
-  duration: "Flexible sessions — choose 1–5 classes per week",
+  availability: "Fully online — remote lessons only (no onsite or hybrid)",
+  duration: "1 or 2 sessions per week — flexible scheduling across time zones",
   levels: "Beginner to advanced — all ages welcome",
   instruments: "Course materials provided; bring a notebook.",
-  schedule: `Mon-Fri: 7am-8pm, Sun: 8am-6pm. KES ${LANGUAGE_SESSION_PRICE_KES.toLocaleString()} per session — enroll via the registration form.`,
+  schedule: `Monthly billing due at the start of each month. ${LANGUAGE_PRICING_NOTE} Enroll via the registration form.`,
 };
 
 const LANGUAGE_COURSE_CONTENT: Record<
@@ -22,26 +29,24 @@ const LANGUAGE_COURSE_CONTENT: Record<
 > = {
   English: {
     title: "English Lessons",
-    description: "Build fluency in English through conversation, reading, and writing.",
+    description: LANGUAGE_PROGRAM_INTRO,
     features: [
-      "Conversation & pronunciation",
-      "Reading comprehension & writing",
-      "Grammar for everyday and professional use",
-      "Exam preparation (IELTS, TOEFL)",
-      "Business & academic English",
-      "1-on-1 personalised instruction",
+      ...LANGUAGE_PROGRAM_HIGHLIGHTS.slice(0, 4),
+      `Individual: ${formatLanguageMonthlyPrice('individual', 1)} or ${formatLanguageMonthlyPrice('individual', 2)}`,
+      `Family/Group (up to 3): ${formatLanguageMonthlyPrice('family_group', 1)} or ${formatLanguageMonthlyPrice('family_group', 2)}`,
     ],
   },
   Kiswahili: {
     title: "Kiswahili Lessons",
-    description: "Master Kiswahili with personalised 1-on-1 instruction for all levels.",
+    description:
+      "Our Swahili program at Damon Music Academy offers Conversational and Academic pathways, led by native speakers from the East African coast who are also professionally trained language and music educators.",
     features: [
-      "Conversation & pronunciation",
-      "Reading & writing in Kiswahili",
-      "Grammar fundamentals",
-      "Cultural context & idioms",
-      "Exam and travel preparation",
-      "1-on-1 personalised instruction",
+      "Conversational pathway: natural rhythm, storytelling & daily life fluency",
+      "Academic pathway: rigorous curriculum for exam bodies & academic excellence",
+      "Native Swahili speakers from the East African coast",
+      "Professionally trained language & music educators",
+      "Fully remote — authentic cultural immersion online",
+      `Individual from $${LANGUAGE_PRICING.individual[1].monthly}/mo · Family/Group from $${LANGUAGE_PRICING.family_group[1].monthly}/mo`,
     ],
   },
   Luganda: {

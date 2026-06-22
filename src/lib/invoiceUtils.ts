@@ -19,10 +19,13 @@ import {
   isBrokenInvoicePdfUrl,
 } from './invoiceNaming';
 import {
+  buildLanguageInvoiceLineDescription,
   getLanguageDisplayName,
-  getLanguageFeeCourseName,
+  getLanguageFeeCourseNameForPackage,
+  getLanguageMonthlyPrice,
   isLanguagesCategory,
-  LANGUAGE_SESSION_PRICE_KES,
+  LANGUAGE_FEE_MODE,
+  normalizeLanguageSessionsPerWeek,
 } from './languageCourseUtils';
 
 export {
@@ -1221,7 +1224,7 @@ export async function generateInvoiceForRegistration(
   } else if (courseCategoryLower === 'technology') {
     paymentType = 'per_class'; // Technology courses use per_class billing
   } else if (courseCategoryLower === 'languages') {
-    paymentType = 'per_class';
+    paymentType = 'monthly';
   }
   
   console.log('Determined payment type:', paymentType, 'for course category:', courseCategory);
@@ -1253,7 +1256,7 @@ export async function generateInvoiceForRegistration(
   } else if (normalizedCourseCategory === 'technology') {
     normalizedInstrument = registration.technology_type || 'Web Design & Programming';
   } else if (normalizedCourseCategory === 'languages') {
-    normalizedInstrument = getLanguageFeeCourseName();
+    normalizedInstrument = getLanguageFeeCourseNameForPackage(registration.language_package);
   } else if (normalizedCourseCategory === 'music') {
     normalizedInstrument = 'Instrumental & Music Theory';
   } else if (normalizedCourseCategory === 'production' || normalizedCourseCategory === 'photography') {
@@ -1293,6 +1296,24 @@ export async function generateInvoiceForRegistration(
         exactFee = data;
         break;
       }
+    }
+  } else if (normalizedCourseCategory === 'languages' && paymentType === 'monthly') {
+    const courseName = getLanguageFeeCourseNameForPackage(registration.language_package);
+    const spw = normalizeLanguageSessionsPerWeek(registration.sessions_per_week);
+    const { data: langFee, error: langFeeError } = await supabase
+      .from('fees')
+      .select('*')
+      .eq('course_type', 'languages')
+      .eq('course_name', courseName)
+      .eq('payment_type', 'monthly')
+      .eq('mode', LANGUAGE_FEE_MODE)
+      .eq('sessions_per_week', spw)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (langFee && !langFeeError) {
+      exactFee = langFee;
+    } else {
+      exactFeeError = langFeeError;
     }
   } else {
     const { data: feeRows, error: feeRowsError } = await applyTermFeeFilters(
@@ -1380,20 +1401,23 @@ export async function generateInvoiceForRegistration(
             fee = techFee;
             console.log('Found Technology per_class fee:', fee);
           }
-        } else if (normalizedCourseCategory === 'languages' && paymentType === 'per_class') {
+        } else if (normalizedCourseCategory === 'languages' && paymentType === 'monthly') {
+          const courseName = getLanguageFeeCourseNameForPackage(registration.language_package);
+          const spw = normalizeLanguageSessionsPerWeek(registration.sessions_per_week);
           const { data: langFee, error: langFeeError } = await supabase
             .from('fees')
             .select('*')
             .eq('course_type', 'languages')
-            .eq('course_name', getLanguageFeeCourseName())
-            .eq('payment_type', 'per_class')
-            .eq('mode', normalizedLearningMode)
+            .eq('course_name', courseName)
+            .eq('payment_type', 'monthly')
+            .eq('mode', LANGUAGE_FEE_MODE)
+            .eq('sessions_per_week', spw)
             .eq('is_active', true)
             .maybeSingle();
 
           if (langFee && !langFeeError) {
             fee = langFee;
-            console.log('Found Languages per_class fee:', fee);
+            console.log('Found Languages monthly fee:', fee);
           }
         } else if (paymentType === 'term') {
           const { data: termFee, error: termFeeError } = await supabase
@@ -1493,7 +1517,8 @@ export async function generateInvoiceForRegistration(
               termPeriod || '1st_term'
             );
           } else if (isLanguagesCategory(registration.course_category)) {
-            defaultPrice = LANGUAGE_SESSION_PRICE_KES;
+            defaultPrice = getLanguageMonthlyPrice(registration.language_package, registration.sessions_per_week);
+            defaultCurrency = '$';
           } else if (learningMode === 'online') {
             defaultPrice = 44; // $44 USD
             defaultCurrency = '$';
@@ -1720,6 +1745,13 @@ export async function generateInvoiceForRegistration(
       termPrice: fee.price,
       programSessionsPerWeek: fee.sessions_per_week,
     });
+  } else if (isLanguagesCategory(registration.course_category) && fee.payment_type === 'monthly') {
+    invoiceAmount = fee.price;
+    console.log('Language monthly billing (flat month):', {
+      courseName: fee.course_name,
+      monthlyPrice: fee.price,
+      sessionsPerWeek: registration.sessions_per_week,
+    });
   } else if (fee.payment_type === 'per_class') {
     const numWeeks = 4;
     invoiceAmount = fee.price * sessionsPerWeek * numWeeks;
@@ -1801,24 +1833,28 @@ export async function generateInvoiceForRegistration(
     const termLabel = getTermDisplayLabel(registration.term_period, fee.duration);
     lineDescription = `${courseDisplayName} - ${termLabel} (term fee — ${getTermScheduleNote(fee)})`;
   } else {
-    if (fee.payment_type === 'monthly' || fee.payment_type === 'per_class') {
-      numWeeks = 4;
+    if (isLanguagesCategory(registration.course_category) && fee.payment_type === 'monthly') {
+      quantity = 1;
+      unitPrice = invoiceAmount;
+      lineDescription = buildLanguageInvoiceLineDescription(courseDisplayName, registration);
     } else {
-      const daysDiff = Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24));
-      numWeeks = Math.ceil(daysDiff / 7);
-    }
-    quantity = sessionsPerWeek * numWeeks;
-    if (fee.payment_type === 'per_class') {
-      unitPrice = fee.price;
-    } else {
-      unitPrice = Math.round((invoiceAmount / quantity) * 100) / 100;
-    }
-    if (isLanguagesCategory(registration.course_category) && fee.payment_type === 'per_class') {
-      lineDescription = `${courseDisplayName} @ KES ${LANGUAGE_SESSION_PRICE_KES.toLocaleString()} per session — ${sessionsPerWeek} session${sessionsPerWeek > 1 ? 's' : ''}/week × ${numWeeks} weeks`;
-    } else if (fee.payment_type === 'monthly' && courseCategoryLower === 'music') {
-      lineDescription = courseDisplayName;
-    } else {
-      lineDescription = `${courseDisplayName} - ${sessionsPerWeek} session${sessionsPerWeek > 1 ? 's' : ''} per week × ${numWeeks} weeks`;
+      if (fee.payment_type === 'monthly' || fee.payment_type === 'per_class') {
+        numWeeks = 4;
+      } else {
+        const daysDiff = Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24));
+        numWeeks = Math.ceil(daysDiff / 7);
+      }
+      quantity = sessionsPerWeek * numWeeks;
+      if (fee.payment_type === 'per_class') {
+        unitPrice = fee.price;
+      } else {
+        unitPrice = Math.round((invoiceAmount / quantity) * 100) / 100;
+      }
+      if (fee.payment_type === 'monthly' && courseCategoryLower === 'music') {
+        lineDescription = courseDisplayName;
+      } else {
+        lineDescription = `${courseDisplayName} - ${sessionsPerWeek} session${sessionsPerWeek > 1 ? 's' : ''} per week × ${numWeeks} weeks`;
+      }
     }
   }
   

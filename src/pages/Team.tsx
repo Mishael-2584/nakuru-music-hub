@@ -615,6 +615,64 @@ const Team = () => {
           ]
         }
       }
+    },
+    {
+      id: "12",
+      name: "Harriet Safari",
+      role: "Swahili Language Instructor",
+      image: "/lovable-uploads/harriet-safari.png",
+      bio: "Native coastal Swahili speaker from the East African coast with a Bachelor of Arts in Music Education. Harriet brings practical experience in teaching Swahili, music theory, and saxophone, alongside high school education expertise. She leads Damon Music Academy's fully remote Swahili program through Conversational and Academic pathways with authentic cultural immersion and expert pedagogy.",
+      specialties: [
+        "Kiswahili",
+        "Conversational Swahili",
+        "Academic Swahili",
+        "High School Education",
+        "Music Theory",
+        "Saxophone (Practical)",
+        "Cultural Immersion",
+        "Online Language Instruction",
+      ],
+      experience: "High school education · native coastal Swahili speaker · remote instruction",
+      education: "Bachelor of Arts in Music Education",
+      contact: {
+        email: "harrietsafari2@gmail.com",
+        phone: "+254 793 974 586",
+        location: "East African Coast · Remote instruction",
+      },
+      social: {},
+      achievements: [
+        "Native coastal Swahili speaker from the East African coast",
+        "Bachelor of Arts in Music Education",
+        "Practical experience teaching Swahili, music theory, and saxophone",
+        "Experience in high school education",
+        "Leads Damon Music Academy's remote Swahili language program",
+        "Teaches Conversational and Academic pathways for all ages",
+      ],
+      categories: ["teaching"],
+      categoryInfo: {
+        teaching: {
+          role: "Swahili Language Instructor",
+          bio: "Native coastal Swahili speaker with a Bachelor of Arts in Music Education and practical experience teaching Swahili, music theory, and saxophone. With a background in high school education, Harriet leads our fully remote Swahili program—Conversational for natural rhythm, storytelling, and daily life fluency, and Academic for rigorous exam-focused study.",
+          specialties: [
+            "Kiswahili",
+            "Conversational Swahili",
+            "Academic Swahili",
+            "High School Education",
+            "Music Theory",
+            "Saxophone (Practical)",
+            "Cultural Immersion",
+            "Online Language Instruction",
+          ],
+          achievements: [
+            "Native coastal Swahili speaker from the East African coast",
+            "Bachelor of Arts in Music Education",
+            "Practical experience teaching Swahili, music theory, and saxophone",
+            "Experience in high school education",
+            "Leads Damon Music Academy's remote Swahili language program",
+            "Teaches Conversational and Academic pathways for all ages",
+          ],
+        },
+      },
     }
   ];
 
@@ -724,7 +782,7 @@ const Team = () => {
                         src={member.image} 
                         alt={member.name}
                         className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${
-                          member.id === "1" || member.id === "2" || member.id === "3" || member.id === "4" || member.id === "5" || member.id === "6" || member.id === "7" || member.id === "8" || member.id === "9" || member.id === "10" || member.id === "11"
+                          member.id === "1" || member.id === "2" || member.id === "3" || member.id === "4" || member.id === "5" || member.id === "6" || member.id === "7" || member.id === "8" || member.id === "9" || member.id === "10" || member.id === "11" || member.id === "12"
                             ? "object-top" 
                             : ""
                         }`}

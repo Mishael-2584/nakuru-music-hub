@@ -333,34 +333,33 @@ const Fees = () => {
     },
     {
       category: "🌍 Language Lessons",
-      subtitle: "1-on-1 instruction · flexible weekly schedule",
-      note: "English, Kiswahili, Luganda, Kinyarwanda, French, German & other native African languages",
+      subtitle: "Fully online · monthly billing · Conversational & Academic pathways",
+      note: "English, Kiswahili, Luganda, Kinyarwanda, French, German & other native African languages. Taught by native speakers who are professionally trained language and music educators.",
       courses: [
         {
-          name: "At the Academy",
+          name: "Individual (1 person)",
           duration: "1 hour per session",
-          perSession: "KSh 1,500",
+          monthly: "From $80/month",
           icon: Globe,
           features: [
-            "English & Kiswahili",
-            "Luganda & Kinyarwanda",
-            "French & German",
-            "Other native African languages on request",
-            "Beginner to advanced — all ages",
-            "Choose 1–5 classes per week"
+            "1 session/week: $80/month ($20 × 4 sessions)",
+            "2 sessions/week: $120/month ($15 × 8 sessions)",
+            "Conversational or Academic pathway",
+            "Fully remote — flexible time zones",
+            "Customised curriculum per student",
           ]
         },
         {
-          name: "Online",
-          duration: "1 hour per session",
-          perSession: "KSh 1,500",
+          name: "Family/Group (up to 3 people)",
+          duration: "1 hour shared session",
+          monthly: "From $120/month",
           icon: Globe,
           features: [
-            "Same languages & per-session rate",
-            "Live 1-on-1 video lessons",
-            "Conversation, reading & writing",
-            "Exam and travel preparation",
-            "Flexible scheduling"
+            "1 shared session/week: $120/month ($30 × 4 sessions)",
+            "2 shared sessions/week: $176/month ($22 × 8 sessions)",
+            "Total rate per session — not per person",
+            "Same pathways & native-speaking instructors",
+            "Monthly billing due at the start of each month",
           ]
         }
       ]
