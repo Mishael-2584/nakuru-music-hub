@@ -6213,7 +6213,7 @@ const AdminPanel = () => {
                               ) : '-'}
                             </td>
                             <td>{inv ? inv.due_date : '-'}</td>
-                            <td className="flex gap-2">
+                            <td className="flex flex-wrap gap-2 max-w-md">
                               {!inv ? (
                                 <>
                                   <Button size="sm" variant="outline" disabled={!!previewInvoiceLoading} onClick={() => handlePreviewInvoice(student)}>
@@ -6242,26 +6242,6 @@ const AdminPanel = () => {
                                       onClick={() => handleOpenInvoicePayments(inv, student)}
                                     >
                                       Payments &amp; receipts
-                                    </Button>
-                                  )}
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={generatingPdfInvoiceId === inv.id}
-                                    onClick={() => void handleDownloadInvoicePDF(inv, student)}
-                                  >
-                                    {generatingPdfInvoiceId === inv.id
-                                      ? 'Generating...'
-                                      : 'Download invoice PDF'}
-                                  </Button>
-                                  {!isInvoiceFullyPaid(inv) && (
-                                    <Button 
-                                      size="sm" 
-                                      variant="default" 
-                                      className="bg-green-600 hover:bg-green-700 text-white"
-                                      onClick={() => handleOpenRecordPayment(inv, student)}
-                                    >
-                                      Record Payment
                                     </Button>
                                   )}
                                 </>
