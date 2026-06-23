@@ -6124,6 +6124,7 @@ const AdminPanel = () => {
                       className="max-w-sm bg-white/80 backdrop-blur-sm border-primary/20"
                     />
                   </div>
+                  <div className="overflow-x-auto -mx-1 px-1">
                   <table className="min-w-full text-sm mb-6">
                     <thead>
                       <tr>
@@ -6134,7 +6135,7 @@ const AdminPanel = () => {
                         <th>Paid</th>
                         <th>Balance</th>
                         <th>Due Date</th>
-                        <th>Actions</th>
+                        <th className="whitespace-nowrap min-w-[26rem]">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -6213,45 +6214,48 @@ const AdminPanel = () => {
                               ) : '-'}
                             </td>
                             <td>{inv ? inv.due_date : '-'}</td>
-                            <td className="flex flex-wrap gap-2 max-w-md">
+                            <td className="align-middle">
+                              <div className="inline-flex flex-nowrap items-center gap-1.5">
                               {!inv ? (
                                 <>
-                                  <Button size="sm" variant="outline" disabled={!!previewInvoiceLoading} onClick={() => handlePreviewInvoice(student)}>
+                                  <Button size="sm" variant="outline" className="shrink-0 whitespace-nowrap" disabled={!!previewInvoiceLoading} onClick={() => handlePreviewInvoice(student)}>
                                     {previewInvoiceLoading === student.id ? 'Opening...' : 'Preview'}
                                   </Button>
-                                  <Button size="sm" variant="default" disabled={!sendAllowed || sendingInvoiceIds.includes(student.id)} onClick={() => handleSendInvoice(student)}>
+                                  <Button size="sm" variant="default" className="shrink-0 whitespace-nowrap" disabled={!sendAllowed || sendingInvoiceIds.includes(student.id)} onClick={() => handleSendInvoice(student)}>
                                     {sendingInvoiceIds.includes(student.id) ? 'Sending...' : 'Send Invoice'}
                                   </Button>
                                 </>
                               ) : (
                                 <>
-                                <Button size="sm" variant="outline" onClick={() => handleViewInvoice(inv)}>View</Button>
-                                <Button size="sm" variant="outline" disabled={!!previewInvoiceLoading} onClick={() => handlePreviewInvoice(student, inv)}>Preview</Button>
+                                <Button size="sm" variant="outline" className="shrink-0 whitespace-nowrap" onClick={() => handleViewInvoice(inv)}>View</Button>
+                                <Button size="sm" variant="outline" className="shrink-0 whitespace-nowrap" disabled={!!previewInvoiceLoading} onClick={() => handlePreviewInvoice(student, inv)}>Preview</Button>
                                   {!isInvoiceFullyPaid(inv) && sendAllowed && (
-                                    <Button size="sm" variant="default" disabled={sendingInvoiceIds.includes(student.id)} onClick={() => handleSendInvoice(student, inv)}>
+                                    <Button size="sm" variant="default" className="shrink-0 whitespace-nowrap" disabled={sendingInvoiceIds.includes(student.id)} onClick={() => handleSendInvoice(student, inv)}>
                                       {sendingInvoiceIds.includes(student.id) ? 'Sending...' : 'Send Invoice'}
                                     </Button>
                                   )}
-                                  <Button size="sm" variant="ghost" onClick={() => handleOpenInvoiceHistory(student)}>
-                                    View All Invoices
+                                  <Button size="sm" variant="ghost" className="shrink-0 whitespace-nowrap px-2" onClick={() => handleOpenInvoiceHistory(student)}>
+                                    All invoices
                                   </Button>
-                                  {inv && (
-                                    <Button
-                                      size="sm"
-                                      variant="secondary"
-                                      onClick={() => handleOpenInvoicePayments(inv, student)}
-                                    >
-                                      Payments &amp; receipts
-                                    </Button>
-                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className="shrink-0 whitespace-nowrap"
+                                    onClick={() => handleOpenInvoicePayments(inv, student)}
+                                    title="Payments, receipts, record payment, download invoice PDF"
+                                  >
+                                    Payments
+                                  </Button>
                                 </>
                               )}
+                              </div>
                           </td>
                         </tr>
                         );
                       })}
                     </tbody>
                   </table>
+                  </div>
                   {financesTotalPages > 1 && (
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                       <div className="text-sm text-gray-600">
