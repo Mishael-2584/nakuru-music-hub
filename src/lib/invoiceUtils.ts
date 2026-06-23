@@ -39,15 +39,32 @@ export {
 } from './invoiceNaming';
 
 function buildInvoicePdfMeta(
-  invoice: { period_start?: string | null; period_end?: string | null; notes?: string | null; sessions_per_week?: number | null },
+  invoice: {
+    period_start?: string | null;
+    period_end?: string | null;
+    notes?: string | null;
+    sessions_per_week?: number | null;
+    amount_due?: number | null;
+    manual_amount_due?: number | null;
+    manual_amount_override?: number | null;
+    amount_paid?: number | null;
+    payment_status?: string | null;
+    status?: string | null;
+  },
   student: { id?: string | null; registration_id?: string | null },
   isFirstInvoice: boolean,
   paymentStatus: string
 ) {
+  const amountDue = getEffectiveAmountDue(invoice);
+  const amountPaid = getInvoiceAmountPaid(invoice);
+  const balanceRemaining = Math.max(0, amountDue - amountPaid);
   return {
     invoiceNumber: buildInvoiceDisplayNumber(student, invoice, isFirstInvoice),
     billingPeriod: formatInvoiceBillingMonth(invoice),
     paymentStatus,
+    amountDue,
+    amountPaid,
+    balanceRemaining,
     studentId: student.id || '',
     registrationId: student.registration_id || '',
     sessionsPerWeek: invoice.sessions_per_week || undefined,
@@ -123,7 +140,15 @@ export function filterInvoicesUpToCurrentMonth<T extends { period_start?: string
   });
 }
 
-/** Invoice history: only completed billing periods before the current calendar month. */
+/** Invoice history in admin: current + past billable invoices (excludes future and cancelled). */
+export function filterInvoicesForAdminHistory<T extends { period_start?: string | null; status?: string | null }>(
+  invoices: T[],
+  reference = new Date()
+): T[] {
+  return sortInvoicesByPeriodEndDesc(filterInvoicesUpToCurrentMonth(invoices, reference));
+}
+
+/** @deprecated Use filterInvoicesForAdminHistory — kept for compatibility. */
 export function filterPastInvoicesForHistory<T extends { period_end: string; status?: string | null }>(
   invoices: T[],
   reference = new Date()
@@ -1017,7 +1042,7 @@ export async function generateAndUploadInvoicePDF(invoice: any, student: any, is
     reference_materials_url: '',
     status: '',
     admin_notes: '',
-    quote_amount: invoice.amount_due,
+    quote_amount: getEffectiveAmountDue(invoice),
     quote_sent_at: '',
     preferred_contact_method: 'email',
     additional_notes: ''
@@ -1032,7 +1057,7 @@ export async function generateAndUploadInvoicePDF(invoice: any, student: any, is
   );
 
   // Generate PDF blob with new layout
-  const pdfBlob = await generateQuotePDF(quoteData, invoice.amount_due, '', invoiceDetails, invoiceMeta);
+  const pdfBlob = await generateQuotePDF(quoteData, getEffectiveAmountDue(invoice), '', invoiceDetails, invoiceMeta);
   // Upload to Supabase Storage
   const fileName = buildInvoiceStoragePath(student, invoice);
   const { error } = await supabase.storage.from('invoices').upload(fileName, pdfBlob, {
@@ -1070,7 +1095,7 @@ export async function generateInvoicePDFBlob(invoice: any, student: any, isFirst
     reference_materials_url: '',
     status: '',
     admin_notes: '',
-    quote_amount: invoice.amount_due,
+    quote_amount: getEffectiveAmountDue(invoice),
     quote_sent_at: '',
     preferred_contact_method: 'email',
     additional_notes: ''
@@ -1081,7 +1106,7 @@ export async function generateInvoicePDFBlob(invoice: any, student: any, isFirst
     isFirstInvoice,
     resolveInvoicePdfPaymentStatus(invoice)
   );
-  return generateQuotePDF(quoteData, invoice.amount_due, '', invoiceDetails, invoiceMeta);
+  return generateQuotePDF(quoteData, getEffectiveAmountDue(invoice), '', invoiceDetails, invoiceMeta);
 }
 
 /** Build PDF line items when older invoices lack lessons_summary. */
@@ -1121,12 +1146,14 @@ export function buildFallbackLessonsSummary(invoice: {
  */
 export async function ensureInvoicePDF(
   invoice: Record<string, unknown>,
-  student: Record<string, unknown>
+  student: Record<string, unknown>,
+  options?: { forceRegenerate?: boolean }
 ): Promise<string> {
+  const forceRegenerate = options?.forceRegenerate === true;
   const existingUrl =
     invoice.pdf_url && typeof invoice.pdf_url === 'string' ? invoice.pdf_url : null;
 
-  if (existingUrl && !isBrokenInvoicePdfUrl(existingUrl)) {
+  if (!forceRegenerate && existingUrl && !isBrokenInvoicePdfUrl(existingUrl)) {
     const accessible = await isInvoicePdfUrlAccessible(existingUrl);
     if (accessible) {
       return existingUrl;

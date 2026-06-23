@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { generateQuotePDF } from "@/lib/pdfGenerator";
 import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
-import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, findInvoiceForCalendarMonth, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchInvoicePayments, filterInvoicesUpToCurrentMonth, filterPastInvoicesForHistory, isInvoiceNotDue, resolveInvoiceAfterGeneration, previewFutureInvoices, voidFutureInvoices, fetchStudentInvoiceForPreview, getLatestBillableInvoiceForStudent, canSendInvoiceEmail, studentNeedsCurrentMonthInvoice, formatInvoiceBillingMonth, type FutureInvoicePreviewRow, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
+import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, findInvoiceForCalendarMonth, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchInvoicePayments, filterInvoicesUpToCurrentMonth, filterInvoicesForAdminHistory, isFutureBillingPeriod, isInvoiceNotDue, resolveInvoiceAfterGeneration, previewFutureInvoices, voidFutureInvoices, fetchStudentInvoiceForPreview, getLatestBillableInvoiceForStudent, canSendInvoiceEmail, studentNeedsCurrentMonthInvoice, formatInvoiceBillingMonth, type FutureInvoicePreviewRow, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
 import { getLanguagePathwayLabel, getLanguagePackageLabel, formatLanguageMonthlyPrice } from '@/lib/languageCourseUtils';
 import { isTermlyCourseCategory } from '@/lib/termlyFeeUtils';
@@ -29,6 +29,8 @@ import ShopProductManager from './admin/ShopProductManager';
 import ShopOrderManager from './admin/ShopOrderManager';
 import ManualInvoiceManager from './admin/ManualInvoiceManager';
 import RecordInvoicePaymentDialog from './admin/RecordInvoicePaymentDialog';
+import { InvoicePaymentsPanel } from './admin/InvoicePaymentsPanel';
+import { InvoicePaymentsDialog } from './admin/InvoicePaymentsDialog';
 import { downloadPaymentReceiptPDF } from '@/lib/paymentReceiptUtils';
 import StudentAccountControl from './admin/StudentAccountControl';
 import PendingTeacherApplicationCard from './admin/PendingTeacherApplicationCard';
@@ -223,14 +225,16 @@ const AdminPanel = () => {
   const [paymentDialogInvoice, setPaymentDialogInvoice] = useState<any>(null);
   const [paymentDialogStudent, setPaymentDialogStudent] = useState<any>(null);
   const [showRecordPaymentDialog, setShowRecordPaymentDialog] = useState(false);
-  const [historyInvoicePayments, setHistoryInvoicePayments] = useState<Record<string, any[]>>({});
   const [hiddenHistoryInvoiceCount, setHiddenHistoryInvoiceCount] = useState(0);
   const [invoiceHistory, setInvoiceHistory] = useState<any[]>([]);
+  const [showInvoicePaymentsDialog, setShowInvoicePaymentsDialog] = useState(false);
+  const [paymentsDialogInvoice, setPaymentsDialogInvoice] = useState<any>(null);
+  const [paymentsDialogStudent, setPaymentsDialogStudent] = useState<any>(null);
+  const [invoicePaymentsRefreshKey, setInvoicePaymentsRefreshKey] = useState(0);
   const [futureInvoicePreview, setFutureInvoicePreview] = useState<FutureInvoicePreviewRow[]>([]);
   const [futureInvoiceCleanupLoading, setFutureInvoiceCleanupLoading] = useState(false);
   const [invoiceHistoryStudent, setInvoiceHistoryStudent] = useState<any>(null);
   const [generatingPdfInvoiceId, setGeneratingPdfInvoiceId] = useState<string | null>(null);
-  const [downloadingPaymentReceiptId, setDownloadingPaymentReceiptId] = useState<string | null>(null);
   const [generatingAllPdfs, setGeneratingAllPdfs] = useState(false);
   const [selectedHistoryInvoice, setSelectedHistoryInvoice] = useState<any>(null);
 
@@ -2627,8 +2631,14 @@ const AdminPanel = () => {
 
   const handleOpenRecordPayment = (invoice: any, student?: any) => {
     setPaymentDialogInvoice(invoice);
-    setPaymentDialogStudent(student ?? invoiceHistoryStudent ?? null);
+    setPaymentDialogStudent(student ?? invoiceHistoryStudent ?? paymentsDialogStudent ?? null);
     setShowRecordPaymentDialog(true);
+  };
+
+  const handleOpenInvoicePayments = (invoice: any, student: any) => {
+    setPaymentsDialogInvoice(invoice);
+    setPaymentsDialogStudent(student);
+    setShowInvoicePaymentsDialog(true);
   };
 
   const handlePaymentRecorded = async (result: RecordInvoicePaymentResult) => {
@@ -2750,11 +2760,17 @@ const AdminPanel = () => {
       toast({ title: 'Payment recorded', description: parts.join(' · ') });
 
       await refreshStudentInvoices();
+      setInvoicePaymentsRefreshKey((k) => k + 1);
+      if (invoiceData) {
+        if (paymentsDialogInvoice?.id === result.invoice_id) {
+          setPaymentsDialogInvoice(invoiceData);
+        }
+        if (selectedHistoryInvoice?.id === result.invoice_id) {
+          setSelectedHistoryInvoice(invoiceData);
+        }
+      }
       if (invoiceHistoryStudent) {
         await fetchInvoiceHistory(invoiceHistoryStudent.id);
-        if (result.invoice_id) {
-          await loadInvoicePaymentHistory(result.invoice_id);
-        }
       }
       if (paymentDialogInvoice?.id === result.invoice_id) {
         const { data: updated } = await supabase.from('invoices').select('*').eq('id', result.invoice_id).single();
@@ -2769,42 +2785,6 @@ const AdminPanel = () => {
         variant: 'destructive',
       });
       await refreshStudentInvoices();
-    }
-  };
-
-  const handleDownloadPaymentReceipt = async (payment: any, invoice: any, student: any) => {
-    if (!payment?.id || !invoice?.id || !student?.id) return;
-    setDownloadingPaymentReceiptId(payment.id);
-    try {
-      let payments = historyInvoicePayments[invoice.id];
-      if (!payments?.length) {
-        payments = await fetchInvoicePayments(invoice.id);
-        setHistoryInvoicePayments((prev) => ({ ...prev, [invoice.id]: payments }));
-      }
-      const { data: earlier } = await supabase
-        .from('invoices')
-        .select('id')
-        .eq('student_id', student.id)
-        .lt('period_start', invoice.period_start)
-        .limit(1);
-      const isFirstInvoice = !earlier || earlier.length === 0;
-      await downloadPaymentReceiptPDF({
-        payment,
-        invoice,
-        student,
-        allPayments: payments,
-        isFirstInvoice,
-      });
-      toast({ title: 'Receipt downloaded', description: 'Payment receipt PDF saved to your downloads.' });
-    } catch (err: unknown) {
-      console.error('Download payment receipt error:', err);
-      toast({
-        title: 'Receipt download failed',
-        description: err instanceof Error ? err.message : 'Could not generate payment receipt PDF.',
-        variant: 'destructive',
-      });
-    } finally {
-      setDownloadingPaymentReceiptId(null);
     }
   };
 
@@ -3301,15 +3281,6 @@ const AdminPanel = () => {
     }
   };
 
-  const loadInvoicePaymentHistory = async (invoiceId: string) => {
-    try {
-      const rows = await fetchInvoicePayments(invoiceId);
-      setHistoryInvoicePayments((prev) => ({ ...prev, [invoiceId]: rows }));
-    } catch (e) {
-      console.error('loadInvoicePaymentHistory:', e);
-    }
-  };
-
   // Function to fetch all invoices for a student
   const fetchInvoiceHistory = async (studentId: string) => {
     const { data, error } = await supabase
@@ -3318,9 +3289,15 @@ const AdminPanel = () => {
       .eq('student_id', studentId)
       .order('period_start', { ascending: false });
     if (!error && data) {
-      const past = filterPastInvoicesForHistory(data);
-      setInvoiceHistory(past);
-      setHiddenHistoryInvoiceCount(data.length - past.length);
+      const visible = filterInvoicesForAdminHistory(data);
+      setInvoiceHistory(visible);
+      const hiddenFuture = data.filter(
+        (inv) =>
+          inv.status !== 'cancelled' &&
+          inv.period_start &&
+          isFutureBillingPeriod(inv.period_start)
+      ).length;
+      setHiddenHistoryInvoiceCount(hiddenFuture);
     }
   };
 
@@ -3328,7 +3305,6 @@ const AdminPanel = () => {
   const handleOpenInvoiceHistory = async (student: any) => {
     setInvoiceHistoryStudent(student);
     setSelectedHistoryInvoice(null);
-    setHistoryInvoicePayments({});
     setHiddenHistoryInvoiceCount(0);
     await fetchInvoiceHistory(student.id);
     setShowInvoiceHistoryModal(true);
@@ -3337,9 +3313,6 @@ const AdminPanel = () => {
   // Handler to view invoice from history
   const handleViewHistoryInvoice = async (inv: any) => {
     setSelectedHistoryInvoice(inv);
-    if (inv?.id && !historyInvoicePayments[inv.id]) {
-      await loadInvoicePaymentHistory(inv.id);
-    }
   };
 
   const patchInvoicePdfUrl = (invoiceId: string, pdfUrl: string) => {
@@ -3354,7 +3327,7 @@ const AdminPanel = () => {
   const handleDownloadInvoicePDF = async (inv: any, student?: any) => {
     if (!inv?.id) return;
 
-    const studentRecord = student || invoiceHistoryStudent;
+    const studentRecord = student || invoiceHistoryStudent || paymentsDialogStudent;
     if (!studentRecord?.id) {
       toast({
         title: 'Cannot generate PDF',
@@ -3366,10 +3339,19 @@ const AdminPanel = () => {
 
     setGeneratingPdfInvoiceId(inv.id);
     try {
-      const pdfUrl = await ensureInvoicePDF(inv, studentRecord);
+      const { data: freshInvoice } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('id', inv.id)
+        .single();
+      const invoiceRow = freshInvoice || inv;
+      const pdfUrl = await ensureInvoicePDF(invoiceRow, studentRecord, { forceRegenerate: true });
       patchInvoicePdfUrl(inv.id, pdfUrl);
-      await openInvoicePdfWithName(pdfUrl, studentRecord, inv);
-      toast({ title: 'PDF ready', description: 'Invoice PDF downloaded.' });
+      if (paymentsDialogInvoice?.id === inv.id) {
+        setPaymentsDialogInvoice({ ...invoiceRow, pdf_url: pdfUrl });
+      }
+      await openInvoicePdfWithName(pdfUrl, studentRecord, invoiceRow);
+      toast({ title: 'PDF ready', description: 'Invoice PDF generated with current payment totals.' });
     } catch (err: unknown) {
       console.error('Generate invoice PDF error:', err);
       toast({
@@ -6253,6 +6235,15 @@ const AdminPanel = () => {
                                   <Button size="sm" variant="ghost" onClick={() => handleOpenInvoiceHistory(student)}>
                                     View All Invoices
                                   </Button>
+                                  {inv && (
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={() => handleOpenInvoicePayments(inv, student)}
+                                    >
+                                      Payments &amp; receipts
+                                    </Button>
+                                  )}
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -6261,9 +6252,7 @@ const AdminPanel = () => {
                                   >
                                     {generatingPdfInvoiceId === inv.id
                                       ? 'Generating...'
-                                      : inv.pdf_url
-                                        ? 'Download PDF'
-                                        : 'Generate PDF'}
+                                      : 'Download invoice PDF'}
                                   </Button>
                                   {!isInvoiceFullyPaid(inv) && (
                                     <Button 
@@ -6451,8 +6440,8 @@ const AdminPanel = () => {
               <DialogTitle>Invoice History for {invoiceHistoryStudent?.student_name}</DialogTitle>
               {hiddenHistoryInvoiceCount > 0 && (
                 <p className="text-sm text-muted-foreground">
-                  {hiddenHistoryInvoiceCount} invoice{hiddenHistoryInvoiceCount === 1 ? '' : 's'} not shown
-                  (current month and future billing appear on Finances).
+                  {hiddenHistoryInvoiceCount} future-month invoice{hiddenHistoryInvoiceCount === 1 ? '' : 's'} hidden
+                  (use Finances → Future invoices to review).
                 </p>
               )}
             </DialogHeader>
@@ -6504,13 +6493,21 @@ const AdminPanel = () => {
                         >
                           {generatingPdfInvoiceId === inv.id
                             ? 'Generating...'
-                            : inv.pdf_url
-                              ? 'Download PDF'
-                              : 'Generate PDF'}
+                            : 'Download invoice PDF'}
                         </Button>
                       </td>
                       <td>
                         <Button size="sm" variant="ghost" onClick={() => handleViewHistoryInvoice(inv)}>View</Button>
+                        {invoiceHistoryStudent && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="ml-1"
+                            onClick={() => handleOpenInvoicePayments(inv, invoiceHistoryStudent)}
+                          >
+                            Payments
+                          </Button>
+                        )}
                       </td>
                       <td>
                         {!isInvoiceFullyPaid(inv) && (
@@ -6584,39 +6581,13 @@ const AdminPanel = () => {
                       />
                     </div>
                   )}
-                  {(historyInvoicePayments[selectedHistoryInvoice.id]?.length ?? 0) > 0 && (
-                    <div className="mt-3">
-                      <b>Payment history</b>
-                      <ul className="mt-1 space-y-2 text-sm">
-                        {historyInvoicePayments[selectedHistoryInvoice.id].map((p: any) => (
-                          <li key={p.id} className="flex flex-col gap-2 border-b border-gray-200 pb-2 sm:flex-row sm:items-center sm:justify-between">
-                            <span>
-                              KES {(p.amount ?? 0).toLocaleString()}
-                              {' · '}{p.payment_method || 'cash'}
-                              {p.paid_date && ` · ${p.paid_date}`}
-                              {p.mpesa_transaction_id && ` · Ref: ${p.mpesa_transaction_id}`}
-                              {p.notes && ` — ${p.notes}`}
-                            </span>
-                            {invoiceHistoryStudent && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="shrink-0"
-                                disabled={downloadingPaymentReceiptId === p.id}
-                                onClick={() =>
-                                  void handleDownloadPaymentReceipt(
-                                    p,
-                                    selectedHistoryInvoice,
-                                    invoiceHistoryStudent
-                                  )
-                                }
-                              >
-                                {downloadingPaymentReceiptId === p.id ? 'Generating...' : 'Download receipt'}
-                              </Button>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
+                  {invoiceHistoryStudent && (
+                    <div className="mt-3 pt-3 border-t">
+                      <InvoicePaymentsPanel
+                        invoice={selectedHistoryInvoice}
+                        student={invoiceHistoryStudent}
+                        refreshKey={`${invoicePaymentsRefreshKey}-${selectedHistoryInvoice.id}`}
+                      />
                     </div>
                   )}
                   <div className="mt-2">
@@ -6628,9 +6599,7 @@ const AdminPanel = () => {
                     >
                       {generatingPdfInvoiceId === selectedHistoryInvoice.id
                         ? 'Generating...'
-                        : selectedHistoryInvoice.pdf_url
-                          ? 'Download PDF'
-                          : 'Generate PDF'}
+                        : 'Download invoice PDF'}
                     </Button>
                     {!isInvoiceFullyPaid(selectedHistoryInvoice) && (
                       <Button 
@@ -6650,6 +6619,30 @@ const AdminPanel = () => {
             </div>
           </DialogContent>
         </Dialog>
+        <InvoicePaymentsDialog
+          open={showInvoicePaymentsDialog}
+          onOpenChange={(open) => {
+            setShowInvoicePaymentsDialog(open);
+            if (!open) {
+              setPaymentsDialogInvoice(null);
+              setPaymentsDialogStudent(null);
+            }
+          }}
+          invoice={paymentsDialogInvoice}
+          student={paymentsDialogStudent}
+          refreshKey={invoicePaymentsRefreshKey}
+          downloadingInvoicePdf={!!paymentsDialogInvoice && generatingPdfInvoiceId === paymentsDialogInvoice.id}
+          onDownloadInvoicePdf={() => {
+            if (paymentsDialogInvoice && paymentsDialogStudent) {
+              void handleDownloadInvoicePDF(paymentsDialogInvoice, paymentsDialogStudent);
+            }
+          }}
+          onRecordPayment={() => {
+            if (paymentsDialogInvoice) {
+              handleOpenRecordPayment(paymentsDialogInvoice, paymentsDialogStudent ?? undefined);
+            }
+          }}
+        />
         <RecordInvoicePaymentDialog
           open={showRecordPaymentDialog}
           onOpenChange={(open) => {

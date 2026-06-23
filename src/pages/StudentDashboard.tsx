@@ -2614,12 +2614,18 @@ const StudentDashboard = () => {
     if (!studentProfile) return;
     setGeneratingStudentPdfId(invoice.id);
     try {
-      const pdfUrl = await ensureInvoicePDF(invoice, studentProfile);
-      setInvoices((prev) => prev.map((row) => (row.id === invoice.id ? { ...row, pdf_url: pdfUrl } : row)));
+      const { data: freshInvoice } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('id', invoice.id)
+        .single();
+      const invoiceRow = freshInvoice || invoice;
+      const pdfUrl = await ensureInvoicePDF(invoiceRow, studentProfile, { forceRegenerate: true });
+      setInvoices((prev) => prev.map((row) => (row.id === invoice.id ? { ...row, ...invoiceRow, pdf_url: pdfUrl } : row)));
       if (selectedInvoice?.id === invoice.id) {
-        setSelectedInvoice({ ...selectedInvoice, pdf_url: pdfUrl });
+        setSelectedInvoice({ ...selectedInvoice, ...invoiceRow, pdf_url: pdfUrl });
       }
-      await openInvoicePdfWithName(pdfUrl, studentProfile, invoice);
+      await openInvoicePdfWithName(pdfUrl, studentProfile, invoiceRow);
     } catch (err) {
       console.error('Student invoice PDF error:', err);
       toast({

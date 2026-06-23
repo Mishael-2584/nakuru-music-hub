@@ -81,6 +81,9 @@ interface InvoiceMeta {
   periodStart?: string;
   periodEnd?: string;
   paymentStatus: string;
+  amountDue?: number;
+  amountPaid?: number;
+  balanceRemaining?: number;
   studentId: string;
   registrationId?: string;
   sessionsPerWeek?: number;
@@ -148,7 +151,12 @@ export const generateQuotePDF = async (
     ? invoiceDetails.lineItems
     : [{ description: quoteData?.project_type ? `${serviceLabel || 'Quote'} – ${quoteData.project_type}` : (serviceLabel || 'Quote'), quantity: 1, unitPrice: quoteAmount, amount: quoteAmount }];
   const subtotalVal = invoiceDetails?.subtotal ?? quoteAmount;
-  const totalVal = invoiceDetails?.total ?? quoteAmount;
+  const totalVal = invoiceMeta?.amountDue ?? invoiceDetails?.total ?? quoteAmount;
+  const amountPaidVal = invoiceMeta?.amountPaid ?? 0;
+  const balanceVal =
+    invoiceMeta?.balanceRemaining ?? Math.max(0, totalVal - amountPaidVal);
+  const showPaymentSummary =
+    !!invoiceMeta && (amountPaidVal > 0 || invoiceMeta.paymentStatus === 'PARTIAL' || invoiceMeta.paymentStatus === 'PAID');
 
   const quoteDetailsHtml = quoteData ? `
     <div style="margin: 12px 32px 0 32px; padding: 12px 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 12px; color: #334155;">
@@ -254,6 +262,16 @@ export const generateQuotePDF = async (
               <td style="padding: 8px 4px; text-align: right; font-weight: 700; color: #1e40af; font-size: 15px;">Total:</td>
               <td style="padding: 8px 4px; text-align: right; font-weight: 700; color: #1e40af; font-size: 15px;">KES ${totalVal.toLocaleString()}</td>
             </tr>
+            ${showPaymentSummary ? `
+            <tr>
+              <td style="padding: 8px 4px; text-align: right; font-weight: 600; color: #166534;">Amount paid:</td>
+              <td style="padding: 8px 4px; text-align: right; font-weight: 600; color: #166534;">KES ${amountPaidVal.toLocaleString()}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 4px; text-align: right; font-weight: 700; color: ${balanceVal > 0 ? '#b45309' : '#166534'}; font-size: 15px;">Balance due:</td>
+              <td style="padding: 8px 4px; text-align: right; font-weight: 700; color: ${balanceVal > 0 ? '#b45309' : '#166534'}; font-size: 15px;">KES ${balanceVal.toLocaleString()}</td>
+            </tr>
+            ` : ''}
           </tbody>
         </table>
       </div>
