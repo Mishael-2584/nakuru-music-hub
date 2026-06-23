@@ -112,12 +112,15 @@ export function getLatestInvoiceByPeriodEnd<T extends { period_end: string }>(
   return sortInvoicesByPeriodEndDesc(invoices)[0];
 }
 
-/** Hide mistakenly generated future-month invoices from student/admin lists. */
-export function filterInvoicesUpToCurrentMonth<T extends { period_start?: string | null }>(
+/** Hide mistakenly generated future-month invoices and voided rows from student/admin lists. */
+export function filterInvoicesUpToCurrentMonth<T extends { period_start?: string | null; status?: string | null }>(
   invoices: T[],
   reference = new Date()
 ): T[] {
-  return invoices.filter((inv) => inv.period_start && !isFutureBillingPeriod(inv.period_start, reference));
+  return invoices.filter((inv) => {
+    if (!inv.period_start || inv.status === 'cancelled') return false;
+    return !isFutureBillingPeriod(inv.period_start, reference);
+  });
 }
 
 /** Invoice history: only completed billing periods before the current calendar month. */
@@ -1702,7 +1705,7 @@ export async function generateInvoiceForRegistration(
     throw existingError;
   }
   
-  if (existingInvoice) {
+  if (existingInvoice && existingInvoice.status !== 'cancelled') {
     console.log('Existing invoice found:', existingInvoice);
     return { existing: existingInvoice }; // Already exists, return existing
   }

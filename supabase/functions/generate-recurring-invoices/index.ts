@@ -754,7 +754,7 @@ async function generateInvoicesForRegistration(registration, fee, student, summa
       .maybeSingle();
     if (existingError) throw existingError;
     
-    if (existingInvoice) {
+    if (existingInvoice && existingInvoice.status !== 'cancelled') {
       // Check if we should send reminder based on timing
       const shouldSendReminder = shouldSendInvoiceReminder(existingInvoice, period);
       if (shouldSendReminder && existingInvoice.status !== 'paid') {
