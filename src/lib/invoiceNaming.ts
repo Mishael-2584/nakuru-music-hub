@@ -1,3 +1,33 @@
+type InvoicePeriodFields = {
+  period_start?: string | null;
+  period_end?: string | null;
+};
+
+function parseBillingMonthDate(dateStr?: string | null): Date | null {
+  if (!dateStr) return null;
+  const normalized = dateStr.split('T')[0];
+  const [year, month, day] = normalized.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  const date = new Date(year, month - 1, day);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Human billing month for an invoice (the calendar month the period ends in).
+ * e.g. 2026-05-31 → 2026-06-30 is shown as "June 2026".
+ */
+export function formatInvoiceBillingMonth(invoice: InvoicePeriodFields): string {
+  const date = parseBillingMonthDate(invoice.period_end) ?? parseBillingMonthDate(invoice.period_start);
+  if (!date) return '';
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+function buildInvoiceBillingMonthSlug(invoice: InvoicePeriodFields): string {
+  const label = formatInvoiceBillingMonth(invoice);
+  if (!label) return '';
+  return label.replace(/\s+/g, '_');
+}
+
 /** Safe segment for file paths (student name, etc.). */
 export function sanitizeInvoiceFilePart(value: string): string {
   return (
@@ -15,18 +45,14 @@ export function sanitizeInvoiceFilePart(value: string): string {
 /** Human-readable invoice reference shown on the PDF (not a UUID). */
 export function buildInvoiceDisplayNumber(
   student: { student_name?: string | null },
-  invoice: { period_start?: string | null; period_end?: string | null },
+  invoice: InvoicePeriodFields,
   isFirstInvoice?: boolean
 ): string {
   const name = sanitizeInvoiceFilePart(student.student_name || 'Student');
-  const start = invoice.period_start || '';
-  const end = invoice.period_end || '';
   const prefix = isFirstInvoice ? 'FIRST' : 'INV';
-  if (start && end) {
-    return `${prefix}-${name}-${start}_to_${end}`;
-  }
-  if (start) {
-    return `${prefix}-${name}-${start}`;
+  const billingMonth = buildInvoiceBillingMonthSlug(invoice);
+  if (billingMonth) {
+    return `${prefix}-${name}-${billingMonth}`;
   }
   return `${prefix}-${name}`;
 }
@@ -34,12 +60,10 @@ export function buildInvoiceDisplayNumber(
 /** Object key inside the `invoices` storage bucket (no bucket name prefix). */
 export function buildInvoiceStoragePath(
   student: { student_name?: string | null },
-  invoice: { period_start?: string | null; period_end?: string | null }
+  invoice: InvoicePeriodFields
 ): string {
   const name = sanitizeInvoiceFilePart(student.student_name || 'Student');
-  const start = (invoice.period_start || '').replace(/-/g, '');
-  const end = (invoice.period_end || '').replace(/-/g, '');
-  const periodSlug = start && end ? `${start}_to_${end}` : `undated_${Date.now()}`;
+  const periodSlug = buildInvoiceBillingMonthSlug(invoice) || `undated_${Date.now()}`;
   return `${name}_${periodSlug}.pdf`;
 }
 
@@ -55,13 +79,12 @@ export function isBrokenInvoicePdfUrl(pdfUrl: string | null | undefined): boolea
 /** Filename when the user downloads/opens the PDF in the browser. */
 export function buildInvoiceDownloadFileName(
   student: { student_name?: string | null },
-  invoice: { period_start?: string | null; period_end?: string | null }
+  invoice: InvoicePeriodFields
 ): string {
   const name = sanitizeInvoiceFilePart(student.student_name || 'Student');
-  const start = invoice.period_start || '';
-  const end = invoice.period_end || '';
-  if (start && end) {
-    return `Invoice_${name}_${start}_to_${end}.pdf`;
+  const billingMonth = buildInvoiceBillingMonthSlug(invoice);
+  if (billingMonth) {
+    return `Invoice_${name}_${billingMonth}.pdf`;
   }
   return `Invoice_${name}.pdf`;
 }

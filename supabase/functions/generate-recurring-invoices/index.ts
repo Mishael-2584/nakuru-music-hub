@@ -155,13 +155,23 @@ async function convertCurrencyToKES(fee) {
   return fee;
 }
 
+function formatInvoiceBillingMonth(invoice) {
+  const dateStr = invoice?.period_end || invoice?.period_start;
+  if (!dateStr) return '';
+  const [year, month, day] = String(dateStr).split('T')[0].split('-').map(Number);
+  if (!year || !month || !day) return '';
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
 async function sendInvoiceEmail(invoice, student, isReminder = false) {
+  const billingMonth = formatInvoiceBillingMonth(invoice);
   const subject = isReminder
     ? `Payment Reminder: Invoice for ${student.student_name} - Damon Music Academy`
     : `Your Invoice for ${student.student_name} - Damon Music Academy`;
   const body = isReminder
-    ? `Dear ${student.student_name},\n\nThis is a friendly reminder that your invoice for the current period is due.\n\nInvoice Amount: KES ${invoice.amount_due}\nPeriod: ${invoice.period_start} to ${invoice.period_end}\nDue Date: ${invoice.due_date}\n\nIf you have already paid, please disregard this message.\n\nThank you!\nDamon Music Academy`
-    : `Dear ${student.student_name},\n\nPlease find your invoice for the current period below.\n\nInvoice Amount: KES ${invoice.amount_due}\nPeriod: ${invoice.period_start} to ${invoice.period_end}\nDue Date: ${invoice.due_date}\n\nIf you have any questions, let us know.\n\nThank you!\nDamon Music Academy`;
+    ? `Dear ${student.student_name},\n\nThis is a friendly reminder about your invoice for ${billingMonth || 'the current billing period'}.\n\nInvoice Amount: KES ${invoice.amount_due}\nBilling period: ${billingMonth || 'Current period'}\n\nIf you have already paid, please disregard this message.\n\nThank you!\nDamon Music Academy`
+    : `Dear ${student.student_name},\n\nPlease find your invoice for ${billingMonth || 'the current billing period'} below.\n\nInvoice Amount: KES ${invoice.amount_due}\nBilling period: ${billingMonth || 'Current period'}\n\nIf you have any questions, let us know.\n\nThank you!\nDamon Music Academy`;
   const { error } = await supabase.functions.invoke('send-confirmation-email', {
     body: {
       to: student.email,

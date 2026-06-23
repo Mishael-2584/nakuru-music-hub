@@ -20,9 +20,10 @@ import { Label } from "@/components/ui/label";
 import { generateQuotePDF } from "@/lib/pdfGenerator";
 import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
-import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, findInvoiceForCalendarMonth, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchInvoicePayments, filterInvoicesUpToCurrentMonth, filterPastInvoicesForHistory, isInvoiceNotDue, resolveInvoiceAfterGeneration, previewFutureInvoices, voidFutureInvoices, fetchStudentInvoiceForPreview, getLatestBillableInvoiceForStudent, canSendInvoiceEmail, studentNeedsCurrentMonthInvoice, type FutureInvoicePreviewRow, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
+import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, findInvoiceForCalendarMonth, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchInvoicePayments, filterInvoicesUpToCurrentMonth, filterPastInvoicesForHistory, isInvoiceNotDue, resolveInvoiceAfterGeneration, previewFutureInvoices, voidFutureInvoices, fetchStudentInvoiceForPreview, getLatestBillableInvoiceForStudent, canSendInvoiceEmail, studentNeedsCurrentMonthInvoice, formatInvoiceBillingMonth, type FutureInvoicePreviewRow, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
 import { getLanguagePathwayLabel, getLanguagePackageLabel, formatLanguageMonthlyPrice } from '@/lib/languageCourseUtils';
+import { isTermlyCourseCategory } from '@/lib/termlyFeeUtils';
 import FeeDebug from './FeeDebug';
 import ShopProductManager from './admin/ShopProductManager';
 import ShopOrderManager from './admin/ShopOrderManager';
@@ -2679,9 +2680,7 @@ const AdminPanel = () => {
           .single();
 
         if (registration) {
-          const periodLabel = invoiceData?.period_start && invoiceData?.period_end
-            ? `${invoiceData.period_start} – ${invoiceData.period_end}`
-            : undefined;
+          const periodLabel = invoiceData ? formatInvoiceBillingMonth(invoiceData) || undefined : undefined;
 
           const paidInvoiceContext = invoiceData && studentRow
             ? { invoice: invoiceData, student: studentRow, isFirstInvoice }
@@ -6099,7 +6098,7 @@ const AdminPanel = () => {
                           <thead className="bg-amber-100/60">
                             <tr>
                               <th className="text-left p-2">Student</th>
-                              <th className="text-left p-2">Period</th>
+                              <th className="text-left p-2">Billing period</th>
                               <th className="text-left p-2">Amount</th>
                               <th className="text-left p-2">Status</th>
                             </tr>
@@ -6108,7 +6107,7 @@ const AdminPanel = () => {
                             {futureInvoicePreview.slice(0, 20).map((row) => (
                               <tr key={row.invoice_id} className="border-t border-amber-50">
                                 <td className="p-2">{row.student_name || row.student_id}</td>
-                                <td className="p-2">{row.period_start} – {row.period_end}</td>
+                                <td className="p-2">{formatInvoiceBillingMonth(row) || '—'}</td>
                                 <td className="p-2">KES {Number(row.amount_due).toLocaleString()}</td>
                                 <td className="p-2">
                                   {row.can_void ? row.status : `${row.status} (skipped)`}
@@ -6473,12 +6472,11 @@ const AdminPanel = () => {
               <table className="min-w-full text-sm mb-4">
                 <thead>
                   <tr>
-                    <th>Period</th>
+                    <th>Billing period</th>
                     <th>Status</th>
                     <th>Due</th>
                     <th>Paid</th>
                     <th>Balance</th>
-                    <th>Due Date</th>
                     <th>PDF</th>
                     <th>Details</th>
                     <th>Actions</th>
@@ -6487,7 +6485,7 @@ const AdminPanel = () => {
                 <tbody>
                   {invoiceHistory.map(inv => (
                     <tr key={inv.id}>
-                      <td>{inv.period_start} - {inv.period_end}</td>
+                      <td>{formatInvoiceBillingMonth(inv)}</td>
                       <td>
                         {inv.payment_status || inv.status}
                         {inv.payment_status === 'partial' && (
@@ -6497,7 +6495,6 @@ const AdminPanel = () => {
                       <td>KES {getEffectiveAmountDue(inv).toLocaleString()}</td>
                       <td>KES {getInvoiceAmountPaid(inv).toLocaleString()}</td>
                       <td>KES {getInvoiceBalanceRemaining(inv).toLocaleString()}</td>
-                      <td>{inv.due_date}</td>
                       <td>
                         <Button
                           size="sm"
@@ -6534,12 +6531,11 @@ const AdminPanel = () => {
               {selectedHistoryInvoice && (
                 <div className="p-4 border rounded bg-gray-50">
                   <h4 className="font-semibold mb-2">Invoice Details</h4>
-                  <div><b>Period:</b> {selectedHistoryInvoice.period_start} - {selectedHistoryInvoice.period_end}</div>
+                  <div><b>Billing period:</b> {formatInvoiceBillingMonth(selectedHistoryInvoice)}</div>
                   <div><b>Status:</b> {selectedHistoryInvoice.payment_status || selectedHistoryInvoice.status}</div>
                   <div><b>Amount due:</b> KES {getEffectiveAmountDue(selectedHistoryInvoice).toLocaleString()}</div>
                   <div><b>Paid:</b> KES {getInvoiceAmountPaid(selectedHistoryInvoice).toLocaleString()}</div>
                   <div><b>Balance:</b> KES {getInvoiceBalanceRemaining(selectedHistoryInvoice).toLocaleString()}</div>
-                  <div><b>Due Date:</b> {selectedHistoryInvoice.due_date}</div>
                   <div><b>Notes:</b> {selectedHistoryInvoice.notes || '-'}</div>
                   {invoiceHistoryStudent && (
                     <div className="mt-3 pt-3 border-t">

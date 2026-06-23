@@ -5,6 +5,7 @@ import {
   buildInvoiceDisplayNumber,
   buildInvoiceDownloadFileName,
   buildInvoiceStoragePath,
+  formatInvoiceBillingMonth,
 } from './invoiceNaming';
 import { generateInvoicePDFBlob, resolveInvoicePdfPaymentStatus } from './invoiceUtils';
 
@@ -1019,11 +1020,10 @@ export const sendInvoiceEmail = async (
     }
     
     // Build invoiceMeta for PDF generation
+    const billingMonth = formatInvoiceBillingMonth(invoice);
     const invoiceMeta = {
       invoiceNumber: buildInvoiceDisplayNumber(student, invoice, options.isFirstInvoice),
-      periodStart: invoice.period_start || '',
-      periodEnd: invoice.period_end || '',
-      dueDate: invoice.due_date || '',
+      billingPeriod: billingMonth,
       paymentStatus: resolveInvoicePdfPaymentStatus(invoice),
       studentId: student.id || '',
       registrationId: student.registration_id || '',
@@ -1035,7 +1035,7 @@ export const sendInvoiceEmail = async (
     const invoiceDetails = invoice.lessons_summary || {
       lineItems: [
         {
-          description: `Music Lessons - ${invoice.period_start ? `${new Date(invoice.period_start).toLocaleDateString()} to ${new Date(invoice.period_end).toLocaleDateString()}` : 'Current Period'}`,
+          description: `Music Lessons — ${billingMonth || 'Current Period'}`,
           quantity: 1,
           unitPrice: invoice.amount_due,
           amount: invoice.amount_due
@@ -1044,7 +1044,7 @@ export const sendInvoiceEmail = async (
       subtotal: invoice.amount_due,
       tax: 0,
       total: invoice.amount_due,
-      paymentTerms: 'Payment due within 7 days of invoice date',
+      paymentTerms: 'Monthly fees are payable upfront at the beginning of the month',
       validUntil: '30 days from invoice date',
       serviceBreakdown: 'Music lessons as scheduled',
       equipmentBreakdown: 'All necessary equipment and materials provided',

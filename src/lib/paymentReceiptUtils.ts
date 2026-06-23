@@ -3,6 +3,7 @@ import {
   buildInvoiceDisplayNumber,
   buildPaymentReceiptDownloadFileName,
   buildPaymentReceiptNumber,
+  formatInvoiceBillingMonth,
 } from './invoiceNaming';
 import { getEffectiveAmountDue, type InvoicePaymentRow } from './invoiceUtils';
 
@@ -58,10 +59,7 @@ export function buildPaymentReceiptData(params: {
     invoice,
     allPayments
   );
-  const invoicePeriod =
-    invoice.period_start && invoice.period_end
-      ? `${invoice.period_start} – ${invoice.period_end}`
-      : invoice.period_start || '';
+  const invoicePeriod = formatInvoiceBillingMonth(invoice);
 
   const thisPayment = Number(payment.amount) || 0;
   const cashAmount = Number(payment.cash_amount) || 0;

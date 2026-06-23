@@ -7,10 +7,19 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+function formatInvoiceBillingMonth(invoice: { period_end?: string | null; period_start?: string | null }) {
+  const dateStr = invoice?.period_end || invoice?.period_start;
+  if (!dateStr) return '';
+  const [year, month, day] = String(dateStr).split('T')[0].split('-').map(Number);
+  if (!year || !month || !day) return '';
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
 async function sendReminderEmail(invoice: any, student: any) {
-  // Compose a simple reminder email (customize as needed)
-  const subject = `Payment Reminder: Invoice Due for Damon Music Academy`;
-  const body = `<p>Dear ${student.student_name},</p><p>This is a friendly reminder that your invoice for the period ${invoice.period_start} to ${invoice.period_end} is due. Please make payment as soon as possible. If you have already paid, please disregard this message.</p>`;
+  const billingMonth = formatInvoiceBillingMonth(invoice);
+  const subject = `Payment Reminder: Invoice for Damon Music Academy`;
+  const body = `<p>Dear ${student.student_name},</p><p>This is a friendly reminder about your invoice for <strong>${billingMonth || 'the current billing period'}</strong>. Please make payment as soon as possible. If you have already paid, please disregard this message.</p>`;
   const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
     body: {
       to: student.email,

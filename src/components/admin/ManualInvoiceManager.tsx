@@ -16,6 +16,7 @@ import {
   getInvoiceAmountPaid,
   invoiceHasRecordedPayments,
   isInvoiceFullyPaid,
+  formatInvoiceBillingMonth,
 } from '@/lib/invoiceUtils';
 
 interface InvoiceLineItem {
@@ -394,7 +395,7 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
               <div className="space-y-1 text-xs sm:text-sm text-blue-800">
                 <p className="break-words"><strong>Name:</strong> {invoice.students?.student_name || 'N/A'}</p>
                 <p className="break-all"><strong>Email:</strong> {invoice.students?.email || 'N/A'}</p>
-                <p className="text-xs"><strong>Period:</strong> {invoice.period_start} to {invoice.period_end}</p>
+                <p className="text-xs"><strong>Billing period:</strong> {formatInvoiceBillingMonth(invoice) || 'N/A'}</p>
               </div>
             </div>
 

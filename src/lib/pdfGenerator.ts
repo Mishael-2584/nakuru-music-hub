@@ -77,9 +77,9 @@ interface InvoiceDetails {
 // 1. Update interfaces to accept more invoice metadata
 interface InvoiceMeta {
   invoiceNumber: string;
-  periodStart: string;
-  periodEnd: string;
-  dueDate: string;
+  billingPeriod?: string;
+  periodStart?: string;
+  periodEnd?: string;
   paymentStatus: string;
   studentId: string;
   registrationId?: string;
@@ -94,9 +94,6 @@ export const generateQuotePDF = async (
   invoiceDetails?: InvoiceDetails,
   invoiceMeta?: InvoiceMeta
 ): Promise<Blob> => {
-  // Debug: log invoiceMeta and dueDate at PDF generation
-  console.log('PDF GENERATOR: invoiceMeta =', invoiceMeta);
-  console.log('PDF GENERATOR: invoiceMeta.dueDate =', invoiceMeta?.dueDate);
   // Create a temporary div to render the PDF content
   const pdfContainer = document.createElement('div');
   pdfContainer.style.width = '800px';
@@ -171,6 +168,12 @@ export const generateQuotePDF = async (
     </div>
   ` : '';
 
+  const billingPeriodLabel =
+    invoiceMeta?.billingPeriod ||
+    (invoiceMeta?.periodStart && invoiceMeta?.periodEnd
+      ? `${invoiceMeta.periodStart} – ${invoiceMeta.periodEnd}`
+      : '');
+
   pdfContainer.innerHTML = `
   <div style="max-width: 794px; margin: 0 auto; background: #fff; font-family: 'Arial', sans-serif; border: 1px solid #e5e7eb; border-radius: 10px; padding: 0 0 20px 0;">
     <!-- Header -->
@@ -195,8 +198,7 @@ export const generateQuotePDF = async (
         ` : ''}
         <div style="font-size: 15px; color: #64748b;">${isQuoteOnly ? 'Reference:' : 'Invoice:'} <b>${isQuoteOnly ? 'Quote' : (invoiceMeta?.invoiceNumber || '-')}</b></div>
         <div style="font-size: 13px; color: #64748b;">Date: ${invoiceOrQuoteDate}</div>
-        ${invoiceMeta?.periodStart && invoiceMeta?.periodEnd ? `<div style="font-size: 13px; color: #64748b;">Period: ${invoiceMeta.periodStart} – ${invoiceMeta.periodEnd}</div>` : ''}
-        ${invoiceMeta?.dueDate ? `<div style="font-size: 13px; color: #64748b;">Due: ${invoiceMeta.dueDate}</div>` : ''}
+        ${billingPeriodLabel ? `<div style="font-size: 13px; color: #64748b;">Billing period: <b>${billingPeriodLabel}</b></div>` : ''}
         <div style="font-size: 13px; color: #1e293b; margin-top: 4px;">Course/Instrument: <b>${courseOrInstrument || '-'}</b></div>
       </div>
     </div>

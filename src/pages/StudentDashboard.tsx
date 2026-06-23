@@ -17,7 +17,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Link } from 'react-router-dom';
 import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
-import { calculateStudentInvoice, InvoiceCalculationResult, ensureInvoicePDF, openInvoicePdfWithName, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, hasOutstandingBalance, isInvoiceFullyPaid, filterInvoicesUpToCurrentMonth, type InvoicePaymentRow } from '../lib/invoiceUtils';
+import { calculateStudentInvoice, InvoiceCalculationResult, ensureInvoicePDF, openInvoicePdfWithName, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, hasOutstandingBalance, isInvoiceFullyPaid, filterInvoicesUpToCurrentMonth, formatInvoiceBillingMonth, type InvoicePaymentRow } from '../lib/invoiceUtils';
 import { Invoice } from '../integrations/supabase/types';
 import VideoConferenceModal from '../components/VideoConferenceModal';
 import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getMeetingDuration, getUserInvitedMeetings, joinMeetingByCode, joinInstantMeetingRoom, joinMeetingRoom, joinBookingOnlineMeeting, openMeetingLink, InstantMeeting } from '../lib/videoConferencing';
@@ -4161,7 +4161,7 @@ const StudentDashboard = () => {
                                   </Badge>
                                 )}
                               </div>
-                              <p className="text-sm text-gray-600">Period: {formatDate(invoice.period_start)} - {formatDate(invoice.period_end)}</p>
+                              <p className="text-sm text-gray-600">Billing period: {formatInvoiceBillingMonth(invoice) || 'N/A'}</p>
                               <p className="text-sm text-gray-600">Please note: Monthly fees are payable upfront at the beginning of the month. Late payments may affect lesson scheduling.</p>
                               {invoice.payment_status === 'partial' && (
                                 <p className="text-sm text-amber-600 font-medium mt-1">
@@ -4632,7 +4632,7 @@ const StudentDashboard = () => {
                         <tbody>
                           {invoices.map(inv => (
                             <tr key={inv.id} className="border-b">
-                              <td>{inv.period_start} - {inv.period_end}</td>
+                              <td>{formatInvoiceBillingMonth(inv)}</td>
                               <td className="text-right">KES {inv.amount_due.toLocaleString()}</td>
                               <td className="text-center">
                                 <Badge 

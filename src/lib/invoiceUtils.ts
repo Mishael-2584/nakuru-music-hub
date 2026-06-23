@@ -16,6 +16,7 @@ import {
   buildInvoiceDisplayNumber,
   buildInvoiceDownloadFileName,
   buildInvoiceStoragePath,
+  formatInvoiceBillingMonth,
   isBrokenInvoicePdfUrl,
 } from './invoiceNaming';
 import {
@@ -33,8 +34,26 @@ export {
   buildInvoiceDisplayNumber,
   buildInvoiceStoragePath,
   buildInvoiceDownloadFileName,
+  formatInvoiceBillingMonth,
   isBrokenInvoicePdfUrl,
 } from './invoiceNaming';
+
+function buildInvoicePdfMeta(
+  invoice: { period_start?: string | null; period_end?: string | null; notes?: string | null; sessions_per_week?: number | null },
+  student: { id?: string | null; registration_id?: string | null },
+  isFirstInvoice: boolean,
+  paymentStatus: string
+) {
+  return {
+    invoiceNumber: buildInvoiceDisplayNumber(student, invoice, isFirstInvoice),
+    billingPeriod: formatInvoiceBillingMonth(invoice),
+    paymentStatus,
+    studentId: student.id || '',
+    registrationId: student.registration_id || '',
+    sessionsPerWeek: invoice.sessions_per_week || undefined,
+    notes: invoice.notes || '',
+  };
+}
 
 /** Local calendar date YYYY-MM-DD (avoids UTC shift from toISOString). */
 export function toLocalDateString(d: Date): string {
@@ -1001,22 +1020,13 @@ export async function generateAndUploadInvoicePDF(invoice: any, student: any, is
     additional_notes: ''
   };
 
-  // Debug: log due date before passing to PDF
-  console.log('PDF Generation: invoice.due_date =', invoice.due_date);
   // Build invoiceMeta for the new PDF layout
-  const invoiceMeta = {
-    invoiceNumber: buildInvoiceDisplayNumber(student, invoice, isFirstInvoice),
-    periodStart: invoice.period_start || '',
-    periodEnd: invoice.period_end || '',
-    dueDate: invoice.due_date || '',
-    paymentStatus: resolveInvoicePdfPaymentStatus(invoice),
-    studentId: student.id || '',
-    registrationId: student.registration_id || '',
-    sessionsPerWeek: invoice.sessions_per_week || undefined,
-    notes: invoice.notes || '',
-  };
-  // Debug: log invoiceMeta before PDF generation
-  console.log('PDF Generation: invoiceMeta =', invoiceMeta);
+  const invoiceMeta = buildInvoicePdfMeta(
+    invoice,
+    student,
+    isFirstInvoice,
+    resolveInvoicePdfPaymentStatus(invoice)
+  );
 
   // Generate PDF blob with new layout
   const pdfBlob = await generateQuotePDF(quoteData, invoice.amount_due, '', invoiceDetails, invoiceMeta);
@@ -1062,17 +1072,12 @@ export async function generateInvoicePDFBlob(invoice: any, student: any, isFirst
     preferred_contact_method: 'email',
     additional_notes: ''
   };
-  const invoiceMeta = {
-    invoiceNumber: buildInvoiceDisplayNumber(student, invoice, isFirstInvoice),
-    periodStart: invoice.period_start || '',
-    periodEnd: invoice.period_end || '',
-    dueDate: invoice.due_date || '',
-    paymentStatus: resolveInvoicePdfPaymentStatus(invoice),
-    studentId: student.id || '',
-    registrationId: student.registration_id || '',
-    sessionsPerWeek: invoice.sessions_per_week || undefined,
-    notes: invoice.notes || '',
-  };
+  const invoiceMeta = buildInvoicePdfMeta(
+    invoice,
+    student,
+    isFirstInvoice,
+    resolveInvoicePdfPaymentStatus(invoice)
+  );
   return generateQuotePDF(quoteData, invoice.amount_due, '', invoiceDetails, invoiceMeta);
 }
 
@@ -1084,10 +1089,7 @@ export function buildFallbackLessonsSummary(invoice: {
   notes?: string | null;
 }) {
   const amount = Number(invoice.amount_due) || 0;
-  const periodLabel =
-    invoice.period_start && invoice.period_end
-      ? `${invoice.period_start} to ${invoice.period_end}`
-      : 'billing period';
+  const periodLabel = formatInvoiceBillingMonth(invoice) || 'billing period';
 
   return {
     lineItems: [
@@ -1102,7 +1104,7 @@ export function buildFallbackLessonsSummary(invoice: {
     subtotal: amount,
     tax: 0,
     total: amount,
-    paymentTerms: 'Payment due within 7 days of invoice date',
+    paymentTerms: 'Monthly fees are payable upfront at the beginning of the month',
     validUntil: '',
     serviceBreakdown: 'Music lessons as scheduled',
     equipmentBreakdown: 'All necessary equipment and materials provided',
@@ -1932,7 +1934,7 @@ export async function generateInvoiceForRegistration(
     subtotal: calculatedSubtotal, // Use sum of line item amounts
     tax: 0, // Remove tax as requested
     total: calculatedTotal, // Use sum of line item amounts
-    paymentTerms: 'Payment due within 7 days of invoice date',
+    paymentTerms: 'Monthly fees are payable upfront at the beginning of the month',
     validUntil: '',
     serviceBreakdown: `${courseDisplayName} as scheduled`,
     equipmentBreakdown: 'All necessary equipment and materials provided',

@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  formatInvoiceBillingMonth,
   getEffectiveAmountDue,
   getInvoiceAmountPaid,
   getInvoiceBalanceRemaining,
@@ -137,9 +138,7 @@ const RecordInvoicePaymentDialog: React.FC<RecordInvoicePaymentDialogProps> = ({
           <DialogTitle>Record Payment</DialogTitle>
           <DialogDescription>
             {studentName ? `${studentName} — ` : ''}
-            {invoice.period_start && invoice.period_end
-              ? `${invoice.period_start} to ${invoice.period_end}`
-              : 'Invoice payment'}
+            {formatInvoiceBillingMonth(invoice) || 'Invoice payment'}
           </DialogDescription>
         </DialogHeader>
 
