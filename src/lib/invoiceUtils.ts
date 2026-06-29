@@ -110,6 +110,49 @@ export function isFutureBillingPeriod(periodStart: string, reference = new Date(
   return getYearMonthKey(periodStart) > getYearMonthKey(reference);
 }
 
+/** Days before month-end when admins can view, edit, and send the next month's recurring invoices. */
+export const NEXT_MONTH_ADMIN_PREVIEW_DAYS = 5;
+
+export type BillingVisibilityOptions = {
+  /** Include the immediate next calendar month during the preview window (admin only). */
+  allowNextMonthPreview?: boolean;
+};
+
+/** Admin finances: show next-month invoices in the last 5 days of the current month. */
+export const ADMIN_BILLING_VISIBILITY: BillingVisibilityOptions = { allowNextMonthPreview: true };
+
+/** True during the last {@link NEXT_MONTH_ADMIN_PREVIEW_DAYS} days of the reference month. */
+export function isWithinNextMonthBillingPreviewWindow(reference = new Date()): boolean {
+  const ref = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
+  const daysInMonth = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
+  const firstPreviewDay = daysInMonth - NEXT_MONTH_ADMIN_PREVIEW_DAYS + 1;
+  return ref.getDate() >= firstPreviewDay;
+}
+
+export function getNextCalendarMonthReference(reference = new Date()): Date {
+  const ref = reference instanceof Date ? reference : parseLocalDateString(String(reference));
+  return new Date(ref.getFullYear(), ref.getMonth() + 1, 1);
+}
+
+/**
+ * True when a billing period should be hidden from lists.
+ * Students: current month and earlier only.
+ * Admin preview: also shows the immediate next calendar month in the last 5 days of the current month.
+ */
+export function isHiddenBillingPeriod(
+  periodStart: string,
+  reference = new Date(),
+  options: BillingVisibilityOptions = {}
+): boolean {
+  if (!periodStart) return true;
+  if (!isFutureBillingPeriod(periodStart, reference)) return false;
+  if (!options.allowNextMonthPreview || !isWithinNextMonthBillingPreviewWindow(reference)) {
+    return true;
+  }
+  const nextMonthKey = getYearMonthKey(getNextCalendarMonthReference(reference));
+  return getYearMonthKey(periodStart) !== nextMonthKey;
+}
+
 export type BillingPaymentType = 'monthly' | 'per_class' | 'term';
 
 /** Sort invoices with the latest billing period first. */
@@ -129,23 +172,26 @@ export function getLatestInvoiceByPeriodEnd<T extends { period_end: string }>(
   return sortInvoicesByPeriodEndDesc(invoices)[0];
 }
 
-/** Hide mistakenly generated future-month invoices and voided rows from student/admin lists. */
+/** Hide future-month invoices (and voided rows) from billing lists. */
 export function filterInvoicesUpToCurrentMonth<T extends { period_start?: string | null; status?: string | null }>(
   invoices: T[],
-  reference = new Date()
+  reference = new Date(),
+  options: BillingVisibilityOptions = {}
 ): T[] {
   return invoices.filter((inv) => {
     if (!inv.period_start || inv.status === 'cancelled') return false;
-    return !isFutureBillingPeriod(inv.period_start, reference);
+    return !isHiddenBillingPeriod(inv.period_start, reference, options);
   });
 }
 
-/** Invoice history in admin: current + past billable invoices (excludes future and cancelled). */
+/** Invoice history in admin: current + past billable invoices (excludes hidden future and cancelled). */
 export function filterInvoicesForAdminHistory<T extends { period_start?: string | null; status?: string | null }>(
   invoices: T[],
   reference = new Date()
 ): T[] {
-  return sortInvoicesByPeriodEndDesc(filterInvoicesUpToCurrentMonth(invoices, reference));
+  return sortInvoicesByPeriodEndDesc(
+    filterInvoicesUpToCurrentMonth(invoices, reference, ADMIN_BILLING_VISIBILITY)
+  );
 }
 
 /** @deprecated Use filterInvoicesForAdminHistory — kept for compatibility. */
@@ -213,7 +259,8 @@ export function computeNextBillingPeriod(params: {
     return null;
   }
 
-  if (isFutureBillingPeriod(toLocalDateString(periodStart), now)) {
+  const periodStartStr = toLocalDateString(periodStart);
+  if (isHiddenBillingPeriod(periodStartStr, now, ADMIN_BILLING_VISIBILITY)) {
     return null;
   }
 
@@ -258,7 +305,7 @@ export async function resolveInvoiceAfterGeneration(
 
   if (isInvoiceNotDue(result)) {
     const { data } = await supabase.from('invoices').select('*').eq('student_id', studentId);
-    const billable = filterInvoicesUpToCurrentMonth(data || []);
+    const billable = filterInvoicesUpToCurrentMonth(data || [], undefined, ADMIN_BILLING_VISIBILITY);
     const current = findInvoiceForCalendarMonth(billable, studentId);
     if (current) {
       const { data: earlier } = await supabase
@@ -486,10 +533,16 @@ export function findInvoiceForFinancePeriod<T extends { student_id: string; peri
 
 export function getLatestBillableInvoiceForStudent<
   T extends { student_id: string; period_start: string; period_end: string }
->(invoices: T[], studentId: string, reference = new Date()): T | undefined {
+>(
+  invoices: T[],
+  studentId: string,
+  reference = new Date(),
+  options: BillingVisibilityOptions = {}
+): T | undefined {
   return sortInvoicesByPeriodEndDesc(
     invoices.filter(
-      (inv) => inv.student_id === studentId && !isFutureBillingPeriod(inv.period_start, reference)
+      (inv) =>
+        inv.student_id === studentId && !isHiddenBillingPeriod(inv.period_start, reference, options)
     )
   )[0];
 }
@@ -502,46 +555,263 @@ export function invoiceHasRecordedPayments(invoice: InvoicePaymentFields | null 
   return false;
 }
 
-/** Student has no invoice overlapping the current calendar month. */
+/** Student has no invoice overlapping the current calendar month (or next month during admin preview). */
 export function studentNeedsCurrentMonthInvoice<
   T extends { student_id: string; period_start: string; period_end: string }
->(invoices: T[], studentId: string, reference = new Date()): boolean {
+>(
+  invoices: T[],
+  studentId: string,
+  reference = new Date(),
+  options: BillingVisibilityOptions = {}
+): boolean {
   const billable = invoices.filter(
-    (inv) => inv.student_id === studentId && !isFutureBillingPeriod(inv.period_start, reference)
+    (inv) =>
+      inv.student_id === studentId && !isHiddenBillingPeriod(inv.period_start, reference, options)
   );
-  return !findInvoiceForCalendarMonth(billable, studentId, reference);
+  if (!findInvoiceForCalendarMonth(billable, studentId, reference)) return true;
+  if (options.allowNextMonthPreview && isWithinNextMonthBillingPreviewWindow(reference)) {
+    return !findInvoiceForCalendarMonth(billable, studentId, getNextCalendarMonthReference(reference));
+  }
+  return false;
 }
 
-/** Send Invoice is allowed unless the current calendar month is already fully paid. */
+/** Send Invoice is allowed unless the active billing month is already fully paid. */
 export function canSendInvoiceEmail<
   T extends { student_id: string; period_start: string; period_end: string } & InvoicePaymentFields
->(invoices: T[], studentId: string, reference = new Date()): boolean {
+>(
+  invoices: T[],
+  studentId: string,
+  reference = new Date(),
+  options: BillingVisibilityOptions = {}
+): boolean {
   const billable = invoices.filter(
-    (inv) => inv.student_id === studentId && !isFutureBillingPeriod(inv.period_start, reference)
+    (inv) =>
+      inv.student_id === studentId && !isHiddenBillingPeriod(inv.period_start, reference, options)
   );
   const current = findInvoiceForCalendarMonth(billable, studentId, reference);
-  if (current && isInvoiceFullyPaid(current)) return false;
+  if (current && !isInvoiceFullyPaid(current)) return true;
+  if (current && isInvoiceFullyPaid(current)) {
+    if (options.allowNextMonthPreview && isWithinNextMonthBillingPreviewWindow(reference)) {
+      const nextMonth = findInvoiceForCalendarMonth(
+        billable,
+        studentId,
+        getNextCalendarMonthReference(reference)
+      );
+      if (!nextMonth || !isInvoiceFullyPaid(nextMonth)) return true;
+    }
+    return false;
+  }
   return true;
 }
 
-/** Invoice to show in admin finances row (latest billable invoice for the student). */
+/** Invoice to show in admin finances row during the active billing window. */
 export function resolveFinanceInvoiceForStudent<
   T extends { student_id: string; period_start: string; period_end: string } & InvoicePaymentFields
->(invoices: T[], studentId: string, period: { start: string; end: string }): {
+>(
+  invoices: T[],
+  studentId: string,
+  period: { start: string; end: string },
+  options: BillingVisibilityOptions = ADMIN_BILLING_VISIBILITY,
+  reference = new Date()
+): {
   invoice: T | undefined;
   isCurrentPeriod: boolean;
 } {
-  const invoice = getLatestBillableInvoiceForStudent(invoices, studentId);
-  const current = findInvoiceForCalendarMonth(
-    invoices.filter(
-      (inv) => inv.student_id === studentId && !isFutureBillingPeriod(inv.period_start)
-    ),
-    studentId
+  const billableForStudent = invoices.filter(
+    (inv) =>
+      inv.student_id === studentId && !isHiddenBillingPeriod(inv.period_start, reference, options)
   );
-  return {
-    invoice,
-    isCurrentPeriod: !!invoice && !!current && invoice.id === current.id,
+  const current = findInvoiceForCalendarMonth(billableForStudent, studentId, reference);
+  const inPreview =
+    options.allowNextMonthPreview && isWithinNextMonthBillingPreviewWindow(reference);
+
+  if (inPreview) {
+    const nextMonth = findInvoiceForCalendarMonth(
+      billableForStudent,
+      studentId,
+      getNextCalendarMonthReference(reference)
+    );
+    if (current && !isInvoiceFullyPaid(current)) {
+      return { invoice: current, isCurrentPeriod: true };
+    }
+    if (nextMonth) {
+      return { invoice: nextMonth, isCurrentPeriod: false };
+    }
+    return { invoice: undefined, isCurrentPeriod: false };
+  }
+
+  const invoice = getLatestBillableInvoiceForStudent(invoices, studentId, reference, options);
+  const isCurrentPeriod = !!invoice && !!current && invoice.id === current.id;
+  return { invoice, isCurrentPeriod };
+}
+
+/** Human-readable label for the upcoming billing month (e.g. "July 2026"). */
+export function formatNextBillingMonthLabel(reference = new Date()): string {
+  const next = getNextCalendarMonthReference(reference);
+  const periodEnd = new Date(next.getFullYear(), next.getMonth() + 1, 0);
+  return (
+    formatInvoiceBillingMonth({
+      period_start: toLocalDateString(next),
+      period_end: toLocalDateString(periodEnd),
+    }) || 'upcoming month'
+  );
+}
+
+export type BulkUpcomingInvoiceGenerationResult = {
+  created: number;
+  skipped: number;
+  failed: number;
+  details: Array<{
+    studentId: string;
+    studentName: string;
+    outcome: 'created' | 'skipped' | 'failed';
+    reason?: string;
+  }>;
+};
+
+/** Why a student cannot receive a bulk-generated upcoming-period invoice, or null if eligible. */
+export function getUpcomingInvoiceGenerationSkipReason<
+  T extends { student_id: string; period_start: string; period_end: string; status?: string | null } & InvoicePaymentFields
+>(invoices: T[], studentId: string, reference = new Date()): string | null {
+  if (!isWithinNextMonthBillingPreviewWindow(reference)) {
+    return 'Outside the 5-day preview window before month-end';
+  }
+
+  const billable = invoices.filter(
+    (inv) =>
+      inv.student_id === studentId &&
+      !isHiddenBillingPeriod(inv.period_start, reference, ADMIN_BILLING_VISIBILITY)
+  );
+  const current = findInvoiceForCalendarMonth(billable, studentId, reference);
+  if (!current) {
+    return 'No invoice for the current billing month yet';
+  }
+  if (!isInvoiceFullyPaid(current)) {
+    return 'Current month still has an outstanding balance';
+  }
+
+  const nextMonth = findInvoiceForCalendarMonth(
+    billable,
+    studentId,
+    getNextCalendarMonthReference(reference)
+  );
+  if (nextMonth) {
+    return 'Upcoming invoice already exists';
+  }
+
+  return null;
+}
+
+export function studentEligibleForUpcomingInvoiceGeneration<
+  T extends { student_id: string; period_start: string; period_end: string; status?: string | null } & InvoicePaymentFields
+>(invoices: T[], studentId: string, reference = new Date()): boolean {
+  return getUpcomingInvoiceGenerationSkipReason(invoices, studentId, reference) === null;
+}
+
+/**
+ * Create upcoming-period invoices for eligible students without sending email.
+ * Intended for the admin preview window so invoices can be edited before Send Invoice.
+ */
+export async function generateUpcomingPeriodInvoices<
+  T extends { student_id: string; period_start: string; period_end: string; status?: string | null } & InvoicePaymentFields
+>(
+  students: Array<{ id: string; registration_id?: string | null; student_name?: string | null }>,
+  invoices: T[],
+  reference = new Date()
+): Promise<BulkUpcomingInvoiceGenerationResult> {
+  if (!isWithinNextMonthBillingPreviewWindow(reference)) {
+    throw new Error('Upcoming invoices can only be bulk-generated in the last 5 days of the month.');
+  }
+
+  const result: BulkUpcomingInvoiceGenerationResult = {
+    created: 0,
+    skipped: 0,
+    failed: 0,
+    details: [],
   };
+
+  let workingInvoices = [...invoices];
+
+  for (const student of students) {
+    const studentName = student.student_name || student.id;
+    const skipReason = getUpcomingInvoiceGenerationSkipReason(workingInvoices, student.id, reference);
+    if (skipReason) {
+      result.skipped++;
+      result.details.push({
+        studentId: student.id,
+        studentName,
+        outcome: 'skipped',
+        reason: skipReason,
+      });
+      continue;
+    }
+
+    if (!student.registration_id) {
+      result.failed++;
+      result.details.push({
+        studentId: student.id,
+        studentName,
+        outcome: 'failed',
+        reason: 'Missing registration_id',
+      });
+      continue;
+    }
+
+    try {
+      const genResult = await generateInvoiceForRegistration(student.registration_id);
+      if (isInvoiceNotDue(genResult)) {
+        result.skipped++;
+        result.details.push({
+          studentId: student.id,
+          studentName,
+          outcome: 'skipped',
+          reason: genResult.message,
+        });
+        continue;
+      }
+
+      if (genResult && 'existing' in genResult) {
+        result.skipped++;
+        result.details.push({
+          studentId: student.id,
+          studentName,
+          outcome: 'skipped',
+          reason: 'Invoice already exists for this period',
+        });
+        workingInvoices = [genResult.existing as T, ...workingInvoices];
+        continue;
+      }
+
+      if (genResult) {
+        result.created++;
+        result.details.push({
+          studentId: student.id,
+          studentName,
+          outcome: 'created',
+        });
+        workingInvoices = [genResult as T, ...workingInvoices];
+        continue;
+      }
+
+      result.skipped++;
+      result.details.push({
+        studentId: student.id,
+        studentName,
+        outcome: 'skipped',
+        reason: 'Nothing to generate',
+      });
+    } catch (error) {
+      result.failed++;
+      result.details.push({
+        studentId: student.id,
+        studentName,
+        outcome: 'failed',
+        reason: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  return result;
 }
 
 export type InvoicePaymentFields = {
@@ -1653,13 +1923,34 @@ export async function generateInvoiceForRegistration(
     throw existingInvoicesError;
   }
 
-  const billableExistingInvoices = filterInvoicesUpToCurrentMonth(existingInvoices || [], now);
+  const billableExistingInvoices = filterInvoicesUpToCurrentMonth(
+    existingInvoices || [],
+    now,
+    ADMIN_BILLING_VISIBILITY
+  );
   const isFirstInvoice = billableExistingInvoices.length === 0;
   const latestInvoice = getLatestInvoiceByPeriodEnd(billableExistingInvoices);
   paymentType = fee.payment_type as BillingPaymentType;
 
   const currentMonthInvoice = findInvoiceForCalendarMonth(billableExistingInvoices, student.id, now);
-  if (currentMonthInvoice) {
+  const inPreviewWindow = isWithinNextMonthBillingPreviewWindow(now);
+  const nextMonthInvoice = inPreviewWindow
+    ? findInvoiceForCalendarMonth(
+        billableExistingInvoices,
+        student.id,
+        getNextCalendarMonthReference(now)
+      )
+    : undefined;
+
+  if (currentMonthInvoice && !isInvoiceFullyPaid(currentMonthInvoice)) {
+    return { existing: currentMonthInvoice as Invoice };
+  }
+
+  if (nextMonthInvoice) {
+    return { existing: nextMonthInvoice as Invoice };
+  }
+
+  if (currentMonthInvoice && isInvoiceFullyPaid(currentMonthInvoice) && !inPreviewWindow) {
     return { existing: currentMonthInvoice as Invoice };
   }
 
@@ -1699,8 +1990,9 @@ export async function generateInvoiceForRegistration(
     }
     return {
       notDue: true,
-      message:
-        'No invoice is due yet. Billing only runs through the current calendar month; the next period will open when that month begins.',
+      message: isWithinNextMonthBillingPreviewWindow(now)
+        ? 'No invoice is due yet. The next billing period will open in the last 5 days of this month.'
+        : 'No invoice is due yet. Billing only runs through the current calendar month; the next period will open in the last 5 days of the month or when that month begins.',
     };
   }
 

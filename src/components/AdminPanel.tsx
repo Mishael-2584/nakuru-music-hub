@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { generateQuotePDF } from "@/lib/pdfGenerator";
 import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
-import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, findInvoiceForCalendarMonth, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchInvoicePayments, filterInvoicesUpToCurrentMonth, filterInvoicesForAdminHistory, isFutureBillingPeriod, isInvoiceNotDue, resolveInvoiceAfterGeneration, previewFutureInvoices, voidFutureInvoices, fetchStudentInvoiceForPreview, getLatestBillableInvoiceForStudent, canSendInvoiceEmail, studentNeedsCurrentMonthInvoice, formatInvoiceBillingMonth, type FutureInvoicePreviewRow, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
+import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, findInvoiceForCalendarMonth, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchInvoicePayments, filterInvoicesUpToCurrentMonth, filterInvoicesForAdminHistory, isHiddenBillingPeriod, isInvoiceNotDue, resolveInvoiceAfterGeneration, previewFutureInvoices, voidFutureInvoices, fetchStudentInvoiceForPreview, getLatestBillableInvoiceForStudent, canSendInvoiceEmail, studentNeedsCurrentMonthInvoice, formatInvoiceBillingMonth, ADMIN_BILLING_VISIBILITY, isWithinNextMonthBillingPreviewWindow, getNextCalendarMonthReference, generateUpcomingPeriodInvoices, studentEligibleForUpcomingInvoiceGeneration, formatNextBillingMonthLabel, type BulkUpcomingInvoiceGenerationResult, type FutureInvoicePreviewRow, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
 import { getLanguagePathwayLabel, getLanguagePackageLabel, formatLanguageMonthlyPrice } from '@/lib/languageCourseUtils';
 import { isTermlyCourseCategory } from '@/lib/termlyFeeUtils';
@@ -236,6 +236,7 @@ const AdminPanel = () => {
   const [invoiceHistoryStudent, setInvoiceHistoryStudent] = useState<any>(null);
   const [generatingPdfInvoiceId, setGeneratingPdfInvoiceId] = useState<string | null>(null);
   const [generatingAllPdfs, setGeneratingAllPdfs] = useState(false);
+  const [bulkGeneratingUpcomingInvoices, setBulkGeneratingUpcomingInvoices] = useState(false);
   const [selectedHistoryInvoice, setSelectedHistoryInvoice] = useState<any>(null);
 
   // Portal messaging state
@@ -2595,7 +2596,7 @@ const AdminPanel = () => {
         .order('period_end', { ascending: false });
       if (error || !data) return;
 
-      const billableInvoices = filterInvoicesUpToCurrentMonth(data);
+      const billableInvoices = filterInvoicesUpToCurrentMonth(data, undefined, ADMIN_BILLING_VISIBILITY);
       setAllStudentInvoices(billableInvoices);
       const period = getCalendarMonthPeriod();
       const currentPeriod: Record<string, any> = {};
@@ -2618,7 +2619,7 @@ const AdminPanel = () => {
       .in('student_id', validStudentIds)
       .order('period_end', { ascending: false });
     if (!data) return;
-    const billableInvoices = filterInvoicesUpToCurrentMonth(data);
+    const billableInvoices = filterInvoicesUpToCurrentMonth(data, undefined, ADMIN_BILLING_VISIBILITY);
     setAllStudentInvoices(billableInvoices);
     const period = getCalendarMonthPeriod();
     const currentPeriod: Record<string, any> = {};
@@ -3083,10 +3084,51 @@ const AdminPanel = () => {
   // 3. Students still needing an invoice for the current calendar month
   useEffect(() => {
     const needing = activeStudents
-      .filter((student) => studentNeedsCurrentMonthInvoice(allStudentInvoices, student.id))
+      .filter((student) => studentNeedsCurrentMonthInvoice(allStudentInvoices, student.id, undefined, ADMIN_BILLING_VISIBILITY))
       .map((s) => s.id);
     setStudentsNeedingInvoice(needing);
   }, [activeStudents, allStudentInvoices]);
+
+  const inUpcomingBillingPreview = isWithinNextMonthBillingPreviewWindow();
+  const upcomingBillingMonthLabel = formatNextBillingMonthLabel();
+  const studentsEligibleForUpcomingGeneration = useMemo(
+    () =>
+      activeStudents.filter((student) =>
+        studentEligibleForUpcomingInvoiceGeneration(allStudentInvoices, student.id)
+      ),
+    [activeStudents, allStudentInvoices]
+  );
+
+  const handleGenerateAllUpcomingInvoices = async () => {
+    if (studentsEligibleForUpcomingGeneration.length === 0) {
+      toast({
+        title: 'Nothing to generate',
+        description: `Every eligible student already has a ${upcomingBillingMonthLabel} invoice, or still has an outstanding current-month balance.`,
+      });
+      return;
+    }
+
+    setBulkGeneratingUpcomingInvoices(true);
+    try {
+      const result: BulkUpcomingInvoiceGenerationResult = await generateUpcomingPeriodInvoices(
+        activeStudents,
+        allStudentInvoices
+      );
+      await refreshStudentInvoices();
+      toast({
+        title: 'Upcoming invoices generated',
+        description: `Created ${result.created} for ${upcomingBillingMonthLabel}. Skipped ${result.skipped}, failed ${result.failed}. Review amounts, then use Send Invoice when ready — no emails were sent.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Generation failed',
+        description: error?.message || 'Could not generate upcoming invoices.',
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkGeneratingUpcomingInvoices(false);
+    }
+  };
 
   // 4. Handler to send invoice for a student (optional existingInvoice = send existing without creating)
   const handleSendInvoice = async (student: any, existingInvoice?: any) => {
@@ -3097,7 +3139,7 @@ const AdminPanel = () => {
       return;
     }
 
-    if (!canSendInvoiceEmail(allStudentInvoices, student.id)) {
+    if (!canSendInvoiceEmail(allStudentInvoices, student.id, undefined, ADMIN_BILLING_VISIBILITY)) {
       toast({
         title: 'Already paid',
         description: 'This student has paid for the current billing month. Send Invoice is not available until the next period.',
@@ -3110,11 +3152,22 @@ const AdminPanel = () => {
       let invoiceToSend: any = null;
       let isFirstInvoice = false;
 
-      const billableForStudent = filterInvoicesUpToCurrentMonth(allStudentInvoices).filter(
-        (row) => row.student_id === student.id
-      );
+      const billableForStudent = filterInvoicesUpToCurrentMonth(
+        allStudentInvoices,
+        undefined,
+        ADMIN_BILLING_VISIBILITY
+      ).filter((row) => row.student_id === student.id);
       const currentMonthInvoice = findInvoiceForCalendarMonth(billableForStudent, student.id);
-      const latestInvoice = getLatestBillableInvoiceForStudent(allStudentInvoices, student.id);
+      const inPreviewWindow = isWithinNextMonthBillingPreviewWindow();
+      const nextMonthInvoice = inPreviewWindow
+        ? findInvoiceForCalendarMonth(billableForStudent, student.id, getNextCalendarMonthReference())
+        : undefined;
+      const latestInvoice = getLatestBillableInvoiceForStudent(
+        allStudentInvoices,
+        student.id,
+        undefined,
+        ADMIN_BILLING_VISIBILITY
+      );
 
       if (existingInvoice) {
         if (isInvoiceFullyPaid(existingInvoice)) {
@@ -3139,6 +3192,15 @@ const AdminPanel = () => {
           .select('id')
           .eq('student_id', student.id)
           .lt('period_start', currentMonthInvoice.period_start)
+          .limit(1);
+        isFirstInvoice = !earlier?.length;
+      } else if (nextMonthInvoice && !isInvoiceFullyPaid(nextMonthInvoice)) {
+        invoiceToSend = nextMonthInvoice;
+        const { data: earlier } = await supabase
+          .from('invoices')
+          .select('id')
+          .eq('student_id', student.id)
+          .lt('period_start', nextMonthInvoice.period_start)
           .limit(1);
         isFirstInvoice = !earlier?.length;
       } else if (latestInvoice && !isInvoiceFullyPaid(latestInvoice)) {
@@ -3220,7 +3282,7 @@ const AdminPanel = () => {
           .in('student_id', validStudentIds)
           .order('period_end', { ascending: false });
         if (!error && data) {
-          const billableInvoices = filterInvoicesUpToCurrentMonth(data);
+          const billableInvoices = filterInvoicesUpToCurrentMonth(data, undefined, ADMIN_BILLING_VISIBILITY);
           setAllStudentInvoices(billableInvoices);
           const period = getCalendarMonthPeriod();
           const currentPeriod: Record<string, any> = {};
@@ -3295,7 +3357,7 @@ const AdminPanel = () => {
         (inv) =>
           inv.status !== 'cancelled' &&
           inv.period_start &&
-          isFutureBillingPeriod(inv.period_start)
+          isHiddenBillingPeriod(inv.period_start, undefined, ADMIN_BILLING_VISIBILITY)
       ).length;
       setHiddenHistoryInvoiceCount(hiddenFuture);
     }
@@ -6113,6 +6175,18 @@ const AdminPanel = () => {
                       {studentsNeedingInvoice.length > 0 && (
                         <Badge className="bg-red-500 text-white">{studentsNeedingInvoice.length} need invoice</Badge>
                       )}
+                      {inUpcomingBillingPreview && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={bulkGeneratingUpcomingInvoices || studentsEligibleForUpcomingGeneration.length === 0}
+                          onClick={() => void handleGenerateAllUpcomingInvoices()}
+                        >
+                          {bulkGeneratingUpcomingInvoices
+                            ? 'Generating...'
+                            : `Generate all ${upcomingBillingMonthLabel} invoices (${studentsEligibleForUpcomingGeneration.length})`}
+                        </Button>
+                      )}
                       {financesTotalPages > 1 && (
                         <Badge variant="outline" className="text-blue-600">Page {financesPage} of {financesTotalPages}</Badge>
                       )}
@@ -6146,7 +6220,12 @@ const AdminPanel = () => {
                           student.id,
                           period
                         );
-                        const sendAllowed = canSendInvoiceEmail(allStudentInvoices, student.id);
+                        const sendAllowed = canSendInvoiceEmail(
+                          allStudentInvoices,
+                          student.id,
+                          undefined,
+                          ADMIN_BILLING_VISIBILITY
+                        );
                         return (
                           <tr key={student.id}>
                             <td>
@@ -6181,7 +6260,7 @@ const AdminPanel = () => {
                                         .in('student_id', validStudentIds)
                                         .order('period_end', { ascending: false });
                                       if (data) {
-                                        const billableInvoices = filterInvoicesUpToCurrentMonth(data);
+                                        const billableInvoices = filterInvoicesUpToCurrentMonth(data, undefined, ADMIN_BILLING_VISIBILITY);
                                         setAllStudentInvoices(billableInvoices);
                                         const p = getCalendarMonthPeriod();
                                         const currentPeriod: Record<string, any> = {};
@@ -6549,7 +6628,11 @@ const AdminPanel = () => {
                                 .in('student_id', validStudentIds)
                                 .order('period_end', { ascending: false });
                               if (allInv) {
-                                const billableInvoices = filterInvoicesUpToCurrentMonth(allInv);
+                                const billableInvoices = filterInvoicesUpToCurrentMonth(
+                                  allInv,
+                                  undefined,
+                                  ADMIN_BILLING_VISIBILITY
+                                );
                                 setAllStudentInvoices(billableInvoices);
                                 const p = getCalendarMonthPeriod();
                                 const currentPeriod: Record<string, any> = {};
