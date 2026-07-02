@@ -26,8 +26,11 @@ import {
   isInvoiceFullyPaid,
   recordInvoicePayment,
   toLocalDateString,
+  analyzeFirstPaymentAlignment,
+  executeFirstPaymentAlignment,
   type RecordInvoicePaymentResult,
 } from '@/lib/invoiceUtils';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface RecordInvoicePaymentDialogProps {
   open: boolean;
@@ -45,6 +48,8 @@ export interface RecordInvoicePaymentDialogProps {
     period_end?: string;
   } | null;
   studentName?: string;
+  studentId?: string;
+  registrationId?: string | null;
   recordedBy?: string;
   onSuccess: (result: RecordInvoicePaymentResult) => void | Promise<void>;
 }
@@ -57,6 +62,8 @@ const RecordInvoicePaymentDialog: React.FC<RecordInvoicePaymentDialogProps> = ({
   onOpenChange,
   invoice,
   studentName,
+  studentId,
+  registrationId,
   recordedBy,
   onSuccess,
 }) => {
@@ -109,8 +116,51 @@ const RecordInvoicePaymentDialog: React.FC<RecordInvoicePaymentDialogProps> = ({
     setLoading(true);
     setError('');
     try {
+      let targetInvoice = invoice;
+      let targetInvoiceId = invoice.id;
+
+      if (studentId) {
+        const plan = await analyzeFirstPaymentAlignment({
+          studentId,
+          invoice,
+          paidDate,
+          registrationId,
+        });
+        if (plan.needed) {
+          const confirmed = window.confirm(
+            `${plan.summary}\n\nEarlier unused invoices will be voided. Continue?`
+          );
+          if (!confirmed) {
+            setLoading(false);
+            return;
+          }
+          const aligned = await executeFirstPaymentAlignment(plan);
+          targetInvoiceId = aligned.paymentInvoiceId;
+          if (aligned.invoice) {
+            targetInvoice = aligned.invoice;
+          } else {
+            const { data: refreshed, error: refreshError } = await supabase
+              .from('invoices')
+              .select('*')
+              .eq('id', targetInvoiceId)
+              .single();
+            if (refreshError || !refreshed) {
+              throw refreshError || new Error('Could not load aligned invoice.');
+            }
+            targetInvoice = refreshed;
+          }
+        }
+      }
+
+      const targetBalance = getInvoiceBalanceRemaining(targetInvoice);
+      if (parsedAmount > targetBalance) {
+        setError(`Payment cannot exceed the remaining balance of ${formatKes(targetBalance)}.`);
+        setLoading(false);
+        return;
+      }
+
       const result = await recordInvoicePayment({
-        invoiceId: invoice.id,
+        invoiceId: targetInvoiceId,
         cashAmount: parsedAmount,
         creditAmount: 0,
         paymentMethod,

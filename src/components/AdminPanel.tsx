@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { generateQuotePDF } from "@/lib/pdfGenerator";
 import AdminFeesManager from './AdminFeesManager';
 import { clearAuthCache, clearAndRedirect } from '@/lib/cacheUtils';
-import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, findInvoiceForCalendarMonth, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchInvoicePayments, filterInvoicesUpToCurrentMonth, filterInvoicesForAdminHistory, isHiddenBillingPeriod, isInvoiceNotDue, resolveInvoiceAfterGeneration, previewFutureInvoices, voidFutureInvoices, fetchStudentInvoiceForPreview, getLatestBillableInvoiceForStudent, canSendInvoiceEmail, studentNeedsCurrentMonthInvoice, formatInvoiceBillingMonth, ADMIN_BILLING_VISIBILITY, isWithinNextMonthBillingPreviewWindow, getNextCalendarMonthReference, generateUpcomingPeriodInvoices, studentEligibleForUpcomingInvoiceGeneration, formatNextBillingMonthLabel, type BulkUpcomingInvoiceGenerationResult, type FutureInvoicePreviewRow, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
+import { generateInvoiceForRegistration, generateInvoicePDFBlob, ensureInvoicePDF, openInvoicePdfWithName, openInvoicePdfPreview, getCalendarMonthPeriod, findInvoiceForFinancePeriod, findInvoiceForCalendarMonth, resolveFinanceInvoiceForStudent, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, isInvoiceFullyPaid, fetchInvoicePayments, filterInvoicesUpToCurrentMonth, filterInvoicesForAdminHistory, isHiddenBillingPeriod, isInvoiceNotDue, resolveInvoiceAfterGeneration, previewFutureInvoices, voidFutureInvoices, fetchStudentInvoiceForPreview, getLatestBillableInvoiceForStudent, canSendInvoiceEmail, studentNeedsCurrentMonthInvoice, formatInvoiceBillingMonth, ADMIN_BILLING_VISIBILITY, isWithinNextMonthBillingPreviewWindow, getNextCalendarMonthReference, generateBillingPeriodInvoices, studentEligibleForUpcomingInvoiceGeneration, studentEligibleForCurrentPeriodGeneration, formatNextBillingMonthLabel, formatCurrentBillingMonthLabel, canVoidInvoice, voidStudentInvoice, type BulkPeriodInvoiceGenerationResult, type FutureInvoicePreviewRow, type RecordInvoicePaymentResult } from "@/lib/invoiceUtils";
 import MessagingUI from './MessagingUI';
 import { getLanguagePathwayLabel, getLanguagePackageLabel, formatLanguageMonthlyPrice } from '@/lib/languageCourseUtils';
 import { isTermlyCourseCategory } from '@/lib/termlyFeeUtils';
@@ -237,6 +237,8 @@ const AdminPanel = () => {
   const [generatingPdfInvoiceId, setGeneratingPdfInvoiceId] = useState<string | null>(null);
   const [generatingAllPdfs, setGeneratingAllPdfs] = useState(false);
   const [bulkGeneratingUpcomingInvoices, setBulkGeneratingUpcomingInvoices] = useState(false);
+  const [bulkGeneratingCurrentInvoices, setBulkGeneratingCurrentInvoices] = useState(false);
+  const [voidingInvoiceId, setVoidingInvoiceId] = useState<string | null>(null);
   const [selectedHistoryInvoice, setSelectedHistoryInvoice] = useState<any>(null);
 
   // Portal messaging state
@@ -3091,6 +3093,14 @@ const AdminPanel = () => {
 
   const inUpcomingBillingPreview = isWithinNextMonthBillingPreviewWindow();
   const upcomingBillingMonthLabel = formatNextBillingMonthLabel();
+  const currentBillingMonthLabel = formatCurrentBillingMonthLabel();
+  const studentsEligibleForCurrentGeneration = useMemo(
+    () =>
+      activeStudents.filter((student) =>
+        studentEligibleForCurrentPeriodGeneration(allStudentInvoices, student.id)
+      ),
+    [activeStudents, allStudentInvoices]
+  );
   const studentsEligibleForUpcomingGeneration = useMemo(
     () =>
       activeStudents.filter((student) =>
@@ -3098,6 +3108,38 @@ const AdminPanel = () => {
       ),
     [activeStudents, allStudentInvoices]
   );
+
+  const handleGenerateAllCurrentInvoices = async () => {
+    if (studentsEligibleForCurrentGeneration.length === 0) {
+      toast({
+        title: 'Nothing to generate',
+        description: `Every eligible student already has a ${currentBillingMonthLabel} invoice, or has an outstanding prior balance.`,
+      });
+      return;
+    }
+
+    setBulkGeneratingCurrentInvoices(true);
+    try {
+      const result: BulkPeriodInvoiceGenerationResult = await generateBillingPeriodInvoices(
+        activeStudents,
+        allStudentInvoices,
+        'current'
+      );
+      await refreshStudentInvoices();
+      toast({
+        title: 'Invoices generated',
+        description: `Created ${result.created} for ${currentBillingMonthLabel}. Skipped ${result.skipped}, failed ${result.failed}. Review amounts, then send manually — no emails were sent.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Generation failed',
+        description: error?.message || 'Could not generate current-period invoices.',
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkGeneratingCurrentInvoices(false);
+    }
+  };
 
   const handleGenerateAllUpcomingInvoices = async () => {
     if (studentsEligibleForUpcomingGeneration.length === 0) {
@@ -3110,9 +3152,10 @@ const AdminPanel = () => {
 
     setBulkGeneratingUpcomingInvoices(true);
     try {
-      const result: BulkUpcomingInvoiceGenerationResult = await generateUpcomingPeriodInvoices(
+      const result: BulkPeriodInvoiceGenerationResult = await generateBillingPeriodInvoices(
         activeStudents,
-        allStudentInvoices
+        allStudentInvoices,
+        'upcoming'
       );
       await refreshStudentInvoices();
       toast({
@@ -3127,6 +3170,43 @@ const AdminPanel = () => {
       });
     } finally {
       setBulkGeneratingUpcomingInvoices(false);
+    }
+  };
+
+  const handleVoidHistoryInvoice = async (inv: any) => {
+    if (!canVoidInvoice(inv)) {
+      toast({
+        title: 'Cannot void',
+        description: 'Paid or partially paid invoices cannot be voided.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const reason = window.prompt(
+      'Reason for voiding this invoice (e.g. no lessons this month):',
+      'No lessons in this billing period'
+    );
+    if (!reason?.trim()) return;
+
+    setVoidingInvoiceId(inv.id);
+    try {
+      await voidStudentInvoice(inv.id, reason.trim());
+      if (invoiceHistoryStudent?.id) {
+        await fetchInvoiceHistory(invoiceHistoryStudent.id);
+      }
+      await refreshStudentInvoices();
+      if (selectedHistoryInvoice?.id === inv.id) {
+        setSelectedHistoryInvoice(null);
+      }
+      toast({ title: 'Invoice voided', description: 'The invoice was cancelled and removed from active billing.' });
+    } catch (error: any) {
+      toast({
+        title: 'Void failed',
+        description: error?.message || 'Could not void invoice.',
+        variant: 'destructive',
+      });
+    } finally {
+      setVoidingInvoiceId(null);
     }
   };
 
@@ -6175,17 +6255,34 @@ const AdminPanel = () => {
                       {studentsNeedingInvoice.length > 0 && (
                         <Badge className="bg-red-500 text-white">{studentsNeedingInvoice.length} need invoice</Badge>
                       )}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={
+                          bulkGeneratingCurrentInvoices || studentsEligibleForCurrentGeneration.length === 0
+                        }
+                        onClick={() => void handleGenerateAllCurrentInvoices()}
+                      >
+                        {bulkGeneratingCurrentInvoices
+                          ? 'Generating...'
+                          : `Generate all ${currentBillingMonthLabel} invoices (${studentsEligibleForCurrentGeneration.length})`}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={
+                          bulkGeneratingUpcomingInvoices || studentsEligibleForUpcomingGeneration.length === 0
+                        }
+                        onClick={() => void handleGenerateAllUpcomingInvoices()}
+                      >
+                        {bulkGeneratingUpcomingInvoices
+                          ? 'Generating...'
+                          : `Generate all ${upcomingBillingMonthLabel} invoices (${studentsEligibleForUpcomingGeneration.length})`}
+                      </Button>
                       {inUpcomingBillingPreview && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={bulkGeneratingUpcomingInvoices || studentsEligibleForUpcomingGeneration.length === 0}
-                          onClick={() => void handleGenerateAllUpcomingInvoices()}
-                        >
-                          {bulkGeneratingUpcomingInvoices
-                            ? 'Generating...'
-                            : `Generate all ${upcomingBillingMonthLabel} invoices (${studentsEligibleForUpcomingGeneration.length})`}
-                        </Button>
+                        <Badge variant="outline" className="text-amber-700 border-amber-300">
+                          Preview window: next month visible
+                        </Badge>
                       )}
                       {financesTotalPages > 1 && (
                         <Badge variant="outline" className="text-blue-600">Page {financesPage} of {financesTotalPages}</Badge>
@@ -6583,6 +6680,20 @@ const AdminPanel = () => {
                             Record Payment
                           </Button>
                         )}
+                        {canVoidInvoice(inv) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="ml-1 text-red-700 border-red-200"
+                            disabled={voidingInvoiceId === inv.id}
+                            onClick={() => void handleVoidHistoryInvoice(inv)}
+                          >
+                            {voidingInvoiceId === inv.id ? 'Voiding...' : 'Void'}
+                          </Button>
+                        )}
+                        {inv.status === 'cancelled' && (
+                          <Badge className="ml-1 bg-gray-100 text-gray-600">voided</Badge>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -6721,6 +6832,8 @@ const AdminPanel = () => {
           }}
           invoice={paymentDialogInvoice}
           studentName={paymentDialogStudent?.student_name}
+          studentId={paymentDialogStudent?.id}
+          registrationId={paymentDialogStudent?.registration_id}
           recordedBy={user?.id ?? undefined}
           onSuccess={handlePaymentRecorded}
         />
