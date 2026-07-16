@@ -26,13 +26,19 @@ interface QuizTakingInterfaceProps {
   questions: QuizQuestion[];
   answers: QuizAnswer[];
   matchingPairs: QuizMatchingPair[];
-  onSubmit: (answers: StudentQuizAnswer[]) => void;
+  onSubmit: (answers: StudentQuizAnswer[]) => void | Promise<void>;
   onStartTimer?: () => void;
   timerStarted?: boolean;
   timerCompleted?: boolean;
   timeLimitMinutes?: number;
+  /** Server-authoritative remaining seconds for refresh-safe countdown */
+  initialSecondsRemaining?: number | null;
   onTimeUp?: () => void;
   isTeacherPreview?: boolean;
+  /** When false, show a start gate instead of questions */
+  attemptReady?: boolean;
+  onBeginAttempt?: () => void | Promise<void>;
+  beginAttemptLoading?: boolean;
 }
 
 export default function QuizTakingInterface({
@@ -45,16 +51,20 @@ export default function QuizTakingInterface({
   timerStarted = false,
   timerCompleted = false,
   timeLimitMinutes,
+  initialSecondsRemaining,
   onTimeUp,
-  isTeacherPreview = false
+  isTeacherPreview = false,
+  attemptReady = true,
+  onBeginAttempt,
+  beginAttemptLoading = false,
 }: QuizTakingInterfaceProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [studentAnswers, setStudentAnswers] = useState<StudentQuizAnswer[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showReview, setShowReview] = useState(true);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [imageFiles, setImageFiles] = useState<Record<string, File>>({});
   const [imagePreviews, setImagePreviews] = useState<Record<string, string>>({});
+  const forceSubmittingRef = React.useRef(false);
 
   // Initialize student answers
   useEffect(() => {
@@ -66,10 +76,14 @@ export default function QuizTakingInterface({
     setStudentAnswers(initialAnswers);
   }, [questions]);
 
+  const inputsLocked = !isTeacherPreview && (!attemptReady || timerCompleted || isSubmitting);
+
   const currentQuestion = questions[currentQuestionIndex];
-  const currentAnswer = studentAnswers.find(a => a.question_id === currentQuestion.id);
-  const questionAnswers = answers.filter(a => a.question_id === currentQuestion.id);
-  const questionMatchingPairs = matchingPairs.filter(mp => mp.question_id === currentQuestion.id);
+  const currentAnswer = studentAnswers.find(a => a.question_id === currentQuestion?.id);
+  const questionAnswers = answers
+    .filter(a => a.question_id === currentQuestion?.id)
+    .map((a) => (isTeacherPreview ? a : { ...a, is_correct: false }));
+  const questionMatchingPairs = matchingPairs.filter(mp => mp.question_id === currentQuestion?.id);
 
   const updateAnswer = (questionId: string, updates: Partial<StudentQuizAnswer>) => {
     setStudentAnswers(prev => 
@@ -82,17 +96,20 @@ export default function QuizTakingInterface({
   };
 
   const handleMultipleChoiceAnswer = (answerId: string) => {
+    if (inputsLocked) return;
     updateAnswer(currentQuestion.id, { selected_answer_id: answerId });
   };
 
   const handleTrueFalseAnswer = (isTrue: boolean) => {
-    const correctAnswer = questionAnswers.find(a => a.answer_text === (isTrue ? 'True' : 'False'));
-    if (correctAnswer) {
-      updateAnswer(currentQuestion.id, { selected_answer_id: correctAnswer.id });
+    if (inputsLocked) return;
+    const option = questionAnswers.find(a => a.answer_text === (isTrue ? 'True' : 'False'));
+    if (option) {
+      updateAnswer(currentQuestion.id, { selected_answer_id: option.id });
     }
   };
 
   const handleMatchingAnswer = (leftItem: string, rightItem: string) => {
+    if (inputsLocked) return;
     const currentMatching = currentAnswer?.matching_pairs || [];
     const existingIndex = currentMatching.findIndex(pair => pair.left === leftItem);
     
@@ -150,18 +167,34 @@ export default function QuizTakingInterface({
   };
 
   const handleSubmit = () => {
-    if (isSubmitting) return; // Prevent multiple submissions
+    if (isSubmitting || timerCompleted) return;
     setShowConfirmDialog(true);
   };
 
   const confirmSubmit = async () => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      console.log('Submitting quiz with answers:', studentAnswers);
       await onSubmit(studentAnswers);
       setShowConfirmDialog(false);
     } catch (error) {
       console.error('Error submitting quiz:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /** Forced submit on timer expiry — no cancelable dialog */
+  const forceSubmit = async () => {
+    if (forceSubmittingRef.current || isSubmitting) return;
+    forceSubmittingRef.current = true;
+    setIsSubmitting(true);
+    setShowConfirmDialog(false);
+    try {
+      onTimeUp?.();
+      await onSubmit(studentAnswers);
+    } catch (error) {
+      console.error('Error force-submitting quiz:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -224,10 +257,57 @@ export default function QuizTakingInterface({
 
   const getMatchingRightItems = () => {
     const usedRightItems = currentAnswer?.matching_pairs.map(pair => pair.right) || [];
-    return questionMatchingPairs
+    // Stable shuffle by question id so refresh doesn't reorder mid-attempt
+    const items = questionMatchingPairs
       .filter(pair => !usedRightItems.includes(pair.right_item))
       .map(pair => pair.right_item);
+    return [...items].sort((a, b) => {
+      const seed = `${currentQuestion?.id || ''}:${a}:${b}`;
+      let hash = 0;
+      for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+      return hash % 2 === 0 ? -1 : 1;
+    });
   };
+
+  if (!isTeacherPreview && !attemptReady) {
+    return (
+      <Card className="max-w-xl mx-auto">
+        <CardHeader>
+          <CardTitle>{quiz.title}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {quiz.description && <p className="text-gray-600">{quiz.description}</p>}
+          <div className="rounded-lg bg-blue-50 border border-blue-200 p-4 text-sm text-blue-900 space-y-2">
+            <p><strong>{questions.length}</strong> question{questions.length === 1 ? '' : 's'}</p>
+            {timeLimitMinutes ? (
+              <p>
+                Timed quiz: <strong>{timeLimitMinutes} minutes</strong>. The timer starts when you begin
+                and continues even if you refresh the page.
+              </p>
+            ) : (
+              <p>No time limit for this quiz.</p>
+            )}
+            <p>Once you start, your attempt is recorded on the server.</p>
+          </div>
+          <Button
+            className="w-full"
+            disabled={beginAttemptLoading}
+            onClick={() => void onBeginAttempt?.()}
+          >
+            {beginAttemptLoading ? 'Starting…' : timeLimitMinutes ? 'Start Quiz & Timer' : 'Start Quiz'}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!currentQuestion) {
+    return (
+      <Card className="max-w-xl mx-auto">
+        <CardContent className="p-6 text-center text-gray-600">No questions available.</CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -265,13 +345,14 @@ export default function QuizTakingInterface({
               <div className="flex items-center">
                 <AssignmentTimer
                   timeLimitMinutes={timeLimitMinutes}
+                  initialSecondsRemaining={initialSecondsRemaining}
+                  hideStartButton
                   onTimeUp={() => {
-                    if (!timerCompleted && !isSubmitting) {
-                      console.log('Timer expired, auto-submitting quiz');
-                      handleSubmit();
+                    if (!timerCompleted && !forceSubmittingRef.current) {
+                      void forceSubmit();
                     }
                   }}
-                  onStartTimer={onStartTimer}
+                  onStartTimer={onStartTimer || (() => {})}
                   isStarted={timerStarted}
                   isCompleted={timerCompleted}
                 />
@@ -382,7 +463,7 @@ export default function QuizTakingInterface({
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
                   } ${isTeacherPreview ? '' : 'cursor-pointer'} transition-colors`}
-                  onClick={() => !isTeacherPreview && handleMultipleChoiceAnswer(answer.id)}
+                  onClick={() => !isTeacherPreview && !inputsLocked && handleMultipleChoiceAnswer(answer.id)}
                 >
                   <div className="flex items-center gap-3">
                     <div className={`w-4 h-4 rounded-full border-2 ${
@@ -420,7 +501,7 @@ export default function QuizTakingInterface({
                     : "outline"
                 }
                 onClick={() => !isTeacherPreview && handleTrueFalseAnswer(true)}
-                disabled={isTeacherPreview}
+                disabled={isTeacherPreview || inputsLocked}
                 className={`flex items-center gap-2 ${
                   isTeacherPreview && questionAnswers.find(a => a.answer_text === 'True')?.is_correct
                     ? 'bg-green-600 hover:bg-green-700'
@@ -444,7 +525,7 @@ export default function QuizTakingInterface({
                     : "outline"
                 }
                 onClick={() => !isTeacherPreview && handleTrueFalseAnswer(false)}
-                disabled={isTeacherPreview}
+                disabled={isTeacherPreview || inputsLocked}
                 className={`flex items-center gap-2 ${
                   isTeacherPreview && questionAnswers.find(a => a.answer_text === 'False')?.is_correct
                     ? 'bg-green-600 hover:bg-green-700'
@@ -503,8 +584,9 @@ export default function QuizTakingInterface({
                       <Button
                         key={rightItem}
                         variant="outline"
+                        disabled={inputsLocked}
                         onClick={() => {
-                          // Find the first unmatched left item
+                          if (inputsLocked) return;
                           const unmatchedLeft = questionMatchingPairs.find(pair => 
                             !currentAnswer?.matching_pairs.find(p => p.left === pair.left_item)
                           );

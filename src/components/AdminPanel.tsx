@@ -6636,9 +6636,15 @@ const AdminPanel = () => {
                     <tr key={inv.id}>
                       <td>{formatInvoiceBillingMonth(inv)}</td>
                       <td>
-                        {inv.payment_status || inv.status}
-                        {inv.payment_status === 'partial' && (
-                          <Badge className="ml-1 bg-amber-100 text-amber-800 text-xs">partial</Badge>
+                        {inv.status === 'cancelled' ? (
+                          <Badge className="bg-gray-100 text-gray-700">voided</Badge>
+                        ) : (
+                          <>
+                            {inv.payment_status || inv.status}
+                            {inv.payment_status === 'partial' && (
+                              <Badge className="ml-1 bg-amber-100 text-amber-800 text-xs">partial</Badge>
+                            )}
+                          </>
                         )}
                       </td>
                       <td>KES {getEffectiveAmountDue(inv).toLocaleString()}</td>
@@ -6658,7 +6664,7 @@ const AdminPanel = () => {
                       </td>
                       <td>
                         <Button size="sm" variant="ghost" onClick={() => handleViewHistoryInvoice(inv)}>View</Button>
-                        {invoiceHistoryStudent && (
+                        {invoiceHistoryStudent && inv.status !== 'cancelled' && (
                           <Button
                             size="sm"
                             variant="secondary"
@@ -6670,7 +6676,7 @@ const AdminPanel = () => {
                         )}
                       </td>
                       <td>
-                        {!isInvoiceFullyPaid(inv) && (
+                        {inv.status !== 'cancelled' && !isInvoiceFullyPaid(inv) && (
                           <Button 
                             size="sm" 
                             variant="default" 
@@ -6690,9 +6696,6 @@ const AdminPanel = () => {
                           >
                             {voidingInvoiceId === inv.id ? 'Voiding...' : 'Void'}
                           </Button>
-                        )}
-                        {inv.status === 'cancelled' && (
-                          <Badge className="ml-1 bg-gray-100 text-gray-600">voided</Badge>
                         )}
                       </td>
                     </tr>

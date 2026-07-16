@@ -26,6 +26,7 @@ const Auth = () => {
   
   // Check if user was redirected due to session expiration
   const sessionExpired = searchParams.get('session_expired') === 'true';
+  const passwordUpdated = searchParams.get('password_updated') === 'true';
 
   // Function to determine user's actual role from database
   const determineUserRole = async (userId: string): Promise<string> => {
@@ -272,6 +273,14 @@ const Auth = () => {
           <Alert className="mb-6 w-full max-w-xs border-red-200 bg-red-50">
             <AlertDescription className="text-red-800 text-sm">
               Your session has expired. Please sign in again to continue.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {passwordUpdated && (
+          <Alert className="mb-6 w-full max-w-xs border-green-200 bg-green-50">
+            <AlertDescription className="text-green-800 text-sm">
+              Password updated successfully. Please sign in with your new password.
             </AlertDescription>
           </Alert>
         )}

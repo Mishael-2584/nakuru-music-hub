@@ -1,21 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Clock, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, Clock, XCircle } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import QuizTakingInterface from '@/components/quiz/QuizTakingInterface';
 import QuizResultsDisplay from '@/components/quiz/QuizResultsDisplay';
-import { StudentQuizAnswer, QuizResult } from '@/types/quiz';
+import { StudentQuizAnswer } from '@/types/quiz';
+
+type AttemptInfo = {
+  submission_id: string;
+  started_at: string;
+  seconds_remaining: number | null;
+  timed_out?: boolean;
+  attempt_number?: number;
+};
 
 export default function QuizPage() {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
-  // Quiz data state
+
   const [quizData, setQuizData] = useState<any>(null);
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
   const [quizAnswers, setQuizAnswers] = useState<any[]>([]);
@@ -23,289 +30,39 @@ export default function QuizPage() {
   const [currentQuizSubmission, setCurrentQuizSubmission] = useState<any>(null);
   const [quizSubmissionAnswers, setQuizSubmissionAnswers] = useState<any[]>([]);
   const [showQuizResults, setShowQuizResults] = useState(false);
-  const [hasExistingSubmission, setHasExistingSubmission] = useState(false);
   const [timerStarted, setTimerStarted] = useState(false);
   const [timerCompleted, setTimerCompleted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [attemptReady, setAttemptReady] = useState(false);
+  const [beginAttemptLoading, setBeginAttemptLoading] = useState(false);
+  const [attemptInfo, setAttemptInfo] = useState<AttemptInfo | null>(null);
+  const [studentUserId, setStudentUserId] = useState<string | null>(null);
 
-  // Load quiz data
   useEffect(() => {
     if (postId) {
-      loadQuizData(postId);
+      void loadQuizData(postId);
     }
   }, [postId]);
 
-  const loadQuizData = async (postId: string) => {
-    try {
-      setIsLoading(true);
-      
-      // Try RPC function first, fallback to direct queries
-      let data, error;
-      
-      try {
-        const result = await supabase.rpc('get_quiz_by_post_id', {
-          post_id_param: postId
-        });
-        data = result.data;
-        error = result.error;
-        
-      } catch (rpcError) {
-        // Fallback: Get quiz data using direct queries
-        const { data: quizData, error: quizError } = await supabase
-          .from('quizzes')
-          .select(`
-            id,
-            title,
-            description,
-            time_limit_minutes,
-            show_answers_after,
-            show_marks_immediately,
-            passing_score,
-            max_attempts,
-            scheduled_open_at,
-            status
-          `)
-          .eq('post_id', postId)
-          .single();
-
-        if (quizError) {
-          toast({ title: 'Error', description: 'No quiz found for this post', variant: 'destructive' });
-          return;
-        }
-
-        // Get questions
-        const { data: questionsData, error: questionsError } = await supabase
-          .from('quiz_questions')
-          .select('*')
-          .eq('quiz_id', quizData.id)
-          .order('order_index');
-          
-
-        if (questionsError) throw questionsError;
-
-        // Get answers
-        const { data: answersData, error: answersError } = await supabase
-          .from('quiz_answers')
-          .select('*')
-          .in('question_id', questionsData.map(q => q.id));
-
-        if (answersError) throw answersError;
-
-        // Get matching pairs
-        const { data: matchingData, error: matchingError } = await supabase
-          .from('quiz_matching_pairs')
-          .select('*')
-          .in('question_id', questionsData.map(q => q.id));
-
-        if (matchingError) throw matchingError;
-
-        // Transform data to match expected format
-        data = [];
-        questionsData.forEach(question => {
-          const baseRow = {
-            quiz_id: quizData.id,
-            quiz_title: quizData.title,
-            quiz_description: quizData.description,
-            time_limit_minutes: quizData.time_limit_minutes,
-            show_answers_after: quizData.show_answers_after,
-            show_marks_immediately: quizData.show_marks_immediately,
-            passing_score: quizData.passing_score,
-            max_attempts: quizData.max_attempts,
-            question_id: question.id,
-            question_text: question.question_text,
-            question_type: question.question_type,
-            question_points: question.points,
-            question_order: question.order_index,
-            has_image_attachment: question.has_image_attachment || false,
-            image_url: question.image_url,
-            image_filename: question.image_filename
-          };
-
-          // Add answers
-          const questionAnswers = answersData.filter(a => a.question_id === question.id);
-          if (questionAnswers.length > 0) {
-            questionAnswers.forEach(answer => {
-              data.push({
-                ...baseRow,
-                answer_id: answer.id,
-                answer_text: answer.answer_text,
-                answer_is_correct: answer.is_correct,
-                answer_order: answer.order_index
-              });
-            });
-          } else {
-            // Add matching pairs
-            const questionMatching = matchingData.filter(m => m.question_id === question.id);
-            if (questionMatching.length > 0) {
-              questionMatching.forEach(match => {
-                data.push({
-                  ...baseRow,
-                  matching_left: match.left_item,
-                  matching_right: match.right_item,
-                  matching_order: match.order_index
-                });
-              });
-            } else {
-              // Just the question
-              data.push(baseRow);
-            }
-          }
-        });
-
-        error = null;
-      }
-
-      if (error) throw error;
-
-      if (!data || data.length === 0) {
-        toast({ title: 'Error', description: 'No quiz data found', variant: 'destructive' });
-        return;
-      }
-
-      // Process the data to separate quiz, questions, answers, and matching pairs
-      const quiz = data[0];
-      const questions = [];
-      const answers = [];
-      const matchingPairs = [];
-
-      for (const row of data) {
-        if (row.question_id && !questions.find(q => q.id === row.question_id)) {
-          const questionData = {
-            id: row.question_id,
-            quiz_id: row.quiz_id,
-            question_text: row.question_text,
-            question_type: row.question_type,
-            points: row.question_points,
-            order_index: row.question_order,
-            has_image_attachment: row.has_image_attachment || false,
-            image_url: row.image_url,
-            image_filename: row.image_filename
-          };
-          
-          
-          questions.push(questionData);
-        }
-
-        if (row.answer_id && !answers.find(a => a.id === row.answer_id)) {
-          answers.push({
-            id: row.answer_id,
-            question_id: row.question_id,
-            answer_text: row.answer_text,
-            is_correct: row.answer_is_correct,
-            order_index: row.answer_order
-          });
-        }
-
-        if (row.matching_left && !matchingPairs.find(mp => mp.left_item === row.matching_left)) {
-          matchingPairs.push({
-            question_id: row.question_id,
-            left_item: row.matching_left,
-            right_item: row.matching_right,
-            order_index: row.matching_order
-          });
-        }
-      }
-
-      const quizScheduledOpenAt = quiz.scheduled_open_at || quiz.quiz_scheduled_open_at;
-      const isScheduled = quizScheduledOpenAt && new Date(quizScheduledOpenAt) > new Date();
-      
-      // Check if quiz is scheduled and not yet open
-      if (isScheduled) {
-        toast({
-          title: 'Quiz Not Available',
-          description: `This quiz opens on ${new Date(quizScheduledOpenAt).toLocaleString()}. Please come back at that time.`,
-          variant: 'destructive'
-        });
-        setIsLoading(false);
-        // Set quiz data to show restriction message
-        setQuizData({
-          id: quiz.quiz_id,
-          title: quiz.quiz_title,
-          description: quiz.quiz_description,
-          time_limit_minutes: quiz.time_limit_minutes,
-          show_answers_after: quiz.show_answers_after,
-          show_marks_immediately: quiz.show_marks_immediately,
-          passing_score: quiz.passing_score,
-          max_attempts: quiz.max_attempts,
-          scheduled_open_at: quizScheduledOpenAt
-        });
-        return;
-      }
-      
-      setQuizData({
-        id: quiz.quiz_id,
-        title: quiz.quiz_title,
-        description: quiz.quiz_description,
-        time_limit_minutes: quiz.time_limit_minutes,
-        show_answers_after: quiz.show_answers_after,
-        show_marks_immediately: quiz.show_marks_immediately,
-        passing_score: quiz.passing_score,
-        max_attempts: quiz.max_attempts,
-        scheduled_open_at: quizScheduledOpenAt
-      });
-      setQuizQuestions(questions);
-      setQuizAnswers(answers);
-      setQuizMatchingPairs(matchingPairs);
-      
-      // Check for existing submission
-      console.log('Checking for existing submission for quiz:', quiz.quiz_id);
-      const existingSubmission = await checkExistingSubmission(quiz.quiz_id);
-      if (existingSubmission) {
-        console.log('Found existing submission:', existingSubmission);
-        setCurrentQuizSubmission(existingSubmission);
-        setHasExistingSubmission(true);
-        setShowQuizResults(true);
-        
-        // Fetch submission answers
-        await fetchQuizSubmissionAnswers(existingSubmission.id);
-      } else {
-        console.log('No existing submission found, starting quiz');
-        // Auto-start timer when quiz loads only if no existing submission
-        setTimerStarted(true);
-        setTimerCompleted(false);
-      }
-      
-    } catch (error) {
-      console.error('Error loading quiz data:', error);
-      toast({ title: 'Error', description: 'Failed to load quiz', variant: 'destructive' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleTimeUp = async () => {
-    setTimerCompleted(true);
-    toast({ title: 'Time Up!', description: 'Quiz time has expired. Submitting automatically...', variant: 'destructive' });
-    
-    // Auto-submit the quiz when time runs out
-    try {
-      // Get current answers from the quiz interface
-      // This will be handled by the QuizTakingInterface component
-      console.log('Auto-submitting quiz due to time up');
-    } catch (error) {
-      console.error('Error auto-submitting quiz:', error);
-    }
+  const getStudentUserId = async (): Promise<string | null> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data: student } = await supabase
+      .from('students')
+      .select('user_id')
+      .eq('user_id', user.id)
+      .single();
+    return student?.user_id || user.id;
   };
 
   const checkExistingSubmission = async (quizId: string) => {
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user?.user) return null;
+      const userId = await getStudentUserId();
+      if (!userId) return null;
 
-      // Get student ID
-      const { data: student } = await supabase
-        .from('students')
-        .select('user_id')
-        .eq('user_id', user.user.id)
-        .single();
-
-      if (!student) return null;
-
-      // Use RPC function to efficiently check for existing submissions
-      console.log('Checking submissions for quiz:', quizId, 'student:', student.user_id);
       const { data: submissions, error } = await supabase.rpc('check_existing_quiz_submission', {
         quiz_id_param: quizId,
-        student_id_param: student.user_id
+        student_id_param: userId,
       });
 
       if (error) {
@@ -313,8 +70,6 @@ export default function QuizPage() {
         return null;
       }
 
-      console.log('Found submissions:', submissions);
-      // Return the most recent submission if any exist
       return submissions && submissions.length > 0 ? submissions[0] : null;
     } catch (error) {
       console.error('Error checking existing submission:', error);
@@ -324,175 +79,382 @@ export default function QuizPage() {
 
   const fetchQuizSubmissionAnswers = async (submissionId: string) => {
     try {
-      console.log('Fetching submission answers for submission ID:', submissionId);
-      
-      // Try RPC function first
       const { data: answers, error } = await supabase.rpc('get_quiz_submission_answers', {
-        submission_id_param: submissionId
+        submission_id_param: submissionId,
       });
 
       if (error) {
-        console.error('Error fetching submission answers via RPC:', error);
-        
-        // Fallback to direct table access
-        const { data: directAnswers, error: directError } = await supabase
+        const { data: directAnswers } = await supabase
           .from('quiz_submission_answers')
           .select('*')
           .eq('submission_id', submissionId);
-
-        if (directError) {
-          console.error('Error fetching submission answers directly:', directError);
-          // Create mock answers based on RPC result if both methods fail
-          console.log('Creating mock answers due to fetch error');
-          const mockAnswers = quizQuestions.map((question, index) => ({
-            id: `mock-${index}`,
-            submission_id: submissionId,
-            question_id: question.id,
-            selected_answer_id: null,
-            matching_pairs: [],
-            is_correct: true, // Assume correct since RPC shows correct_answers: 1
-            points_earned: question.points || 1,
-            created_at: new Date().toISOString()
-          }));
-          setQuizSubmissionAnswers(mockAnswers);
-          return;
-        }
-        
-        console.log('Fetched submission answers via direct access:', directAnswers);
         setQuizSubmissionAnswers(directAnswers || []);
         return;
       }
 
-      console.log('Fetched submission answers via RPC:', answers);
       setQuizSubmissionAnswers(answers || []);
     } catch (error) {
       console.error('Error fetching submission answers:', error);
-      // Create mock answers as fallback
-      const mockAnswers = quizQuestions.map((question, index) => ({
-        id: `mock-${index}`,
-        submission_id: submissionId,
-        question_id: question.id,
-        selected_answer_id: null,
-        matching_pairs: [],
-        is_correct: true,
-        points_earned: question.points || 1,
-        created_at: new Date().toISOString()
-      }));
-      setQuizSubmissionAnswers(mockAnswers);
+      setQuizSubmissionAnswers([]);
     }
   };
 
-  const submitQuiz = async (answers: StudentQuizAnswer[]) => {
-    if (!quizData) return;
+  const sanitizeAnswers = (rows: any[]) =>
+    rows.map((a) => ({ ...a, is_correct: false }));
 
+  const loadQuizData = async (postIdValue: string) => {
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({ title: 'Error', description: 'You must be logged in to submit a quiz', variant: 'destructive' });
-        return;
-      }
+      setIsLoading(true);
+      const userId = await getStudentUserId();
+      setStudentUserId(userId);
 
-      // Get student data
-      const { data: student } = await supabase
-        .from('students')
-        .select('id, user_id')
-        .eq('user_id', user.id)
-        .single();
+      let data: any[] | null = null;
+      let error: any = null;
 
-      if (!student) {
-        toast({ title: 'Error', description: 'Student profile not found', variant: 'destructive' });
-        return;
-      }
-
-      // Use efficient RPC function for quiz submission
-      console.log('Submitting quiz with data:', {
-        quiz_id: quizData.id,
-        student_id: student.user_id,
-        answers: answers
-      });
-      
-      // Debug: Log each answer's question ID
-      answers.forEach((answer, index) => {
-        console.log(`Answer ${index + 1}:`, {
-          questionId: answer.question_id, // Fixed: use question_id not questionId
-          selectedAnswerId: answer.selected_answer_id, // Fixed: use selected_answer_id not selectedAnswerId
-          matchingPairs: answer.matching_pairs
+      try {
+        const result = await supabase.rpc('get_quiz_by_post_id', {
+          post_id_param: postIdValue,
         });
-      });
+        data = result.data;
+        error = result.error;
+      } catch {
+        const { data: quizRow, error: quizError } = await supabase
+          .from('quizzes')
+          .select(`
+            id, title, description, time_limit_minutes, show_answers_after,
+            show_marks_immediately, passing_score, max_attempts, scheduled_open_at, status
+          `)
+          .eq('post_id', postIdValue)
+          .single();
 
-      const { data: submissionResult, error: submissionError } = await supabase.rpc('submit_quiz_complete', {
-        quiz_id_param: quizData.id,
-        student_id_param: student.user_id, // Use user_id instead of student.id
-        answers_data: answers
-      });
-
-      console.log('RPC Result:', submissionResult);
-      console.log('RPC Error:', submissionError);
-
-      if (submissionError) {
-        console.error('Submission error:', submissionError);
-        throw submissionError;
-      }
-
-      if (submissionResult?.error) {
-        throw new Error(submissionResult.error);
-      }
-
-      // Use the data directly from the RPC function
-      const submissionData = {
-        id: submissionResult.submission_id,
-        total_score: submissionResult.score,
-        percentage_score: submissionResult.percentage,
-        is_passed: submissionResult.passed,
-        submitted_at: new Date().toISOString(),
-        status: 'submitted',
-        attempt_number: submissionResult.attempt_number
-      };
-      
-      console.log('Using submission data:', submissionData);
-      setCurrentQuizSubmission(submissionData);
-
-      // Fetch submission answers
-      await fetchQuizSubmissionAnswers(submissionResult.submission_id);
-
-      setShowQuizResults(true);
-      
-      toast({ title: 'Success', description: 'Quiz submitted successfully!' });
-      
-    } catch (error: any) {
-      console.error('Error submitting quiz:', error);
-      
-      // Handle duplicate key constraint error (student already submitted)
-      if (error.code === '23505' && error.message.includes('duplicate key value violates unique constraint')) {
-        console.log('Student has already submitted this quiz, redirecting to results...');
-        
-        // Check for existing submission and show results
-        const existingSubmission = await checkExistingSubmission(quizData.id);
-        if (existingSubmission) {
-          setCurrentQuizSubmission(existingSubmission);
-          setHasExistingSubmission(true);
-          setShowQuizResults(true);
-          await fetchQuizSubmissionAnswers(existingSubmission.id);
-          
-          toast({ 
-            title: 'Already Submitted', 
-            description: 'You have already submitted this quiz. Showing your results.', 
-            variant: 'default' 
-          });
+        if (quizError || !quizRow) {
+          toast({ title: 'Error', description: 'No quiz found for this post', variant: 'destructive' });
           return;
         }
+
+        const { data: questionsData, error: questionsError } = await supabase
+          .from('quiz_questions')
+          .select('*')
+          .eq('quiz_id', quizRow.id)
+          .order('order_index');
+        if (questionsError) throw questionsError;
+
+        const questionIds = (questionsData || []).map((q) => q.id);
+        const { data: answersData } = await supabase.rpc('get_answers_for_questions', {
+          question_ids_param: questionIds,
+        });
+
+        const { data: matchingData } = await supabase
+          .from('quiz_matching_pairs')
+          .select('*')
+          .in('question_id', questionIds);
+
+        data = [];
+        (questionsData || []).forEach((question) => {
+          const baseRow = {
+            quiz_id: quizRow.id,
+            quiz_title: quizRow.title,
+            quiz_description: quizRow.description,
+            time_limit_minutes: quizRow.time_limit_minutes,
+            show_answers_after: quizRow.show_answers_after,
+            show_marks_immediately: quizRow.show_marks_immediately,
+            passing_score: quizRow.passing_score,
+            max_attempts: quizRow.max_attempts,
+            scheduled_open_at: quizRow.scheduled_open_at,
+            question_id: question.id,
+            question_text: question.question_text,
+            question_type: question.question_type,
+            question_points: question.points,
+            question_order: question.order_index,
+            has_image_attachment: question.has_image_attachment || false,
+            image_url: question.image_url,
+            image_filename: question.image_filename,
+          };
+
+          const questionAnswers = (answersData || []).filter((a: any) => a.question_id === question.id);
+          if (questionAnswers.length > 0) {
+            questionAnswers.forEach((answer: any) => {
+              data!.push({
+                ...baseRow,
+                answer_id: answer.id,
+                answer_text: answer.answer_text,
+                answer_is_correct: false,
+                answer_order: answer.order_index ?? 0,
+              });
+            });
+          } else {
+            const questionMatching = (matchingData || []).filter((m: any) => m.question_id === question.id);
+            if (questionMatching.length > 0) {
+              const rights = questionMatching.map((m: any) => m.right_item);
+              // Scramble rights client-side as defense in depth
+              for (let i = rights.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [rights[i], rights[j]] = [rights[j], rights[i]];
+              }
+              questionMatching.forEach((match: any, idx: number) => {
+                data!.push({
+                  ...baseRow,
+                  matching_left: match.left_item,
+                  matching_right: rights[idx],
+                  matching_order: match.order_index,
+                });
+              });
+            } else {
+              data!.push(baseRow);
+            }
+          }
+        });
+        error = null;
       }
-      
-      toast({ title: 'Error', description: 'Failed to submit quiz', variant: 'destructive' });
+
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        toast({ title: 'Error', description: 'No quiz data found', variant: 'destructive' });
+        return;
+      }
+
+      const quiz = data[0];
+      const questions: any[] = [];
+      const answers: any[] = [];
+      const matchingPairs: any[] = [];
+
+      for (const row of data) {
+        if (row.question_id && !questions.find((q) => q.id === row.question_id)) {
+          questions.push({
+            id: row.question_id,
+            quiz_id: row.quiz_id,
+            question_text: row.question_text,
+            question_type: row.question_type,
+            points: row.question_points,
+            order_index: row.question_order,
+            has_image_attachment: row.has_image_attachment || false,
+            image_url: row.image_url,
+            image_filename: row.image_filename,
+          });
+        }
+
+        if (row.answer_id && !answers.find((a) => a.id === row.answer_id)) {
+          answers.push({
+            id: row.answer_id,
+            question_id: row.question_id,
+            answer_text: row.answer_text,
+            is_correct: false,
+            order_index: row.answer_order,
+          });
+        }
+
+        if (
+          row.matching_left &&
+          !matchingPairs.find(
+            (mp) => mp.left_item === row.matching_left && mp.question_id === row.question_id
+          )
+        ) {
+          matchingPairs.push({
+            question_id: row.question_id,
+            left_item: row.matching_left,
+            right_item: row.matching_right,
+            order_index: row.matching_order,
+          });
+        }
+      }
+
+      const quizScheduledOpenAt = quiz.scheduled_open_at || quiz.quiz_scheduled_open_at;
+      const isScheduled = quizScheduledOpenAt && new Date(quizScheduledOpenAt) > new Date();
+
+      setQuizData({
+        id: quiz.quiz_id,
+        title: quiz.quiz_title,
+        description: quiz.quiz_description,
+        time_limit_minutes: quiz.time_limit_minutes,
+        show_answers_after: quiz.show_answers_after,
+        show_marks_immediately: quiz.show_marks_immediately,
+        passing_score: quiz.passing_score,
+        max_attempts: quiz.max_attempts,
+        scheduled_open_at: quizScheduledOpenAt,
+      });
+
+      if (isScheduled) {
+        toast({
+          title: 'Quiz Not Available',
+          description: `This quiz opens on ${new Date(quizScheduledOpenAt).toLocaleString()}.`,
+          variant: 'destructive',
+        });
+        setQuizQuestions([]);
+        setQuizAnswers([]);
+        setQuizMatchingPairs([]);
+        return;
+      }
+
+      setQuizQuestions(questions);
+      setQuizAnswers(sanitizeAnswers(answers));
+      setQuizMatchingPairs(matchingPairs);
+
+      const existingSubmission = await checkExistingSubmission(quiz.quiz_id);
+      if (existingSubmission) {
+        setCurrentQuizSubmission(existingSubmission);
+        setShowQuizResults(true);
+        await fetchQuizSubmissionAnswers(existingSubmission.id);
+        return;
+      }
+
+      // Resume in-progress attempt if one already exists (does not create a new attempt)
+      if (userId) {
+        const { data: activeResult } = await supabase.rpc('get_active_quiz_attempt', {
+          quiz_id_param: quiz.quiz_id,
+          student_id_param: userId,
+        });
+
+        if (activeResult && !activeResult.error && activeResult.active) {
+          applyAttempt(activeResult as AttemptInfo & { timed_out?: boolean });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading quiz data:', error);
+      toast({ title: 'Error', description: 'Failed to load quiz', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const applyAttempt = (result: AttemptInfo & { timed_out?: boolean; already_started?: boolean }) => {
+    setAttemptInfo({
+      submission_id: result.submission_id,
+      started_at: result.started_at,
+      seconds_remaining: result.seconds_remaining,
+      timed_out: result.timed_out,
+      attempt_number: result.attempt_number,
+    });
+    setAttemptReady(true);
+    setTimerStarted(true);
+    setTimerCompleted(false);
+  };
+
+  const beginAttempt = async () => {
+    if (!quizData) return;
+    setBeginAttemptLoading(true);
+    try {
+      const userId = studentUserId || (await getStudentUserId());
+      if (!userId) {
+        toast({ title: 'Error', description: 'You must be logged in to start the quiz', variant: 'destructive' });
+        return;
+      }
+
+      const { data: result, error } = await supabase.rpc('start_quiz_attempt', {
+        quiz_id_param: quizData.id,
+        student_id_param: userId,
+      });
+
+      if (error) throw error;
+      if (result?.error) {
+        toast({ title: 'Cannot start quiz', description: result.error, variant: 'destructive' });
+        return;
+      }
+
+      applyAttempt(result as AttemptInfo);
+      toast({
+        title: result.already_started ? 'Resuming quiz' : 'Quiz started',
+        description: quizData.time_limit_minutes
+          ? 'Your timer is running. Refreshing will not reset your time.'
+          : 'Your attempt has been recorded.',
+      });
+    } catch (error: any) {
+      console.error('Error starting quiz attempt:', error);
+      toast({
+        title: 'Error',
+        description: error?.message || 'Could not start quiz attempt. Apply the latest database migration if this persists.',
+        variant: 'destructive',
+      });
+    } finally {
+      setBeginAttemptLoading(false);
+    }
+  };
+
+  const submitQuiz = useCallback(
+    async (answers: StudentQuizAnswer[]) => {
+      if (!quizData) return;
+
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          toast({ title: 'Error', description: 'You must be logged in to submit a quiz', variant: 'destructive' });
+          return;
+        }
+
+        const userId = studentUserId || user.id;
+
+        const { data: submissionResult, error: submissionError } = await supabase.rpc(
+          'submit_quiz_complete',
+          {
+            quiz_id_param: quizData.id,
+            student_id_param: userId,
+            answers_data: answers,
+          }
+        );
+
+        if (submissionError) throw submissionError;
+        if (submissionResult?.error) throw new Error(submissionResult.error);
+
+        setTimerCompleted(true);
+        setTimerStarted(false);
+
+        const submissionData = {
+          id: submissionResult.submission_id,
+          total_score: submissionResult.score,
+          percentage_score: submissionResult.percentage,
+          is_passed: submissionResult.passed,
+          submitted_at: new Date().toISOString(),
+          status: 'submitted',
+          attempt_number: submissionResult.attempt_number,
+          time_taken_minutes: submissionResult.time_taken_minutes,
+        };
+
+        setCurrentQuizSubmission(submissionData);
+        await fetchQuizSubmissionAnswers(submissionResult.submission_id);
+        setShowQuizResults(true);
+
+        toast({
+          title: submissionResult.timed_out ? 'Time up — quiz submitted' : 'Success',
+          description: submissionResult.timed_out
+            ? 'Your quiz was submitted because time ran out.'
+            : 'Quiz submitted successfully!',
+          variant: submissionResult.timed_out ? 'destructive' : 'default',
+        });
+      } catch (error: any) {
+        console.error('Error submitting quiz:', error);
+
+        if (error.code === '23505' && error.message?.includes('duplicate key')) {
+          const existingSubmission = await checkExistingSubmission(quizData.id);
+          if (existingSubmission) {
+            setCurrentQuizSubmission(existingSubmission);
+            setShowQuizResults(true);
+            await fetchQuizSubmissionAnswers(existingSubmission.id);
+            toast({
+              title: 'Already Submitted',
+              description: 'You have already submitted this quiz. Showing your results.',
+            });
+            return;
+          }
+        }
+
+        toast({
+          title: 'Error',
+          description: error?.message || 'Failed to submit quiz',
+          variant: 'destructive',
+        });
+      }
+    },
+    [quizData, studentUserId, toast]
+  );
+
+  const handleTimeUp = () => {
+    setTimerCompleted(true);
   };
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Loading quiz...</p>
         </div>
       </div>
@@ -505,7 +467,9 @@ export default function QuizPage() {
         <div className="text-center">
           <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Quiz Not Found</h2>
-          <p className="text-gray-600 mb-4">The quiz you're looking for doesn't exist or you don't have access to it.</p>
+          <p className="text-gray-600 mb-4">
+            The quiz you're looking for doesn't exist or you don't have access to it.
+          </p>
           <Button onClick={() => navigate(-1)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Go Back
@@ -515,9 +479,8 @@ export default function QuizPage() {
     );
   }
 
-  // Check if quiz is scheduled and not yet open
   const isQuizLocked = quizData.scheduled_open_at && new Date(quizData.scheduled_open_at) > new Date();
-  
+
   if (isQuizLocked && quizQuestions.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -526,16 +489,11 @@ export default function QuizPage() {
             <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Clock className="h-8 w-8 text-yellow-600" />
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">🔒 Quiz Not Yet Available</h2>
-            <p className="text-gray-600 mb-4">
-              This quiz is scheduled to open on:
-            </p>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Quiz Not Yet Available</h2>
+            <p className="text-gray-600 mb-4">This quiz is scheduled to open on:</p>
             <Badge variant="outline" className="text-lg px-4 py-2 text-yellow-600 border-yellow-300 bg-yellow-50 mb-6">
               {new Date(quizData.scheduled_open_at).toLocaleString()}
             </Badge>
-            <p className="text-sm text-gray-500 mb-6">
-              Please come back at the scheduled time to start the quiz.
-            </p>
             <Button onClick={() => navigate(-1)} variant="outline">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Classroom
@@ -546,32 +504,24 @@ export default function QuizPage() {
     );
   }
 
+  const goBack = () => {
+    if (window.history.length <= 1) {
+      window.close();
+      setTimeout(() => {
+        if (!window.closed) navigate(-1);
+      }, 100);
+    } else {
+      navigate(-1);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  // Try to close the tab if it was opened as a new tab
-                  if (window.history.length <= 1) {
-                    window.close();
-                    // If window.close() doesn't work (browser security), try to navigate back
-                    setTimeout(() => {
-                      if (!window.closed) {
-                        navigate(-1);
-                      }
-                    }, 100);
-                  } else {
-                    navigate(-1);
-                  }
-                }}
-                className="flex items-center gap-2"
-              >
+              <Button variant="outline" size="sm" onClick={goBack} className="flex items-center gap-2">
                 <ArrowLeft className="h-4 w-4" />
                 Back to Classroom
               </Button>
@@ -597,7 +547,6 @@ export default function QuizPage() {
         </div>
       </div>
 
-      {/* Quiz Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">
         {!showQuizResults ? (
           <QuizTakingInterface
@@ -611,6 +560,10 @@ export default function QuizPage() {
             timerStarted={timerStarted}
             timerCompleted={timerCompleted}
             timeLimitMinutes={quizData.time_limit_minutes}
+            initialSecondsRemaining={attemptInfo?.seconds_remaining}
+            attemptReady={attemptReady}
+            onBeginAttempt={beginAttempt}
+            beginAttemptLoading={beginAttemptLoading}
           />
         ) : (
           <QuizResultsDisplay
@@ -618,7 +571,7 @@ export default function QuizPage() {
               submission: currentQuizSubmission,
               answers: quizSubmissionAnswers,
               questions: quizQuestions,
-              showAnswers: quizData.show_answers_after || false
+              showAnswers: quizData.show_answers_after || false,
             }}
             onRetake={() => {
               setShowQuizResults(false);
@@ -626,22 +579,11 @@ export default function QuizPage() {
               setQuizSubmissionAnswers([]);
               setTimerStarted(false);
               setTimerCompleted(false);
+              setAttemptReady(false);
+              setAttemptInfo(null);
             }}
             canRetake={quizData.max_attempts > 1}
-            onBack={() => {
-              // Try to close the tab if it was opened as a new tab
-              if (window.history.length <= 1) {
-                window.close();
-                // If window.close() doesn't work (browser security), try to navigate back
-                setTimeout(() => {
-                  if (!window.closed) {
-                    navigate(-1);
-                  }
-                }, 100);
-              } else {
-                navigate(-1);
-              }
-            }}
+            onBack={goBack}
           />
         )}
       </div>

@@ -2161,39 +2161,35 @@ export async function generateInvoiceForRegistration(
     throw existingInvoicesError;
   }
 
+  const allExistingInvoices = existingInvoices || [];
   const billableExistingInvoices = filterInvoicesUpToCurrentMonth(
-    existingInvoices || [],
+    allExistingInvoices,
     now,
     ADMIN_BILLING_VISIBILITY
   );
+  // Application fee / "first billable invoice" uses active rows only.
   const isFirstInvoice = billableExistingInvoices.length === 0;
-  const latestInvoice = getLatestInvoiceByPeriodEnd(billableExistingInvoices);
+  const latestBillableInvoice = getLatestInvoiceByPeriodEnd(billableExistingInvoices);
+  // Sequencing includes voided rows so we don't recreate a voided month
+  // (e.g. May paid + June voided → July, not June again).
+  const latestForSequence = getLatestInvoiceByPeriodEnd(
+    allExistingInvoices.filter((inv) => !!inv.period_end)
+  );
   paymentType = fee.payment_type as BillingPaymentType;
 
   const currentMonthInvoice = findInvoiceForCalendarMonth(billableExistingInvoices, student.id, now);
-  const inPreviewWindow = isWithinNextMonthBillingPreviewWindow(now);
-  const nextMonthInvoice = inPreviewWindow
-    ? findInvoiceForCalendarMonth(
-        billableExistingInvoices,
-        student.id,
-        getNextCalendarMonthReference(now)
-      )
-    : undefined;
+  const nextMonthRef = getNextCalendarMonthReference(now);
+  const nextMonthInvoice = findInvoiceForCalendarMonth(
+    billableExistingInvoices,
+    student.id,
+    nextMonthRef
+  );
 
-  if (currentMonthInvoice && !isInvoiceFullyPaid(currentMonthInvoice)) {
+  if (targetPeriod !== 'upcoming' && currentMonthInvoice && !isInvoiceFullyPaid(currentMonthInvoice)) {
     return { existing: currentMonthInvoice as Invoice };
   }
 
-  if (nextMonthInvoice && targetPeriod !== 'upcoming') {
-    return { existing: nextMonthInvoice as Invoice };
-  }
-
-  if (
-    targetPeriod === 'current' &&
-    currentMonthInvoice &&
-    isInvoiceFullyPaid(currentMonthInvoice) &&
-    !inPreviewWindow
-  ) {
+  if (targetPeriod === 'current' && currentMonthInvoice) {
     return { existing: currentMonthInvoice as Invoice };
   }
 
@@ -2201,43 +2197,84 @@ export async function generateInvoiceForRegistration(
     return { existing: nextMonthInvoice as Invoice };
   }
 
-  if (latestInvoice && isInvoiceFullyPaid(latestInvoice)) {
+  if (latestBillableInvoice && isInvoiceFullyPaid(latestBillableInvoice) && !options?.targetPeriod) {
     const nextPeriodCheck = computeNextBillingPeriod({
       paymentType,
       isFirstInvoice: false,
       registrationCreatedAt: registration.created_at,
-      lastPeriodEnd: latestInvoice.period_end,
+      lastPeriodEnd: latestForSequence?.period_end ?? latestBillableInvoice.period_end,
       reference: now,
       billingStartDate,
       allowUpcomingPeriod,
     });
     if (!nextPeriodCheck) {
-      return { existing: latestInvoice as Invoice };
+      return { existing: latestBillableInvoice as Invoice };
     }
   }
 
   console.log('📅 Billing period calculation:', {
     isFirstInvoice,
-    existingInvoicesCount: existingInvoices?.length || 0,
+    existingInvoicesCount: allExistingInvoices.length,
     billableInvoicesCount: billableExistingInvoices.length,
-    latestPeriodEnd: latestInvoice?.period_end ?? null,
+    latestBillablePeriodEnd: latestBillableInvoice?.period_end ?? null,
+    latestCoveredPeriodEnd: latestForSequence?.period_end ?? null,
     currentDate: toLocalDateString(now),
     paymentType,
+    targetPeriod,
   });
 
-  const nextPeriod = computeNextBillingPeriod({
-    paymentType,
-    isFirstInvoice,
-    registrationCreatedAt: registration.created_at,
-    lastPeriodEnd: latestInvoice?.period_end ?? null,
-    reference: now,
-    billingStartDate,
-    allowUpcomingPeriod,
-  });
+  let nextPeriod: { periodStart: Date; periodEnd: Date } | null = null;
+
+  // Bulk/admin generate: force the requested calendar month (current or upcoming).
+  if (options?.targetPeriod === 'current' || options?.targetPeriod === 'upcoming') {
+    const ref = options.targetPeriod === 'upcoming' ? nextMonthRef : now;
+    if (paymentType === 'term') {
+      const periodStart = new Date(ref.getFullYear(), ref.getMonth(), 1);
+      const periodEnd = new Date(periodStart);
+      periodEnd.setMonth(periodEnd.getMonth() + 3);
+      periodEnd.setDate(periodEnd.getDate() - 1);
+      nextPeriod = { periodStart, periodEnd };
+    } else {
+      nextPeriod = {
+        periodStart: new Date(ref.getFullYear(), ref.getMonth(), 1),
+        periodEnd: new Date(ref.getFullYear(), ref.getMonth() + 1, 0),
+      };
+    }
+  } else {
+    nextPeriod = computeNextBillingPeriod({
+      paymentType,
+      // Use covered history (including voids) so the chain advances past voided months.
+      isFirstInvoice: !latestForSequence,
+      registrationCreatedAt: registration.created_at,
+      lastPeriodEnd: latestForSequence?.period_end ?? null,
+      reference: now,
+      billingStartDate,
+      allowUpcomingPeriod,
+    });
+
+    // Catch-up: never create a past-month invoice when we're already in a later month.
+    if (nextPeriod && (paymentType === 'monthly' || paymentType === 'per_class')) {
+      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      while (
+        nextPeriod &&
+        getYearMonthKey(nextPeriod.periodStart) < getYearMonthKey(currentMonthStart)
+      ) {
+        nextPeriod = computeNextBillingPeriod({
+          paymentType,
+          isFirstInvoice: false,
+          registrationCreatedAt: registration.created_at,
+          lastPeriodEnd: toLocalDateString(nextPeriod.periodEnd),
+          reference: now,
+          billingStartDate,
+          allowUpcomingPeriod,
+        });
+      }
+    }
+  }
 
   if (!nextPeriod) {
-    if (latestInvoice) {
-      return { existing: latestInvoice as Invoice };
+    if (latestBillableInvoice) {
+      return { existing: latestBillableInvoice as Invoice };
     }
     return {
       notDue: true,
@@ -2260,24 +2297,24 @@ export async function generateInvoiceForRegistration(
   }
   const dueDateStr = toLocalDateString(dueDateObj);
 
-  // Check for existing invoice for this student/period (temporarily without registration_id)
-  const { data: existingInvoice, error: existingError } = await supabase
-// ... (rest of the code remains the same)
+  // Prefer an active (non-voided) invoice for this period. Multiple voided rows can exist.
+  const { data: periodInvoices, error: existingError } = await supabase
     .from('invoices')
     .select('*')
     .eq('student_id', student.id)
     .eq('period_start', periodStartStr)
     .eq('period_end', periodEndStr)
-    .maybeSingle();
-  
+    .order('created_at', { ascending: false });
+
   if (existingError) {
     console.error('Error checking for existing invoice:', existingError);
     throw existingError;
   }
-  
-  if (existingInvoice && existingInvoice.status !== 'cancelled') {
-    console.log('Existing invoice found:', existingInvoice);
-    return { existing: existingInvoice }; // Already exists, return existing
+
+  const existingInvoice = (periodInvoices || []).find((inv) => inv.status !== 'cancelled');
+  if (existingInvoice) {
+    console.log('Existing active invoice found:', existingInvoice);
+    return { existing: existingInvoice };
   }
 
   // --- Makeup Credits Enforcement Logic ---

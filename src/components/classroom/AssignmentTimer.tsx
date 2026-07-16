@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,10 @@ interface AssignmentTimerProps {
   onStartTimer: () => void;
   isStarted: boolean;
   isCompleted: boolean;
+  /** Server-authoritative remaining seconds (refresh-safe). */
+  initialSecondsRemaining?: number | null;
+  /** Hide manual start when attempt is managed by parent. */
+  hideStartButton?: boolean;
 }
 
 export default function AssignmentTimer({ 
@@ -17,36 +21,60 @@ export default function AssignmentTimer({
   onTimeUp, 
   onStartTimer,
   isStarted,
-  isCompleted 
+  isCompleted,
+  initialSecondsRemaining,
+  hideStartButton = false,
 }: AssignmentTimerProps) {
-  const [timeLeft, setTimeLeft] = useState(timeLimitMinutes * 60); // Convert to seconds
+  const fallbackSeconds = Math.max(0, Math.round((timeLimitMinutes || 0) * 60));
+  const [timeLeft, setTimeLeft] = useState(
+    typeof initialSecondsRemaining === 'number' ? Math.max(0, initialSecondsRemaining) : fallbackSeconds
+  );
   const [isRunning, setIsRunning] = useState(false);
+  const hasFiredTimeUp = useRef(false);
 
-  // Auto-start timer when isStarted becomes true
+  // Sync when server sends a new remaining value (e.g. after refresh/resume)
+  useEffect(() => {
+    if (typeof initialSecondsRemaining === 'number') {
+      setTimeLeft(Math.max(0, initialSecondsRemaining));
+      hasFiredTimeUp.current = false;
+    }
+  }, [initialSecondsRemaining]);
+
   useEffect(() => {
     if (isStarted && !isRunning && !isCompleted) {
       setIsRunning(true);
     }
+    if (isCompleted) {
+      setIsRunning(false);
+    }
   }, [isStarted, isRunning, isCompleted]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (isRunning && timeLeft > 0 && !isCompleted) {
-      interval = setInterval(() => {
-        setTimeLeft((prevTime) => {
-          if (prevTime <= 1) {
-            setIsRunning(false);
-            onTimeUp();
-            return 0;
-          }
-          return prevTime - 1;
-        });
-      }, 1000);
+    if (!isRunning || isCompleted || timeLeft <= 0) {
+      if (isStarted && !isCompleted && timeLeft <= 0 && !hasFiredTimeUp.current) {
+        hasFiredTimeUp.current = true;
+        setIsRunning(false);
+        onTimeUp();
+      }
+      return;
     }
 
+    const interval = setInterval(() => {
+      setTimeLeft((prevTime) => {
+        if (prevTime <= 1) {
+          setIsRunning(false);
+          if (!hasFiredTimeUp.current) {
+            hasFiredTimeUp.current = true;
+            onTimeUp();
+          }
+          return 0;
+        }
+        return prevTime - 1;
+      });
+    }, 1000);
+
     return () => clearInterval(interval);
-  }, [isRunning, timeLeft, onTimeUp, isCompleted]);
+  }, [isRunning, timeLeft, onTimeUp, isCompleted, isStarted]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -61,8 +89,8 @@ export default function AssignmentTimer({
 
   const getTimeColor = () => {
     if (isCompleted) return 'text-green-600';
-    if (timeLeft <= 60) return 'text-red-600'; // Last minute
-    if (timeLeft <= 300) return 'text-orange-600'; // Last 5 minutes
+    if (timeLeft <= 60) return 'text-red-600';
+    if (timeLeft <= 300) return 'text-orange-600';
     return 'text-blue-600';
   };
 
@@ -86,13 +114,14 @@ export default function AssignmentTimer({
       timerStatus === 'critical' ? 'border-red-500 bg-red-50' :
       timerStatus === 'warning' ? 'border-orange-500 bg-orange-50' :
       timerStatus === 'completed' ? 'border-green-500 bg-green-50' :
+      timerStatus === 'expired' ? 'border-red-500 bg-red-50' :
       'border-blue-500 bg-blue-50'
     }`}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-full ${
-              timerStatus === 'critical' ? 'bg-red-100' :
+              timerStatus === 'critical' || timerStatus === 'expired' ? 'bg-red-100' :
               timerStatus === 'warning' ? 'bg-orange-100' :
               timerStatus === 'completed' ? 'bg-green-100' :
               'bg-blue-100'
@@ -101,7 +130,7 @@ export default function AssignmentTimer({
                 <CheckCircle className="h-5 w-5 text-green-600" />
               ) : (
                 <Clock className={`h-5 w-5 ${
-                  timerStatus === 'critical' ? 'text-red-600' :
+                  timerStatus === 'critical' || timerStatus === 'expired' ? 'text-red-600' :
                   timerStatus === 'warning' ? 'text-orange-600' :
                   'text-blue-600'
                 }`} />
@@ -124,6 +153,11 @@ export default function AssignmentTimer({
                     Time Running Low
                   </Badge>
                 )}
+                {timerStatus === 'expired' && (
+                  <Badge variant="destructive">
+                    Time Expired — Submitting
+                  </Badge>
+                )}
                 {timerStatus === 'completed' && (
                   <Badge variant="outline" className="border-green-500 text-green-600">
                     <CheckCircle className="h-3 w-3 mr-1" />
@@ -132,14 +166,14 @@ export default function AssignmentTimer({
                 )}
               </div>
               <p className="text-sm text-gray-600">
-                {timerStatus === 'completed' ? 'Assignment completed successfully' :
+                {timerStatus === 'completed' ? 'Quiz submitted' :
                  timerStatus === 'expired' ? 'Time expired' :
-                 isStarted ? 'Timer running' : 'Click start to begin timed assignment'}
+                 isStarted ? 'Timer running' : 'Click start to begin timed quiz'}
               </p>
             </div>
           </div>
           
-          {!isStarted && !isCompleted && (
+          {!hideStartButton && !isStarted && !isCompleted && (
             <Button 
               onClick={handleStartTimer}
               className="bg-blue-600 hover:bg-blue-700 text-white"
