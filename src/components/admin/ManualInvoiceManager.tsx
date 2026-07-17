@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +9,6 @@ import { Edit, Save, X, AlertTriangle, DollarSign, Plus, Trash2 } from 'lucide-r
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/priceFormatter';
-import { sendInvoiceEmail } from '@/lib/emailService';
 import {
   getEffectiveAmountDue,
   getInvoiceAmountPaid,
@@ -30,6 +28,7 @@ interface Invoice {
   id: string;
   student_id: string;
   amount_due: number;
+  manual_amount_due?: number | null;
   manual_amount_override?: number | null;
   manual_balance?: number | null;
   override_reason?: string | null;
@@ -39,6 +38,7 @@ interface Invoice {
   due_date: string;
   overridden_by?: string | null;
   overridden_at?: string | null;
+  pdf_url?: string | null;
   lessons_summary?: {
     lineItems?: InvoiceLineItem[];
     subtotal?: number;
@@ -63,27 +63,27 @@ interface ManualInvoiceManagerProps {
 export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoiceManagerProps) {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  
-  // Get existing line items from invoice
+
   const getExistingLineItems = (): InvoiceLineItem[] => {
     const items = invoice.lessons_summary?.lineItems || invoice.invoice_details?.lineItems;
     if (items && items.length > 0) {
-      return items.map(item => ({ ...item }));
+      return items.map((item) => ({ ...item }));
     }
-    // Default if no items exist
-    return [{
-      description: 'Classes',
-      quantity: 1,
-      unitPrice: 0,
-      amount: 0
-    }];
+    const effective = getEffectiveAmountDue(invoice);
+    return [
+      {
+        description: 'Classes',
+        quantity: 1,
+        unitPrice: effective,
+        amount: effective,
+      },
+    ];
   };
-  
+
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>(getExistingLineItems());
   const [overrideReason, setOverrideReason] = useState<string>(invoice.override_reason || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Recalculate line item amount when quantity or unitPrice changes
+
   const updateLineItem = (index: number, field: keyof InvoiceLineItem, value: string | number) => {
     const newItems = [...lineItems];
     if (field === 'description') {
@@ -95,32 +95,33 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
     }
     setLineItems(newItems);
   };
-  
+
   const addLineItem = () => {
-    setLineItems([...lineItems, {
-      description: 'New Item',
-      quantity: 1,
-      unitPrice: 0,
-      amount: 0
-    }]);
+    setLineItems([
+      ...lineItems,
+      {
+        description: 'New Item',
+        quantity: 1,
+        unitPrice: 0,
+        amount: 0,
+      },
+    ]);
   };
-  
+
   const removeLineItem = (index: number) => {
     if (lineItems.length === 1) {
       toast({
         title: 'Cannot Remove',
         description: 'Invoice must have at least one line item',
-        variant: 'destructive'
+        variant: 'destructive',
       });
       return;
     }
     setLineItems(lineItems.filter((_, i) => i !== index));
   };
-  
-  const calculateTotal = () => {
-    return lineItems.reduce((sum, item) => sum + item.amount, 0);
-  };
-  
+
+  const calculateTotal = () => lineItems.reduce((sum, item) => sum + item.amount, 0);
+
   const handleSaveOverride = async () => {
     const hasPayments = invoiceHasRecordedPayments(invoice) || isInvoiceFullyPaid(invoice);
     if (hasPayments) {
@@ -130,124 +131,81 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
       if (!confirmed) return;
     }
 
+    const calculatedAmount = calculateTotal();
+
+    if (calculatedAmount <= 0) {
+      toast({
+        title: 'Invalid Amount',
+        description: 'Total amount must be greater than zero',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!overrideReason.trim()) {
+      toast({
+        title: 'Reason Required',
+        description: 'Please provide a reason for the manual override',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       if (!user) {
         throw new Error('No authenticated user');
       }
 
-      const calculatedAmount = calculateTotal();
-
-      if (calculatedAmount < 0) {
-        toast({
-          title: 'Invalid Amount',
-          description: 'Total amount cannot be negative',
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      if (!overrideReason.trim()) {
-        toast({
-          title: 'Reason Required',
-          description: 'Please provide a reason for the manual override',
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      // Build detailed invoice breakdown for storage
       const invoiceDetails = {
-        lineItems: lineItems,
+        lineItems,
         subtotal: calculatedAmount,
-        total: calculatedAmount
+        total: calculatedAmount,
       };
 
-    const { error } = await supabase
-      .from('invoices')
-      .update({
-        amount_due: calculatedAmount, // Update the actual amount
-        lessons_summary: invoiceDetails, // Update breakdown
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', invoice.id);
+      // Write amount_due + manual override fields so Due / balance / PDF all read the new total.
+      // Do NOT email here — Send Invoice is the only email path.
+      const { data: updatedRow, error } = await supabase
+        .from('invoices')
+        .update({
+          amount_due: calculatedAmount,
+          manual_amount_due: calculatedAmount,
+          manual_amount_override: calculatedAmount,
+          lessons_summary: invoiceDetails,
+          override_reason: overrideReason.trim(),
+          overridden_by: user.id,
+          overridden_at: new Date().toISOString(),
+          pdf_url: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', invoice.id)
+        .select('id, amount_due, manual_amount_due, manual_amount_override, lessons_summary')
+        .maybeSingle();
 
       if (error) throw error;
-
-      // Fetch updated invoice with student data to send email
-      const { data: updatedInvoiceData, error: fetchError } = await supabase
-        .from('invoices')
-        .select(`
-          *,
-          students (
-            id,
-            student_name,
-            email
-          )
-        `)
-        .eq('id', invoice.id)
-        .single();
-
-      if (!fetchError && updatedInvoiceData && updatedInvoiceData.students) {
-        // Check if this is the first invoice by checking if student has any other invoices
-        const { data: otherInvoices } = await supabase
-          .from('invoices')
-          .select('id')
-          .eq('student_id', updatedInvoiceData.student_id)
-          .neq('id', invoice.id)
-          .limit(1);
-        
-        const isFirstInvoice = !otherInvoices || otherInvoices.length === 0;
-        
-        // Check if invoice has been paid (for credentials message logic)
-        const effectiveDue =
-          updatedInvoiceData.manual_amount_due ??
-          updatedInvoiceData.manual_amount_override ??
-          updatedInvoiceData.amount_due ??
-          0;
-        const amountPaid = Number(updatedInvoiceData.amount_paid) || 0;
-        const invoicePaid =
-          updatedInvoiceData.payment_status === 'paid' ||
-          updatedInvoiceData.status === 'paid' ||
-          (amountPaid > 0 && amountPaid >= Number(effectiveDue));
-        
-        // Send updated invoice email to student with isUpdated flag
-        // Only show credentials message if it's first invoice AND not paid yet
-        await sendInvoiceEmail(
-          updatedInvoiceData,
-          {
-            id: updatedInvoiceData.students.id,
-            student_name: updatedInvoiceData.students.student_name,
-            email: updatedInvoiceData.students.email
-          },
-          {
-            subject: `Updated Invoice - ${updatedInvoiceData.students.student_name} - Damon Music Academy`,
-            isUpdated: true,
-            isFirstInvoice: isFirstInvoice && !invoicePaid // Only true if first invoice AND not paid
-          }
+      if (!updatedRow) {
+        throw new Error(
+          'Update did not apply. You may not have permission to edit this invoice, or it was removed.'
         );
-        
-        toast({
-          title: 'Success',
-          description: `Invoice updated to ${formatPrice(calculatedAmount)} and email sent to student`
-        });
-      } else {
-        toast({
-          title: 'Success',
-          description: `Invoice updated to ${formatPrice(calculatedAmount)}`
-        });
       }
+
+      toast({
+        title: 'Invoice updated',
+        description: `Amount saved as ${formatPrice(calculatedAmount)}. Use Send Invoice when you are ready to email the student — nothing was emailed.`,
+      });
 
       setIsDialogOpen(false);
       onUpdate();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating invoice:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update invoice',
-        variant: 'destructive'
+        description: error?.message || 'Failed to update invoice',
+        variant: 'destructive',
       });
     } finally {
       setIsSubmitting(false);
@@ -257,23 +215,24 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
   const handleClearOverride = async () => {
     const hasPayments = invoiceHasRecordedPayments(invoice) || isInvoiceFullyPaid(invoice);
     const confirmMessage = hasPayments
-      ? 'This invoice has recorded payments. Restoring the original amount will recalculate the balance and payment status. Continue?'
-      : 'Are you sure you want to restore the original invoice amount?';
+      ? 'This invoice has recorded payments. Clearing the override will recalculate the balance and payment status. Continue?'
+      : 'Clear the manual override? The saved line-item total in amount_due will remain.';
 
     if (!confirm(confirmMessage)) {
       return;
     }
-
-    // Restore from lessons_summary if available
-    const originalTotal = invoice.lessons_summary?.total || 0;
 
     setIsSubmitting(true);
     try {
       const { error } = await supabase
         .from('invoices')
         .update({
-          amount_due: originalTotal,
-          updated_at: new Date().toISOString()
+          manual_amount_due: null,
+          manual_amount_override: null,
+          override_reason: null,
+          overridden_by: null,
+          overridden_at: null,
+          updated_at: new Date().toISOString(),
         })
         .eq('id', invoice.id);
 
@@ -281,16 +240,16 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
 
       toast({
         title: 'Success',
-        description: 'Invoice amount has been restored'
+        description: 'Manual override cleared',
       });
 
       onUpdate();
-    } catch (error) {
-      console.error('Error restoring invoice:', error);
+    } catch (error: any) {
+      console.error('Error clearing override:', error);
       toast({
         title: 'Error',
-        description: 'Failed to restore invoice',
-        variant: 'destructive'
+        description: error?.message || 'Failed to clear override',
+        variant: 'destructive',
       });
     } finally {
       setIsSubmitting(false);
@@ -303,18 +262,10 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
     setIsDialogOpen(true);
   };
 
-  // Get effective amount - prioritize lessons_summary.total, then amount_due
-  const getEffectiveAmount = () => {
-    const fromUtils = getEffectiveAmountDue(invoice);
-    if (fromUtils > 0) return fromUtils;
-    if (invoice.lessons_summary?.total && invoice.lessons_summary.total > 0) {
-      return invoice.lessons_summary.total;
-    }
-    return invoice.amount_due;
-  };
-  
-  const effectiveAmount = getEffectiveAmount();
-  const hasOverride = false;
+  const effectiveAmount = getEffectiveAmountDue(invoice);
+  const hasOverride =
+    (invoice.manual_amount_due !== null && invoice.manual_amount_due !== undefined) ||
+    (invoice.manual_amount_override !== null && invoice.manual_amount_override !== undefined);
   const hasPayments = invoiceHasRecordedPayments(invoice) || isInvoiceFullyPaid(invoice);
 
   return (
@@ -332,13 +283,11 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
               </Badge>
             )}
           </div>
-          {hasOverride && invoice.amount_due !== effectiveAmount && (
-            <div className="text-xs text-gray-500 mt-1">
-              Original: {formatPrice(invoice.amount_due)}
-            </div>
+          {hasOverride && Number(invoice.amount_due) !== effectiveAmount && (
+            <div className="text-xs text-gray-500 mt-1">Base: {formatPrice(invoice.amount_due)}</div>
           )}
         </div>
-        
+
         <Button
           size="sm"
           variant="outline"
@@ -377,15 +326,19 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 sm:p-4 text-xs sm:text-sm text-amber-900">
                 <p className="font-semibold mb-1">Paid invoice correction</p>
                 <p className="leading-relaxed">
-                  This invoice already has payments recorded (KES {getInvoiceAmountPaid(invoice).toLocaleString()} paid).
-                  Saving changes will update the amount due and automatically recalculate the remaining balance and payment status.
+                  This invoice already has payments recorded (KES {getInvoiceAmountPaid(invoice).toLocaleString()}{' '}
+                  paid). Saving changes will update the amount due and recalculate the remaining balance and
+                  payment status.
                 </p>
               </div>
             )}
 
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 sm:p-4 text-xs sm:text-sm text-orange-800">
-              <p className="font-semibold mb-1">⚠️ Important:</p>
-              <p className="leading-relaxed">You're editing the invoice line items. The total will be automatically calculated. Add or remove rows as needed.</p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 text-xs sm:text-sm text-blue-800">
+              <p className="font-semibold mb-1">Save vs Send</p>
+              <p className="leading-relaxed">
+                Saving updates the invoice in admin only. The student is emailed only when you click{' '}
+                <strong>Send Invoice</strong>.
+              </p>
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
@@ -393,24 +346,28 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
                 Student Information
               </Label>
               <div className="space-y-1 text-xs sm:text-sm text-blue-800">
-                <p className="break-words"><strong>Name:</strong> {invoice.students?.student_name || 'N/A'}</p>
-                <p className="break-all"><strong>Email:</strong> {invoice.students?.email || 'N/A'}</p>
-                <p className="text-xs"><strong>Billing period:</strong> {formatInvoiceBillingMonth(invoice) || 'N/A'}</p>
+                <p className="break-words">
+                  <strong>Name:</strong> {invoice.students?.student_name || 'N/A'}
+                </p>
+                <p className="break-all">
+                  <strong>Email:</strong> {invoice.students?.email || 'N/A'}
+                </p>
+                <p className="text-xs">
+                  <strong>Billing period:</strong> {formatInvoiceBillingMonth(invoice) || 'N/A'}
+                </p>
               </div>
             </div>
 
             <div className="bg-gray-100 border border-gray-300 rounded-lg p-3 sm:p-4">
               <Label className="text-xs sm:text-sm font-semibold text-gray-700 mb-2 block">
-                Original Invoice Amount
+                Current Amount Due
               </Label>
-              <div className="text-xl sm:text-2xl font-bold text-gray-900">
-                {formatPrice(invoice.amount_due)}
-              </div>
+              <div className="text-xl sm:text-2xl font-bold text-gray-900">{formatPrice(effectiveAmount)}</div>
             </div>
 
             <div className="border-2 border-blue-300 rounded-lg p-4 bg-blue-50/50 space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="font-semibold text-blue-900 text-base">📋 Invoice Line Items</h3>
+                <h3 className="font-semibold text-blue-900 text-base">Invoice Line Items</h3>
                 <Button
                   type="button"
                   size="sm"
@@ -439,17 +396,17 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <div>
                         <Label className="text-xs">Description</Label>
                         <Input
                           value={item.description}
                           onChange={(e) => updateLineItem(index, 'description', e.target.value)}
-                          placeholder="E.g., Piano Lessons - 2 sessions/week × 4 weeks"
+                          placeholder="E.g., Piano Lessons - 12 sessions"
                         />
                       </div>
-                      
+
                       <div className="grid grid-cols-3 gap-2">
                         <div>
                           <Label className="text-xs">Quantity</Label>
@@ -461,7 +418,7 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
                             onChange={(e) => updateLineItem(index, 'quantity', e.target.value)}
                           />
                         </div>
-                        
+
                         <div>
                           <Label className="text-xs">Unit Price (KES)</Label>
                           <Input
@@ -472,7 +429,7 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
                             onChange={(e) => updateLineItem(index, 'unitPrice', e.target.value)}
                           />
                         </div>
-                        
+
                         <div>
                           <Label className="text-xs">Amount (KES)</Label>
                           <Input
@@ -488,7 +445,6 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
                 ))}
               </div>
 
-              {/* Total Display */}
               <div className="bg-green-50 border-2 border-green-400 rounded-lg p-4">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-900 font-semibold text-lg">TOTAL INVOICE:</span>
@@ -505,7 +461,7 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
                 id="override-reason"
                 value={overrideReason}
                 onChange={(e) => setOverrideReason(e.target.value)}
-                placeholder="E.g., 'Partial month adjustment - joined mid-month', 'Special discount approved', 'Added extra sessions'"
+                placeholder="E.g., 'Changed to 12 sessions', 'Special discount approved'"
                 rows={4}
                 className="resize-none"
               />
@@ -513,7 +469,9 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
 
             {hasOverride && invoice.overridden_at && (
               <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                <p><strong>Last Override:</strong> {new Date(invoice.overridden_at).toLocaleString()}</p>
+                <p>
+                  <strong>Last Override:</strong> {new Date(invoice.overridden_at).toLocaleString()}
+                </p>
               </div>
             )}
           </div>
@@ -528,7 +486,7 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
               Cancel
             </Button>
             <Button
-              onClick={handleSaveOverride}
+              onClick={() => void handleSaveOverride()}
               disabled={isSubmitting}
               className="bg-orange-600 hover:bg-orange-700 w-full sm:w-auto sm:min-w-[140px]"
             >
@@ -537,7 +495,7 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
               ) : (
                 <>
                   <Save className="h-4 w-4 mr-2" />
-                  Save Override
+                  Save Amount
                 </>
               )}
             </Button>
@@ -547,4 +505,3 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
     </>
   );
 }
-
