@@ -167,9 +167,11 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
         total: calculatedAmount,
       };
 
-      // Write amount_due + manual override fields so Due / balance / PDF all read the new total.
-      // Do NOT email here — Send Invoice is the only email path.
-      const { data: updatedRow, error } = await supabase
+      // Prefer full override metadata; fall back if older DBs lack override columns.
+      let updatedRow: Record<string, unknown> | null = null;
+      let error: { message?: string } | null = null;
+
+      const fullUpdate = await supabase
         .from('invoices')
         .update({
           amount_due: calculatedAmount,
@@ -185,6 +187,32 @@ export default function ManualInvoiceManager({ invoice, onUpdate }: ManualInvoic
         .eq('id', invoice.id)
         .select('id, amount_due, manual_amount_due, manual_amount_override, lessons_summary')
         .maybeSingle();
+
+      updatedRow = fullUpdate.data;
+      error = fullUpdate.error;
+
+      const missingColumn =
+        error?.message?.includes('schema cache') ||
+        error?.message?.includes('does not exist') ||
+        error?.message?.includes('overridden_at') ||
+        error?.message?.includes('manual_amount');
+
+      if (error && missingColumn) {
+        const fallbackUpdate = await supabase
+          .from('invoices')
+          .update({
+            amount_due: calculatedAmount,
+            lessons_summary: invoiceDetails,
+            pdf_url: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', invoice.id)
+          .select('id, amount_due, lessons_summary')
+          .maybeSingle();
+
+        updatedRow = fallbackUpdate.data;
+        error = fallbackUpdate.error;
+      }
 
       if (error) throw error;
       if (!updatedRow) {
