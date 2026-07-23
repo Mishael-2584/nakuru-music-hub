@@ -22,11 +22,12 @@ export async function verifyPaynexusSignature(
 ): Promise<boolean> {
   const secret = getPaynexusWebhookSecret();
   if (!secret) {
-    // Fail closed in production if secret missing after configure; allow empty only when explicitly set to "disabled"
     if (Deno.env.get('PAYNEXUS_WEBHOOK_SECRET_OPTIONAL') === 'true') return true;
     return false;
   }
   if (!signature) return false;
+
+  const provided = signature.trim().replace(/^sha256=/i, '').trim();
 
   const key = await crypto.subtle.importKey(
     'raw',
@@ -36,15 +37,24 @@ export async function verifyPaynexusSignature(
     ['sign'],
   );
   const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody));
-  const expected = Array.from(new Uint8Array(mac))
+  const bytes = new Uint8Array(mac);
+  const expectedHex = Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
+  const expectedB64 = btoa(String.fromCharCode(...bytes));
 
-  // Constant-time-ish compare
-  if (expected.length !== signature.length) return false;
+  const candidates = [expectedHex, expectedHex.toUpperCase(), expectedB64];
+  for (const expected of candidates) {
+    if (timingSafeEqual(expected, provided)) return true;
+  }
+  return false;
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
   let diff = 0;
-  for (let i = 0; i < expected.length; i++) {
-    diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   }
   return diff === 0;
 }

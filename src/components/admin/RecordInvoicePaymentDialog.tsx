@@ -31,7 +31,7 @@ import {
   type RecordInvoicePaymentResult,
 } from '@/lib/invoiceUtils';
 import { supabase } from '@/integrations/supabase/client';
-import { fetchPaymentAttempt, initiateMpesaPayment } from '@/lib/paynexusClient';
+import { fetchPaymentAttempt, initiateMpesaPayment, reconcileMpesaPayment } from '@/lib/paynexusClient';
 import { Loader2 } from 'lucide-react';
 
 export interface RecordInvoicePaymentDialogProps {
@@ -124,6 +124,35 @@ const RecordInvoicePaymentDialog: React.FC<RecordInvoicePaymentDialogProps> = ({
     let cancelled = false;
     const poll = async () => {
       try {
+        const reconciled = await reconcileMpesaPayment({ attemptId });
+        if (cancelled) return;
+
+        if (reconciled.success && reconciled.status === 'completed') {
+          setStkPhase('success');
+          setStkMessage(
+            reconciled.mpesa_transaction_id
+              ? `Payment received. M-Pesa receipt: ${reconciled.mpesa_transaction_id}`
+              : 'Payment received and applied to this invoice.',
+          );
+          await onStkSuccess?.({
+            invoiceId: invoice?.id || '',
+            paymentId: reconciled.payment_id,
+            amount: parsedAmount,
+            mpesaReceipt: reconciled.mpesa_transaction_id,
+          });
+          return;
+        }
+
+        if (
+          reconciled.success &&
+          reconciled.status &&
+          ['failed', 'cancelled', 'expired'].includes(reconciled.status)
+        ) {
+          setStkPhase('failed');
+          setStkFailure(reconciled.failure_reason || `Payment ${reconciled.status}`);
+          return;
+        }
+
         const attempt = await fetchPaymentAttempt(attemptId);
         if (cancelled || !attempt) return;
 
@@ -156,11 +185,11 @@ const RecordInvoicePaymentDialog: React.FC<RecordInvoicePaymentDialogProps> = ({
     };
 
     void poll();
-    const timer = window.setInterval(() => void poll(), 3000);
+    const timer = window.setInterval(() => void poll(), 4000);
     const timeout = window.setTimeout(() => {
       if (!cancelled) {
         setStkMessage(
-          'Still waiting. If they paid, the invoice will update shortly — you can close and refresh.',
+          'Still waiting. Use “Check status” if they already paid, or close and refresh finances.',
         );
       }
     }, 90_000);
@@ -170,9 +199,8 @@ const RecordInvoicePaymentDialog: React.FC<RecordInvoicePaymentDialogProps> = ({
       window.clearInterval(timer);
       window.clearTimeout(timeout);
     };
-    // parsedAmount intentionally omitted — use amount from attempt when complete
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, attemptId, stkPhase, onStkSuccess]);
+  }, [open, attemptId, stkPhase, onStkSuccess, invoice?.id]);
 
   const parsedAmount = Math.max(0, Number(paymentAmount) || 0);
 
@@ -338,6 +366,40 @@ const RecordInvoicePaymentDialog: React.FC<RecordInvoicePaymentDialogProps> = ({
             <Loader2 className="h-8 w-8 animate-spin text-green-700" />
             <p className="text-sm font-medium">Waiting for M-Pesa confirmation…</p>
             <p className="text-sm text-muted-foreground max-w-sm">{stkMessage}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                void (async () => {
+                  const reconciled = await reconcileMpesaPayment({ attemptId: attemptId! });
+                  if (reconciled.success && reconciled.status === 'completed') {
+                    setStkPhase('success');
+                    setStkMessage(
+                      reconciled.mpesa_transaction_id
+                        ? `Payment received. M-Pesa receipt: ${reconciled.mpesa_transaction_id}`
+                        : 'Payment received and applied to this invoice.',
+                    );
+                    await onStkSuccess?.({
+                      invoiceId: invoice.id,
+                      paymentId: reconciled.payment_id,
+                      amount: parsedAmount,
+                      mpesaReceipt: reconciled.mpesa_transaction_id,
+                    });
+                  } else if (
+                    reconciled.status &&
+                    ['failed', 'cancelled', 'expired'].includes(reconciled.status)
+                  ) {
+                    setStkPhase('failed');
+                    setStkFailure(reconciled.failure_reason || reconciled.status);
+                  } else {
+                    setStkMessage('Still pending on M-Pesa — ask them to approve the prompt, then check again.');
+                  }
+                })();
+              }}
+            >
+              Check status
+            </Button>
           </div>
         )}
 

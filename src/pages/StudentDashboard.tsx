@@ -4103,9 +4103,12 @@ const StudentDashboard = () => {
                         const remainingAmount = getOutstandingAmount(invoice);
                         
                         return (
-                          <div key={invoice.id} className={`flex items-center justify-between p-4 border rounded-lg ${isPaid ? 'bg-green-50 border-green-200' : 'bg-white'}`}>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
+                          <div
+                            key={invoice.id}
+                            className={`flex flex-col gap-4 p-4 border rounded-lg sm:flex-row sm:items-start sm:justify-between ${isPaid ? 'bg-green-50 border-green-200' : 'bg-white'}`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
                                 <h4 className="font-semibold">Invoice #{invoice.id.slice(0, 8)}</h4>
                                 {isPaid && (
                                   <Badge className="bg-green-100 text-green-800 text-xs">
@@ -4131,14 +4134,15 @@ const StudentDashboard = () => {
                                           {formatCurrency(Number(p.amount) || 0)}
                                           {p.paid_date ? ` · ${p.paid_date}` : ''}
                                           {p.payment_method ? ` · ${p.payment_method}` : ''}
+                                          {p.mpesa_transaction_id ? ` · ${p.mpesa_transaction_id}` : ''}
                                         </li>
                                       ))}
                                   </ul>
                                 </div>
                               )}
                             </div>
-                            <div className="flex items-center space-x-4">
-                              <div className="text-right">
+                            <div className="flex flex-col gap-3 sm:items-end sm:shrink-0 w-full sm:w-auto">
+                              <div className="text-left sm:text-right">
                                 <div className="text-lg font-semibold">{formatCurrency(getEffectiveAmountDue(invoice))}</div>
                                 {getInvoiceAmountPaid(invoice) > 0 && (
                                   <div className="text-sm text-green-600">Paid: {formatCurrency(getInvoiceAmountPaid(invoice))}</div>
@@ -4146,47 +4150,49 @@ const StudentDashboard = () => {
                                 {remainingAmount > 0 && !isPaid && (
                                   <div className="text-sm text-red-600 font-medium">
                                     Remaining: {formatCurrency(remainingAmount)}
-                            </div>
+                                  </div>
                                 )}
-                          </div>
-                              <Badge className={getStatusColor(invoice.payment_status)}>{invoice.payment_status}</Badge>
+                              </div>
+                              <Badge className={`${getStatusColor(invoice.payment_status)} w-fit`}>
+                                {invoice.payment_status}
+                              </Badge>
                               {isPaid ? (
-                                <div className="flex flex-col items-center gap-1">
-                                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                <div className="flex flex-col items-stretch gap-1 w-full sm:w-auto">
+                                  <Badge variant="secondary" className="bg-green-100 text-green-800 justify-center">
                                     ✓ Paid
                                   </Badge>
                                   <Button 
                                     variant="outline" 
                                     size="sm" 
                                     onClick={() => handleViewInvoice(invoice)}
-                                    className="text-xs"
+                                    className="text-xs w-full"
                                   >
                                     View Details
                                   </Button>
                                 </div>
                               ) : (
-                                <div className="flex flex-col gap-2">
+                                <div className="flex flex-col gap-2 w-full sm:w-[200px]">
                                   <Button
                                     size="sm"
                                     onClick={() => handlePayWithMpesa(invoice)}
-                                    className="text-xs bg-green-700 hover:bg-green-800"
+                                    className="text-xs bg-green-700 hover:bg-green-800 w-full"
                                   >
                                     Pay with M-Pesa
                                   </Button>
-                                  <p className="text-xs text-muted-foreground max-w-[180px]">
+                                  <p className="text-xs text-muted-foreground">
                                     Or pay cash at the academy — admin can still record offline payments.
                                   </p>
                                   <Button 
                                     variant="outline" 
                                     size="sm" 
                                     onClick={() => handleViewInvoice(invoice)}
-                                    className="text-xs"
+                                    className="text-xs w-full"
                                   >
                                     View Details
                                   </Button>
                                 </div>
-                      )}
-                    </div>
+                              )}
+                            </div>
                           </div>
                         );
                       })

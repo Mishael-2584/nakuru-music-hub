@@ -46,6 +46,40 @@ export async function initiateMpesaPayment(
   return data as InitiateMpesaPaymentResult;
 }
 
+export async function reconcileMpesaPayment(params: {
+  attemptId?: string;
+  reference?: string;
+}): Promise<{
+  success: boolean;
+  status?: string;
+  pending?: boolean;
+  already_applied?: boolean;
+  payment_id?: string;
+  mpesa_transaction_id?: string | null;
+  failure_reason?: string;
+  error?: string;
+  balance_remaining?: number;
+  payment_status?: string;
+}> {
+  const { data, error } = await supabase.functions.invoke('reconcile-mpesa-payment', {
+    body: {
+      attempt_id: params.attemptId,
+      reference: params.reference,
+    },
+  });
+
+  if (error) {
+    return {
+      success: false,
+      error: (data as any)?.error || error.message || 'Failed to check payment status',
+    };
+  }
+  if ((data as any)?.error) {
+    return { success: false, error: (data as any).error };
+  }
+  return data as any;
+}
+
 export async function ensureInvoicePaymentLink(invoiceId: string, forceNew = false): Promise<{
   success: boolean;
   payment_link_url?: string;

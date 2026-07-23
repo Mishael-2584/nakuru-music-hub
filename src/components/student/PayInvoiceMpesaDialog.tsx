@@ -5,7 +5,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { useToast } from '../../hooks/use-toast';
 import { getInvoiceBalanceRemaining } from '../../lib/invoiceUtils';
-import { fetchPaymentAttempt, initiateMpesaPayment } from '../../lib/paynexusClient';
+import { fetchPaymentAttempt, initiateMpesaPayment, reconcileMpesaPayment } from '../../lib/paynexusClient';
 import { Loader2, Smartphone } from 'lucide-react';
 
 interface PayInvoiceMpesaDialogProps {
@@ -60,8 +60,41 @@ export default function PayInvoiceMpesaDialog({
     if (!open || !attemptId || phase !== 'waiting') return;
 
     let cancelled = false;
+    let ticks = 0;
     const poll = async () => {
       try {
+        ticks += 1;
+        // Every poll after the first: ask PayNexus directly (webhook may be delayed/missing).
+        if (ticks >= 1) {
+          const reconciled = await reconcileMpesaPayment({ attemptId });
+          if (cancelled) return;
+
+          if (reconciled.success && reconciled.status === 'completed') {
+            setPhase('success');
+            setStatusMessage(
+              reconciled.mpesa_transaction_id
+                ? `Payment received. M-Pesa receipt: ${reconciled.mpesa_transaction_id}`
+                : 'Payment received successfully.',
+            );
+            toast({
+              title: 'Payment successful',
+              description: 'Your invoice has been updated.',
+            });
+            onPaymentComplete?.();
+            return;
+          }
+
+          if (
+            reconciled.success &&
+            reconciled.status &&
+            ['failed', 'cancelled', 'expired'].includes(reconciled.status)
+          ) {
+            setPhase('failed');
+            setFailureReason(reconciled.failure_reason || `Payment ${reconciled.status}`);
+            return;
+          }
+        }
+
         const attempt = await fetchPaymentAttempt(attemptId);
         if (cancelled || !attempt) return;
 
@@ -93,11 +126,11 @@ export default function PayInvoiceMpesaDialog({
     };
 
     void poll();
-    const timer = window.setInterval(() => void poll(), 3000);
+    const timer = window.setInterval(() => void poll(), 4000);
     const timeout = window.setTimeout(() => {
       if (!cancelled) {
         setStatusMessage(
-          'Still waiting for confirmation. If you paid, this page will update shortly — or refresh in a minute.',
+          'Still confirming with M-Pesa. If you already paid, tap Refresh below or reopen invoices in a minute.',
         );
       }
     }, 90000);
@@ -208,6 +241,38 @@ export default function PayInvoiceMpesaDialog({
             <Loader2 className="h-8 w-8 animate-spin text-green-700" />
             <p className="text-sm font-medium">Waiting for M-Pesa…</p>
             <p className="text-sm text-muted-foreground max-w-sm">{statusMessage}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                void (async () => {
+                  const reconciled = await reconcileMpesaPayment({ attemptId: attemptId! });
+                  if (reconciled.success && reconciled.status === 'completed') {
+                    setPhase('success');
+                    setStatusMessage(
+                      reconciled.mpesa_transaction_id
+                        ? `Payment received. M-Pesa receipt: ${reconciled.mpesa_transaction_id}`
+                        : 'Payment received successfully.',
+                    );
+                    onPaymentComplete?.();
+                  } else if (
+                    reconciled.status &&
+                    ['failed', 'cancelled', 'expired'].includes(reconciled.status)
+                  ) {
+                    setPhase('failed');
+                    setFailureReason(reconciled.failure_reason || reconciled.status);
+                  } else {
+                    toast({
+                      title: 'Still pending',
+                      description: 'M-Pesa has not confirmed yet. Try again in a few seconds.',
+                    });
+                  }
+                })();
+              }}
+            >
+              Check payment status
+            </Button>
           </div>
         )}
 
