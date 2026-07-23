@@ -20,6 +20,7 @@ import { LessonCalendar, LessonEvent } from '../components/LessonCalendar';
 import { calculateStudentInvoice, InvoiceCalculationResult, ensureInvoicePDF, openInvoicePdfWithName, getEffectiveAmountDue, getInvoiceAmountPaid, getInvoiceBalanceRemaining, hasOutstandingBalance, isInvoiceFullyPaid, filterInvoicesUpToCurrentMonth, formatInvoiceBillingMonth, type InvoicePaymentRow } from '../lib/invoiceUtils';
 import { Invoice } from '../integrations/supabase/types';
 import VideoConferenceModal from '../components/VideoConferenceModal';
+import PayInvoiceMpesaDialog from '../components/student/PayInvoiceMpesaDialog';
 import { MeetingRoom, getUserMeetingRooms, getMeetingRoomByBooking, getMeetingDuration, getUserInvitedMeetings, joinMeetingByCode, joinInstantMeetingRoom, joinMeetingRoom, joinBookingOnlineMeeting, openMeetingLink, InstantMeeting } from '../lib/videoConferencing';
 import MessagingUI from '../components/MessagingUI';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
@@ -351,6 +352,8 @@ const StudentDashboard = () => {
   const [accessLockReason, setAccessLockReason] = useState<string | null>(null);
   const [accountCreditBalance, setAccountCreditBalance] = useState(0);
   const [invoicePayments, setInvoicePayments] = useState<InvoicePaymentRow[]>([]);
+  const [mpesaPayInvoice, setMpesaPayInvoice] = useState<any | null>(null);
+  const [mpesaPayOpen, setMpesaPayOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -2638,72 +2641,15 @@ const StudentDashboard = () => {
     }
   };
 
-  const handlePayment = async (invoice: any) => {
-    try {
-      // First, check the current live status of the invoice
-      const { data: currentInvoice, error: statusError } = await supabase
-        .from('invoices')
-        .select('status, amount_due, amount_paid')
-        .eq('id', invoice.id)
-        .single();
+  const handlePayWithMpesa = (invoice: any) => {
+    setMpesaPayInvoice(invoice);
+    setMpesaPayOpen(true);
+  };
 
-      if (statusError) {
-        console.error('Error checking invoice status:', statusError);
-        toast({
-          title: "Error",
-          description: "Failed to verify invoice status. Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Check if invoice is already paid
-      if (currentInvoice.status === 'paid') {
-        toast({
-          title: "Already Paid",
-          description: "This invoice has already been paid. Refreshing status...",
-        });
-        await refreshInvoiceStatus();
-        return;
-      }
-
-      // Check if invoice is fully paid but status not updated
-      if (currentInvoice.status === 'paid') {
-        toast({
-          title: "Payment Complete",
-          description: "This invoice appears to be fully paid. Refreshing status...",
-        });
-        await refreshInvoiceStatus();
-        return;
-      }
-
-      toast({
-        title: "Payment Processing",
-        description: "Redirecting to payment gateway...",
-      });
-      
-      // TODO: Implement actual payment processing
-      // This would typically redirect to a payment gateway like M-Pesa, PayPal, etc.
-      console.log('Processing payment for invoice:', invoice.id);
-      
-      // For now, simulate payment processing
-      setTimeout(async () => {
-        // After payment is processed, refresh the invoice status
-        await refreshInvoiceStatus();
-        
-        toast({
-          title: "Payment Successful",
-          description: "Your payment has been processed successfully.",
-        });
-      }, 2000);
-      
-    } catch (error) {
-      console.error('Payment error:', error);
-      toast({
-        title: "Payment Error",
-        description: "Failed to process payment. Please try again.",
-        variant: "destructive",
-      });
+  const handleMpesaPaymentComplete = async () => {
+    await refreshInvoiceStatus();
+    if (studentProfile?.id) {
+      await fetchInvoices(studentProfile.id);
     }
   };
 
@@ -4220,8 +4166,15 @@ const StudentDashboard = () => {
                                 </div>
                               ) : (
                                 <div className="flex flex-col gap-2">
-                                  <p className="text-xs text-muted-foreground max-w-[160px]">
-                                    Pay via M-Pesa or cash at the academy. Admin will record your payment here.
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handlePayWithMpesa(invoice)}
+                                    className="text-xs bg-green-700 hover:bg-green-800"
+                                  >
+                                    Pay with M-Pesa
+                                  </Button>
+                                  <p className="text-xs text-muted-foreground max-w-[180px]">
+                                    Or pay cash at the academy — admin can still record offline payments.
                                   </p>
                                   <Button 
                                     variant="outline" 
@@ -4946,6 +4899,14 @@ const StudentDashboard = () => {
         userName={studentProfile?.student_name || 'Student'}
         userRole="student"
         currentUserId={studentProfile?.user_id}
+      />
+
+      <PayInvoiceMpesaDialog
+        open={mpesaPayOpen}
+        onOpenChange={setMpesaPayOpen}
+        invoice={mpesaPayInvoice}
+        defaultPhone={studentProfile?.phone || ''}
+        onPaymentComplete={() => void handleMpesaPaymentComplete()}
       />
 
       {/* Booking Modal */}

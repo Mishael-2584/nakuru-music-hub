@@ -1018,6 +1018,46 @@ export const sendInvoiceEmail = async (
       console.error('❌ Missing required fields for invoice email', { invoice, student });
       return false;
     }
+
+    // Create / reuse PayNexus hosted checkout link for email Pay Now.
+    let paymentLinkUrl: string | null =
+      invoice.payment_link_url &&
+      invoice.payment_link_expires_at &&
+      new Date(invoice.payment_link_expires_at).getTime() > Date.now()
+        ? invoice.payment_link_url
+        : null;
+
+    if (invoice.id && (!paymentLinkUrl || options.isUpdated || options.isReminder)) {
+      try {
+        const { ensureInvoicePaymentLink } = await import('./paynexusClient');
+        const linkResult = await ensureInvoicePaymentLink(
+          invoice.id,
+          Boolean(options.isUpdated || options.isReminder),
+        );
+        if (linkResult.success && linkResult.payment_link_url) {
+          paymentLinkUrl = linkResult.payment_link_url;
+          invoice.payment_link_url = paymentLinkUrl;
+        } else if (linkResult.error) {
+          console.warn('Payment link not added to invoice email:', linkResult.error);
+        }
+      } catch (linkErr) {
+        console.warn('Payment link creation failed (email will still send):', linkErr);
+      }
+    }
+
+    const payNowBlock = paymentLinkUrl
+      ? `<div style="margin: 24px 0; text-align: center;">
+           <p style="margin-bottom: 12px;"><strong>Pay securely with M-Pesa:</strong></p>
+           <a href="${paymentLinkUrl}"
+              style="display:inline-block;background:#15803d;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:6px;font-weight:600;">
+             Pay Now with M-Pesa
+           </a>
+           <p style="margin-top: 10px; font-size: 12px; color: #666;">
+             Or open your Student Portal and use <strong>Pay with M-Pesa</strong> for an STK prompt on your phone.
+           </p>
+           <p style="font-size: 12px; color: #666;">Link: <a href="${paymentLinkUrl}">${paymentLinkUrl}</a></p>
+         </div>`
+      : `<p style="margin: 16px 0;">You can also pay from your Student Portal using <strong>Pay with M-Pesa</strong>, or pay cash at the academy.</p>`;
     
     // Build invoiceMeta for PDF generation
     const billingMonth = formatInvoiceBillingMonth(invoice);
@@ -1108,6 +1148,7 @@ export const sendInvoiceEmail = async (
         body = `<p>Dear ${student.student_name},</p>
          <p>This is a friendly reminder that your invoice for the current period is pending.</p>
          <p><strong>${paymentNote}</strong></p>
+         ${payNowBlock}
          <p>Please find the attached invoice PDF for payment details.</p>
          <p>If you have already paid, please disregard this message.</p>`;
       } else if (options.isUpdated && options.isFirstInvoice && !invoicePaid) {
@@ -1117,6 +1158,7 @@ export const sendInvoiceEmail = async (
          <p><strong>⚠️ IMPORTANT:</strong> Please disregard any previous invoice you may have received. This is the correct and current invoice.</p>
          <p><strong>${paymentNote}</strong></p>
          <p><strong>Updated Amount:</strong> KES ${invoice.amount_due.toLocaleString()}</p>
+         ${payNowBlock}
          <p><strong>📧 Student Portal Access:</strong> You will receive your student portal login credentials <strong>only after your first invoice payment has been received and confirmed</strong>. Please ensure timely payment to gain access to your portal where you can book classes, view your schedule, track your progress, and access learning materials.</p>
          <p>Please use this updated invoice for payment. If you have already paid using the previous invoice, please contact us immediately.</p>
          <p>If you have any questions about this update, please contact us.</p>`;
@@ -1127,6 +1169,7 @@ export const sendInvoiceEmail = async (
          <p><strong>⚠️ IMPORTANT:</strong> Please disregard any previous invoice you may have received. This is the correct and current invoice.</p>
          <p><strong>${paymentNote}</strong></p>
          <p><strong>Updated Amount:</strong> KES ${invoice.amount_due.toLocaleString()}</p>
+         ${payNowBlock}
          <p>Please use this updated invoice for payment. If you have already paid using the previous invoice, please contact us immediately.</p>
          <p>If you have any questions about this update, please contact us.</p>`;
       } else if (options.isFirstInvoice && !invoicePaid) {
@@ -1134,6 +1177,7 @@ export const sendInvoiceEmail = async (
         body = `<p>Dear ${student.student_name},</p>
          <p>Welcome to Damon Music Academy! Please find attached your first invoice.</p>
          <p><strong>${paymentNote}</strong></p>
+         ${payNowBlock}
          <p><strong>📧 Student Portal Access:</strong> You will receive your student portal login credentials <strong>only after your first invoice payment has been received and confirmed</strong>. Please ensure timely payment to gain access to your portal where you can book classes, view your schedule, track your progress, and access learning materials.</p>
          <p>If you have any questions, please contact us.</p>`;
       } else {
@@ -1141,8 +1185,11 @@ export const sendInvoiceEmail = async (
         body = `<p>Dear ${student.student_name},</p>
          <p>Please find attached your invoice for the current period.</p>
          <p><strong>${paymentNote}</strong></p>
+         ${payNowBlock}
          <p>If you have any questions, please contact us.</p>`;
       }
+    } else if (paymentLinkUrl && !String(body).includes(paymentLinkUrl)) {
+      body = `${body}${payNowBlock}`;
     }
     // Send email using the same pattern as working emails
     const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
@@ -1171,8 +1218,6 @@ export const sendInvoiceEmail = async (
       console.error('❌ Failed to send invoice email:', data?.message);
       return false;
     }
-    console.log('✅ Invoice email sent successfully', { invoice, student, options });
-    return true;
   } catch (error) {
     console.error('❌ Error in sendInvoiceEmail:', error);
     return false;
