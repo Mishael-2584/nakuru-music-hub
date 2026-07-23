@@ -2791,6 +2791,90 @@ const AdminPanel = () => {
     }
   };
 
+  const handleStkPaymentSuccess = async (info: {
+    invoiceId: string;
+    paymentId?: string | null;
+    amount: number;
+    mpesaReceipt?: string | null;
+  }) => {
+    try {
+      const { data: invoiceData } = await supabase
+        .from('invoices')
+        .select('*, students(*)')
+        .eq('id', info.invoiceId)
+        .single();
+
+      const studentRow = invoiceData?.students;
+      toast({
+        title: 'M-Pesa payment received',
+        description: [
+          `KES ${info.amount.toLocaleString()} applied`,
+          info.mpesaReceipt ? `Receipt ${info.mpesaReceipt}` : null,
+          invoiceData?.payment_status === 'paid' ? 'Invoice fully paid' : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      });
+
+      // First full payment may still need portal user creation (webhook only emails a receipt).
+      if (invoiceData?.payment_status === 'paid' && studentRow?.id && studentRow?.registration_id) {
+        const { data: allInvs } = await supabase
+          .from('invoices')
+          .select('id, created_at')
+          .eq('student_id', studentRow.id)
+          .order('created_at', { ascending: true });
+        const isFirstInvoice = !!allInvs?.length && allInvs[0].id === info.invoiceId;
+        if (isFirstInvoice) {
+          try {
+            const { data: registration } = await supabase
+              .from('registrations')
+              .select('*')
+              .eq('id', studentRow.registration_id)
+              .single();
+            if (registration) {
+              const { data: userData } = await supabase.functions.invoke('create-student-user', {
+                body: {
+                  email: registration.email,
+                  student_name: registration.student_name,
+                  action: 'get_password',
+                },
+              });
+              if (userData?.tempPassword) {
+                await sendPaymentConfirmationEmail(registration, userData.tempPassword, true, {
+                  invoice: invoiceData,
+                  student: studentRow,
+                  isFirstInvoice: true,
+                });
+              }
+            }
+          } catch (credErr) {
+            console.warn('First-invoice portal credentials after STK:', credErr);
+          }
+        }
+      }
+
+      await refreshStudentInvoices();
+      setInvoicePaymentsRefreshKey((k) => k + 1);
+      if (invoiceData) {
+        if (paymentsDialogInvoice?.id === info.invoiceId) setPaymentsDialogInvoice(invoiceData);
+        if (selectedHistoryInvoice?.id === info.invoiceId) setSelectedHistoryInvoice(invoiceData);
+        if (paymentDialogInvoice?.id === info.invoiceId) setPaymentDialogInvoice(invoiceData);
+      }
+      if (invoiceHistoryStudent) {
+        await fetchInvoiceHistory(invoiceHistoryStudent.id);
+      }
+      fetchData();
+    } catch (error) {
+      console.error('handleStkPaymentSuccess:', error);
+      toast({
+        title: 'Payment received',
+        description: 'M-Pesa succeeded; refresh if the invoice list looks stale.',
+      });
+      await refreshStudentInvoices();
+      setInvoicePaymentsRefreshKey((k) => k + 1);
+    }
+  };
+
   // Handler to view invoice details
   const handleViewInvoice = (invoice: any) => {
     setSelectedInvoice(invoice);
@@ -6836,9 +6920,11 @@ const AdminPanel = () => {
           invoice={paymentDialogInvoice}
           studentName={paymentDialogStudent?.student_name}
           studentId={paymentDialogStudent?.id}
+          studentPhone={paymentDialogStudent?.phone}
           registrationId={paymentDialogStudent?.registration_id}
           recordedBy={user?.id ?? undefined}
           onSuccess={handlePaymentRecorded}
+          onStkSuccess={handleStkPaymentSuccess}
         />
 
         {/* Delete Classroom Modal */}
