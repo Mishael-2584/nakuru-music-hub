@@ -162,9 +162,14 @@ export async function createCheckoutSession(params: {
     };
   }
 
+  const data = (raw as any)?.data || {};
   return {
     success: Boolean((raw as any)?.success ?? true),
-    data: (raw as any)?.data,
+    data: {
+      session_id: data.session_id,
+      checkout_url: data.checkout_url,
+      expires_at: data.expires_at,
+    },
     message: (raw as any)?.message,
     raw,
   };

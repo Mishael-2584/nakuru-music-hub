@@ -1019,21 +1019,12 @@ export const sendInvoiceEmail = async (
       return false;
     }
 
-    // Create / reuse PayNexus hosted checkout link for email Pay Now.
-    let paymentLinkUrl: string | null =
-      invoice.payment_link_url &&
-      invoice.payment_link_expires_at &&
-      new Date(invoice.payment_link_expires_at).getTime() > Date.now()
-        ? invoice.payment_link_url
-        : null;
-
-    if (invoice.id && (!paymentLinkUrl || options.isUpdated || options.isReminder)) {
+    // Always mint a fresh PayNexus checkout link for emails — sessions expire quickly.
+    let paymentLinkUrl: string | null = null;
+    if (invoice.id) {
       try {
         const { ensureInvoicePaymentLink } = await import('./paynexusClient');
-        const linkResult = await ensureInvoicePaymentLink(
-          invoice.id,
-          Boolean(options.isUpdated || options.isReminder),
-        );
+        const linkResult = await ensureInvoicePaymentLink(invoice.id, true);
         if (linkResult.success && linkResult.payment_link_url) {
           paymentLinkUrl = linkResult.payment_link_url;
           invoice.payment_link_url = paymentLinkUrl;
@@ -1053,11 +1044,11 @@ export const sendInvoiceEmail = async (
              Pay Now with M-Pesa
            </a>
            <p style="margin-top: 10px; font-size: 12px; color: #666;">
-             Or open your Student Portal and use <strong>Pay with M-Pesa</strong> for an STK prompt on your phone.
+             This link is for this invoice only and may expire — if it does not work, open your Student Portal and use <strong>Pay with M-Pesa</strong>, or ask the academy to resend the invoice.
            </p>
            <p style="font-size: 12px; color: #666;">Link: <a href="${paymentLinkUrl}">${paymentLinkUrl}</a></p>
          </div>`
-      : `<p style="margin: 16px 0;">You can also pay from your Student Portal using <strong>Pay with M-Pesa</strong>, or pay cash at the academy.</p>`;
+      : `<p style="margin: 16px 0;">You can pay from your Student Portal using <strong>Pay with M-Pesa</strong>, or pay cash at the academy.</p>`;
     
     // Build invoiceMeta for PDF generation
     const billingMonth = formatInvoiceBillingMonth(invoice);

@@ -44,6 +44,7 @@ export async function applyCompletedPaynexusPayment(
         status: 'completed',
         mpesa_transaction_id: params.mpesaTx,
         payment_id: ledgerResult?.payment_id ?? null,
+        paynexus_reference: params.reference || undefined,
         raw_webhook: params.payload,
         completed_at: new Date().toISOString(),
         failure_reason: null,

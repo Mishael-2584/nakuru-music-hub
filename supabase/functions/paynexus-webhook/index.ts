@@ -53,22 +53,46 @@ serve(async (req) => {
     const reference = data.reference as string | undefined;
     const checkoutId = data.checkout_request_id as string | undefined;
     const accountRef = (data.account_reference || data.merchant_reference || '') as string;
-    const sessionId = data.session_id as string | undefined;
+    const sessionId = (data.session_id || data.checkout_session_id || '') as string;
+    const description = String(data.description || '');
 
     let attempt: any = null;
-    if (reference || checkoutId) {
-      let attemptQuery = admin.from('payment_attempts').select('*');
-      if (reference) {
-        attemptQuery = attemptQuery.eq('paynexus_reference', reference);
-      } else {
-        attemptQuery = attemptQuery.eq('checkout_request_id', checkoutId!);
+
+    // 1) STK attempts keyed by PayNexus payment reference
+    if (reference) {
+      const { data: byRef, error: byRefErr } = await admin
+        .from('payment_attempts')
+        .select('*')
+        .eq('paynexus_reference', reference)
+        .maybeSingle();
+      if (byRefErr) {
+        console.error('Attempt lookup by reference error:', byRefErr);
+        return json({ error: byRefErr.message }, 500);
       }
-      const { data: found, error: attemptError } = await attemptQuery.maybeSingle();
-      if (attemptError) {
-        console.error('Attempt lookup error:', attemptError);
-        return json({ error: attemptError.message }, 500);
-      }
-      attempt = found;
+      attempt = byRef;
+    }
+
+    // 2) Email checkout attempts keyed by session id (stored in checkout_request_id)
+    if (!attempt && sessionId) {
+      const { data: bySession } = await admin
+        .from('payment_attempts')
+        .select('*')
+        .eq('checkout_request_id', sessionId)
+        .in('status', ['initiated', 'processing'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      attempt = bySession;
+    }
+
+    // 3) STK checkout_request_id (ws_CO_...)
+    if (!attempt && checkoutId) {
+      const { data: byCheckout } = await admin
+        .from('payment_attempts')
+        .select('*')
+        .eq('checkout_request_id', checkoutId)
+        .maybeSingle();
+      attempt = byCheckout;
     }
 
     // If signature is bad, only continue when we already have a pending attempt we know about.
@@ -91,20 +115,49 @@ serve(async (req) => {
       const fromRef =
         parseInvoiceIdFromReference(accountRef) ||
         parseInvoiceIdFromReference(reference) ||
+        parseInvoiceIdFromReference(description) ||
         null;
 
       if (fromRef) {
         invoiceId = fromRef;
-      } else if (accountRef || sessionId) {
-        let invQuery = admin.from('invoices').select('id, payment_status, status');
+      } else {
+        // Match stored invoice payment-link metadata
         if (accountRef) {
-          invQuery = invQuery.eq('payment_link_reference', accountRef);
-        } else {
-          invQuery = invQuery.eq('payment_link_session_id', sessionId!);
+          const { data: inv } = await admin
+            .from('invoices')
+            .select('id')
+            .eq('payment_link_reference', accountRef)
+            .maybeSingle();
+          invoiceId = inv?.id || null;
         }
-        const { data: inv } = await invQuery.maybeSingle();
-        invoiceId = inv?.id || null;
+        if (!invoiceId && sessionId) {
+          const { data: inv } = await admin
+            .from('invoices')
+            .select('id')
+            .eq('payment_link_session_id', sessionId)
+            .maybeSingle();
+          invoiceId = inv?.id || null;
+        }
+        // Last resort: description may contain dma-invoice:uuid without being the whole string
+        if (!invoiceId && description) {
+          const m = description.match(/dma-invoice:([0-9a-f-]{36})/i);
+          if (m?.[1]) invoiceId = m[1];
+        }
       }
+    }
+
+    // If we resolved invoice via link metadata but have no attempt, attach latest email-checkout attempt
+    if (invoiceId && !attempt) {
+      const { data: linkAttempt } = await admin
+        .from('payment_attempts')
+        .select('*')
+        .eq('invoice_id', invoiceId)
+        .eq('phone', 'email-checkout')
+        .in('status', ['initiated', 'processing'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      attempt = linkAttempt;
     }
 
     if (!invoiceId) {
@@ -113,6 +166,7 @@ serve(async (req) => {
         checkoutId,
         accountRef,
         sessionId,
+        description,
         event,
       });
       return json({ ResultCode: 0, ResultDesc: 'Unknown payment — ignored' });

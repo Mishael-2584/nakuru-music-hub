@@ -34,6 +34,23 @@ serve(async (req) => {
       });
     }
 
+    if (body.action === 'create-checkout') {
+      const { createCheckoutSession, invoicePaymentReference } = await import('../_shared/paynexus.ts');
+      const invoiceId = body.invoice_id || '00000000-0000-0000-0000-000000000000';
+      const amount = Math.max(1, Math.round(Number(body.amount) || 10));
+      const result = await createCheckoutSession({
+        amount,
+        description: `${invoicePaymentReference(invoiceId)} · DMA email-link smoke test`,
+        reference: invoicePaymentReference(invoiceId),
+        returnUrl: 'https://damonmusicacademy.co.ke/auth?payment=success',
+        cancelUrl: 'https://damonmusicacademy.co.ke/auth?payment=cancelled',
+      });
+      return new Response(JSON.stringify({ amount, ...result }), {
+        status: result.success ? 200 : 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (body.action === 'backfill' && body.reference) {
       const supabaseUrl = Deno.env.get('SUPABASE_URL');
       const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');

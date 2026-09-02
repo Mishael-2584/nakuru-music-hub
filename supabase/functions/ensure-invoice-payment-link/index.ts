@@ -115,10 +115,12 @@ serve(async (req) => {
 
     const periodLabel = formatPeriod(invoice.period_end || invoice.period_start);
     const reference = invoicePaymentReference(invoiceId);
-    const description = `DMA ${periodLabel || 'invoice'} · ${studentRow?.student_name || 'Student'}`.slice(
-      0,
-      100,
-    );
+    // Embed invoice id in description too — PayNexus often leaves account_reference null.
+    const description =
+      `${reference} · DMA ${periodLabel || 'invoice'} · ${studentRow?.student_name || 'Student'}`.slice(
+        0,
+        100,
+      );
 
     const session = await createCheckoutSession({
       amount: balance,
@@ -135,7 +137,11 @@ serve(async (req) => {
       );
     }
 
-    const linkExpires = session.data.expires_at || null;
+    // Default expiry window if PayNexus omits expires_at (keep reuse logic honest).
+    const linkExpires =
+      session.data.expires_at ||
+      new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
     const { error: updateError } = await admin
       .from('invoices')
       .update({
@@ -151,6 +157,30 @@ serve(async (req) => {
     if (updateError) {
       return json({ error: updateError.message, checkout_url: session.data.checkout_url }, 500);
     }
+
+    // Track email-checkout attempts so webhooks/reconcile can attach payments without account_reference.
+    await admin
+      .from('payment_attempts')
+      .update({
+        status: 'expired',
+        failure_reason: 'Superseded by a new payment link',
+      })
+      .eq('invoice_id', invoiceId)
+      .in('status', ['initiated', 'processing'])
+      .eq('phone', 'email-checkout');
+
+    await admin.from('payment_attempts').insert({
+      invoice_id: invoiceId,
+      student_id: invoice.student_id,
+      amount: balance,
+      phone: 'email-checkout',
+      description,
+      status: 'initiated',
+      checkout_request_id: session.data.session_id,
+      paynexus_reference: null,
+      initiated_by: user.id,
+      raw_response: session.raw ?? null,
+    });
 
     return json({
       success: true,
