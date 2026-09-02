@@ -1044,7 +1044,7 @@ export const sendInvoiceEmail = async (
              Pay Now with M-Pesa
            </a>
            <p style="margin-top: 10px; font-size: 12px; color: #666;">
-             This link is for this invoice only and may expire — if it does not work, open your Student Portal and use <strong>Pay with M-Pesa</strong>, or ask the academy to resend the invoice.
+             Opens Damon Music Academy’s secure pay page. Enter your M-Pesa number and approve the prompt on your phone.
            </p>
            <p style="font-size: 12px; color: #666;">Link: <a href="${paymentLinkUrl}">${paymentLinkUrl}</a></p>
          </div>`

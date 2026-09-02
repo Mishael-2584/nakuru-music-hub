@@ -2,10 +2,8 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
-import {
-  createCheckoutSession,
-  invoicePaymentReference,
-} from '../_shared/paynexus.ts';
+import { buildAcademyPayUrl } from '../_shared/payLink.ts';
+import { invoicePaymentReference } from '../_shared/paynexus.ts';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -89,8 +87,10 @@ serve(async (req) => {
     const expiresAt = invoice.payment_link_expires_at
       ? new Date(invoice.payment_link_expires_at).getTime()
       : 0;
+    const isAcademyPayLink = String(invoice.payment_link_url || '').includes('/pay?');
     const stillValid =
       !forceNew &&
+      isAcademyPayLink &&
       invoice.payment_link_url &&
       Number(invoice.payment_link_amount) === balance &&
       expiresAt > Date.now() + 60_000;
@@ -115,50 +115,36 @@ serve(async (req) => {
 
     const periodLabel = formatPeriod(invoice.period_end || invoice.period_start);
     const reference = invoicePaymentReference(invoiceId);
-    // Embed invoice id in description too — PayNexus often leaves account_reference null.
     const description =
       `${reference} · DMA ${periodLabel || 'invoice'} · ${studentRow?.student_name || 'Student'}`.slice(
         0,
         100,
       );
 
-    const session = await createCheckoutSession({
+    // PayNexus hosted /checkout/s/{session} currently returns HTTP 500.
+    // Email Pay Now uses our academy /pay page + working STK Push instead.
+    const academyPay = await buildAcademyPayUrl({
+      invoiceId,
       amount: balance,
-      description,
-      reference,
-      returnUrl: 'https://damonmusicacademy.co.ke/auth?payment=success',
-      cancelUrl: 'https://damonmusicacademy.co.ke/auth?payment=cancelled',
+      ttlSeconds: 7 * 24 * 60 * 60,
     });
-
-    if (!session.success || !session.data?.checkout_url) {
-      return json(
-        { error: session.error || 'Failed to create PayNexus payment link', raw: session.raw },
-        502,
-      );
-    }
-
-    // Default expiry window if PayNexus omits expires_at (keep reuse logic honest).
-    const linkExpires =
-      session.data.expires_at ||
-      new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     const { error: updateError } = await admin
       .from('invoices')
       .update({
-        payment_link_url: session.data.checkout_url,
-        payment_link_session_id: session.data.session_id,
+        payment_link_url: academyPay.url,
+        payment_link_session_id: `paylink_${academyPay.expUnix}`,
         payment_link_reference: reference,
         payment_link_amount: balance,
-        payment_link_expires_at: linkExpires,
+        payment_link_expires_at: academyPay.expiresAtIso,
         updated_at: new Date().toISOString(),
       })
       .eq('id', invoiceId);
 
     if (updateError) {
-      return json({ error: updateError.message, checkout_url: session.data.checkout_url }, 500);
+      return json({ error: updateError.message, checkout_url: academyPay.url }, 500);
     }
 
-    // Track email-checkout attempts so webhooks/reconcile can attach payments without account_reference.
     await admin
       .from('payment_attempts')
       .update({
@@ -176,20 +162,25 @@ serve(async (req) => {
       phone: 'email-checkout',
       description,
       status: 'initiated',
-      checkout_request_id: session.data.session_id,
+      checkout_request_id: `paylink_${academyPay.expUnix}`,
       paynexus_reference: null,
       initiated_by: user.id,
-      raw_response: session.raw ?? null,
+      raw_response: {
+        mode: 'academy_pay_page',
+        url: academyPay.url,
+        note: 'PayNexus hosted checkout page returns 500; using academy /pay + STK',
+      },
     });
 
     return json({
       success: true,
       reused: false,
-      payment_link_url: session.data.checkout_url,
-      payment_link_session_id: session.data.session_id,
+      payment_link_url: academyPay.url,
+      payment_link_session_id: `paylink_${academyPay.expUnix}`,
       payment_link_reference: reference,
-      payment_link_expires_at: linkExpires,
+      payment_link_expires_at: academyPay.expiresAtIso,
       amount: balance,
+      mode: 'academy_stk',
     });
   } catch (error) {
     console.error('ensure-invoice-payment-link:', error);

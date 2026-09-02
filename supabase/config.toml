@@ -3,3 +3,7 @@ project_id = "xtjarscgxhbyktwriahu"
 # PayNexus sends unsigned JWTs; verify HMAC signature inside the function instead.
 [functions.paynexus-webhook]
 verify_jwt = false
+
+# Public email pay page (signed link); no user JWT.
+[functions.public-invoice-mpesa]
+verify_jwt = false

@@ -14,6 +14,7 @@ import FeesPage from "./pages/Fees";
 import Gallery from "./pages/Gallery";
 import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
+import PayInvoicePublic from "./pages/PayInvoicePublic";
 import Events from "./pages/Events";
 import EventDetail from "./pages/EventDetail";
 import News from "./pages/News";
@@ -101,6 +102,7 @@ const App = () => (
             <Route path="/news/:slug" element={<NewsDetail />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/pay" element={<PayInvoicePublic />} />
             <Route path="/registration" element={<RegistrationPage />} />
             <Route path="/email-debug" element={<EmailDebug />} />
             <Route path="/student" element={<StudentDashboard />} />
