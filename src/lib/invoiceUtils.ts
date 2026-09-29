@@ -886,13 +886,31 @@ function getBillableInvoicesForStudent<T extends { student_id: string; period_st
   );
 }
 
+/** Voided (cancelled) invoice rows for the student that overlap the reference month. */
+function hasVoidedInvoiceForMonth<T extends { student_id: string; period_start: string; period_end: string; status?: string | null }>(
+  voidedInvoices: T[],
+  studentId: string,
+  reference: Date
+): boolean {
+  return voidedInvoices.some(
+    (inv) =>
+      inv.student_id === studentId &&
+      inv.status === 'cancelled' &&
+      invoiceOverlapsCalendarMonth(inv, reference)
+  );
+}
+
 /** Why a student cannot receive a bulk-generated current-period invoice, or null if eligible. */
 export function getCurrentPeriodGenerationSkipReason<
   T extends { student_id: string; period_start: string; period_end: string; status?: string | null } & InvoicePaymentFields
->(invoices: T[], studentId: string, reference = new Date()): string | null {
+>(invoices: T[], studentId: string, reference = new Date(), voidedInvoices: T[] = []): string | null {
   const billable = getBillableInvoicesForStudent(invoices, studentId, reference);
   const current = findInvoiceForCalendarMonth(billable, studentId, reference);
   if (current) return 'Current month invoice already exists';
+
+  if (hasVoidedInvoiceForMonth(voidedInvoices, studentId, reference)) {
+    return 'Current month was voided (skipped month)';
+  }
 
   const latest = getLatestBillableInvoiceForStudent(billable, studentId, reference, ADMIN_BILLING_VISIBILITY);
   if (latest && !isInvoiceFullyPaid(latest)) {
@@ -903,20 +921,32 @@ export function getCurrentPeriodGenerationSkipReason<
 
 export function studentEligibleForCurrentPeriodGeneration<
   T extends { student_id: string; period_start: string; period_end: string; status?: string | null } & InvoicePaymentFields
->(invoices: T[], studentId: string, reference = new Date()): boolean {
-  return getCurrentPeriodGenerationSkipReason(invoices, studentId, reference) === null;
+>(invoices: T[], studentId: string, reference = new Date(), voidedInvoices: T[] = []): boolean {
+  return getCurrentPeriodGenerationSkipReason(invoices, studentId, reference, voidedInvoices) === null;
 }
 
 /** Why a student cannot receive a bulk-generated upcoming-period invoice, or null if eligible. */
 export function getUpcomingInvoiceGenerationSkipReason<
   T extends { student_id: string; period_start: string; period_end: string; status?: string | null } & InvoicePaymentFields
->(invoices: T[], studentId: string, reference = new Date()): string | null {
+>(invoices: T[], studentId: string, reference = new Date(), voidedInvoices: T[] = []): string | null {
   const billable = getBillableInvoicesForStudent(invoices, studentId, reference);
   const current = findInvoiceForCalendarMonth(billable, studentId, reference);
   if (!current) {
-    return 'No invoice for the current billing month yet';
-  }
-  if (!isInvoiceFullyPaid(current)) {
+    // A voided current month counts as skipped: the last real invoice before it must be fully paid.
+    if (!hasVoidedInvoiceForMonth(voidedInvoices, studentId, reference)) {
+      return 'No invoice for the current billing month yet';
+    }
+    const currentMonthStart = new Date(reference.getFullYear(), reference.getMonth(), 1);
+    const previous = sortInvoicesByPeriodEndDesc(
+      billable.filter((inv) => parseLocalDateString(inv.period_end) < currentMonthStart)
+    )[0];
+    if (!previous) {
+      return 'Current month was voided and there is no paid invoice before it';
+    }
+    if (!isInvoiceFullyPaid(previous)) {
+      return 'Previous invoice still has an outstanding balance';
+    }
+  } else if (!isInvoiceFullyPaid(current)) {
     return 'Current month still has an outstanding balance';
   }
 
@@ -934,8 +964,8 @@ export function getUpcomingInvoiceGenerationSkipReason<
 
 export function studentEligibleForUpcomingInvoiceGeneration<
   T extends { student_id: string; period_start: string; period_end: string; status?: string | null } & InvoicePaymentFields
->(invoices: T[], studentId: string, reference = new Date()): boolean {
-  return getUpcomingInvoiceGenerationSkipReason(invoices, studentId, reference) === null;
+>(invoices: T[], studentId: string, reference = new Date(), voidedInvoices: T[] = []): boolean {
+  return getUpcomingInvoiceGenerationSkipReason(invoices, studentId, reference, voidedInvoices) === null;
 }
 
 /**
@@ -948,7 +978,8 @@ export async function generateBillingPeriodInvoices<
   students: Array<{ id: string; registration_id?: string | null; student_name?: string | null }>,
   invoices: T[],
   period: 'current' | 'upcoming',
-  reference = new Date()
+  reference = new Date(),
+  voidedInvoices: T[] = []
 ): Promise<BulkPeriodInvoiceGenerationResult> {
   const result: BulkPeriodInvoiceGenerationResult = {
     created: 0,
@@ -963,7 +994,7 @@ export async function generateBillingPeriodInvoices<
 
   for (const student of students) {
     const studentName = student.student_name || student.id;
-    const skipReason = skipReasonFn(workingInvoices, student.id, reference);
+    const skipReason = skipReasonFn(workingInvoices, student.id, reference, voidedInvoices);
     if (skipReason) {
       result.skipped++;
       result.details.push({ studentId: student.id, studentName, outcome: 'skipped', reason: skipReason });
@@ -2482,9 +2513,10 @@ export async function generateInvoiceForRegistration(
     // For subsequent invoices, check if student enrolled mid-month in the first month
     const registrationDate = new Date(registration.created_at);
     const firstMonthStart = new Date(registrationDate.getFullYear(), registrationDate.getMonth(), 1);
+    const isEnrollmentMonthPeriod = getYearMonthKey(periodStart) === getYearMonthKey(firstMonthStart);
     
-    // If student enrolled after the 1st of their enrollment month, calculate partial billing
-    if (registrationDate.getDate() > 1) {
+    // Only the enrollment month is prorated; later months are billed in full.
+    if (isEnrollmentMonthPeriod && registrationDate.getDate() > 1) {
       const daysBeforeEnrollment = registrationDate.getDate() - 1;
       const sessionsBeforeEnrollment = Math.ceil((daysBeforeEnrollment / 7) * sessionsPerWeek);
       const deductionAmount = sessionsBeforeEnrollment * unitPrice;

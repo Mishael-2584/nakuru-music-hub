@@ -163,6 +163,7 @@ const AdminPanel = () => {
   const [invoicePDFUrl, setInvoicePDFUrl] = useState<string | null>(null);
   const [studentInvoices, setStudentInvoices] = useState<Record<string, any>>({});
   const [allStudentInvoices, setAllStudentInvoices] = useState<any[]>([]);
+  const [voidedStudentInvoices, setVoidedStudentInvoices] = useState<any[]>([]);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -2587,6 +2588,7 @@ const AdminPanel = () => {
       const validStudentIds = activeStudents.filter(s => isValidId(s.id)).map(s => s.id);
       if (validStudentIds.length === 0) {
         setAllStudentInvoices([]);
+        setVoidedStudentInvoices([]);
         setStudentInvoices({});
         return;
       }
@@ -2600,6 +2602,7 @@ const AdminPanel = () => {
 
       const billableInvoices = filterInvoicesUpToCurrentMonth(data, undefined, ADMIN_BILLING_VISIBILITY);
       setAllStudentInvoices(billableInvoices);
+      setVoidedStudentInvoices(data.filter((inv) => inv.status === 'cancelled'));
       const period = getCalendarMonthPeriod();
       const currentPeriod: Record<string, any> = {};
       for (const studentId of validStudentIds) {
@@ -2623,6 +2626,7 @@ const AdminPanel = () => {
     if (!data) return;
     const billableInvoices = filterInvoicesUpToCurrentMonth(data, undefined, ADMIN_BILLING_VISIBILITY);
     setAllStudentInvoices(billableInvoices);
+    setVoidedStudentInvoices(data.filter((inv) => inv.status === 'cancelled'));
     const period = getCalendarMonthPeriod();
     const currentPeriod: Record<string, any> = {};
     for (const studentId of validStudentIds) {
@@ -3181,16 +3185,16 @@ const AdminPanel = () => {
   const studentsEligibleForCurrentGeneration = useMemo(
     () =>
       activeStudents.filter((student) =>
-        studentEligibleForCurrentPeriodGeneration(allStudentInvoices, student.id)
+        studentEligibleForCurrentPeriodGeneration(allStudentInvoices, student.id, undefined, voidedStudentInvoices)
       ),
-    [activeStudents, allStudentInvoices]
+    [activeStudents, allStudentInvoices, voidedStudentInvoices]
   );
   const studentsEligibleForUpcomingGeneration = useMemo(
     () =>
       activeStudents.filter((student) =>
-        studentEligibleForUpcomingInvoiceGeneration(allStudentInvoices, student.id)
+        studentEligibleForUpcomingInvoiceGeneration(allStudentInvoices, student.id, undefined, voidedStudentInvoices)
       ),
-    [activeStudents, allStudentInvoices]
+    [activeStudents, allStudentInvoices, voidedStudentInvoices]
   );
 
   const handleGenerateAllCurrentInvoices = async () => {
@@ -3207,7 +3211,9 @@ const AdminPanel = () => {
       const result: BulkPeriodInvoiceGenerationResult = await generateBillingPeriodInvoices(
         activeStudents,
         allStudentInvoices,
-        'current'
+        'current',
+        undefined,
+        voidedStudentInvoices
       );
       await refreshStudentInvoices();
       toast({
@@ -3239,7 +3245,9 @@ const AdminPanel = () => {
       const result: BulkPeriodInvoiceGenerationResult = await generateBillingPeriodInvoices(
         activeStudents,
         allStudentInvoices,
-        'upcoming'
+        'upcoming',
+        undefined,
+        voidedStudentInvoices
       );
       await refreshStudentInvoices();
       toast({
@@ -3448,6 +3456,7 @@ const AdminPanel = () => {
         if (!error && data) {
           const billableInvoices = filterInvoicesUpToCurrentMonth(data, undefined, ADMIN_BILLING_VISIBILITY);
           setAllStudentInvoices(billableInvoices);
+          setVoidedStudentInvoices(data.filter((inv) => inv.status === 'cancelled'));
           const period = getCalendarMonthPeriod();
           const currentPeriod: Record<string, any> = {};
           for (const studentId of validStudentIds) {
@@ -6443,6 +6452,7 @@ const AdminPanel = () => {
                                       if (data) {
                                         const billableInvoices = filterInvoicesUpToCurrentMonth(data, undefined, ADMIN_BILLING_VISIBILITY);
                                         setAllStudentInvoices(billableInvoices);
+                                        setVoidedStudentInvoices(data.filter((inv) => inv.status === 'cancelled'));
                                         const p = getCalendarMonthPeriod();
                                         const currentPeriod: Record<string, any> = {};
                                         for (const studentId of validStudentIds) {
@@ -6832,6 +6842,7 @@ const AdminPanel = () => {
                                   ADMIN_BILLING_VISIBILITY
                                 );
                                 setAllStudentInvoices(billableInvoices);
+                                setVoidedStudentInvoices(allInv.filter((inv) => inv.status === 'cancelled'));
                                 const p = getCalendarMonthPeriod();
                                 const currentPeriod: Record<string, any> = {};
                                 for (const studentId of validStudentIds) {

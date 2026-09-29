@@ -801,9 +801,12 @@ async function generateInvoicesForRegistration(registration, fee, student, summa
     if (!isFirstInvoice && fee.payment_type === 'monthly' && courseCategory !== 'Technology' && courseCategory !== 'Languages') {
       // For subsequent invoices, check if student enrolled mid-month in the first month
       const registrationDate = new Date(registration.created_at);
-      
-      // If student enrolled after the 1st of their enrollment month, calculate partial billing
-      if (registrationDate.getDate() > 1) {
+      const isEnrollmentMonthPeriod =
+        period.periodStart.getFullYear() === registrationDate.getFullYear() &&
+        period.periodStart.getMonth() === registrationDate.getMonth();
+
+      // Only the enrollment month is prorated; later months are billed in full.
+      if (isEnrollmentMonthPeriod && registrationDate.getDate() > 1) {
         const daysBeforeEnrollment = registrationDate.getDate() - 1;
         const sessionsPerWeek = registration.sessions_per_week || 1;
         const sessionsBeforeEnrollment = Math.ceil((daysBeforeEnrollment / 7) * sessionsPerWeek);
